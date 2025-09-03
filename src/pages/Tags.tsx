@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,10 +34,12 @@ export default function Tags() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isManageMunicipesDialogOpen, setIsManageMunicipesDialogOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<any>(null);
   const [newTagName, setNewTagName] = useState("");
   const [newTagDescription, setNewTagDescription] = useState("");
   const [newTagColor, setNewTagColor] = useState(colorOptions[0]);
+  const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>([]);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,6 +84,40 @@ export default function Tags() {
       console.log('✅ Tags processadas:', tagsWithCounts);
       return tagsWithCounts;
     }
+  });
+
+  // Buscar todos os munícipes
+  const { data: allMunicipes = [] } = useQuery({
+    queryKey: ['all-municipes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('id, nome, email')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Buscar munícipes da tag selecionada
+  const { data: tagMunicipes = [] } = useQuery({
+    queryKey: ['tag-municipes', selectedTag?.id],
+    queryFn: async () => {
+      if (!selectedTag?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('municipe_tags')
+        .select(`
+          municipe_id,
+          municipes!inner(id, nome, email)
+        `)
+        .eq('tag_id', selectedTag.id);
+      
+      if (error) throw error;
+      return data.map(item => item.municipes);
+    },
+    enabled: !!selectedTag?.id
   });
 
   console.log('🏷️ Estado atual - tags:', tags, 'loading:', isLoading, 'error:', error);
@@ -191,6 +229,66 @@ export default function Tags() {
     onError: (error) => {
       toast({
         title: "Erro ao excluir tag",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutações para gerenciar munícipes nas tags
+  const addMunicipesToTagMutation = useMutation({
+    mutationFn: async ({ tagId, municipeIds }: { tagId: string; municipeIds: string[] }) => {
+      const inserts = municipeIds.map(municipeId => ({
+        tag_id: tagId,
+        municipe_id: municipeId
+      }));
+
+      const { error } = await supabase
+        .from('municipe_tags')
+        .insert(inserts);
+
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Munícipes adicionados com sucesso!",
+        description: "Os munícipes foram associados à tag."
+      });
+      queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['tag-municipes'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao adicionar munícipes",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const removeMunicipeFromTagMutation = useMutation({
+    mutationFn: async ({ tagId, municipeId }: { tagId: string; municipeId: string }) => {
+      const { error } = await supabase
+        .from('municipe_tags')
+        .delete()
+        .eq('tag_id', tagId)
+        .eq('municipe_id', municipeId);
+
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Munícipe removido com sucesso!",
+        description: "O munícipe foi removido da tag."
+      });
+      queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['tag-municipes'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao remover munícipe",
         description: error.message,
         variant: "destructive"
       });
@@ -444,11 +542,18 @@ export default function Tags() {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                    <DropdownMenuItem onClick={() => handleEditTag(tag)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
+                   <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                     <DropdownMenuItem onClick={() => {
+                       setSelectedTag(tag);
+                       setIsManageMunicipesDialogOpen(true);
+                     }}>
+                       <Settings className="h-4 w-4 mr-2" />
+                       Gerenciar Munícipes
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                       <Edit className="h-4 w-4 mr-2" />
+                       Editar
+                     </DropdownMenuItem>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -591,6 +696,129 @@ export default function Tags() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Gestão de Munícipes */}
+      <Dialog open={isManageMunicipesDialogOpen} onOpenChange={setIsManageMunicipesDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: selectedTag?.cor }}
+              />
+              Gerenciar Munícipes - {selectedTag?.nome}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[500px]">
+            {/* Munícipes já associados à tag */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <h3 className="font-semibold">Munícipes na Tag ({tagMunicipes.length})</h3>
+              </div>
+              
+              <ScrollArea className="h-[400px] border rounded-lg p-2">
+                {tagMunicipes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum munícipe associado a esta tag
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {tagMunicipes.map((municipe: any) => (
+                      <div key={municipe.id} className="flex items-center justify-between p-2 border rounded">
+                        <div>
+                          <p className="font-medium">{municipe.nome}</p>
+                          <p className="text-sm text-muted-foreground">{municipe.email}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removeMunicipeFromTagMutation.mutate({
+                            tagId: selectedTag?.id,
+                            municipeId: municipe.id
+                          })}
+                          disabled={removeMunicipeFromTagMutation.isPending}
+                        >
+                          <Trash className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Munícipes disponíveis para adicionar */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                <h3 className="font-semibold">Adicionar Munícipes</h3>
+              </div>
+              
+              <ScrollArea className="h-[400px] border rounded-lg p-2">
+                {allMunicipes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum munícipe disponível
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {allMunicipes
+                      .filter((municipe: any) => !tagMunicipes.some((tm: any) => tm.id === municipe.id))
+                      .map((municipe: any) => (
+                        <div key={municipe.id} className="flex items-center gap-3 p-2 border rounded">
+                          <Checkbox
+                            checked={selectedMunicipes.includes(municipe.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedMunicipes([...selectedMunicipes, municipe.id]);
+                              } else {
+                                setSelectedMunicipes(selectedMunicipes.filter(id => id !== municipe.id));
+                              }
+                            }}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium">{municipe.nome}</p>
+                            <p className="text-sm text-muted-foreground">{municipe.email}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </ScrollArea>
+              
+              {selectedMunicipes.length > 0 && (
+                <Button
+                  onClick={() => {
+                    addMunicipesToTagMutation.mutate({
+                      tagId: selectedTag?.id,
+                      municipeIds: selectedMunicipes
+                    });
+                    setSelectedMunicipes([]);
+                  }}
+                  disabled={addMunicipesToTagMutation.isPending}
+                  className="w-full"
+                >
+                  {addMunicipesToTagMutation.isPending ? "Adicionando..." : `Adicionar ${selectedMunicipes.length} munícipe(s)`}
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsManageMunicipesDialogOpen(false);
+                setSelectedMunicipes([]);
+                setSelectedTag(null);
+              }}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
