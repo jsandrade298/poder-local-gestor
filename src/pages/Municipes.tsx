@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,15 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Municipes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Buscar munícipes com suas tags
   const { data: municipes = [], isLoading } = useQuery({
@@ -116,6 +120,214 @@ export default function Municipes() {
     setCidadeFilter("all");
   };
 
+  // Função para exportar CSV
+  const exportToCSV = () => {
+    const headers = [
+      'Nome',
+      'Telefone', 
+      'Email',
+      'Data de Nascimento',
+      'Endereço',
+      'Bairro',
+      'Cidade',
+      'CEP',
+      'Observações'
+    ];
+
+    const csvData = filteredMunicipes.map(municipe => [
+      municipe.nome || '',
+      municipe.telefone || '',
+      municipe.email || '',
+      municipe.data_nascimento ? formatDateOnly(municipe.data_nascimento) : '',
+      municipe.endereco || '',
+      municipe.bairro || '',
+      municipe.cidade || '',
+      municipe.cep || '',
+      municipe.observacoes || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => 
+        row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `municipes_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "CSV exportado com sucesso!",
+      description: `${filteredMunicipes.length} munícipes exportados.`
+    });
+  };
+
+  // Função para processar CSV importado
+  const importMunicipes = useMutation({
+    mutationFn: async (municipes: any[]) => {
+      const results = [];
+      
+      for (const municipe of municipes) {
+        try {
+          const { data, error } = await supabase
+            .from('municipes')
+            .insert({
+              nome: municipe.nome,
+              telefone: municipe.telefone || null,
+              email: municipe.email || null,
+              endereco: municipe.endereco || null,
+              bairro: municipe.bairro || null,
+              cidade: municipe.cidade || 'São Paulo',
+              cep: municipe.cep || null,
+              data_nascimento: municipe.data_nascimento || null,
+              observacoes: municipe.observacoes || null
+            })
+            .select('id')
+            .single();
+
+          if (error) {
+            results.push({ success: false, nome: municipe.nome, error: error.message });
+          } else {
+            results.push({ success: true, nome: municipe.nome, id: data.id });
+          }
+        } catch (err) {
+          results.push({ success: false, nome: municipe.nome, error: 'Erro inesperado' });
+        }
+      }
+      
+      return results;
+    },
+    onSuccess: (results) => {
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+      
+      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      
+      toast({
+        title: "Importação concluída!",
+        description: `${successCount} munícipes importados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro na importação",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Função para processar arquivo CSV
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Arquivo inválido",
+        description: "Por favor, selecione um arquivo CSV.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string;
+        const lines = csv.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast({
+            title: "Arquivo vazio",
+            description: "O arquivo CSV está vazio ou não possui dados válidos.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Processar header
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        
+        // Mapear colunas esperadas
+        const expectedColumns = {
+          nome: ['nome', 'nome completo', 'name'],
+          telefone: ['telefone', 'phone', 'celular'],
+          email: ['email', 'e-mail', 'mail'],
+          endereco: ['endereco', 'endereço', 'address', 'rua'],
+          bairro: ['bairro', 'neighborhood'],
+          cidade: ['cidade', 'city'],
+          cep: ['cep', 'zip', 'zipcode'],
+          data_nascimento: ['data_nascimento', 'data de nascimento', 'nascimento', 'birth_date'],
+          observacoes: ['observacoes', 'observações', 'notes', 'obs']
+        };
+
+        // Processar dados
+        const municipes = lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.replace(/"/g, '').trim());
+          const municipe: any = {};
+
+          Object.keys(expectedColumns).forEach(key => {
+            const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
+            const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
+            
+            if (headerIndex !== -1 && values[headerIndex]) {
+              if (key === 'data_nascimento') {
+                // Tentar converter data
+                const dateValue = values[headerIndex];
+                if (dateValue && dateValue !== '') {
+                  try {
+                    const date = new Date(dateValue);
+                    if (!isNaN(date.getTime())) {
+                      municipe[key] = date.toISOString().split('T')[0];
+                    }
+                  } catch {
+                    // Ignorar datas inválidas
+                  }
+                }
+              } else {
+                municipe[key] = values[headerIndex];
+              }
+            }
+          });
+
+          return municipe;
+        }).filter(m => m.nome && m.nome.trim() !== ''); // Só importar se tiver nome
+
+        if (municipes.length === 0) {
+          toast({
+            title: "Nenhum dado válido",
+            description: "Não foram encontrados munícipes válidos no arquivo. Certifique-se de que há uma coluna 'nome'.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        importMunicipes.mutate(municipes);
+      } catch (error) {
+        toast({
+          title: "Erro ao processar arquivo",
+          description: "Erro ao ler o arquivo CSV. Verifique se o formato está correto.",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    reader.readAsText(file, 'UTF-8');
+    
+    // Limpar input para permitir re-upload do mesmo arquivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
       <div className="container mx-auto px-4 py-6 space-y-6">
@@ -131,11 +343,27 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleFileImport}
+              className="hidden"
+            />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importMunicipes.isPending}
+            >
               <Upload className="h-4 w-4 mr-2" />
-              Importar CSV
+              {importMunicipes.isPending ? 'Importando...' : 'Importar CSV'}
             </Button>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={exportToCSV}
+            >
               <Download className="h-4 w-4 mr-2" />
               Exportar CSV
             </Button>
@@ -242,39 +470,13 @@ export default function Municipes() {
         </Card>
 
         {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="shadow-sm border-0 bg-card">
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Total de Munícipes</p>
                   <p className="text-2xl font-bold text-foreground">{municipes.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="shadow-sm border-0 bg-card">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Com Email</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {municipes.filter(m => m.email).length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-0 bg-card">
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Com Telefone</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {municipes.filter(m => m.telefone).length}
-                  </p>
                 </div>
               </div>
             </CardContent>
