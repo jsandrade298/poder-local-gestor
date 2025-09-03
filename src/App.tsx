@@ -17,31 +17,35 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthLayout>
+const App = () => {
+  console.log('App está renderizando...');
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="min-h-screen bg-background">
+          <h1 className="text-2xl p-4">Sistema de Gestão - Debug</h1>
+          <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/demandas" element={<Demandas />} />
-              <Route path="/municipes" element={<Municipes />} />
-              <Route path="/tags" element={<Tags />} />
-              <Route path="/areas" element={<Areas />} />
-              <Route path="/usuarios" element={<Usuarios />} />
-              <Route path="/config" element={<Configuracoes />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="/" element={
+                <div className="p-4">
+                  <h2>Página Principal</h2>
+                  <p>Se você está vendo isso, o App está funcionando!</p>
+                  <a href="/login" className="text-blue-500 underline">
+                    Ir para Login
+                  </a>
+                </div>
+              } />
+              <Route path="*" element={<div className="p-4">Página não encontrada</div>} />
             </Routes>
-          </AuthLayout>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+          </BrowserRouter>
+        </div>
+        <Toaster />
+        <Sonner />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
