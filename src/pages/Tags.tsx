@@ -123,19 +123,17 @@ export default function Tags() {
   // Mutação para atualizar tag
   const updateTagMutation = useMutation({
     mutationFn: async (tagData: { id: string; nome: string; descricao?: string; cor: string }) => {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('tags')
         .update({
           nome: tagData.nome,
           cor: tagData.cor,
           ...(tagData.descricao !== undefined && { descricao: tagData.descricao })
         })
-        .eq('id', tagData.id)
-        .select()
-        .single();
+        .eq('id', tagData.id);
 
       if (error) throw error;
-      return data;
+      return true;
     },
     onSuccess: () => {
       toast({
