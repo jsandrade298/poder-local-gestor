@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatDateOnly } from '@/lib/dateUtils';
 
 export function useDashboardData() {
   const { data: demandas = [], isLoading: isLoadingDemandas } = useQuery({
@@ -129,7 +129,7 @@ export function useDashboardData() {
       area: demanda.areas?.nome || 'Sem área',
       cidade: demanda.cidade,
       bairro: demanda.bairro,
-      data_prazo: formatInTimeZone(new Date(demanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy'),
+      data_prazo: formatDateOnly(demanda.data_prazo),
       diasAtraso,
       status: demanda.status
     };

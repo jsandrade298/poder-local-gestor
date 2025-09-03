@@ -14,6 +14,7 @@ import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
+import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
 import { useLocation, useSearchParams } from "react-router-dom";
 
 export default function Demandas() {
@@ -511,7 +512,7 @@ export default function Demandas() {
 
                       {demanda.data_prazo && (
                         <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Prazo:</span> {formatInTimeZone(new Date(demanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy')}
+                          <span className="font-medium">Prazo:</span> {formatDateOnly(demanda.data_prazo)}
                         </div>
                       )}
 
@@ -524,7 +525,7 @@ export default function Demandas() {
                       <div className="text-right text-sm text-muted-foreground">
                         <div>Criado em</div>
                         <div className="font-medium">
-                          {formatInTimeZone(new Date(demanda.created_at), 'America/Sao_Paulo', 'dd/MM/yyyy')}
+                          {formatDateTime(demanda.created_at)}
                         </div>
                       </div>
                       
@@ -650,7 +651,7 @@ export default function Demandas() {
                   <div>
                     <label className="text-sm font-medium">Prazo</label>
                     <p className="text-sm text-muted-foreground">
-                      {formatInTimeZone(new Date(selectedDemanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy')}
+                      {formatDateOnly(selectedDemanda.data_prazo)}
                     </p>
                   </div>
                 )}
@@ -726,13 +727,13 @@ export default function Demandas() {
                   <div>
                     <label className="text-sm font-medium">Criado em</label>
                     <p className="text-sm text-muted-foreground">
-                      {formatInTimeZone(new Date(selectedDemanda.created_at), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm')}
+                      {formatDateTime(selectedDemanda.created_at)}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Atualizado em</label>
                     <p className="text-sm text-muted-foreground">
-                      {formatInTimeZone(new Date(selectedDemanda.updated_at), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm')}
+                      {formatDateTime(selectedDemanda.updated_at)}
                     </p>
                   </div>
                 </div>
