@@ -10,6 +10,7 @@ import Municipes from "./pages/Municipes";
 import Tags from "./pages/Tags";
 import Areas from "./pages/Areas";
 import Usuarios from "./pages/Usuarios";
+import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/tags" element={<Tags />} />
             <Route path="/areas" element={<Areas />} />
             <Route path="/usuarios" element={<Usuarios />} />
+            <Route path="/config" element={<Configuracoes />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
