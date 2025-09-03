@@ -458,17 +458,19 @@ export default function Usuarios() {
                   <Label className="text-sm font-medium">Cargo</Label>
                   <p className="text-sm text-muted-foreground">{selectedUser.cargo || "Não informado"}</p>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label className="text-sm font-medium">Papel</Label>
-                  <Badge variant={
-                    selectedUser.role === 'admin' ? 'destructive' : 
-                    selectedUser.role === 'gestor' ? 'default' : 
-                    selectedUser.role === 'atendente' ? 'secondary' : 'outline'
-                  }>
-                    {selectedUser.role === 'admin' ? 'Admin' : 
-                     selectedUser.role === 'gestor' ? 'Gestor' :
-                     selectedUser.role === 'atendente' ? 'Atendente' : 'Usuário'}
-                  </Badge>
+                  <div>
+                    <Badge variant={
+                      selectedUser.role === 'admin' ? 'destructive' : 
+                      selectedUser.role === 'gestor' ? 'default' : 
+                      selectedUser.role === 'atendente' ? 'secondary' : 'outline'
+                    }>
+                      {selectedUser.role === 'admin' ? 'Admin' : 
+                       selectedUser.role === 'gestor' ? 'Gestor' :
+                       selectedUser.role === 'atendente' ? 'Atendente' : 'Usuário'}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Total de Demandas</Label>
@@ -530,18 +532,11 @@ export default function Usuarios() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-role">Papel do Usuário</Label>
-                  <Select value={editingUser.role} onValueChange={(value) => handleUpdateRole(editingUser.id, value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o papel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usuario">Usuário</SelectItem>
-                      <SelectItem value="atendente">Atendente</SelectItem>
-                      <SelectItem value="gestor">Gestor</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm font-medium">Papel do Usuário</Label>
+                  <div className="p-2 bg-muted rounded-md">
+                    <Badge variant="destructive">Admin</Badge>
+                    <p className="text-xs text-muted-foreground mt-1">Todos os usuários têm acesso administrativo completo</p>
+                  </div>
                 </div>
               </div>
             )}
