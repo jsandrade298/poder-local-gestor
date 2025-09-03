@@ -2,12 +2,14 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App.tsx'
 import Login from './pages/Login.tsx'
+import Dashboard from './pages/Dashboard.tsx'
 import './index.css'
 
 const AppRouter = () => (
   <BrowserRouter>
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/" element={<App />} />
       <Route path="*" element={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

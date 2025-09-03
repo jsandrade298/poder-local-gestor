@@ -1,15 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignup, setIsSignup] = useState(false);
   const [nome, setNome] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Verificar se já está logado
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard');
+      }
+    };
+    checkUser();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Tentativa de login:', { email, password });
-    alert(`${isSignup ? 'Cadastro' : 'Login'} realizado! Email: ${email}`);
+    setLoading(true);
+    setError('');
+
+    try {
+      if (isSignup) {
+        // Cadastro
+        const redirectUrl = `${window.location.origin}/dashboard`;
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              full_name: nome
+            }
+          }
+        });
+
+        if (error) {
+          setError(error.message);
+        } else {
+          alert('Cadastro realizado! Verifique seu email para ativar a conta.');
+          setIsSignup(false);
+          setNome('');
+          setEmail('');
+          setPassword('');
+        }
+      } else {
+        // Login
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          setError(error.message);
+        } else {
+          console.log('Login realizado com sucesso!', data);
+          navigate('/dashboard');
+        }
+      }
+    } catch (err) {
+      setError('Erro inesperado. Tente novamente.');
+      console.error('Erro:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,7 +125,7 @@ const Login = () => {
                   onChange={(e) => setNome(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Seu nome completo"
-                  required={isSignup}
+                  disabled={loading}
                 />
               </div>
             )}
@@ -79,7 +140,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="seu@email.com"
-                required
+                disabled={loading}
               />
             </div>
 
@@ -93,15 +154,29 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
-                required
+                disabled={loading}
               />
             </div>
 
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              className={`w-full py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                loading 
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              disabled={loading}
             >
-              {isSignup ? 'Cadastrar' : 'Entrar'}
+              {loading 
+                ? (isSignup ? 'Cadastrando...' : 'Entrando...') 
+                : (isSignup ? 'Cadastrar' : 'Entrar')
+              }
             </button>
           </form>
 
