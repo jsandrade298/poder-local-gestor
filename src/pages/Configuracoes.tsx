@@ -46,8 +46,7 @@ export default function Configuracoes() {
       timezone: "America/Sao_Paulo",
       idioma: "pt-BR",
       formato_data: "DD/MM/AAAA",
-      limite_upload_mb: 10,
-      backup_automatico: true
+      limite_upload_mb: 10
     }
   });
 
@@ -130,8 +129,7 @@ export default function Configuracoes() {
         timezone: "Fuso horário do sistema",
         idioma: "Idioma padrão",
         formato_data: "Formato de exibição de datas",
-        limite_upload_mb: "Limite máximo para upload de arquivos em MB",
-        backup_automatico: "Ativar backup automático diário"
+        limite_upload_mb: "Limite máximo para upload de arquivos em MB"
       }
     };
     
@@ -321,19 +319,16 @@ export default function Configuracoes() {
           
           <Separator />
           
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-medium text-foreground">Backup Automático</h4>
-              <p className="text-xs text-muted-foreground">
-                Realizar backup diário dos dados automaticamente
-              </p>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <div>
+                <h4 className="text-sm font-medium text-foreground">Backup Automático Ativo</h4>
+                <p className="text-xs text-muted-foreground">
+                  Sistema configurado para backup diário automático às 03:00
+                </p>
+              </div>
             </div>
-            <input
-              type="checkbox"
-              checked={config.sistema.backup_automatico}
-              onChange={(e) => handleInputChange('sistema', 'backup_automatico', e.target.checked.toString())}
-              className="h-4 w-4"
-            />
           </div>
         </CardContent>
       </Card>

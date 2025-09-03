@@ -14,7 +14,6 @@ export interface ConfiguracaoData {
     idioma: string;
     formato_data: string;
     limite_upload_mb: number;
-    backup_automatico: boolean;
   };
 }
 
@@ -41,8 +40,7 @@ export const useConfiguracoes = () => {
           timezone: "America/Sao_Paulo",
           idioma: "pt-BR",
           formato_data: "DD/MM/AAAA",
-          limite_upload_mb: 10,
-          backup_automatico: true
+          limite_upload_mb: 10
         }
       };
 
@@ -51,13 +49,11 @@ export const useConfiguracoes = () => {
         const [section, field] = item.chave.split('.');
         if (config[section as keyof ConfiguracaoData] && field) {
           const sectionData = config[section as keyof ConfiguracaoData] as any;
-          if (field === 'limite_upload_mb') {
-            sectionData[field] = parseInt(item.valor || '10');
-          } else if (field === 'backup_automatico') {
-            sectionData[field] = item.valor === 'true';
-          } else {
-            sectionData[field] = item.valor || "";
-          }
+        if (field === 'limite_upload_mb') {
+          sectionData[field] = parseInt(item.valor || '10');
+        } else {
+          sectionData[field] = item.valor || "";
+        }
         }
       });
 
