@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export default function Areas() {
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch areas from Supabase
   const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
@@ -145,6 +147,10 @@ export default function Areas() {
       nome: newAreaName.trim(),
       descricao: newAreaDescription.trim() || undefined,
     });
+  };
+
+  const handleViewDemandas = (areaId: string, areaNome: string) => {
+    navigate(`/demandas?area=${areaId}&areaNome=${encodeURIComponent(areaNome)}`);
   };
 
   const totalDemandas = areasWithCount.reduce((acc, area) => acc + area.total_demandas, 0);
@@ -314,8 +320,10 @@ export default function Areas() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
+                      Ver Demandas
+                    </DropdownMenuItem>
                     <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem>Ver Demandas</DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">
                       Excluir
                     </DropdownMenuItem>
@@ -382,7 +390,12 @@ export default function Areas() {
                     )}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => handleViewDemandas(area.id, area.nome)}
+                >
                   Ver Demandas
                 </Button>
               </div>
@@ -474,8 +487,10 @@ export default function Areas() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
+                              Ver Demandas
+                            </DropdownMenuItem>
                             <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Ver Demandas</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">
                               Excluir
                             </DropdownMenuItem>

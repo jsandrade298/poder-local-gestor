@@ -37,6 +37,12 @@ export default function Demandas() {
     if (atrasoParam) {
       setAtrasoFilter(atrasoParam);
     }
+    
+    // Aplicar filtro de área se vier da página de Áreas
+    const areaParam = searchParams.get('area');
+    if (areaParam) {
+      setAreaFilter(areaParam);
+    }
   }, [searchParams]);
 
   const queryClient = useQueryClient();
@@ -329,6 +335,11 @@ export default function Demandas() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
               Gestão de Demandas
+              {searchParams.get('areaNome') && (
+                <span className="text-lg text-muted-foreground ml-2">
+                  - Área: {decodeURIComponent(searchParams.get('areaNome') || '')}
+                </span>
+              )}
             </h1>
             <p className="text-base text-muted-foreground lg:text-lg">
               Acompanhe e gerencie todas as demandas do gabinete
