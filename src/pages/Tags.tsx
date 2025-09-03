@@ -41,16 +41,23 @@ export default function Tags() {
   const queryClient = useQueryClient();
 
   // Buscar tags com contagem de munícipes
-  const { data: tags = [], isLoading } = useQuery({
+  const { data: tags = [], isLoading, error } = useQuery({
     queryKey: ['tags-with-counts'],
     queryFn: async () => {
+      console.log('🔍 Buscando tags do banco de dados...');
+      
       // Primeiro buscar todas as tags
       const { data: tagsData, error: tagsError } = await supabase
         .from('tags')
         .select('*')
         .order('nome');
       
-      if (tagsError) throw tagsError;
+      console.log('📋 Tags encontradas:', tagsData);
+      
+      if (tagsError) {
+        console.error('❌ Erro ao buscar tags:', tagsError);
+        throw tagsError;
+      }
       
       // Para cada tag, contar os munícipes associados
       const tagsWithCounts = await Promise.all(
@@ -65,13 +72,17 @@ export default function Tags() {
             return { ...tag, total_municipes: 0 };
           }
           
+          console.log(`📊 Tag "${tag.nome}": ${count} munícipes`);
           return { ...tag, total_municipes: count || 0 };
         })
       );
       
+      console.log('✅ Tags processadas:', tagsWithCounts);
       return tagsWithCounts;
     }
   });
+
+  console.log('🏷️ Estado atual - tags:', tags, 'loading:', isLoading, 'error:', error);
 
   // Mutação para criar nova tag
   const createTagMutation = useMutation({
