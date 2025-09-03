@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthLayout } from "@/components/layout/AuthLayout";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import Dashboard from "./pages/Dashboard";
 import Demandas from "./pages/Demandas";
 import Municipes from "./pages/Municipes";
@@ -19,9 +20,10 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+      <ThemeProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <AuthLayout>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -35,8 +37,9 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthLayout>
-      </BrowserRouter>
+          </AuthLayout>
+        </BrowserRouter>
+      </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

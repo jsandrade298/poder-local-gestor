@@ -9,6 +9,7 @@ import {
   Settings,
   Home
 } from "lucide-react";
+import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
 import {
   Sidebar,
@@ -37,6 +38,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const currentPath = location.pathname;
+  const { data: config } = useConfiguracoes();
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -60,8 +62,12 @@ export function AppSidebar() {
                 <BarChart3 className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Gabinete</h2>
-                <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
+                <h2 className="text-sm font-semibold text-foreground">
+                  {config?.gabinete.nome || "Gabinete"}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {config?.gabinete.descricao || "Sistema de Gestão"}
+                </p>
               </div>
             </div>
           )}
