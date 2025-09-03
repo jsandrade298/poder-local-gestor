@@ -40,7 +40,7 @@ export default function Usuarios() {
   const navigate = useNavigate();
 
   // Fetch users with their roles and demandas count
-  const { data: usuarios = [], isLoading: isLoadingUsuarios } = useQuery({
+  const { data: usuarios = [], isLoading: isLoadingUsuarios, refetch: refetchUsuarios } = useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => {
       // Fetch profiles
@@ -135,6 +135,8 @@ export default function Usuarios() {
       return authData;
     },
     onSuccess: () => {
+      // Forçar recarregamento imediato dos dados
+      refetchUsuarios();
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       toast({
         title: "Usuário criado",
