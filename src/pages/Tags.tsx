@@ -845,37 +845,40 @@ export default function Tags() {
                 </div>
               </div>
               
-              <ScrollArea className="h-[400px] border rounded-lg p-2">
-                {allMunicipes.length === 0 ? (
+              <ScrollArea className="h-[300px] border rounded-lg p-2">
+                {filteredMunicipes.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    Nenhum munícipe disponível
+                    {municipesSearchTerm || selectedBairro !== "all" || selectedCidade !== "all" ? 
+                      "Nenhum munícipe encontrado com os filtros aplicados" : 
+                      "Nenhum munícipe disponível"
+                    }
                   </div>
-                 ) : (
-                   <div className="space-y-2">
-                     {filteredMunicipes.map((municipe: any) => (
-                       <div key={municipe.id} className="flex items-center gap-3 p-2 border rounded">
-                         <Checkbox
-                           checked={selectedMunicipes.includes(municipe.id)}
-                           onCheckedChange={(checked) => {
-                             if (checked) {
-                               setSelectedMunicipes([...selectedMunicipes, municipe.id]);
-                             } else {
-                               setSelectedMunicipes(selectedMunicipes.filter(id => id !== municipe.id));
-                             }
-                           }}
-                         />
-                         <div className="flex-1">
-                           <p className="font-medium">{municipe.nome}</p>
-                           <div className="text-xs text-muted-foreground space-y-1">
-                             <p>{municipe.email}</p>
-                             {(municipe.bairro || municipe.cidade) && (
-                               <p>{[municipe.bairro, municipe.cidade].filter(Boolean).join(", ")}</p>
-                             )}
-                           </div>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredMunicipes.map((municipe: any) => (
+                      <div key={municipe.id} className="flex items-center gap-3 p-2 border rounded">
+                        <Checkbox
+                          checked={selectedMunicipes.includes(municipe.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedMunicipes([...selectedMunicipes, municipe.id]);
+                            } else {
+                              setSelectedMunicipes(selectedMunicipes.filter(id => id !== municipe.id));
+                            }
+                          }}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{municipe.nome}</p>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <p>{municipe.email}</p>
+                            {(municipe.bairro || municipe.cidade) && (
+                              <p>{[municipe.bairro, municipe.cidade].filter(Boolean).join(", ")}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </ScrollArea>
               
