@@ -106,6 +106,33 @@ export function useDashboardData() {
   const demandas60Dias = demandasComIdade.filter(d => d.diasVencido >= 60 && d.diasVencido < 90);
   const demandas90Dias = demandasComIdade.filter(d => d.diasVencido >= 90);
 
+  // Calcular demandas em atraso (com base no campo data_prazo)
+  const demandasComAtraso = demandas.filter(demanda => {
+    if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
+      return false;
+    }
+    const prazo = new Date(demanda.data_prazo);
+    return now > prazo;
+  });
+
+  const demandasAtraso30Dias = demandasComAtraso.filter(demanda => {
+    const prazo = new Date(demanda.data_prazo);
+    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    return diasAtraso > 30;
+  });
+
+  const demandasAtraso60Dias = demandasComAtraso.filter(demanda => {
+    const prazo = new Date(demanda.data_prazo);
+    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    return diasAtraso > 60;
+  });
+
+  const demandasAtraso90Dias = demandasComAtraso.filter(demanda => {
+    const prazo = new Date(demanda.data_prazo);
+    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    return diasAtraso > 90;
+  });
+
   return {
     metrics: {
       totalDemandas,
@@ -115,7 +142,11 @@ export function useDashboardData() {
       demandasResolvidas,
       demandasCanceladas,
       totalMunicipes,
-      taxaConclusao: `${taxaConclusao}%`
+      taxaConclusao: `${taxaConclusao}%`,
+      demandasEmAtraso: demandasComAtraso.length,
+      demandasAtraso30: demandasAtraso30Dias.length,
+      demandasAtraso60: demandasAtraso60Dias.length,
+      demandasAtraso90: demandasAtraso90Dias.length
     },
     charts: {
       statusData,
@@ -125,6 +156,12 @@ export function useDashboardData() {
       demandas30Dias,
       demandas60Dias,
       demandas90Dias
+    },
+    overdue: {
+      demandasEmAtraso: demandasComAtraso.length,
+      demandasAtraso30: demandasAtraso30Dias.length,
+      demandasAtraso60: demandasAtraso60Dias.length,
+      demandasAtraso90: demandasAtraso90Dias.length
     },
     isLoading: isLoadingDemandas || isLoadingMunicipes
   };

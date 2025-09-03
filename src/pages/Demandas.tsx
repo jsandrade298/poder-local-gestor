@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download } from "luc
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { toast } from "sonner";
+import { useLocation, useSearchParams } from "react-router-dom";
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,9 +23,19 @@ export default function Demandas() {
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
+  const [atrasoFilter, setAtrasoFilter] = useState("all");
   const [selectedDemanda, setSelectedDemanda] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  
+  useEffect(() => {
+    const atrasoParam = searchParams.get('atraso');
+    if (atrasoParam) {
+      setAtrasoFilter(atrasoParam);
+    }
+  }, [searchParams]);
 
   const queryClient = useQueryClient();
 
@@ -182,7 +193,31 @@ export default function Demandas() {
     const matchesCidade = cidadeFilter === "all" || demanda.cidade === cidadeFilter;
     const matchesBairro = bairroFilter === "all" || demanda.bairro === bairroFilter;
 
-    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro;
+    // Filtro de atraso
+    let matchesAtraso = true;
+    if (atrasoFilter !== "all") {
+      if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
+        matchesAtraso = false;
+      } else {
+        const now = new Date();
+        const prazo = new Date(demanda.data_prazo);
+        const isOverdue = now > prazo;
+        
+        if (atrasoFilter === "overdue") {
+          matchesAtraso = isOverdue;
+        } else if (atrasoFilter === "30" || atrasoFilter === "60" || atrasoFilter === "90") {
+          if (!isOverdue) {
+            matchesAtraso = false;
+          } else {
+            const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+            const minDays = parseInt(atrasoFilter);
+            matchesAtraso = diasAtraso > minDays;
+          }
+        }
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
   });
 
   // Função para download de anexo
@@ -271,6 +306,7 @@ export default function Demandas() {
     setResponsavelFilter("all");
     setCidadeFilter("all");
     setBairroFilter("all");
+    setAtrasoFilter("all");
   };
 
   if (isLoading) {
@@ -309,7 +345,7 @@ export default function Demandas() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9 gap-4">
               <div className="relative xl:col-span-2">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -403,6 +439,19 @@ export default function Demandas() {
                       {bairro}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={atrasoFilter} onValueChange={setAtrasoFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Atraso" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Sem filtro de atraso</SelectItem>
+                  <SelectItem value="overdue">Em atraso</SelectItem>
+                  <SelectItem value="30">Mais de 30 dias</SelectItem>
+                  <SelectItem value="60">Mais de 60 dias</SelectItem>
+                  <SelectItem value="90">Mais de 90 dias</SelectItem>
                 </SelectContent>
               </Select>
 
