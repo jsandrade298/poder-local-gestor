@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,80 +10,129 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-// Dados mockados - substituir pela integração com Supabase
-const areasMock = [
-  {
-    id: "1",
-    nome: "Infraestrutura",
-    descricao: "Reparos urbanos, pavimentação, iluminação pública",
-    total_demandas: 28,
-    demandas_ativas: 15,
-    cor: "#3b82f6"
-  },
-  {
-    id: "2", 
-    nome: "Trânsito",
-    descricao: "Sinalização, semáforos, controle de tráfego",
-    total_demandas: 45,
-    demandas_ativas: 23,
-    cor: "#f59e0b"
-  },
-  {
-    id: "3",
-    nome: "Saúde",
-    descricao: "Postos de saúde, atendimento médico, campanhas",
-    total_demandas: 38,
-    demandas_ativas: 12,
-    cor: "#10b981"
-  },
-  {
-    id: "4",
-    nome: "Educação", 
-    descricao: "Escolas, creches, programas educacionais",
-    total_demandas: 32,
-    demandas_ativas: 8,
-    cor: "#8b5cf6"
-  },
-  {
-    id: "5",
-    nome: "Meio Ambiente",
-    descricao: "Limpeza urbana, áreas verdes, sustentabilidade",
-    total_demandas: 15,
-    demandas_ativas: 6,
-    cor: "#22c55e"
-  },
-  {
-    id: "6",
-    nome: "Segurança",
-    descricao: "Policiamento, guardas municipais, prevenção",
-    total_demandas: 12,
-    demandas_ativas: 4,
-    cor: "#ef4444"
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 export default function Areas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
+  const queryClient = useQueryClient();
 
-  const filteredAreas = areasMock.filter(area =>
+  // Fetch areas from Supabase
+  const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
+    queryKey: ['areas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('areas')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch demandas count for each area
+  const { data: demandasCount = [], isLoading: isLoadingDemandas } = useQuery({
+    queryKey: ['demandas-count-by-area'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('area_id, status');
+      
+      if (error) throw error;
+      
+      // Count demandas by area
+      const countByArea = data.reduce((acc, demanda) => {
+        if (!demanda.area_id) return acc;
+        
+        if (!acc[demanda.area_id]) {
+          acc[demanda.area_id] = { total: 0, ativas: 0 };
+        }
+        
+        acc[demanda.area_id].total += 1;
+        if (['aberta', 'em_andamento', 'aguardando'].includes(demanda.status)) {
+          acc[demanda.area_id].ativas += 1;
+        }
+        
+        return acc;
+      }, {});
+      
+      return countByArea;
+    }
+  });
+
+  // Create area mutation
+  const createAreaMutation = useMutation({
+    mutationFn: async (newArea: { nome: string; descricao: string }) => {
+      const { data, error } = await supabase
+        .from('areas')
+        .insert([newArea])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      toast({
+        title: "Área criada",
+        description: "A área foi criada com sucesso.",
+      });
+      setIsCreateDialogOpen(false);
+      setNewAreaName("");
+      setNewAreaDescription("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao criar área: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Combine areas with demandas count
+  const areasWithCount = useMemo(() => {
+    return areas.map(area => ({
+      ...area,
+      total_demandas: demandasCount[area.id]?.total || 0,
+      demandas_ativas: demandasCount[area.id]?.ativas || 0,
+    }));
+  }, [areas, demandasCount]);
+
+  const filteredAreas = areasWithCount.filter(area =>
     area.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    area.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+    (area.descricao && area.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleCreateArea = () => {
-    // Aqui implementar a criação da área via Supabase
-    console.log("Criar área:", { nome: newAreaName, descricao: newAreaDescription });
-    setIsCreateDialogOpen(false);
-    setNewAreaName("");
-    setNewAreaDescription("");
+    if (!newAreaName.trim()) return;
+    
+    createAreaMutation.mutate({
+      nome: newAreaName.trim(),
+      descricao: newAreaDescription.trim() || null,
+    });
   };
 
-  const totalDemandas = areasMock.reduce((acc, area) => acc + area.total_demandas, 0);
-  const totalAtivas = areasMock.reduce((acc, area) => acc + area.demandas_ativas, 0);
+  const totalDemandas = areasWithCount.reduce((acc, area) => acc + area.total_demandas, 0);
+  const totalAtivas = areasWithCount.reduce((acc, area) => acc + area.demandas_ativas, 0);
+
+  if (isLoadingAreas || isLoadingDemandas) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground mt-2">Carregando áreas...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -132,8 +182,11 @@ export default function Areas() {
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateArea} disabled={!newAreaName.trim()}>
-                Criar Área
+              <Button 
+                onClick={handleCreateArea} 
+                disabled={!newAreaName.trim() || createAreaMutation.isPending}
+              >
+                {createAreaMutation.isPending ? "Criando..." : "Criar Área"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -147,7 +200,7 @@ export default function Areas() {
             <div className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold text-foreground">{areasMock.length}</div>
+                <div className="text-2xl font-bold text-foreground">{areas.length}</div>
                 <p className="text-sm text-muted-foreground">Áreas Ativas</p>
               </div>
             </div>
