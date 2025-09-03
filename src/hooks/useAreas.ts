@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Area } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 
-export interface AreaWithStats extends Area {
+export interface AreaWithStats {
+  id: string
+  nome: string
+  descricao?: string
+  responsavel_id?: string
+  created_at: string
+  updated_at: string
   total_demandas?: number
   demandas_ativas?: number
 }

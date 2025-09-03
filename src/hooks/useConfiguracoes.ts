@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Configuracao } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 
 export const useConfiguracoes = () => {
   const [configuracoes, setConfiguracoes] = useState<Record<string, string>>({})

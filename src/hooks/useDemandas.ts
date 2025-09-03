@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Demanda, type Area, type Usuario, type Municipe } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 
-export interface DemandaWithRelations extends Demanda {
-  area?: Area
-  responsavel?: Usuario
-  municipe?: Municipe
+export interface DemandaWithRelations {
+  id: string
+  protocolo: string
+  titulo: string
+  descricao: string
+  status: string
+  prioridade: string
+  municipe_id: string
+  area_id?: string
+  responsavel_id?: string
+  criado_por: string
+  data_prazo?: string
+  resolucao?: string
+  created_at: string
+  updated_at: string
+  area?: { id: string; nome: string }
+  responsavel?: { id: string; nome: string }
+  municipe?: { id: string; nome: string }
 }
 
 export const useDemandas = () => {

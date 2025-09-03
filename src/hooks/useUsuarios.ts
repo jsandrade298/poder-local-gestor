@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Usuario } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
+
+export interface Usuario {
+  id: string
+  nome: string
+  email: string
+  telefone?: string
+  cargo?: string
+  created_at: string
+  updated_at: string
+}
 
 export const useUsuarios = () => {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])

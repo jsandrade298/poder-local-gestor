@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Tag } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 
-export interface TagWithCount extends Tag {
+export interface TagWithCount {
+  id: string
+  nome: string
+  cor: string
+  created_at: string
+  updated_at: string
   total_municipes?: number
 }
 

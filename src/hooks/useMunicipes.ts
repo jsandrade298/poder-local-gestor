@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react'
-import { supabase, type Municipe } from '@/lib/supabase'
+import { supabase } from '@/integrations/supabase/client'
 
-export interface MunicipeWithTags extends Municipe {
+export interface MunicipeWithTags {
+  id: string
+  nome: string
+  cpf?: string
+  rg?: string
+  email?: string
+  telefone?: string
+  endereco?: string
+  bairro?: string
+  cidade?: string
+  cep?: string
+  data_nascimento?: string
+  profissao?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
   tags?: { id: string; nome: string; cor: string }[]
   total_demandas?: number
 }
