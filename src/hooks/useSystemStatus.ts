@@ -15,14 +15,14 @@ export const useSystemStatus = () => {
     ultima_atualizacao: new Date().toLocaleString('pt-BR')
   });
 
-  // Verificar conexão com banco de dados
+  // Verificar conexão com banco de dados - usar query mais simples
   const { data: dbStatus, isError } = useQuery({
     queryKey: ['system-status'],
     queryFn: async () => {
       try {
         // Fazer uma query simples para testar conectividade
         const { data, error } = await supabase
-          .from('configuracoes')
+          .from('demandas')
           .select('updated_at')
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -31,14 +31,14 @@ export const useSystemStatus = () => {
         
         return {
           connected: true,
-          lastUpdate: data?.[0]?.updated_at
+          lastUpdate: data?.[0]?.updated_at || new Date().toISOString()
         };
       } catch (error) {
         throw error;
       }
     },
     refetchInterval: 30000, // Verificar a cada 30 segundos
-    retry: 3
+    retry: 2
   });
 
   useEffect(() => {

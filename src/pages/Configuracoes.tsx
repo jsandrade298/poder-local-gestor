@@ -53,12 +53,31 @@ export default function Configuracoes() {
   // Carregar configurações do banco quando disponíveis
   useEffect(() => {
     if (configuracoes.length > 0) {
-      const newConfig = { ...config };
+      const newConfig = {
+        gabinete: {
+          nome: "",
+          descricao: "",
+          endereco: "",
+          telefone: "",
+          email: ""
+        },
+        sistema: {
+          timezone: "America/Sao_Paulo",
+          idioma: "pt-BR",
+          formato_data: "DD/MM/AAAA",
+          limite_upload_mb: 10
+        }
+      };
       
       configuracoes.forEach((item) => {
         const [section, field] = item.chave.split('.');
         if (newConfig[section as keyof typeof newConfig] && field) {
-          (newConfig[section as keyof typeof newConfig] as any)[field] = item.valor || "";
+          const sectionData = newConfig[section as keyof typeof newConfig] as any;
+          if (field === 'limite_upload_mb') {
+            sectionData[field] = parseInt(item.valor || '10');
+          } else {
+            sectionData[field] = item.valor || "";
+          }
         }
       });
       

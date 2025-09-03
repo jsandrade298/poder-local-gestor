@@ -49,11 +49,11 @@ export const useConfiguracoes = () => {
         const [section, field] = item.chave.split('.');
         if (config[section as keyof ConfiguracaoData] && field) {
           const sectionData = config[section as keyof ConfiguracaoData] as any;
-        if (field === 'limite_upload_mb') {
-          sectionData[field] = parseInt(item.valor || '10');
-        } else {
-          sectionData[field] = item.valor || "";
-        }
+          if (field === 'limite_upload_mb') {
+            sectionData[field] = parseInt(item.valor || '10');
+          } else {
+            sectionData[field] = item.valor || "";
+          }
         }
       });
 
