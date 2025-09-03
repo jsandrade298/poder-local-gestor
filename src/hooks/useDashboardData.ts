@@ -10,7 +10,7 @@ export function useDashboardData() {
         .select(`
           *,
           areas(nome),
-          profiles!demandas_responsavel_id_fkey(nome),
+          responsavel:profiles(nome),
           municipes(nome)
         `);
       
@@ -72,7 +72,7 @@ export function useDashboardData() {
       id: demanda.id,
       titulo: demanda.titulo,
       area: demanda.areas?.nome || 'Sem área',
-      responsavel: demanda.profiles?.nome || 'Sem responsável',
+      responsavel: demanda.responsavel?.nome || 'Sem responsável',
       diasVencido
     };
   });
