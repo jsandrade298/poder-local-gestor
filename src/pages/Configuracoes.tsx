@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Save, Upload, Palette, ExternalLink, Building, Users, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -246,7 +245,7 @@ export default function Configuracoes() {
             </div>
           </div>
           
-          <Separator />
+          <div className="border-t border-border my-4" />
           
           <div className="space-y-4">
             <div className="space-y-2">
@@ -376,7 +375,7 @@ export default function Configuracoes() {
             </div>
           </div>
           
-          <Separator />
+          <div className="border-t border-border my-4" />
           
           <div className="flex items-center justify-between">
             <div>
