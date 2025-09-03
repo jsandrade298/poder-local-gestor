@@ -10,12 +10,14 @@ export function useDashboardData() {
         .select(`
           *,
           areas(nome),
-          responsavel:profiles(nome),
           municipes(nome)
         `);
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar demandas:', error);
+        throw error;
+      }
+      return data || [];
     }
   });
 
@@ -72,7 +74,7 @@ export function useDashboardData() {
       id: demanda.id,
       titulo: demanda.titulo,
       area: demanda.areas?.nome || 'Sem área',
-      responsavel: demanda.responsavel?.nome || 'Sem responsável',
+      responsavel: 'Sem responsável', // Temporariamente removido até resolver foreign key
       diasVencido
     };
   });

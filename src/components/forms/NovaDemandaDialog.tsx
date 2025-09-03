@@ -91,7 +91,13 @@ export function NovaDemandaDialog() {
 
   const uploadFiles = async (demandaId: string) => {
     for (const file of files) {
-      const fileName = `${demandaId}/${file.name}`;
+      // Sanitizar o nome do arquivo para evitar caracteres especiais
+      const sanitizedFileName = file.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/[^a-zA-Z0-9.-]/g, '_'); // Substitui caracteres especiais por underscore
+      
+      const fileName = `${demandaId}/${sanitizedFileName}`;
       const { error } = await supabase.storage
         .from('demanda-anexos')
         .upload(fileName, file);

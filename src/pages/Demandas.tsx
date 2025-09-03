@@ -23,7 +23,6 @@ export default function Demandas() {
         .select(`
           *,
           areas(nome),
-          responsavel:profiles(nome),
           municipes(nome)
         `)
         .order('created_at', { ascending: false });
