@@ -10,23 +10,46 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const isLoginPage = location.pathname === "/login";
+
+  console.log('AuthLayout Debug:', { 
+    isAuthenticated, 
+    loading, 
+    isLoginPage, 
+    pathname: location.pathname 
+  });
+
+  // Aguardar enquanto carrega
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Se não está autenticado e não está na página de login, redireciona
   if (!isAuthenticated && !isLoginPage) {
+    console.log('Redirecionando para login - não autenticado');
     return <Navigate to="/login" replace />;
   }
 
   // Se está autenticado e está na página de login, redireciona para dashboard
   if (isAuthenticated && isLoginPage) {
+    console.log('Redirecionando para dashboard - já autenticado');
     return <Navigate to="/" replace />;
   }
 
   if (isLoginPage) {
+    console.log('Renderizando página de login');
     return <>{children}</>;
   }
 
+  console.log('Renderizando layout autenticado');
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">

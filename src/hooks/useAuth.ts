@@ -66,18 +66,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: async () => {
+    console.log('Inicializando autenticação...');
     try {
       // Set up auth state listener FIRST
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         (event, session) => {
+          console.log('Auth state changed:', { event, user: session?.user?.email, hasSession: !!session });
           set({ session, user: session?.user ?? null, loading: false })
         }
       )
 
       // THEN check for existing session
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('Session inicial:', { user: session?.user?.email, hasSession: !!session });
       set({ session, user: session?.user ?? null, loading: false })
     } catch (error) {
+      console.error('Erro na inicialização:', error);
       set({ loading: false })
     }
   },
@@ -86,5 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // Hook para verificar se o usuário está autenticado
 export const useAuth = () => {
   const { user, session, loading } = useAuthStore()
-  return { user, session, loading, isAuthenticated: !!user }
+  const isAuthenticated = !!user
+  console.log('useAuth hook:', { user: user?.email, isAuthenticated, loading });
+  return { user, session, loading, isAuthenticated }
 }
