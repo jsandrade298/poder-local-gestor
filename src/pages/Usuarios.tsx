@@ -164,10 +164,16 @@ export default function Usuarios() {
       if (error) throw error;
       return { success: true };
     },
-    onSuccess: () => {
-      // Forçar recarregamento imediato dos dados
-      refetchUsuarios();
+    onSuccess: async () => {
+      // Aguardar um pouco e depois forçar recarregamento
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Invalidar cache primeiro
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      
+      // Então forçar refetch
+      await refetchUsuarios();
+      
       toast({
         title: "Usuário atualizado",
         description: "O usuário foi atualizado com sucesso.",
@@ -267,7 +273,9 @@ export default function Usuarios() {
   const handleUpdateUser = () => {
     if (!editingUser) return;
     
+    console.log('👤 Usuário sendo editado:', editingUser);
     const { id, user_roles, role, total_demandas, ativo, ...updates } = editingUser;
+    console.log('📝 Updates que serão enviados:', updates);
     updateUserMutation.mutate({ id, updates });
   };
 
