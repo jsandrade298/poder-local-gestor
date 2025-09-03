@@ -14,6 +14,10 @@ export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
+  const [municipeFilter, setMunicipeFilter] = useState("all");
+  const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [cidadeFilter, setCidadeFilter] = useState("all");
+  const [bairroFilter, setBairroFilter] = useState("all");
 
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas'],
@@ -23,7 +27,8 @@ export default function Demandas() {
         .select(`
           *,
           areas(nome),
-          municipes(nome)
+          municipes(nome),
+          responsavel:profiles!demandas_responsavel_id_fkey(nome)
         `)
         .order('created_at', { ascending: false });
       
@@ -42,6 +47,48 @@ export default function Demandas() {
       
       if (error) throw error;
       return data;
+    }
+  });
+
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ['responsaveis'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Buscar valores únicos para cidade e bairro
+  const { data: cidades = [] } = useQuery({
+    queryKey: ['cidades-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('cidade')
+        .not('cidade', 'is', null)
+        .order('cidade');
+      
+      if (error) throw error;
+      return [...new Set(data.map(item => item.cidade))];
+    }
+  });
+
+  const { data: bairros = [] } = useQuery({
+    queryKey: ['bairros-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('bairro')
+        .not('bairro', 'is', null)
+        .order('bairro');
+      
+      if (error) throw error;
+      return [...new Set(data.map(item => item.bairro))];
     }
   });
 
@@ -78,6 +125,16 @@ export default function Demandas() {
     }
   };
 
+  const getPrioridadeColor = (prioridade: string) => {
+    switch (prioridade) {
+      case 'baixa': return 'hsl(var(--chart-4))'; // Verde
+      case 'media': return 'hsl(var(--chart-2))'; // Laranja
+      case 'alta': return 'hsl(var(--chart-1))'; // Azul
+      case 'urgente': return 'hsl(var(--chart-5))'; // Vermelho
+      default: return 'hsl(var(--muted-foreground))';
+    }
+  };
+
   const getPrioridadeLabel = (prioridade: string) => {
     switch (prioridade) {
       case 'baixa': return 'Baixa';
@@ -95,14 +152,22 @@ export default function Demandas() {
     
     const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
     const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
+    const matchesMunicipe = municipeFilter === "all" || demanda.municipe_id === municipeFilter;
+    const matchesResponsavel = responsavelFilter === "all" || demanda.responsavel_id === responsavelFilter;
+    const matchesCidade = cidadeFilter === "all" || demanda.cidade === cidadeFilter;
+    const matchesBairro = bairroFilter === "all" || demanda.bairro === bairroFilter;
 
-    return matchesSearch && matchesStatus && matchesArea;
+    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro;
   });
 
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
     setAreaFilter("all");
+    setMunicipeFilter("all");
+    setResponsavelFilter("all");
+    setCidadeFilter("all");
+    setBairroFilter("all");
   };
 
   if (isLoading) {
@@ -141,8 +206,8 @@ export default function Demandas() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+              <div className="relative xl:col-span-2">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Buscar por título, protocolo ou munícipe..."
@@ -175,6 +240,64 @@ export default function Demandas() {
                   {areas.map((area) => (
                     <SelectItem key={area.id} value={area.id}>
                       {area.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Munícipe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os munícipes</SelectItem>
+                  {demandas.map((demanda) => demanda.municipes).filter((municipe, index, self) => 
+                    municipe && self.findIndex(m => m?.nome === municipe.nome) === index
+                  ).map((municipe) => (
+                    <SelectItem key={municipe?.nome} value={demandas.find(d => d.municipes?.nome === municipe?.nome)?.municipe_id || ""}>
+                      {municipe?.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os responsáveis</SelectItem>
+                  {responsaveis.map((responsavel) => (
+                    <SelectItem key={responsavel.id} value={responsavel.id}>
+                      {responsavel.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Cidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as cidades</SelectItem>
+                  {cidades.map((cidade) => (
+                    <SelectItem key={cidade} value={cidade}>
+                      {cidade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={bairroFilter} onValueChange={setBairroFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Bairro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os bairros</SelectItem>
+                  {bairros.map((bairro) => (
+                    <SelectItem key={bairro} value={bairro}>
+                      {bairro}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -214,7 +337,10 @@ export default function Demandas() {
                         >
                           {getStatusLabel(demanda.status)}
                         </Badge>
-                        <Badge variant="secondary">
+                        <Badge 
+                          variant="secondary"
+                          style={{ backgroundColor: getPrioridadeColor(demanda.prioridade), color: 'white' }}
+                        >
                           {getPrioridadeLabel(demanda.prioridade)}
                         </Badge>
                       </div>
