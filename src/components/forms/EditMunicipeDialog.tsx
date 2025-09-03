@@ -24,19 +24,39 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOnOpenChange || setInternalOpen;
   const [formData, setFormData] = useState({
-    nome: municipe?.nome || "",
-    telefone: municipe?.telefone || "",
-    email: municipe?.email || "",
+    nome: "",
+    telefone: "",
+    email: "",
     logradouro: "",
     numero: "",
-    bairro: municipe?.bairro || "",
-    cidade: municipe?.cidade || "São Paulo",
-    cep: municipe?.cep || "",
+    bairro: "",
+    cidade: "São Paulo",
+    cep: "",
     complemento: "",
-    data_nascimento: municipe?.data_nascimento || "",
-    observacoes: municipe?.observacoes || "",
+    data_nascimento: "",
+    observacoes: "",
     tag_id: ""
   });
+
+  // Atualizar formData quando municipe muda
+  useEffect(() => {
+    if (municipe) {
+      setFormData({
+        nome: municipe.nome || "",
+        telefone: municipe.telefone || "",
+        email: municipe.email || "",
+        logradouro: "",
+        numero: "",
+        bairro: municipe.bairro || "",
+        cidade: municipe.cidade || "São Paulo",
+        cep: municipe.cep || "",
+        complemento: "",
+        data_nascimento: municipe.data_nascimento || "",
+        observacoes: municipe.observacoes || "",
+        tag_id: ""
+      });
+    }
+  }, [municipe]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
