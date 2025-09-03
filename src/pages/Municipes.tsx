@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
+import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -123,28 +124,32 @@ export default function Municipes() {
   // Função para exportar CSV
   const exportToCSV = () => {
     const headers = [
-      'Nome',
-      'Telefone', 
-      'Email',
-      'Data de Nascimento',
-      'Endereço',
-      'Bairro',
-      'Cidade',
-      'CEP',
-      'Observações'
+      'nome',
+      'telefone', 
+      'email',
+      'logradouro',
+      'numero',
+      'bairro',
+      'cidade',
+      'cep',
+      'complemento',
+      'data_nascimento',
+      'observacoes'
     ];
 
-    const csvData = filteredMunicipes.map(municipe => [
-      municipe.nome || '',
-      municipe.telefone || '',
-      municipe.email || '',
-      municipe.data_nascimento ? formatDateOnly(municipe.data_nascimento) : '',
-      municipe.endereco || '',
-      municipe.bairro || '',
-      municipe.cidade || '',
-      municipe.cep || '',
-      municipe.observacoes || ''
-    ]);
+        const csvData = filteredMunicipes.map(municipe => [
+          municipe.nome || '',
+          municipe.telefone || '',
+          municipe.email || '',
+          municipe.endereco?.split(' - ')[0] || '', // logradouro
+          '', // numero (extrair do endereço seria complexo)
+          municipe.bairro || '',
+          municipe.cidade || '',
+          municipe.cep || '',
+          '', // complemento
+          municipe.data_nascimento ? formatDateOnly(municipe.data_nascimento) : '',
+          municipe.observacoes || ''
+        ]);
 
     const csvContent = [
       headers.join(','),
@@ -176,13 +181,21 @@ export default function Municipes() {
       
       for (const municipe of municipes) {
         try {
+          // Montar endereço completo
+          let endereco = '';
+          if (municipe.logradouro) {
+            endereco = municipe.logradouro;
+            if (municipe.numero) endereco += `, ${municipe.numero}`;
+            if (municipe.complemento) endereco += ` - ${municipe.complemento}`;
+          }
+
           const { data, error } = await supabase
             .from('municipes')
             .insert({
               nome: municipe.nome,
               telefone: municipe.telefone || null,
               email: municipe.email || null,
-              endereco: municipe.endereco || null,
+              endereco: endereco || null,
               bairro: municipe.bairro || null,
               cidade: municipe.cidade || 'São Paulo',
               cep: municipe.cep || null,
@@ -261,10 +274,12 @@ export default function Municipes() {
           nome: ['nome', 'nome completo', 'name'],
           telefone: ['telefone', 'phone', 'celular'],
           email: ['email', 'e-mail', 'mail'],
-          endereco: ['endereco', 'endereço', 'address', 'rua'],
+          logradouro: ['logradouro', 'endereco', 'endereço', 'address', 'rua'],
+          numero: ['numero', 'número', 'number'],
           bairro: ['bairro', 'neighborhood'],
           cidade: ['cidade', 'city'],
           cep: ['cep', 'zip', 'zipcode'],
+          complemento: ['complemento', 'complement'],
           data_nascimento: ['data_nascimento', 'data de nascimento', 'nascimento', 'birth_date'],
           observacoes: ['observacoes', 'observações', 'notes', 'obs']
         };
@@ -343,22 +358,11 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleFileImport}
-              className="hidden"
+            <ImportCSVDialog 
+              onFileSelect={handleFileImport}
+              isImporting={importMunicipes.isPending}
+              fileInputRef={fileInputRef}
             />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importMunicipes.isPending}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {importMunicipes.isPending ? 'Importando...' : 'Importar CSV'}
-            </Button>
             <Button 
               variant="outline" 
               size="sm"
