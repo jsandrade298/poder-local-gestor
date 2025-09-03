@@ -11,7 +11,7 @@ interface KPICardProps {
     isPositive: boolean;
   };
   description?: string;
-  variant?: "default" | "destructive" | "warning";
+  variant?: "default" | "destructive" | "warning" | "caution";
 }
 
 export function KPICard({ title, value, icon: Icon, trend, description, variant = "default" }: KPICardProps) {
@@ -24,6 +24,12 @@ export function KPICard({ title, value, icon: Icon, trend, description, variant 
           iconColor: "text-destructive"
         };
       case "warning":
+        return {
+          card: "border-orange-500/20 bg-orange-500/5",
+          icon: "bg-orange-500/10 group-hover:bg-orange-500/20",
+          iconColor: "text-orange-600"
+        };
+      case "caution":
         return {
           card: "border-yellow-500/20 bg-yellow-500/5",
           icon: "bg-yellow-500/10 group-hover:bg-yellow-500/20",
