@@ -6,14 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Save, Upload, Palette, ExternalLink, Building, Users, Settings } from "lucide-react";
+import { Save, Building, Users, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSystemStatus } from "@/hooks/useSystemStatus";
 
 export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const systemStatus = useSystemStatus();
   
   // Carregamento das configurações do banco
   const { data: configuracoes = [], isLoading: isLoadingConfigs } = useQuery({
@@ -177,15 +179,23 @@ export default function Configuracoes() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">Sistema</span>
-              <Badge variant="default">Online</Badge>
+              <Badge variant={systemStatus.sistema === 'online' ? 'default' : 'destructive'}>
+                {systemStatus.sistema === 'online' ? 'Online' : 'Offline'}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">Banco de Dados</span>
-              <Badge variant="default">Conectado</Badge>
+              <Badge variant={
+                systemStatus.banco_dados === 'conectado' ? 'default' : 
+                systemStatus.banco_dados === 'erro' ? 'destructive' : 'secondary'
+              }>
+                {systemStatus.banco_dados === 'conectado' ? 'Conectado' : 
+                 systemStatus.banco_dados === 'erro' ? 'Erro' : 'Desconectado'}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-foreground">Última Atualização</span>
-              <span className="text-sm text-muted-foreground">10/01/2024 14:30</span>
+              <span className="text-sm text-muted-foreground">{systemStatus.ultima_atualizacao}</span>
             </div>
           </div>
         </CardContent>
