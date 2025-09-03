@@ -123,19 +123,28 @@ export default function Tags() {
   // Mutação para atualizar tag
   const updateTagMutation = useMutation({
     mutationFn: async (tagData: { id: string; nome: string; descricao?: string; cor: string }) => {
-      const { error } = await supabase
+      console.log('🔄 Atualizando tag:', tagData);
+      
+      const { data, error } = await supabase
         .from('tags')
         .update({
           nome: tagData.nome,
           cor: tagData.cor,
-          ...(tagData.descricao !== undefined && { descricao: tagData.descricao })
+          updated_at: new Date().toISOString()
         })
-        .eq('id', tagData.id);
+        .eq('id', tagData.id)
+        .select();
 
-      if (error) throw error;
-      return true;
+      console.log('📝 Resultado da atualização:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro na atualização:', error);
+        throw error;
+      }
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('✅ Tag atualizada com sucesso:', data);
       toast({
         title: "Tag atualizada com sucesso!",
         description: "As alterações foram salvas."
@@ -145,6 +154,7 @@ export default function Tags() {
       setSelectedTag(null);
     },
     onError: (error) => {
+      console.error('❌ Erro ao atualizar tag:', error);
       toast({
         title: "Erro ao atualizar tag",
         description: error.message,
