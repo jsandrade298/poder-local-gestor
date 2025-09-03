@@ -2,6 +2,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { StatusChart } from "@/components/dashboard/StatusChart";
 import { AreaChart } from "@/components/dashboard/AreaChart";
 import { AgingList } from "@/components/dashboard/AgingList";
+import { OverdueList } from "@/components/dashboard/OverdueList";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { FileText, Users, Clock, TrendingUp, Play, Pause, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -12,7 +13,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const handleOverdueClick = (filter: string) => {
-    navigate(`/demandas?atraso=${filter}`);
+    if (filter === 'all') {
+      navigate(`/demandas?atraso=overdue`);
+    } else {
+      navigate(`/demandas?atraso=${filter}`);
+    }
   };
 
   if (isLoading) {
@@ -101,6 +106,12 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Gráficos */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <StatusChart data={charts.statusData} />
+          <AreaChart data={charts.areaChartData} />
+        </div>
+
         {/* Demandas em Atraso */}
         <div className="space-y-6">
           <div className="flex items-center gap-3">
@@ -109,50 +120,10 @@ export default function Dashboard() {
               Demandas em Atraso
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <div onClick={() => handleOverdueClick('all')} className="cursor-pointer">
-              <KPICard
-                title="Total em Atraso"
-                value={metrics.demandasEmAtraso}
-                icon={AlertTriangle}
-                description="Passaram do prazo estipulado"
-                variant="destructive"
-              />
-            </div>
-            <div onClick={() => handleOverdueClick('30')} className="cursor-pointer">
-              <KPICard
-                title="Mais de 30 dias"
-                value={metrics.demandasAtraso30}
-                icon={Clock}
-                description="Em atraso há mais de 30 dias"
-                variant="warning"
-              />
-            </div>
-            <div onClick={() => handleOverdueClick('60')} className="cursor-pointer">
-              <KPICard
-                title="Mais de 60 dias"
-                value={metrics.demandasAtraso60}
-                icon={Clock}
-                description="Em atraso há mais de 60 dias"
-                variant="destructive"
-              />
-            </div>
-            <div onClick={() => handleOverdueClick('90')} className="cursor-pointer">
-              <KPICard
-                title="Mais de 90 dias"
-                value={metrics.demandasAtraso90}
-                icon={Clock}
-                description="Em atraso há mais de 90 dias"
-                variant="destructive"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <StatusChart data={charts.statusData} />
-          <AreaChart data={charts.areaChartData} />
+          <OverdueList 
+            title="Demandas que passaram do prazo"
+            demandas={overdue.demandasAtrasoDetalhadas}
+          />
         </div>
 
         {/* Listas de Envelhecimento */}
@@ -179,6 +150,37 @@ export default function Dashboard() {
               days={90}
               demandas={aging.demandas90Dias}
             />
+          </div>
+          
+          {/* Cards de Demandas em Atraso por Tempo */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div onClick={() => handleOverdueClick('30')} className="cursor-pointer">
+              <KPICard
+                title="Mais de 30 dias em atraso"
+                value={metrics.demandasAtraso30}
+                icon={Clock}
+                description="Em atraso há mais de 30 dias"
+                variant="warning"
+              />
+            </div>
+            <div onClick={() => handleOverdueClick('60')} className="cursor-pointer">
+              <KPICard
+                title="Mais de 60 dias em atraso"
+                value={metrics.demandasAtraso60}
+                icon={Clock}
+                description="Em atraso há mais de 60 dias"
+                variant="destructive"
+              />
+            </div>
+            <div onClick={() => handleOverdueClick('90')} className="cursor-pointer">
+              <KPICard
+                title="Mais de 90 dias em atraso"
+                value={metrics.demandasAtraso90}
+                icon={Clock}
+                description="Em atraso há mais de 90 dias"
+                variant="destructive"
+              />
+            </div>
           </div>
         </div>
       </div>

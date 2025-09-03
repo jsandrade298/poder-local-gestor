@@ -133,6 +133,24 @@ export function useDashboardData() {
     return diasAtraso > 90;
   });
 
+  // Preparar dados das demandas em atraso para exibição
+  const demandasAtrasoDetalhadas = demandasComAtraso.map(demanda => {
+    const prazo = new Date(demanda.data_prazo);
+    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return {
+      id: demanda.id,
+      titulo: demanda.titulo,
+      protocolo: demanda.protocolo,
+      area: demanda.areas?.nome || 'Sem área',
+      cidade: demanda.cidade,
+      bairro: demanda.bairro,
+      data_prazo: demanda.data_prazo,
+      diasAtraso,
+      status: demanda.status
+    };
+  }).sort((a, b) => b.diasAtraso - a.diasAtraso); // Ordenar por dias de atraso (maior primeiro)
+
   return {
     metrics: {
       totalDemandas,
@@ -161,7 +179,8 @@ export function useDashboardData() {
       demandasEmAtraso: demandasComAtraso.length,
       demandasAtraso30: demandasAtraso30Dias.length,
       demandasAtraso60: demandasAtraso60Dias.length,
-      demandasAtraso90: demandasAtraso90Dias.length
+      demandasAtraso90: demandasAtraso90Dias.length,
+      demandasAtrasoDetalhadas
     },
     isLoading: isLoadingDemandas || isLoadingMunicipes
   };
