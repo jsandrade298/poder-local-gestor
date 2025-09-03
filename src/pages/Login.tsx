@@ -5,40 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Lock, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/hooks/useAuth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signIn } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Simulação de login - substituir pela integração com Supabase
-      if (email && password) {
-        toast({
-          title: "Login realizado com sucesso",
-          description: "Redirecionando para o painel...",
-        });
-        navigate("/");
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        // Exibir erro na interface
+        console.error('Erro de login:', error);
       } else {
-        toast({
-          title: "Erro no login",
-          description: "Por favor, preencha todos os campos.",
-          variant: "destructive",
-        });
+        // Login bem-sucedido, redirecionar para dashboard
+        navigate('/');
       }
     } catch (error) {
-      toast({
-        title: "Erro no login",
-        description: "Credenciais inválidas. Tente novamente.",
-        variant: "destructive",
-      });
+      console.error('Erro inesperado:', error);
     } finally {
       setLoading(false);
     }
