@@ -9,6 +9,9 @@ import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
+import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
+import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -19,6 +22,8 @@ export default function Municipes() {
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
+  const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -352,6 +357,38 @@ export default function Municipes() {
     }
   };
 
+  // Função para excluir munícipe
+  const deleteMunicipe = useMutation({
+    mutationFn: async (municipeId: string) => {
+      const { error } = await supabase
+        .from('municipes')
+        .delete()
+        .eq('id', municipeId);
+
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Munícipe excluído com sucesso!",
+        description: "O munícipe foi removido do sistema."
+      });
+      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao excluir munícipe",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleViewDetails = (municipe: any) => {
+    setSelectedMunicipe(municipe);
+    setShowDetails(true);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
       <div className="container mx-auto px-4 py-6 space-y-6">
@@ -610,9 +647,44 @@ export default function Municipes() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver detalhes</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewDetails(municipe)}>
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <EditMunicipeDialog 
+                                municipe={municipe}
+                                trigger={
+                                  <span className="flex items-center w-full cursor-pointer">
+                                    Editar
+                                  </span>
+                                }
+                              />
+                            </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <span className="text-destructive cursor-pointer">Excluir</span>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir o munícipe "{municipe.nome}"? 
+                                    Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteMunicipe.mutate(municipe.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -623,6 +695,13 @@ export default function Municipes() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Dialog de Detalhes */}
+        <MunicipeDetailsDialog
+          municipe={selectedMunicipe}
+          open={showDetails}
+          onOpenChange={setShowDetails}
+        />
       </div>
     </div>
   );
