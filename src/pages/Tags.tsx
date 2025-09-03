@@ -652,11 +652,18 @@ export default function Tags() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                          <DropdownMenuItem onClick={() => handleEditTag(tag)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
+                         <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                           <DropdownMenuItem onClick={() => {
+                             setSelectedTag(tag);
+                             setIsManageMunicipesDialogOpen(true);
+                           }}>
+                             <Settings className="h-4 w-4 mr-2" />
+                             Gerenciar Munícipes
+                           </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                             <Edit className="h-4 w-4 mr-2" />
+                             Editar
+                           </DropdownMenuItem>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
