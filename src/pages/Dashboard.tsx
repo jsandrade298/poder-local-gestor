@@ -6,22 +6,41 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Users, Clock, TrendingUp, Plus, Filter } from "lucide-react";
-
-// Dados mockados - substituir pela integração com Supabase
-const demandas30Dias = [
-  { id: "1", titulo: "Reparo de buraco na Rua das Flores", area: "Infraestrutura", responsavel: "João Silva", diasVencido: 35 },
-  { id: "2", titulo: "Melhoria na iluminação da praça", area: "Infraestrutura", responsavel: "Maria Santos", diasVencido: 38 },
-];
-
-const demandas60Dias = [
-  { id: "3", titulo: "Solicitação de novo semáforo", area: "Trânsito", responsavel: "Carlos Lima", diasVencido: 65 },
-];
-
-const demandas90Dias = [
-  { id: "4", titulo: "Reforma da escola municipal", area: "Educação", responsavel: "Ana Costa", diasVencido: 95 },
-];
+import { useDemandas } from "@/hooks/useDemandas";
+import { useMunicipes } from "@/hooks/useMunicipes";
+import { useState } from "react";
 
 export default function Dashboard() {
+  const { demandas, loading, getDemandasPorStatus, getDemandasPorArea, getDemandasEnvelhecimento } = useDemandas();
+  const { municipes } = useMunicipes();
+  const [bairroFilter, setBairroFilter] = useState("all");
+  const [responsavelFilter, setResponsavelFilter] = useState("all");
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const statusData = getDemandasPorStatus();
+  const areaData = getDemandasPorArea();
+  const { demandas30, demandas60, demandas90 } = getDemandasEnvelhecimento();
+  
+  // Calcular KPIs
+  const totalDemandas = demandas.length;
+  const demandasAtivas = demandas.filter(d => ['solicitado', 'em_andamento'].includes(d.status)).length;
+  const totalMunicipes = municipes.length;
+  const taxaConclusao = totalDemandas > 0 ? Math.round((demandas.filter(d => d.status === 'concluido').length / totalDemandas) * 100) : 0;
   return (
     <div className="space-y-6">
       {/* Header da Dashboard */}
@@ -95,38 +114,37 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total de Demandas"
-          value="248"
+          value={totalDemandas.toString()}
           icon={FileText}
           trend={{ value: "+12%", isPositive: true }}
           description="Todas as demandas cadastradas"
         />
         <KPICard
           title="Demandas Ativas"
-          value="156"
+          value={demandasAtivas.toString()}
           icon={Clock}
           trend={{ value: "+8%", isPositive: true }}
           description="Em andamento ou solicitadas"
         />
         <KPICard
           title="Munícipes Cadastrados"
-          value="1.247"
+          value={totalMunicipes.toString()}
           icon={Users}
           trend={{ value: "+24", isPositive: true }}
           description="Base de dados atualizada"
         />
         <KPICard
           title="Taxa de Conclusão"
-          value="68%"
+          value={`${taxaConclusao}%`}
           icon={TrendingUp}
           trend={{ value: "+5%", isPositive: true }}
-          description="Demandas concluídas no mês"
+          description="Demandas concluídas no total"
         />
       </div>
 
-      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StatusChart />
-        <AreaChart />
+        <StatusChart data={statusData} />
+        <AreaChart data={areaData} />
       </div>
 
       {/* Listas de Envelhecimento */}
@@ -138,17 +156,17 @@ export default function Dashboard() {
           <AgingList
             title="Mais de 30 dias"
             days={30}
-            demandas={demandas30Dias}
+            demandas={demandas30}
           />
           <AgingList
             title="Mais de 60 dias"
             days={60}
-            demandas={demandas60Dias}
+            demandas={demandas60}
           />
           <AgingList
             title="Mais de 90 dias"
             days={90}
-            demandas={demandas90Dias}
+            demandas={demandas90}
           />
         </div>
       </div>

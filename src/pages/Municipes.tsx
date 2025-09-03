@@ -7,54 +7,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
-// Dados mockados - substituir pela integração com Supabase
-const municipesMock = [
-  {
-    id: "1",
-    nome_completo: "Maria da Silva Santos",
-    email: "maria.silva@email.com",
-    telefone: "(11) 99999-1111",
-    data_nascimento: "1985-05-15",
-    endereco: "Rua das Flores, 123 - Centro - São Paulo/SP",
-    tags: ["Idoso", "Deficiente"],
-    total_demandas: 3
-  },
-  {
-    id: "2", 
-    nome_completo: "José Santos Oliveira",
-    email: "jose.santos@email.com",
-    telefone: "(11) 99999-2222",
-    data_nascimento: "1978-12-03",
-    endereco: "Av. Principal, 456 - Vila Nova - São Paulo/SP",
-    tags: ["Comerciante"],
-    total_demandas: 1
-  },
-  {
-    id: "3",
-    nome_completo: "Ana Costa Lima",
-    email: "ana.costa@email.com", 
-    telefone: "(11) 99999-3333",
-    data_nascimento: "1992-08-20",
-    endereco: "Rua B, 789 - Jardim América - São Paulo/SP",
-    tags: ["Jovem", "Estudante"],
-    total_demandas: 2
-  }
-];
+import { useMunicipes } from "@/hooks/useMunicipes";
+import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 
 export default function Municipes() {
+  const { municipes, loading, fetchMunicipes } = useMunicipes();
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
 
-  const filteredMunicipes = municipesMock.filter(municipe => {
+  const filteredMunicipes = municipes.filter(municipe => {
     const matchesSearch = municipe.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          municipe.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = tagFilter === "all" || municipe.tags.includes(tagFilter);
-    const matchesBairro = bairroFilter === "all" || municipe.endereco.includes(bairroFilter);
+    const matchesTag = tagFilter === "all" || (municipe.tags && municipe.tags.some(tag => tag.nome === tagFilter));
+    const matchesBairro = bairroFilter === "all" || (municipe.end_bairro && municipe.end_bairro.includes(bairroFilter));
     
     return matchesSearch && matchesTag && matchesBairro;
   });
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -78,10 +68,7 @@ export default function Municipes() {
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Munícipe
-          </Button>
+          <NovoMunicipeDialog onSuccess={fetchMunicipes} />
         </div>
       </div>
 
@@ -160,14 +147,14 @@ export default function Municipes() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{municipesMock.length}</div>
+            <div className="text-2xl font-bold text-foreground">{municipes.length}</div>
             <p className="text-sm text-muted-foreground">Total de Munícipes</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {municipesMock.reduce((acc, m) => acc + m.total_demandas, 0)}
+              {municipes.reduce((acc, m) => acc + (m.total_demandas || 0), 0)}
             </div>
             <p className="text-sm text-muted-foreground">Total de Demandas</p>
           </CardContent>
@@ -175,7 +162,7 @@ export default function Municipes() {
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {new Set(municipesMock.flatMap(m => m.tags)).size}
+              {new Set(municipes.flatMap(m => m.tags?.map(t => t.nome) || [])).size}
             </div>
             <p className="text-sm text-muted-foreground">Tags Ativas</p>
           </CardContent>
@@ -209,7 +196,10 @@ export default function Municipes() {
                       <div>
                         <p className="font-medium text-foreground">{municipe.nome_completo}</p>
                         <p className="text-xs text-muted-foreground">
-                          Nascimento: {new Date(municipe.data_nascimento).toLocaleDateString('pt-BR')}
+                          Nascimento: {municipe.data_nascimento 
+                            ? new Date(municipe.data_nascimento).toLocaleDateString('pt-BR')
+                            : 'Não informado'
+                          }
                         </p>
                       </div>
                     </TableCell>
@@ -228,21 +218,27 @@ export default function Municipes() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-xs text-foreground">{municipe.endereco}</span>
+                        <span className="text-xs text-foreground">
+                          {[municipe.end_logradouro, municipe.end_numero, municipe.end_bairro, municipe.end_cidade]
+                            .filter(Boolean)
+                            .join(', ') || 'Endereço não informado'}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {municipe.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
+                        {municipe.tags?.map((tag) => (
+                          <Badge key={tag.id} variant="secondary" className="text-xs">
+                            {tag.nome}
                           </Badge>
-                        ))}
+                        )) || (
+                          <span className="text-xs text-muted-foreground">Sem tags</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {municipe.total_demandas}
+                        {municipe.total_demandas || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

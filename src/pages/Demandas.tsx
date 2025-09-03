@@ -7,46 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Filter, MoreHorizontal, Calendar, User, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
-// Dados mockados - substituir pela integração com Supabase
-const demandasMock = [
-  {
-    id: "1",
-    titulo: "Reparo de buraco na Rua das Flores",
-    descricao: "Buraco grande na via principal causando acidentes",
-    area: "Infraestrutura",
-    responsavel: "João Silva",
-    status: "em_andamento",
-    municipe: "Maria da Silva",
-    endereco: "Rua das Flores, 123 - Centro",
-    prazo: "2024-01-15",
-    criado_em: "2023-12-01"
-  },
-  {
-    id: "2",
-    titulo: "Melhoria na iluminação da praça",
-    descricao: "Instalação de novos postes de luz",
-    area: "Infraestrutura", 
-    responsavel: "Maria Santos",
-    status: "solicitado",
-    municipe: "José Santos",
-    endereco: "Praça Central - Centro",
-    prazo: "2024-02-01",
-    criado_em: "2023-11-15"
-  },
-  {
-    id: "3",
-    titulo: "Solicitação de novo semáforo",
-    descricao: "Cruzamento perigoso necessita sinalização",
-    area: "Trânsito",
-    responsavel: "Carlos Lima", 
-    status: "nao_atendido",
-    municipe: "Ana Costa",
-    endereco: "Av. Principal x Rua B - Vila Nova",
-    prazo: "2024-01-30",
-    criado_em: "2023-10-20"
-  }
-];
+import { useDemandas } from "@/hooks/useDemandas";
+import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 
 const getStatusVariant = (status: string) => {
   switch (status) {
@@ -71,18 +33,35 @@ const getStatusLabel = (status: string) => {
 };
 
 export default function Demandas() {
+  const { demandas, loading, fetchDemandas } = useDemandas();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
 
-  const filteredDemandas = demandasMock.filter(demanda => {
+  const filteredDemandas = demandas.filter(demanda => {
     const matchesSearch = demanda.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         demanda.municipe.toLowerCase().includes(searchTerm.toLowerCase());
+                         (demanda.municipe?.nome_completo || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
-    const matchesArea = areaFilter === "all" || demanda.area === areaFilter;
+    const matchesArea = areaFilter === "all" || demanda.area?.nome === areaFilter;
     
     return matchesSearch && matchesStatus && matchesArea;
   });
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -97,10 +76,7 @@ export default function Demandas() {
           </p>
         </div>
         
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Demanda
-        </Button>
+        <NovaDemandaDialog onSuccess={fetchDemandas} />
       </div>
 
       {/* Filtros */}
@@ -204,7 +180,11 @@ export default function Demandas() {
                         <p className="font-medium text-foreground">{demanda.titulo}</p>
                         <div className="flex items-center gap-1 mt-1">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">{demanda.endereco}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {[demanda.end_logradouro, demanda.end_numero, demanda.end_bairro]
+                              .filter(Boolean)
+                              .join(', ') || 'Endereço não informado'}
+                          </p>
                         </div>
                       </div>
                     </TableCell>
@@ -214,22 +194,25 @@ export default function Demandas() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-foreground">{demanda.area}</span>
+                      <span className="text-sm text-foreground">{demanda.area?.nome || 'Sem área'}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm text-foreground">{demanda.municipe}</span>
+                        <span className="text-sm text-foreground">{demanda.municipe?.nome_completo || 'Sem munícipe'}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-foreground">{demanda.responsavel}</span>
+                      <span className="text-sm text-foreground">{demanda.responsavel?.nome || 'Sem responsável'}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
                         <span className="text-sm text-foreground">
-                          {new Date(demanda.prazo).toLocaleDateString('pt-BR')}
+                          {demanda.prazo_entrega 
+                            ? new Date(demanda.prazo_entrega).toLocaleDateString('pt-BR')
+                            : 'Sem prazo'
+                          }
                         </span>
                       </div>
                     </TableCell>
