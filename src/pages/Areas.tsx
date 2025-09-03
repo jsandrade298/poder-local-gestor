@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3 } from "lucide-react";
+import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3, Clock, Play, Pause, CheckCircle, XCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -224,7 +224,7 @@ export default function Areas() {
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -249,8 +249,24 @@ export default function Areas() {
         </Card>
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{totalAtivas}</div>
-            <p className="text-sm text-muted-foreground">Demandas Ativas</p>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
+              <div>
+                <div className="text-2xl font-bold text-foreground">{totalAtivas}</div>
+                <p className="text-sm text-muted-foreground">Em Andamento</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-0 bg-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-success" />
+              <div>
+                <div className="text-2xl font-bold text-foreground">{totalResolvidas}</div>
+                <p className="text-sm text-muted-foreground">Resolvidas</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-0 bg-card">
@@ -312,14 +328,22 @@ export default function Areas() {
                 <p className="text-sm text-muted-foreground">
                   {area.descricao}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   <div className="text-center">
                     <div className="text-lg font-bold text-foreground">{area.total_demandas}</div>
                     <p className="text-xs text-muted-foreground">Total</p>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-warning">{area.demandas_ativas}</div>
-                    <p className="text-xs text-muted-foreground">Ativas</p>
+                    <div className="text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
+                    <p className="text-xs text-muted-foreground">Abertas</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
+                    <p className="text-xs text-muted-foreground">Andamento</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
+                    <p className="text-xs text-muted-foreground">Aguardando</p>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-bold text-success">{area.demandas_resolvidas}</div>
@@ -340,6 +364,22 @@ export default function Areas() {
                         width: `${area.total_demandas > 0 ? (area.demandas_resolvidas / area.total_demandas) * 100 : 0}%` 
                       }}
                     />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-xs mt-2">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded bg-warning"></div>
+                      <span className="text-muted-foreground">Ativas: {area.demandas_ativas}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded bg-success"></div>
+                      <span className="text-muted-foreground">Resolvidas: {area.demandas_resolvidas}</span>
+                    </div>
+                    {area.demandas_canceladas > 0 && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded bg-destructive"></div>
+                        <span className="text-muted-foreground">Canceladas: {area.demandas_canceladas}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="w-full">
@@ -366,8 +406,11 @@ export default function Areas() {
                   <TableHead>Área</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-center">Ativas</TableHead>
+                  <TableHead className="text-center">Abertas</TableHead>
+                  <TableHead className="text-center">Em Andamento</TableHead>
+                  <TableHead className="text-center">Aguardando</TableHead>
                   <TableHead className="text-center">Resolvidas</TableHead>
+                  <TableHead className="text-center">Canceladas</TableHead>
                   <TableHead className="text-center">Taxa de Resolução</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -396,17 +439,32 @@ export default function Areas() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="warning">
-                          {area.demandas_ativas}
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          {area.demandas_abertas}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="default">
+                        <Badge variant="warning">
+                          {area.demandas_em_andamento}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                          {area.demandas_aguardando}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="default" className="bg-green-100 text-green-800">
                           {area.demandas_resolvidas}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="text-sm text-foreground">{taxaResolucao}%</span>
+                        <Badge variant="destructive" className="bg-red-100 text-red-800">
+                          {area.demandas_canceladas}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm font-medium text-foreground">{taxaResolucao}%</span>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
