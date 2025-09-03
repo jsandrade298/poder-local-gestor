@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { formatInTimeZone } from 'date-fns-tz';
 
 export function useDashboardData() {
   const { data: demandas = [], isLoading: isLoadingDemandas } = useQuery({
@@ -87,24 +88,6 @@ export function useDashboardData() {
     total: number;
   }>;
 
-  // Calcular dias desde criação e separar por faixas
-  const now = new Date();
-  const demandasComIdade = demandas.map(demanda => {
-    const createdAt = new Date(demanda.created_at || '');
-    const diasVencido = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-    
-    return {
-      id: demanda.id,
-      titulo: demanda.titulo,
-      area: demanda.areas?.nome || 'Sem área',
-      responsavel: 'Sem responsável', // Temporariamente removido até resolver foreign key
-      diasVencido
-    };
-  });
-
-  const demandas30Dias = demandasComIdade.filter(d => d.diasVencido >= 30 && d.diasVencido < 60);
-  const demandas60Dias = demandasComIdade.filter(d => d.diasVencido >= 60 && d.diasVencido < 90);
-  const demandas90Dias = demandasComIdade.filter(d => d.diasVencido >= 90);
 
   // Calcular demandas em atraso (com base no campo data_prazo)
   const today = new Date('2025-09-03'); // Data atual para teste
@@ -146,7 +129,7 @@ export function useDashboardData() {
       area: demanda.areas?.nome || 'Sem área',
       cidade: demanda.cidade,
       bairro: demanda.bairro,
-      data_prazo: demanda.data_prazo,
+      data_prazo: formatInTimeZone(new Date(demanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy'),
       diasAtraso,
       status: demanda.status
     };
@@ -170,11 +153,6 @@ export function useDashboardData() {
     charts: {
       statusData,
       areaChartData
-    },
-    aging: {
-      demandas30Dias,
-      demandas60Dias,
-      demandas90Dias
     },
     overdue: {
       demandasEmAtraso: demandasComAtraso.length,

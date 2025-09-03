@@ -13,6 +13,7 @@ import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download } from "luc
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { toast } from "sonner";
+import { formatInTimeZone } from 'date-fns-tz';
 import { useLocation, useSearchParams } from "react-router-dom";
 
 export default function Demandas() {
@@ -510,7 +511,7 @@ export default function Demandas() {
 
                       {demanda.data_prazo && (
                         <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Prazo:</span> {new Date(demanda.data_prazo).toLocaleDateString('pt-BR')}
+                          <span className="font-medium">Prazo:</span> {formatInTimeZone(new Date(demanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy')}
                         </div>
                       )}
 
@@ -523,7 +524,7 @@ export default function Demandas() {
                       <div className="text-right text-sm text-muted-foreground">
                         <div>Criado em</div>
                         <div className="font-medium">
-                          {new Date(demanda.created_at).toLocaleDateString('pt-BR')}
+                          {formatInTimeZone(new Date(demanda.created_at), 'America/Sao_Paulo', 'dd/MM/yyyy')}
                         </div>
                       </div>
                       
@@ -649,7 +650,7 @@ export default function Demandas() {
                   <div>
                     <label className="text-sm font-medium">Prazo</label>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(selectedDemanda.data_prazo).toLocaleDateString('pt-BR')}
+                      {formatInTimeZone(new Date(selectedDemanda.data_prazo), 'America/Sao_Paulo', 'dd/MM/yyyy')}
                     </p>
                   </div>
                 )}
@@ -725,15 +726,13 @@ export default function Demandas() {
                   <div>
                     <label className="text-sm font-medium">Criado em</label>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(selectedDemanda.created_at).toLocaleDateString('pt-BR')} às{' '}
-                      {new Date(selectedDemanda.created_at).toLocaleTimeString('pt-BR')}
+                      {formatInTimeZone(new Date(selectedDemanda.created_at), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm')}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Atualizado em</label>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(selectedDemanda.updated_at).toLocaleDateString('pt-BR')} às{' '}
-                      {new Date(selectedDemanda.updated_at).toLocaleTimeString('pt-BR')}
+                      {formatInTimeZone(new Date(selectedDemanda.updated_at), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm')}
                     </p>
                   </div>
                 </div>

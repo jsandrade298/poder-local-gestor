@@ -1,7 +1,7 @@
 import { KPICard } from "@/components/dashboard/KPICard";
 import { StatusChart } from "@/components/dashboard/StatusChart";
 import { AreaChart } from "@/components/dashboard/AreaChart";
-import { AgingList } from "@/components/dashboard/AgingList";
+
 import { OverdueList } from "@/components/dashboard/OverdueList";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { FileText, Users, Clock, TrendingUp, Play, Pause, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
@@ -9,7 +9,7 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
-  const { metrics, charts, aging, overdue, isLoading } = useDashboardData();
+  const { metrics, charts, overdue, isLoading } = useDashboardData();
   const navigate = useNavigate();
 
   const handleOverdueClick = (filter: string) => {
@@ -126,33 +126,14 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Listas de Envelhecimento */}
+        {/* Cards de Demandas em Atraso por Tempo */}
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <Clock className="h-6 w-6 text-primary" />
+            <AlertTriangle className="h-6 w-6 text-destructive" />
             <h2 className="text-xl font-semibold text-foreground">
-              Demandas por Tempo de Criação
+              Análise de Atraso
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            <AgingList
-              title="Mais de 30 dias"
-              days={30}
-              demandas={aging.demandas30Dias}
-            />
-            <AgingList
-              title="Mais de 60 dias"
-              days={60}
-              demandas={aging.demandas60Dias}
-            />
-            <AgingList
-              title="Mais de 90 dias"
-              days={90}
-              demandas={aging.demandas90Dias}
-            />
-          </div>
-          
-          {/* Cards de Demandas em Atraso por Tempo */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div onClick={() => handleOverdueClick('30')} className="cursor-pointer">
               <KPICard
