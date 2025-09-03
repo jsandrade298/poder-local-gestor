@@ -13,10 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 interface EditMunicipeDialogProps {
   municipe: any;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProps) {
-  const [open, setOpen] = useState(false);
+export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOpenChange: externalOnOpenChange }: EditMunicipeDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Usar controle externo se fornecido, senão usar controle interno
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
   const [formData, setFormData] = useState({
     nome: municipe?.nome || "",
     telefone: municipe?.telefone || "",
@@ -204,9 +210,11 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || defaultTrigger}
-      </DialogTrigger>
+      {externalOpen === undefined && (
+        <DialogTrigger asChild>
+          {trigger || defaultTrigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Munícipe</DialogTitle>

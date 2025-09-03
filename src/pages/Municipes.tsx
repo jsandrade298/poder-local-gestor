@@ -24,6 +24,8 @@ export default function Municipes() {
   const [cidadeFilter, setCidadeFilter] = useState("all");
   const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [municipeToEdit, setMunicipeToEdit] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -654,42 +656,29 @@ export default function Municipes() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetails(municipe)}>
+                            <DropdownMenuItem onClick={() => {
+                              console.log('Ver detalhes clicado para:', municipe.nome);
+                              handleViewDetails(municipe);
+                            }}>
                               Ver detalhes
                             </DropdownMenuItem>
-                            <EditMunicipeDialog 
-                              municipe={municipe}
-                              trigger={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  Editar
-                                </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.preventDefault();
+                              console.log('Editar clicado para:', municipe.nome);
+                              setMunicipeToEdit(municipe);
+                              setShowEditDialog(true);
+                            }}>
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.preventDefault();
+                              console.log('Excluir clicado para:', municipe.nome);
+                              if (window.confirm(`Tem certeza que deseja excluir o munícipe "${municipe.nome}"?`)) {
+                                deleteMunicipe.mutate(municipe.id);
                               }
-                            />
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <span className="text-destructive">Excluir</span>
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja excluir o munícipe "{municipe.nome}"? 
-                                    Esta ação não pode ser desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteMunicipe.mutate(municipe.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            }}>
+                              <span className="text-destructive">Excluir</span>
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -706,6 +695,13 @@ export default function Municipes() {
           municipe={selectedMunicipe}
           open={showDetails}
           onOpenChange={setShowDetails}
+        />
+
+        {/* Dialog de Edição */}
+        <EditMunicipeDialog
+          municipe={municipeToEdit}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
         />
       </div>
     </div>
