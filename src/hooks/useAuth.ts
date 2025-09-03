@@ -1,17 +1,20 @@
 import { create } from 'zustand'
-import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { User, Session } from '@supabase/supabase-js'
+import { supabase } from '@/integrations/supabase/client'
 
 interface AuthState {
   user: User | null
+  session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error?: string }>
+  signUp: (email: string, password: string, nome: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   initialize: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  session: null,
   loading: true,
 
   signIn: async (email: string, password: string) => {
@@ -25,27 +28,55 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { error: error.message }
       }
 
-      set({ user: data.user })
+      set({ user: data.user, session: data.session })
       return {}
     } catch (error) {
       return { error: 'Erro inesperado ao fazer login' }
     }
   },
 
+  signUp: async (email: string, password: string, nome: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/`
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: nome
+          }
+        }
+      })
+
+      if (error) {
+        return { error: error.message }
+      }
+
+      return {}
+    } catch (error) {
+      return { error: 'Erro inesperado ao fazer cadastro' }
+    }
+  },
+
   signOut: async () => {
     await supabase.auth.signOut()
-    set({ user: null })
+    set({ user: null, session: null })
   },
 
   initialize: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      set({ user: session?.user ?? null, loading: false })
+      // Set up auth state listener FIRST
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          set({ session, user: session?.user ?? null, loading: false })
+        }
+      )
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange((event, session) => {
-        set({ user: session?.user ?? null, loading: false })
-      })
+      // THEN check for existing session
+      const { data: { session } } = await supabase.auth.getSession()
+      set({ session, user: session?.user ?? null, loading: false })
     } catch (error) {
       set({ loading: false })
     }
@@ -54,6 +85,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 // Hook para verificar se o usuário está autenticado
 export const useAuth = () => {
-  const { user, loading } = useAuthStore()
-  return { user, loading, isAuthenticated: !!user }
+  const { user, session, loading } = useAuthStore()
+  return { user, session, loading, isAuthenticated: !!user }
 }
