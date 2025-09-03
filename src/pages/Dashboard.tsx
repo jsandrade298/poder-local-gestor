@@ -1,287 +1,157 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useDemandas } from '@/hooks/useDemandas';
-import { useMunicipes } from '@/hooks/useMunicipes';
+import { KPICard } from "@/components/dashboard/KPICard";
+import { StatusChart } from "@/components/dashboard/StatusChart";
+import { AreaChart } from "@/components/dashboard/AreaChart";
+import { AgingList } from "@/components/dashboard/AgingList";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Users, Clock, TrendingUp, Plus, Filter } from "lucide-react";
 
-const Dashboard = () => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { demandas } = useDemandas();
-  const { municipes } = useMunicipes();
+// Dados mockados - substituir pela integração com Supabase
+const demandas30Dias = [
+  { id: "1", titulo: "Reparo de buraco na Rua das Flores", area: "Infraestrutura", responsavel: "João Silva", diasVencido: 35 },
+  { id: "2", titulo: "Melhoria na iluminação da praça", area: "Infraestrutura", responsavel: "Maria Santos", diasVencido: 38 },
+];
 
-  useEffect(() => {
-    // Verificar se está autenticado
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
-      
-      setUser(session.user);
-      setLoading(false);
-    };
+const demandas60Dias = [
+  { id: "3", titulo: "Solicitação de novo semáforo", area: "Trânsito", responsavel: "Carlos Lima", diasVencido: 65 },
+];
 
-    checkAuth();
+const demandas90Dias = [
+  { id: "4", titulo: "Reforma da escola municipal", area: "Educação", responsavel: "Ana Costa", diasVencido: 95 },
+];
 
-    // Escutar mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        navigate('/login');
-      } else if (session) {
-        setUser(session.user);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Estatísticas
-  const demandasAbertas = demandas.filter(d => d.status === 'aberta').length;
-  const demandasEmAndamento = demandas.filter(d => d.status === 'em_andamento').length;
-  const demandasResolvidas = demandas.filter(d => d.status === 'resolvida').length;
-
+export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-xl font-semibold text-gray-900">
-                Sistema de Gestão de Gabinete
-              </h1>
-              
-              {/* Navigation */}
-              <nav className="hidden md:flex space-x-6">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="text-blue-600 font-medium"
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => navigate('/demandas')}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Demandas
-                </button>
-                <button
-                  onClick={() => navigate('/municipes')}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Munícipes
-                </button>
-                <button
-                  onClick={() => navigate('/areas')}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Áreas
-                </button>
-                <button
-                  onClick={() => navigate('/tags')}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Tags
-                </button>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Olá, {user?.email}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm"
-              >
-                Sair
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Dashboard
-          </h2>
-          <p className="text-gray-600">
-            Visão geral do sistema de gestão do gabinete político.
+    <div className="space-y-6">
+      {/* Header da Dashboard */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            Visão Geral do Gabinete
+          </h1>
+          <p className="text-muted-foreground">
+            Acompanhe as principais métricas e demandas em tempo real
           </p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Munícipes</p>
-                <p className="text-2xl font-semibold text-gray-900">{municipes.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <svg className="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Demandas Abertas</p>
-                <p className="text-2xl font-semibold text-gray-900">{demandasAbertas}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Em Andamento</p>
-                <p className="text-2xl font-semibold text-gray-900">{demandasEmAndamento}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Resolvidas</p>
-                <p className="text-2xl font-semibold text-gray-900">{demandasResolvidas}</p>
-              </div>
-            </div>
-          </div>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+          </Button>
+          <Button size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Demanda
+          </Button>
         </div>
+      </div>
 
-        {/* Content Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Demandas Recentes
-            </h3>
-            <div className="space-y-3">
-              {demandas.slice(0, 5).map(demanda => (
-                <div key={demanda.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{demanda.titulo}</p>
-                    <p className="text-xs text-gray-500">
-                      {demanda.municipe?.nome} • {demanda.protocolo}
-                    </p>
-                  </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    demanda.status === 'aberta' ? 'bg-red-100 text-red-800' :
-                    demanda.status === 'em_andamento' ? 'bg-yellow-100 text-yellow-800' :
-                    demanda.status === 'resolvida' ? 'bg-green-100 text-green-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {demanda.status}
-                  </span>
-                </div>
-              ))}
-              {demandas.length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  Nenhuma demanda cadastrada ainda
-                </p>
-              )}
+      {/* Filtros Globais */}
+      <Card className="shadow-sm border-0 bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Filtros Globais</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Filtrar por Bairro
+              </label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os bairros" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="centro">Centro</SelectItem>
+                  <SelectItem value="vila-nova">Vila Nova</SelectItem>
+                  <SelectItem value="jardim-america">Jardim América</SelectItem>
+                  <SelectItem value="industrial">Industrial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Filtrar por Responsável
+              </label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os responsáveis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="joao">João Silva</SelectItem>
+                  <SelectItem value="maria">Maria Santos</SelectItem>
+                  <SelectItem value="carlos">Carlos Lima</SelectItem>
+                  <SelectItem value="ana">Ana Costa</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Ações Rápidas
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => navigate('/demandas')}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <svg className="h-8 w-8 text-blue-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <p className="text-sm font-medium">Nova Demanda</p>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => navigate('/municipes')}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <svg className="h-8 w-8 text-green-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <p className="text-sm font-medium">Novo Munícipe</p>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => navigate('/areas')}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <svg className="h-8 w-8 text-purple-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  <p className="text-sm font-medium">Gerenciar Áreas</p>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => navigate('/tags')}
-                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <svg className="h-8 w-8 text-yellow-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <p className="text-sm font-medium">Gerenciar Tags</p>
-                </div>
-              </button>
-            </div>
-          </div>
+      {/* KPIs Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Total de Demandas"
+          value="248"
+          icon={FileText}
+          trend={{ value: "+12%", isPositive: true }}
+          description="Todas as demandas cadastradas"
+        />
+        <KPICard
+          title="Demandas Ativas"
+          value="156"
+          icon={Clock}
+          trend={{ value: "+8%", isPositive: true }}
+          description="Em andamento ou solicitadas"
+        />
+        <KPICard
+          title="Munícipes Cadastrados"
+          value="1.247"
+          icon={Users}
+          trend={{ value: "+24", isPositive: true }}
+          description="Base de dados atualizada"
+        />
+        <KPICard
+          title="Taxa de Conclusão"
+          value="68%"
+          icon={TrendingUp}
+          trend={{ value: "+5%", isPositive: true }}
+          description="Demandas concluídas no mês"
+        />
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <StatusChart />
+        <AreaChart />
+      </div>
+
+      {/* Listas de Envelhecimento */}
+      <div>
+        <h2 className="text-lg font-semibold text-foreground mb-4">
+          Demandas por Tempo de Criação
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <AgingList
+            title="Mais de 30 dias"
+            days={30}
+            demandas={demandas30Dias}
+          />
+          <AgingList
+            title="Mais de 60 dias"
+            days={60}
+            demandas={demandas60Dias}
+          />
+          <AgingList
+            title="Mais de 90 dias"
+            days={90}
+            demandas={demandas90Dias}
+          />
         </div>
-      </main>
+      </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
