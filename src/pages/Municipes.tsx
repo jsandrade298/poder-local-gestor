@@ -362,18 +362,29 @@ export default function Municipes() {
   // Função para excluir munícipe
   const deleteMunicipe = useMutation({
     mutationFn: async (municipeId: string) => {
+      console.log('Iniciando exclusão do munícipe:', municipeId);
+      
       // Primeiro, remover todas as tags associadas ao munícipe
-      await supabase
+      const { error: tagDeleteError } = await supabase
         .from('municipe_tags')
         .delete()
         .eq('municipe_id', municipeId);
       
+      if (tagDeleteError) {
+        console.error('Erro ao remover tags:', tagDeleteError);
+      } else {
+        console.log('Tags removidas com sucesso');
+      }
+      
       // Depois, excluir o munícipe
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('municipes')
         .delete()
-        .eq('id', municipeId);
+        .eq('id', municipeId)
+        .select();
 
+      console.log('Resultado da exclusão:', { error, data });
+      
       if (error) throw error;
       return true;
     },

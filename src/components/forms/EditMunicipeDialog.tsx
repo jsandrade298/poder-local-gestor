@@ -117,6 +117,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
 
   const updateMunicipe = useMutation({
     mutationFn: async (data: typeof formData) => {
+      console.log('Iniciando atualização do munícipe:', municipe.id, data);
+      
       // Montar endereço completo
       let endereco = '';
       if (data.logradouro) {
@@ -126,7 +128,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
       }
 
       // Atualizar dados do munícipe
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updateData } = await supabase
         .from('municipes')
         .update({
           nome: data.nome,
@@ -139,7 +141,10 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null
         })
-        .eq('id', municipe.id);
+        .eq('id', municipe.id)
+        .select();
+
+      console.log('Resultado da atualização:', { updateError, updateData });
 
       if (updateError) throw updateError;
 
