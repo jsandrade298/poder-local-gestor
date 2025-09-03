@@ -4,69 +4,220 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-// Dados mockados - substituir pela integração com Supabase
-const tagsMock = [
-  {
-    id: "1",
-    nome: "Idoso",
-    descricao: "Munícipes com mais de 60 anos",
-    total_municipes: 25,
-    cor: "#3b82f6"
-  },
-  {
-    id: "2",
-    nome: "Deficiente",
-    descricao: "Munícipes com necessidades especiais",
-    total_municipes: 12,
-    cor: "#10b981"
-  },
-  {
-    id: "3",
-    nome: "Comerciante",
-    descricao: "Proprietários de estabelecimentos comerciais",
-    total_municipes: 38,
-    cor: "#f59e0b"
-  },
-  {
-    id: "4",
-    nome: "Jovem",
-    descricao: "Munícipes de 18 a 30 anos",
-    total_municipes: 45,
-    cor: "#8b5cf6"
-  },
-  {
-    id: "5",
-    nome: "Estudante",
-    descricao: "Estudantes de ensino médio e superior",
-    total_municipes: 22,
-    cor: "#ef4444"
-  }
+// Color picker básico para seleção de cores
+const colorOptions = [
+  "#3b82f6", // blue
+  "#10b981", // green
+  "#f59e0b", // yellow
+  "#8b5cf6", // purple
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#84cc16", // lime
+  "#f97316", // orange
+  "#ec4899", // pink
+  "#6b7280"  // gray
 ];
 
 export default function Tags() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<any>(null);
   const [newTagName, setNewTagName] = useState("");
   const [newTagDescription, setNewTagDescription] = useState("");
+  const [newTagColor, setNewTagColor] = useState(colorOptions[0]);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const filteredTags = tagsMock.filter(tag =>
+  // Buscar tags com contagem de munícipes
+  const { data: tags = [], isLoading } = useQuery({
+    queryKey: ['tags-with-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tags')
+        .select(`
+          *,
+          municipe_tags(count)
+        `)
+        .order('nome');
+      
+      if (error) throw error;
+      
+      // Mapear dados para incluir contagem
+      return data.map(tag => ({
+        ...tag,
+        total_municipes: tag.municipe_tags[0]?.count || 0
+      }));
+    }
+  });
+
+  // Mutação para criar nova tag
+  const createTagMutation = useMutation({
+    mutationFn: async (tagData: { nome: string; descricao?: string; cor: string }) => {
+      const { data, error } = await supabase
+        .from('tags')
+        .insert({
+          nome: tagData.nome,
+          cor: tagData.cor,
+          ...(tagData.descricao && { descricao: tagData.descricao })
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tag criada com sucesso!",
+        description: "A nova tag foi adicionada ao sistema."
+      });
+      queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      setIsCreateDialogOpen(false);
+      setNewTagName("");
+      setNewTagDescription("");
+      setNewTagColor(colorOptions[0]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao criar tag",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutação para atualizar tag
+  const updateTagMutation = useMutation({
+    mutationFn: async (tagData: { id: string; nome: string; descricao?: string; cor: string }) => {
+      const { data, error } = await supabase
+        .from('tags')
+        .update({
+          nome: tagData.nome,
+          cor: tagData.cor,
+          ...(tagData.descricao !== undefined && { descricao: tagData.descricao })
+        })
+        .eq('id', tagData.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tag atualizada com sucesso!",
+        description: "As alterações foram salvas."
+      });
+      queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      setIsEditDialogOpen(false);
+      setSelectedTag(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao atualizar tag",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutação para excluir tag
+  const deleteTagMutation = useMutation({
+    mutationFn: async (tagId: string) => {
+      // Primeiro, remover associações com munícipes
+      await supabase
+        .from('municipe_tags')
+        .delete()
+        .eq('tag_id', tagId);
+
+      // Depois, excluir a tag
+      const { error } = await supabase
+        .from('tags')
+        .delete()
+        .eq('id', tagId);
+
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tag excluída com sucesso!",
+        description: "A tag foi removida do sistema."
+      });
+      queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao excluir tag",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const filteredTags = tags.filter(tag =>
     tag.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tag.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+    (tag.descricao && tag.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleCreateTag = () => {
-    // Aqui implementar a criação da tag via Supabase
-    console.log("Criar tag:", { nome: newTagName, descricao: newTagDescription });
-    setIsCreateDialogOpen(false);
-    setNewTagName("");
-    setNewTagDescription("");
+    if (!newTagName.trim()) return;
+    
+    createTagMutation.mutate({
+      nome: newTagName.trim(),
+      descricao: newTagDescription.trim() || undefined,
+      cor: newTagColor
+    });
   };
+
+  const handleEditTag = (tag: any) => {
+    setSelectedTag(tag);
+    setNewTagName(tag.nome);
+    setNewTagDescription(tag.descricao || "");
+    setNewTagColor(tag.cor);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateTag = () => {
+    if (!selectedTag || !newTagName.trim()) return;
+    
+    updateTagMutation.mutate({
+      id: selectedTag.id,
+      nome: newTagName.trim(),
+      descricao: newTagDescription.trim() || undefined,
+      cor: newTagColor
+    });
+  };
+
+  const handleDeleteTag = (tagId: string) => {
+    deleteTagMutation.mutate(tagId);
+  };
+
+  const totalMunicipesCategorizados = tags.reduce((acc, tag) => acc + tag.total_municipes, 0);
+  const mediaPorTag = tags.length > 0 ? Math.round(totalMunicipesCategorizados / tags.length) : 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -111,18 +262,87 @@ export default function Tags() {
                   onChange={(e) => setNewTagDescription(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Cor da Tag</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`w-8 h-8 rounded-full border-2 ${
+                        newTagColor === color ? 'border-foreground' : 'border-muted'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setNewTagColor(color)}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateTag} disabled={!newTagName.trim()}>
-                Criar Tag
+              <Button onClick={handleCreateTag} disabled={!newTagName.trim() || createTagMutation.isPending}>
+                {createTagMutation.isPending ? "Criando..." : "Criar Tag"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Dialog de Edição */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Tag</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-nome">Nome da Tag</Label>
+              <Input
+                id="edit-nome"
+                placeholder="Ex: Idoso, Comerciante..."
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-descricao">Descrição (opcional)</Label>
+              <Textarea
+                id="edit-descricao"
+                placeholder="Descreva o propósito desta tag..."
+                value={newTagDescription}
+                onChange={(e) => setNewTagDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cor da Tag</Label>
+              <div className="flex gap-2 flex-wrap">
+                {colorOptions.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-8 h-8 rounded-full border-2 ${
+                      newTagColor === color ? 'border-foreground' : 'border-muted'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setNewTagColor(color)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateTag} disabled={!newTagName.trim() || updateTagMutation.isPending}>
+              {updateTagMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -131,7 +351,7 @@ export default function Tags() {
             <div className="flex items-center gap-2">
               <TagIcon className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold text-foreground">{tagsMock.length}</div>
+                <div className="text-2xl font-bold text-foreground">{tags.length}</div>
                 <p className="text-sm text-muted-foreground">Tags Ativas</p>
               </div>
             </div>
@@ -143,7 +363,7 @@ export default function Tags() {
               <Users className="h-5 w-5 text-primary" />
               <div>
                 <div className="text-2xl font-bold text-foreground">
-                  {tagsMock.reduce((acc, tag) => acc + tag.total_municipes, 0)}
+                  {totalMunicipesCategorizados}
                 </div>
                 <p className="text-sm text-muted-foreground">Munícipes Categorizados</p>
               </div>
@@ -153,7 +373,7 @@ export default function Tags() {
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {Math.round(tagsMock.reduce((acc, tag) => acc + tag.total_municipes, 0) / tagsMock.length)}
+              {mediaPorTag}
             </div>
             <p className="text-sm text-muted-foreground">Média por Tag</p>
           </CardContent>
@@ -194,12 +414,37 @@ export default function Tags() {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem>Gerenciar Munícipes</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
-                      Excluir
+                  <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                    <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar
                     </DropdownMenuItem>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Trash className="h-4 w-4 mr-2" />
+                          <span className="text-destructive">Excluir</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir a tag "{tag.nome}"? 
+                            Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteTag(tag.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -207,7 +452,7 @@ export default function Tags() {
             <CardContent>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  {tag.descricao}
+                  {tag.descricao || "Sem descrição"}
                 </p>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
@@ -218,9 +463,6 @@ export default function Tags() {
                     {tag.total_municipes}
                   </Badge>
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
-                  Ver Munícipes
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -258,7 +500,7 @@ export default function Tags() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-muted-foreground">{tag.descricao}</span>
+                      <span className="text-sm text-muted-foreground">{tag.descricao || "Sem descrição"}</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
@@ -272,12 +514,37 @@ export default function Tags() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem>Gerenciar Munícipes</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            Excluir
+                        <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                          <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
                           </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                <Trash className="h-4 w-4 mr-2" />
+                                <span className="text-destructive">Excluir</span>
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir a tag "{tag.nome}"? 
+                                  Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTag(tag.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
