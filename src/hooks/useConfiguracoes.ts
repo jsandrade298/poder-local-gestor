@@ -9,19 +9,6 @@ export interface ConfiguracaoData {
     telefone: string;
     email: string;
   };
-  tema: {
-    cor_primaria: string;
-    cor_secundaria: string;
-    logo_url: string;
-    favicon_url: string;
-  };
-  redes_sociais: {
-    whatsapp: string;
-    instagram: string;
-    facebook: string;
-    twitter: string;
-    linkedin: string;
-  };
   sistema: {
     timezone: string;
     idioma: string;
@@ -49,19 +36,6 @@ export const useConfiguracoes = () => {
           endereco: "",
           telefone: "",
           email: ""
-        },
-        tema: {
-          cor_primaria: "#3b82f6",
-          cor_secundaria: "#10b981",
-          logo_url: "",
-          favicon_url: ""
-        },
-        redes_sociais: {
-          whatsapp: "",
-          instagram: "",
-          facebook: "",
-          twitter: "",
-          linkedin: ""
         },
         sistema: {
           timezone: "America/Sao_Paulo",

@@ -39,23 +39,6 @@ export default function Configuracoes() {
       email: ""
     },
     
-    // Tema e Marca
-    tema: {
-      cor_primaria: "#3b82f6",
-      cor_secundaria: "#10b981", 
-      logo_url: "",
-      favicon_url: ""
-    },
-    
-    // Redes Sociais
-    redes_sociais: {
-      whatsapp: "",
-      instagram: "",
-      facebook: "",
-      twitter: "",
-      linkedin: ""
-    },
-    
     // Configurações do Sistema
     sistema: {
       timezone: "America/Sao_Paulo",
@@ -140,19 +123,6 @@ export default function Configuracoes() {
         endereco: "Endereço completo do gabinete",
         telefone: "Telefone oficial para contato",
         email: "Email oficial do gabinete"
-      },
-      tema: {
-        cor_primaria: "Cor primária do sistema",
-        cor_secundaria: "Cor secundária do sistema",
-        logo_url: "URL da logo do gabinete",
-        favicon_url: "URL do favicon"
-      },
-      redes_sociais: {
-        whatsapp: "Número do WhatsApp oficial",
-        instagram: "URL do Instagram",
-        facebook: "URL do Facebook",
-        twitter: "URL do Twitter/X",
-        linkedin: "URL do LinkedIn"
       },
       sistema: {
         timezone: "Fuso horário do sistema",
@@ -282,134 +252,6 @@ export default function Configuracoes() {
                 value={config.gabinete.telefone}
                 onChange={(e) => handleInputChange('gabinete', 'telefone', e.target.value)}
                 placeholder="(11) 3333-4444"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tema e Aparência */}
-      <Card className="shadow-sm border-0 bg-card">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Tema e Aparência
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cor_primaria">Cor Primária</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="cor_primaria"
-                  type="color"
-                  value={config.tema.cor_primaria}
-                  onChange={(e) => handleInputChange('tema', 'cor_primaria', e.target.value)}
-                  className="w-16 h-10 p-1 border"
-                />
-                <Input
-                  value={config.tema.cor_primaria}
-                  onChange={(e) => handleInputChange('tema', 'cor_primaria', e.target.value)}
-                  placeholder="#3b82f6"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="cor_secundaria">Cor Secundária</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="cor_secundaria"
-                  type="color"
-                  value={config.tema.cor_secundaria}
-                  onChange={(e) => handleInputChange('tema', 'cor_secundaria', e.target.value)}
-                  className="w-16 h-10 p-1 border"
-                />
-                <Input
-                  value={config.tema.cor_secundaria}
-                  onChange={(e) => handleInputChange('tema', 'cor_secundaria', e.target.value)}
-                  placeholder="#10b981"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <Separator />
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="logo_url">Logo do Gabinete</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="logo_url"
-                  value={config.tema.logo_url}
-                  onChange={(e) => handleInputChange('tema', 'logo_url', e.target.value)}
-                  placeholder="URL da logo ou deixe vazio"
-                  className="flex-1"
-                />
-                <Button variant="outline" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Recomendado: PNG ou SVG, máximo 200px de altura
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Redes Sociais */}
-      <Card className="shadow-sm border-0 bg-card">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <ExternalLink className="h-4 w-4" />
-            Redes Sociais e Contatos
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input
-                id="whatsapp"
-                value={config.redes_sociais.whatsapp}
-                onChange={(e) => handleInputChange('redes_sociais', 'whatsapp', e.target.value)}
-                placeholder="+5511999999999"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="instagram">Instagram</Label>
-              <Input
-                id="instagram"
-                value={config.redes_sociais.instagram}
-                onChange={(e) => handleInputChange('redes_sociais', 'instagram', e.target.value)}
-                placeholder="https://instagram.com/usuario"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="facebook">Facebook</Label>
-              <Input
-                id="facebook"
-                value={config.redes_sociais.facebook}
-                onChange={(e) => handleInputChange('redes_sociais', 'facebook', e.target.value)}
-                placeholder="https://facebook.com/usuario"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="twitter">Twitter/X</Label>
-              <Input
-                id="twitter"
-                value={config.redes_sociais.twitter}
-                onChange={(e) => handleInputChange('redes_sociais', 'twitter', e.target.value)}
-                placeholder="https://twitter.com/usuario"
               />
             </div>
           </div>
