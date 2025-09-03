@@ -156,10 +156,18 @@ export default function Usuarios() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const { error } = await supabase
+      console.log('🔄 MUTATION - ID do usuário:', id);
+      console.log('🔄 MUTATION - Updates:', updates);
+      
+      const { data, error, count } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
+      
+      console.log('🔄 MUTATION - Resultado data:', data);
+      console.log('🔄 MUTATION - Resultado error:', error);
+      console.log('🔄 MUTATION - Count afetados:', count);
       
       if (error) throw error;
       return { success: true };
