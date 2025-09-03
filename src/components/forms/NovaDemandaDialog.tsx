@@ -20,7 +20,7 @@ export function NovaDemandaDialog() {
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "aberta" as "aberta" | "em_andamento" | "nao_atendida" | "arquivada" | "concluida",
+    status: "aberta" as "aberta" | "em_andamento" | "aguardando" | "resolvida" | "cancelada",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -354,7 +354,7 @@ export function NovaDemandaDialog() {
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: "aberta" | "em_andamento" | "nao_atendida" | "arquivada" | "concluida") => 
+                  onValueChange={(value: "aberta" | "em_andamento" | "aguardando" | "resolvida" | "cancelada") => 
                     setFormData(prev => ({ ...prev, status: value }))
                   }
                 >
@@ -364,9 +364,9 @@ export function NovaDemandaDialog() {
                   <SelectContent>
                     <SelectItem value="aberta">Aberta</SelectItem>
                     <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                    <SelectItem value="nao_atendida">Não Atendida</SelectItem>
-                    <SelectItem value="arquivada">Arquivada</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
+                    <SelectItem value="resolvida">Resolvida</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,10 +1,15 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface AreaChartProps {
   data: Array<{
     name: string;
-    value: number;
+    aberta: number;
+    em_andamento: number;
+    aguardando: number;
+    resolvida: number;
+    cancelada: number;
+    total: number;
   }>;
 }
 
@@ -40,13 +45,39 @@ export function AreaChart({ data }: AreaChartProps) {
                 className="text-muted-foreground"
               />
               <Tooltip 
-                formatter={(value) => [value, "Demandas"]}
+                formatter={(value, name) => [value, name]}
                 labelFormatter={(label) => `Área: ${label}`}
               />
+              <Legend />
               <Bar 
-                dataKey="value"
-                fill="hsl(var(--primary))"
-                radius={[4, 4, 0, 0]}
+                dataKey="aberta"
+                stackId="a"
+                fill="#3b82f6"
+                name="Aberta"
+              />
+              <Bar 
+                dataKey="em_andamento"
+                stackId="a"
+                fill="#f59e0b"
+                name="Em Andamento"
+              />
+              <Bar 
+                dataKey="aguardando"
+                stackId="a"
+                fill="#8b5cf6"
+                name="Aguardando"
+              />
+              <Bar 
+                dataKey="resolvida"
+                stackId="a"
+                fill="#10b981"
+                name="Resolvida"
+              />
+              <Bar 
+                dataKey="cancelada"
+                stackId="a"
+                fill="#ef4444"
+                name="Cancelada"
               />
             </BarChart>
           </ResponsiveContainer>

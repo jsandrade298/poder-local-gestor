@@ -40,29 +40,50 @@ export function useDashboardData() {
   ).length;
   const totalMunicipes = municipes.length;
   const taxaConclusao = totalDemandas > 0 
-    ? Math.round((demandas.filter(d => d.status === 'concluida').length / totalDemandas) * 100)
+    ? Math.round((demandas.filter(d => d.status === 'resolvida').length / totalDemandas) * 100)
     : 0;
 
   // Dados para gráfico de status
   const statusData = [
     { name: "Aberta", value: demandas.filter(d => d.status === 'aberta').length, color: "#3b82f6" },
     { name: "Em Andamento", value: demandas.filter(d => d.status === 'em_andamento').length, color: "#f59e0b" },
-    { name: "Concluída", value: demandas.filter(d => d.status === 'concluida').length, color: "#10b981" },
-    { name: "Não Atendida", value: demandas.filter(d => d.status === 'nao_atendida').length, color: "#ef4444" },
-    { name: "Arquivada", value: demandas.filter(d => d.status === 'arquivada').length, color: "#6b7280" },
+    { name: "Aguardando", value: demandas.filter(d => d.status === 'aguardando').length, color: "#8b5cf6" },
+    { name: "Resolvida", value: demandas.filter(d => d.status === 'resolvida').length, color: "#10b981" },
+    { name: "Cancelada", value: demandas.filter(d => d.status === 'cancelada').length, color: "#ef4444" },
   ];
 
-  // Dados para gráfico de áreas
-  const areaData = demandas.reduce((acc, demanda) => {
+  // Dados para gráfico de áreas com divisão por status
+  const areaStatusData = demandas.reduce((acc, demanda) => {
     const areaName = demanda.areas?.nome || 'Sem área';
-    acc[areaName] = (acc[areaName] || 0) + 1;
+    const status = demanda.status || 'aberta';
+    
+    if (!acc[areaName]) {
+      acc[areaName] = {
+        name: areaName,
+        aberta: 0,
+        em_andamento: 0,
+        aguardando: 0,
+        resolvida: 0,
+        cancelada: 0,
+        total: 0
+      };
+    }
+    
+    acc[areaName][status] = (acc[areaName][status] || 0) + 1;
+    acc[areaName].total += 1;
+    
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, any>);
 
-  const areaChartData = Object.entries(areaData).map(([name, value]) => ({
-    name,
-    value: value as number
-  }));
+  const areaChartData = Object.values(areaStatusData) as Array<{
+    name: string;
+    aberta: number;
+    em_andamento: number;
+    aguardando: number;
+    resolvida: number;
+    cancelada: number;
+    total: number;
+  }>;
 
   // Calcular dias desde criação e separar por faixas
   const now = new Date();
