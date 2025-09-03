@@ -1,16 +1,14 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-const areaData = [
-  { name: "Trânsito", demandas: 45 },
-  { name: "Saúde", demandas: 38 },
-  { name: "Educação", demandas: 32 },
-  { name: "Infraestrutura", demandas: 28 },
-  { name: "Meio Ambiente", demandas: 15 },
-  { name: "Segurança", demandas: 12 },
-];
+interface AreaChartProps {
+  data: Array<{
+    name: string;
+    value: number;
+  }>;
+}
 
-export function AreaChart() {
+export function AreaChart({ data }: AreaChartProps) {
   return (
     <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
       <CardHeader>
@@ -23,7 +21,7 @@ export function AreaChart() {
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={areaData}
+              data={data}
               margin={{
                 top: 5,
                 right: 30,
@@ -46,7 +44,7 @@ export function AreaChart() {
                 labelFormatter={(label) => `Área: ${label}`}
               />
               <Bar 
-                dataKey="demandas" 
+                dataKey="value"
                 fill="hsl(var(--primary))"
                 radius={[4, 4, 0, 0]}
               />
