@@ -63,10 +63,10 @@ export function AppSidebar() {
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-foreground">
-                  {config?.gabinete.nome || "Gabinete"}
+                  {config?.gabinete?.nome || "Gabinete"}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {config?.gabinete.descricao || "Sistema de Gestão"}
+                  {config?.gabinete?.descricao || "Sistema de Gestão"}
                 </p>
               </div>
             </div>
