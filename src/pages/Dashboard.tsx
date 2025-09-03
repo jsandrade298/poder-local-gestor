@@ -150,7 +150,7 @@ export default function Dashboard() {
                 value={metrics.demandasAtraso60}
                 icon={Clock}
                 description="Em atraso há mais de 60 dias"
-                variant="destructive"
+                variant="warning"
               />
             </div>
             <div onClick={() => handleOverdueClick('90')} className="cursor-pointer">
