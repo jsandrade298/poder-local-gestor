@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,20 +8,35 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Save, Upload, Palette, ExternalLink, Building, Users, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Configuracoes() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   
-  // Estado das configurações - substituir pela integração com Supabase
+  // Carregamento das configurações do banco
+  const { data: configuracoes = [], isLoading: isLoadingConfigs } = useQuery({
+    queryKey: ['configuracoes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Estado das configurações
   const [config, setConfig] = useState({
     // Dados do Gabinete
     gabinete: {
-      nome: "Gabinete do Vereador João Silva",
-      descricao: "Atuando em prol da comunidade local",
-      endereco: "Rua da Câmara, 123 - Centro - São Paulo/SP",
-      telefone: "(11) 3333-4444",
-      email: "contato@gabinetejoao.gov.br"
+      nome: "",
+      descricao: "",
+      endereco: "",
+      telefone: "",
+      email: ""
     },
     
     // Tema e Marca
@@ -34,9 +49,9 @@ export default function Configuracoes() {
     
     // Redes Sociais
     redes_sociais: {
-      whatsapp: "+5511999999999",
-      instagram: "https://instagram.com/vereadorjoao",
-      facebook: "https://facebook.com/vereadorjoao",
+      whatsapp: "",
+      instagram: "",
+      facebook: "",
       twitter: "",
       linkedin: ""
     },
@@ -51,28 +66,104 @@ export default function Configuracoes() {
     }
   });
 
-  const handleSave = async () => {
-    setIsLoading(true);
-    try {
-      // Aqui implementar o salvamento via Supabase
-      console.log("Salvando configurações:", config);
+  // Carregar configurações do banco quando disponíveis
+  useEffect(() => {
+    if (configuracoes.length > 0) {
+      const newConfig = { ...config };
       
-      // Simular delay de salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      configuracoes.forEach((item) => {
+        const [section, field] = item.chave.split('.');
+        if (newConfig[section as keyof typeof newConfig] && field) {
+          (newConfig[section as keyof typeof newConfig] as any)[field] = item.valor || "";
+        }
+      });
       
+      setConfig(newConfig);
+    }
+  }, [configuracoes]);
+
+  // Mutation para salvar configurações
+  const saveConfigMutation = useMutation({
+    mutationFn: async (configData: typeof config) => {
+      const configEntries = [];
+      
+      // Converter o objeto de config em entradas para o banco
+      Object.entries(configData).forEach(([section, sectionData]) => {
+        Object.entries(sectionData).forEach(([field, value]) => {
+          configEntries.push({
+            chave: `${section}.${field}`,
+            valor: String(value),
+            descricao: getFieldDescription(section, field)
+          });
+        });
+      });
+
+      // Salvar cada configuração
+      for (const entry of configEntries) {
+        const { error } = await supabase
+          .from('configuracoes')
+          .upsert(entry, { 
+            onConflict: 'chave',
+            ignoreDuplicates: false 
+          });
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['configuracoes'] });
       toast({
         title: "Configurações salvas",
         description: "As configurações foram atualizadas com sucesso.",
       });
-    } catch (error) {
+    },
+    onError: (error) => {
+      console.error('Erro ao salvar configurações:', error);
       toast({
         title: "Erro ao salvar",
         description: "Não foi possível salvar as configurações.",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
+  });
+
+  const handleSave = () => {
+    saveConfigMutation.mutate(config);
+  };
+
+  // Função para obter descrição dos campos
+  const getFieldDescription = (section: string, field: string): string => {
+    const descriptions: Record<string, Record<string, string>> = {
+      gabinete: {
+        nome: "Nome oficial do gabinete",
+        descricao: "Descrição da atuação do gabinete",
+        endereco: "Endereço completo do gabinete",
+        telefone: "Telefone oficial para contato",
+        email: "Email oficial do gabinete"
+      },
+      tema: {
+        cor_primaria: "Cor primária do sistema",
+        cor_secundaria: "Cor secundária do sistema",
+        logo_url: "URL da logo do gabinete",
+        favicon_url: "URL do favicon"
+      },
+      redes_sociais: {
+        whatsapp: "Número do WhatsApp oficial",
+        instagram: "URL do Instagram",
+        facebook: "URL do Facebook",
+        twitter: "URL do Twitter/X",
+        linkedin: "URL do LinkedIn"
+      },
+      sistema: {
+        timezone: "Fuso horário do sistema",
+        idioma: "Idioma padrão",
+        formato_data: "Formato de exibição de datas",
+        limite_upload_mb: "Limite máximo para upload de arquivos em MB",
+        backup_automatico: "Ativar backup automático diário"
+      }
+    };
+    
+    return descriptions[section]?.[field] || "";
   };
 
   const handleInputChange = (section: string, field: string, value: string) => {
@@ -98,9 +189,9 @@ export default function Configuracoes() {
           </p>
         </div>
         
-        <Button onClick={handleSave} disabled={isLoading}>
+        <Button onClick={handleSave} disabled={saveConfigMutation.isPending || isLoadingConfigs}>
           <Save className="h-4 w-4 mr-2" />
-          {isLoading ? "Salvando..." : "Salvar Configurações"}
+          {saveConfigMutation.isPending ? "Salvando..." : "Salvar Configurações"}
         </Button>
       </div>
 
@@ -397,9 +488,9 @@ export default function Configuracoes() {
 
       {/* Botão de Salvar Final */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isLoading} size="lg">
+        <Button onClick={handleSave} disabled={saveConfigMutation.isPending || isLoadingConfigs} size="lg">
           <Save className="h-4 w-4 mr-2" />
-          {isLoading ? "Salvando..." : "Salvar Todas as Configurações"}
+          {saveConfigMutation.isPending ? "Salvando..." : "Salvar Todas as Configurações"}
         </Button>
       </div>
     </div>
