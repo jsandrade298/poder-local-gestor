@@ -43,17 +43,12 @@ export default function Usuarios() {
   const { data: usuarios = [], isLoading: isLoadingUsuarios, refetch: refetchUsuarios } = useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => {
-      console.log('🔍 Buscando usuários...');
       // Fetch profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
-      console.log('📋 Profiles encontrados:', profilesData);
-      if (profilesError) {
-        console.error('❌ Erro ao buscar profiles:', profilesError);
-        throw profilesError;
-      }
+      if (profilesError) throw profilesError;
 
       // Fetch all user roles
       const { data: rolesData, error: rolesError } = await supabase
@@ -87,17 +82,12 @@ export default function Usuarios() {
       }, {});
 
       // Combine profiles with roles and demandas count
-      const resultado = profilesData.map(profile => ({
+      return profilesData.map(profile => ({
         ...profile,
         total_demandas: demandasCount[profile.id] || 0,
         role: rolesMap[profile.id] || 'usuario',
         ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
       }));
-      
-      console.log('✅ Resultado final:', resultado);
-      console.log('👥 Total de usuários processados:', resultado.length);
-      
-      return resultado;
     }
   });
 
@@ -346,17 +336,13 @@ export default function Usuarios() {
           </p>
         </div>
         
-        <div className="flex gap-2">
-          <Button onClick={() => refetchUsuarios()} variant="outline">
-            🔄 Atualizar Lista
-          </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Usuário
-              </Button>
-            </DialogTrigger>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Usuário
+            </Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Novo Usuário</DialogTitle>
@@ -431,7 +417,6 @@ export default function Usuarios() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        </div>
 
         {/* Dialog de Visualização de Perfil */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
