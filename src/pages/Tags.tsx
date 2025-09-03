@@ -375,9 +375,6 @@ export default function Tags() {
     deleteTagMutation.mutate(tagId);
   };
 
-  const totalMunicipesCategorizados = tags.reduce((acc, tag) => acc + tag.total_municipes, 0);
-  const mediaPorTag = tags.length > 0 ? Math.round(totalMunicipesCategorizados / tags.length) : 0;
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -513,42 +510,6 @@ export default function Tags() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TagIcon className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">{tags.length}</div>
-                <p className="text-sm text-muted-foreground">Tags Ativas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">
-                  {totalMunicipesCategorizados}
-                </div>
-                <p className="text-sm text-muted-foreground">Munícipes Categorizados</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">
-              {mediaPorTag}
-            </div>
-            <p className="text-sm text-muted-foreground">Média por Tag</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Filtro de Busca */}
       <Card className="shadow-sm border-0 bg-card">
