@@ -6,83 +6,69 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAreas } from "@/hooks/useAreas";
+import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// Dados mockados - substituir pela integração com Supabase
-const areasMock = [
-  {
-    id: "1",
-    nome: "Infraestrutura",
-    descricao: "Reparos urbanos, pavimentação, iluminação pública",
-    total_demandas: 28,
-    demandas_ativas: 15,
-    cor: "#3b82f6"
-  },
-  {
-    id: "2", 
-    nome: "Trânsito",
-    descricao: "Sinalização, semáforos, controle de tráfego",
-    total_demandas: 45,
-    demandas_ativas: 23,
-    cor: "#f59e0b"
-  },
-  {
-    id: "3",
-    nome: "Saúde",
-    descricao: "Postos de saúde, atendimento médico, campanhas",
-    total_demandas: 38,
-    demandas_ativas: 12,
-    cor: "#10b981"
-  },
-  {
-    id: "4",
-    nome: "Educação", 
-    descricao: "Escolas, creches, programas educacionais",
-    total_demandas: 32,
-    demandas_ativas: 8,
-    cor: "#8b5cf6"
-  },
-  {
-    id: "5",
-    nome: "Meio Ambiente",
-    descricao: "Limpeza urbana, áreas verdes, sustentabilidade",
-    total_demandas: 15,
-    demandas_ativas: 6,
-    cor: "#22c55e"
-  },
-  {
-    id: "6",
-    nome: "Segurança",
-    descricao: "Policiamento, guardas municipais, prevenção",
-    total_demandas: 12,
-    demandas_ativas: 4,
-    cor: "#ef4444"
-  }
-];
-
 export default function Areas() {
+  const { areas, loading, createArea } = useAreas();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
 
-  const filteredAreas = areasMock.filter(area =>
+  const filteredAreas = areas.filter(area =>
     area.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    area.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+    (area.descricao && area.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleCreateArea = () => {
-    // Aqui implementar a criação da área via Supabase
-    console.log("Criar área:", { nome: newAreaName, descricao: newAreaDescription });
-    setIsCreateDialogOpen(false);
-    setNewAreaName("");
-    setNewAreaDescription("");
+  const handleCreateArea = async () => {
+    if (!newAreaName.trim()) return;
+
+    const { error } = await createArea({
+      nome: newAreaName,
+      descricao: newAreaDescription,
+      cor: '#3b82f6'
+    });
+
+    if (error) {
+      toast({
+        title: "Erro ao criar área",
+        description: error,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Área criada com sucesso",
+        description: "A nova área foi adicionada ao sistema."
+      });
+      setIsCreateDialogOpen(false);
+      setNewAreaName("");
+      setNewAreaDescription("");
+    }
   };
 
-  const totalDemandas = areasMock.reduce((acc, area) => acc + area.total_demandas, 0);
-  const totalAtivas = areasMock.reduce((acc, area) => acc + area.demandas_ativas, 0);
+  const totalDemandas = areas.reduce((acc, area) => acc + (area.total_demandas || 0), 0);
+  const totalAtivas = areas.reduce((acc, area) => acc + (area.demandas_ativas || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -147,7 +133,7 @@ export default function Areas() {
             <div className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold text-foreground">{areasMock.length}</div>
+                <div className="text-2xl font-bold text-foreground">{areas.length}</div>
                 <p className="text-sm text-muted-foreground">Áreas Ativas</p>
               </div>
             </div>
@@ -231,11 +217,11 @@ export default function Areas() {
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-xl font-bold text-foreground">{area.total_demandas}</div>
+                    <div className="text-xl font-bold text-foreground">{area.total_demandas || 0}</div>
                     <p className="text-xs text-muted-foreground">Total</p>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-warning">{area.demandas_ativas}</div>
+                    <div className="text-xl font-bold text-warning">{area.demandas_ativas || 0}</div>
                     <p className="text-xs text-muted-foreground">Ativas</p>
                   </div>
                 </div>
@@ -243,14 +229,14 @@ export default function Areas() {
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Progresso</span>
                     <span className="text-muted-foreground">
-                      {area.total_demandas > 0 ? Math.round(((area.total_demandas - area.demandas_ativas) / area.total_demandas) * 100) : 0}%
+                      {(area.total_demandas || 0) > 0 ? Math.round(((area.total_demandas! - (area.demandas_ativas || 0)) / area.total_demandas!) * 100) : 0}%
                     </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div 
                       className="bg-primary h-2 rounded-full transition-all" 
                       style={{ 
-                        width: `${area.total_demandas > 0 ? ((area.total_demandas - area.demandas_ativas) / area.total_demandas) * 100 : 0}%` 
+                        width: `${(area.total_demandas || 0) > 0 ? (((area.total_demandas! - (area.demandas_ativas || 0)) / area.total_demandas!) * 100) : 0}%` 
                       }}
                     />
                   </div>
@@ -287,8 +273,8 @@ export default function Areas() {
               </TableHeader>
               <TableBody>
                 {filteredAreas.map((area) => {
-                  const concluidas = area.total_demandas - area.demandas_ativas;
-                  const taxaConclusao = area.total_demandas > 0 ? Math.round((concluidas / area.total_demandas) * 100) : 0;
+                  const concluidas = (area.total_demandas || 0) - (area.demandas_ativas || 0);
+                  const taxaConclusao = (area.total_demandas || 0) > 0 ? Math.round((concluidas / area.total_demandas!) * 100) : 0;
                   
                   return (
                     <TableRow key={area.id}>
@@ -306,12 +292,12 @@ export default function Areas() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline">
-                          {area.total_demandas}
+                          {area.total_demandas || 0}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="warning">
-                          {area.demandas_ativas}
+                          {area.demandas_ativas || 0}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">

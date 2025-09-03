@@ -9,6 +9,8 @@ import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useMunicipes } from "@/hooks/useMunicipes";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
+import { ImportExportCSV } from "@/components/forms/ImportExportCSV";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function Municipes() {
   const { municipes, loading, fetchMunicipes } = useMunicipes();
@@ -60,14 +62,26 @@ export default function Municipes() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Importar CSV
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Importar/Exportar Munícipes</DialogTitle>
+              </DialogHeader>
+              <ImportExportCSV />
+            </DialogContent>
+          </Dialog>
+          
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
+          
           <NovoMunicipeDialog onSuccess={fetchMunicipes} />
         </div>
       </div>

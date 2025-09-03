@@ -6,67 +6,66 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useTags } from "@/hooks/useTags";
+import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// Dados mockados - substituir pela integração com Supabase
-const tagsMock = [
-  {
-    id: "1",
-    nome: "Idoso",
-    descricao: "Munícipes com mais de 60 anos",
-    total_municipes: 25,
-    cor: "#3b82f6"
-  },
-  {
-    id: "2",
-    nome: "Deficiente",
-    descricao: "Munícipes com necessidades especiais",
-    total_municipes: 12,
-    cor: "#10b981"
-  },
-  {
-    id: "3",
-    nome: "Comerciante",
-    descricao: "Proprietários de estabelecimentos comerciais",
-    total_municipes: 38,
-    cor: "#f59e0b"
-  },
-  {
-    id: "4",
-    nome: "Jovem",
-    descricao: "Munícipes de 18 a 30 anos",
-    total_municipes: 45,
-    cor: "#8b5cf6"
-  },
-  {
-    id: "5",
-    nome: "Estudante",
-    descricao: "Estudantes de ensino médio e superior",
-    total_municipes: 22,
-    cor: "#ef4444"
-  }
-];
-
 export default function Tags() {
+  const { tags, loading, createTag, fetchTags } = useTags();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagDescription, setNewTagDescription] = useState("");
 
-  const filteredTags = tagsMock.filter(tag =>
+  const filteredTags = tags.filter(tag =>
     tag.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tag.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+    (tag.descricao && tag.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleCreateTag = () => {
-    // Aqui implementar a criação da tag via Supabase
-    console.log("Criar tag:", { nome: newTagName, descricao: newTagDescription });
-    setIsCreateDialogOpen(false);
-    setNewTagName("");
-    setNewTagDescription("");
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return;
+
+    const { error } = await createTag({
+      nome: newTagName,
+      descricao: newTagDescription,
+      cor: '#3b82f6'
+    });
+
+    if (error) {
+      toast({
+        title: "Erro ao criar tag",
+        description: error,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Tag criada com sucesso",
+        description: "A nova tag foi adicionada ao sistema."
+      });
+      setIsCreateDialogOpen(false);
+      setNewTagName("");
+      setNewTagDescription("");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -130,31 +129,31 @@ export default function Tags() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <TagIcon className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">{tagsMock.length}</div>
-                <p className="text-sm text-muted-foreground">Tags Ativas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">
-                  {tagsMock.reduce((acc, tag) => acc + tag.total_municipes, 0)}
+                <div>
+                  <div className="text-2xl font-bold text-foreground">{tags.length}</div>
+                  <p className="text-sm text-muted-foreground">Tags Ativas</p>
                 </div>
-                <p className="text-sm text-muted-foreground">Munícipes Categorizados</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">
-              {Math.round(tagsMock.reduce((acc, tag) => acc + tag.total_municipes, 0) / tagsMock.length)}
-            </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {tags.reduce((acc, tag) => acc + (tag.total_municipes || 0), 0)}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Munícipes Categorizados</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-0 bg-card">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-foreground">
+                {tags.length > 0 ? Math.round(tags.reduce((acc, tag) => acc + (tag.total_municipes || 0), 0) / tags.length) : 0}
+              </div>
             <p className="text-sm text-muted-foreground">Média por Tag</p>
           </CardContent>
         </Card>
@@ -212,10 +211,10 @@ export default function Tags() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">{tag.total_municipes} munícipes</span>
+                    <span className="text-sm text-foreground">{tag.total_municipes || 0} munícipes</span>
                   </div>
                   <Badge variant="secondary">
-                    {tag.total_municipes}
+                    {tag.total_municipes || 0}
                   </Badge>
                 </div>
                 <Button variant="outline" size="sm" className="w-full">
@@ -258,11 +257,11 @@ export default function Tags() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-muted-foreground">{tag.descricao}</span>
+                      <span className="text-sm text-muted-foreground">{tag.descricao || 'Sem descrição'}</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {tag.total_municipes}
+                        {tag.total_municipes || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

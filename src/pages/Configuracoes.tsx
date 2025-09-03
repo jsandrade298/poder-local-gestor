@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,57 +7,76 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Save, Upload, Palette, ExternalLink, Building, Users, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
 export default function Configuracoes() {
   const { toast } = useToast();
+  const { 
+    loading, 
+    updateMultipleConfiguracoes, 
+    getGabineteConfig, 
+    getTemaConfig, 
+    getRedesSociaisConfig, 
+    getSistemaConfig 
+  } = useConfiguracoes();
+  
   const [isLoading, setIsLoading] = useState(false);
   
-  // Estado das configurações - substituir pela integração com Supabase
+  // Estado das configurações carregado do Supabase
   const [config, setConfig] = useState({
-    // Dados do Gabinete
-    gabinete: {
-      nome: "Gabinete do Vereador João Silva",
-      descricao: "Atuando em prol da comunidade local",
-      endereco: "Rua da Câmara, 123 - Centro - São Paulo/SP",
-      telefone: "(11) 3333-4444",
-      email: "contato@gabinetejoao.gov.br"
-    },
-    
-    // Tema e Marca
-    tema: {
-      cor_primaria: "#3b82f6",
-      cor_secundaria: "#10b981", 
-      logo_url: "",
-      favicon_url: ""
-    },
-    
-    // Redes Sociais
-    redes_sociais: {
-      whatsapp: "+5511999999999",
-      instagram: "https://instagram.com/vereadorjoao",
-      facebook: "https://facebook.com/vereadorjoao",
-      twitter: "",
-      linkedin: ""
-    },
-    
-    // Configurações do Sistema
-    sistema: {
-      timezone: "America/Sao_Paulo",
-      idioma: "pt-BR",
-      formato_data: "DD/MM/AAAA",
-      limite_upload_mb: 10,
-      backup_automatico: true
-    }
+    gabinete: getGabineteConfig(),
+    tema: getTemaConfig(),
+    redes_sociais: getRedesSociaisConfig(),
+    sistema: getSistemaConfig()
   });
+
+  // Atualizar estado quando os dados carregarem
+  useEffect(() => {
+    if (!loading) {
+      setConfig({
+        gabinete: getGabineteConfig(),
+        tema: getTemaConfig(),
+        redes_sociais: getRedesSociaisConfig(),
+        sistema: getSistemaConfig()
+      });
+    }
+  }, [loading, getGabineteConfig, getTemaConfig, getRedesSociaisConfig, getSistemaConfig]);
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // Aqui implementar o salvamento via Supabase
-      console.log("Salvando configurações:", config);
+      // Preparar dados para envio ao Supabase
+      const updates = {
+        // Gabinete
+        'gabinete_nome': config.gabinete.nome,
+        'gabinete_email': config.gabinete.email,
+        'gabinete_descricao': config.gabinete.descricao,
+        'gabinete_endereco': config.gabinete.endereco,
+        'gabinete_telefone': config.gabinete.telefone,
+        
+        // Tema
+        'cor_primaria': config.tema.cor_primaria,
+        'cor_secundaria': config.tema.cor_secundaria,
+        'logo_url': config.tema.logo_url,
+        
+        // Redes Sociais
+        'whatsapp_url': config.redes_sociais.whatsapp,
+        'instagram_url': config.redes_sociais.instagram,
+        'facebook_url': config.redes_sociais.facebook,
+        'twitter_url': config.redes_sociais.twitter,
+        
+        // Sistema
+        'timezone': config.sistema.timezone,
+        'formato_data': config.sistema.formato_data,
+        'limite_upload_mb': config.sistema.limite_upload_mb.toString(),
+        'backup_automatico': config.sistema.backup_automatico.toString()
+      };
       
-      // Simular delay de salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await updateMultipleConfiguracoes(updates);
+      
+      if (error) {
+        throw new Error(error);
+      }
       
       toast({
         title: "Configurações salvas",
