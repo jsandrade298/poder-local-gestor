@@ -39,15 +39,19 @@ export default function Usuarios() {
   const { data: usuarios = [], isLoading: isLoadingUsuarios } = useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => {
-      // Fetch profiles with roles
+      // Fetch profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `);
+        .select('*');
 
       if (profilesError) throw profilesError;
+
+      // Fetch all user roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) throw rolesError;
 
       // Fetch demandas count for each user
       const { data: demandasData, error: demandasError } = await supabase
@@ -55,6 +59,12 @@ export default function Usuarios() {
         .select('criado_por, responsavel_id');
 
       if (demandasError) throw demandasError;
+
+      // Create roles map
+      const rolesMap = rolesData.reduce((acc, roleItem) => {
+        acc[roleItem.user_id] = roleItem.role;
+        return acc;
+      }, {});
 
       // Count demandas by user
       const demandasCount = demandasData.reduce((acc, demanda) => {
@@ -67,11 +77,11 @@ export default function Usuarios() {
         return acc;
       }, {});
 
-      // Combine profiles with demandas count and roles
+      // Combine profiles with roles and demandas count
       return profilesData.map(profile => ({
         ...profile,
         total_demandas: demandasCount[profile.id] || 0,
-        role: profile.user_roles?.[0]?.role || 'usuario',
+        role: rolesMap[profile.id] || 'usuario',
         ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
       }));
     }
