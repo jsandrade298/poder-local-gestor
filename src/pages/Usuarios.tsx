@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,54 +11,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-
-// Dados mockados - substituir pela integração com Supabase
-const usuariosMock = [
-  {
-    id: "1",
-    nome: "João Silva",
-    email: "joao.silva@gabinete.gov.br",
-    telefone: "(11) 99999-1111",
-    ativo: true,
-    papel: "admin",
-    criado_em: "2023-01-15",
-    ultimo_acesso: "2024-01-10",
-    total_demandas: 15
-  },
-  {
-    id: "2",
-    nome: "Maria Santos",
-    email: "maria.santos@gabinete.gov.br", 
-    telefone: "(11) 99999-2222",
-    ativo: true,
-    papel: "admin",
-    criado_em: "2023-03-20",
-    ultimo_acesso: "2024-01-09",
-    total_demandas: 23
-  },
-  {
-    id: "3",
-    nome: "Carlos Lima",
-    email: "carlos.lima@gabinete.gov.br",
-    telefone: "(11) 99999-3333", 
-    ativo: false,
-    papel: "admin",
-    criado_em: "2023-06-10",
-    ultimo_acesso: "2023-12-15",
-    total_demandas: 8
-  },
-  {
-    id: "4",
-    nome: "Ana Costa",
-    email: "ana.costa@gabinete.gov.br",
-    telefone: "(11) 99999-4444",
-    ativo: true,
-    papel: "admin", 
-    criado_em: "2023-09-05",
-    ultimo_acesso: "2024-01-08",
-    total_demandas: 12
-  }
-];
+import { toast } from "@/hooks/use-toast";
+import { formatDateTime } from '@/lib/dateUtils';
 
 export default function Usuarios() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,28 +22,111 @@ export default function Usuarios() {
     nome: "",
     email: "",
     telefone: "",
+    cargo: "",
     ativo: true
   });
+  const queryClient = useQueryClient();
 
-  const filteredUsuarios = usuariosMock.filter(usuario => {
-    const matchesSearch = usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || 
-                         (statusFilter === "ativo" && usuario.ativo) ||
-                         (statusFilter === "inativo" && !usuario.ativo);
-    
-    return matchesSearch && matchesStatus;
+  // Fetch users with their roles and demandas count
+  const { data: usuarios = [], isLoading: isLoadingUsuarios } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: async () => {
+      // Fetch profiles with roles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles(role)
+        `);
+
+      if (profilesError) throw profilesError;
+
+      // Fetch demandas count for each user
+      const { data: demandasData, error: demandasError } = await supabase
+        .from('demandas')
+        .select('criado_por, responsavel_id');
+
+      if (demandasError) throw demandasError;
+
+      // Count demandas by user
+      const demandasCount = demandasData.reduce((acc, demanda) => {
+        if (demanda.criado_por) {
+          acc[demanda.criado_por] = (acc[demanda.criado_por] || 0) + 1;
+        }
+        if (demanda.responsavel_id && demanda.responsavel_id !== demanda.criado_por) {
+          acc[demanda.responsavel_id] = (acc[demanda.responsavel_id] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      // Combine profiles with demandas count and roles
+      return profilesData.map(profile => ({
+        ...profile,
+        total_demandas: demandasCount[profile.id] || 0,
+        role: profile.user_roles?.[0]?.role || 'usuario',
+        ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
+      }));
+    }
   });
 
+  // Create user mutation (placeholder - requires auth implementation)
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: typeof newUser) => {
+      // This would need proper auth implementation to create users
+      // For now, we'll just show a message
+      throw new Error("Criação de usuários requer implementação de autenticação completa");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      toast({
+        title: "Usuário criado",
+        description: "O usuário foi criado com sucesso.",
+      });
+      setIsCreateDialogOpen(false);
+      setNewUser({ nome: "", email: "", telefone: "", cargo: "", ativo: true });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const filteredUsuarios = useMemo(() => {
+    return usuarios.filter(usuario => {
+      const matchesSearch = usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || 
+                           (statusFilter === "ativo" && usuario.ativo) ||
+                           (statusFilter === "inativo" && !usuario.ativo);
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [usuarios, searchTerm, statusFilter]);
+
   const handleCreateUser = () => {
-    // Aqui implementar a criação do usuário via Supabase
-    console.log("Criar usuário:", newUser);
-    setIsCreateDialogOpen(false);
-    setNewUser({ nome: "", email: "", telefone: "", ativo: true });
+    if (!newUser.nome.trim() || !newUser.email.trim()) return;
+    
+    createUserMutation.mutate(newUser);
   };
 
-  const usuariosAtivos = usuariosMock.filter(u => u.ativo).length;
-  const totalDemandas = usuariosMock.reduce((acc, u) => acc + u.total_demandas, 0);
+  const usuariosAtivos = usuarios.filter(u => u.ativo).length;
+  const totalDemandas = usuarios.reduce((acc, u) => acc + u.total_demandas, 0);
+
+  if (isLoadingUsuarios) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground mt-2">Carregando usuários...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -142,6 +181,15 @@ export default function Usuarios() {
                   onChange={(e) => setNewUser({ ...newUser, telefone: e.target.value })}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="cargo">Cargo</Label>
+                <Input
+                  id="cargo"
+                  placeholder="Ex: Analista, Coordenador..."
+                  value={newUser.cargo}
+                  onChange={(e) => setNewUser({ ...newUser, cargo: e.target.value })}
+                />
+              </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="ativo"
@@ -155,8 +203,11 @@ export default function Usuarios() {
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateUser} disabled={!newUser.nome.trim() || !newUser.email.trim()}>
-                Criar Usuário
+              <Button 
+                onClick={handleCreateUser} 
+                disabled={!newUser.nome.trim() || !newUser.email.trim() || createUserMutation.isPending}
+              >
+                {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -170,7 +221,7 @@ export default function Usuarios() {
             <div className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold text-foreground">{usuariosMock.length}</div>
+                <div className="text-2xl font-bold text-foreground">{usuarios.length}</div>
                 <p className="text-sm text-muted-foreground">Total de Usuários</p>
               </div>
             </div>
@@ -184,7 +235,7 @@ export default function Usuarios() {
         </Card>
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-destructive">{usuariosMock.length - usuariosAtivos}</div>
+            <div className="text-2xl font-bold text-destructive">{usuarios.length - usuariosAtivos}</div>
             <p className="text-sm text-muted-foreground">Usuários Inativos</p>
           </CardContent>
         </Card>
@@ -270,54 +321,64 @@ export default function Usuarios() {
                   <TableHead>Status</TableHead>
                   <TableHead>Papel</TableHead>
                   <TableHead>Demandas</TableHead>
-                  <TableHead>Último Acesso</TableHead>
+                  <TableHead>Última Atualização</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsuarios.map((usuario) => (
                   <TableRow key={usuario.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-foreground">{usuario.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Cadastrado em {new Date(usuario.criado_em).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-foreground">{usuario.email}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-foreground">{usuario.telefone}</span>
-                        </div>
-                      </div>
-                    </TableCell>
+                     <TableCell>
+                       <div>
+                         <p className="font-medium text-foreground">{usuario.nome}</p>
+                         <p className="text-xs text-muted-foreground">
+                           Cadastrado em {formatDateTime(usuario.created_at).split(' ')[0]}
+                         </p>
+                       </div>
+                     </TableCell>
+                     <TableCell>
+                       <div className="space-y-1">
+                         <div className="flex items-center gap-1">
+                           <Mail className="h-3 w-3 text-muted-foreground" />
+                           <span className="text-xs text-foreground">{usuario.email}</span>
+                         </div>
+                         {usuario.telefone && (
+                           <div className="flex items-center gap-1">
+                             <Phone className="h-3 w-3 text-muted-foreground" />
+                             <span className="text-xs text-foreground">{usuario.telefone}</span>
+                           </div>
+                         )}
+                       </div>
+                     </TableCell>
                     <TableCell>
                       <Badge variant={usuario.ativo ? "default" : "destructive"}>
                         {usuario.ativo ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Shield className="h-3 w-3 text-muted-foreground" />
-                        <Badge variant="secondary">Admin</Badge>
-                      </div>
-                    </TableCell>
+                     <TableCell>
+                       <div className="flex items-center gap-1">
+                         <Shield className="h-3 w-3 text-muted-foreground" />
+                         <Badge variant={
+                           usuario.role === 'admin' ? 'destructive' : 
+                           usuario.role === 'gestor' ? 'default' : 
+                           usuario.role === 'atendente' ? 'secondary' : 'outline'
+                         }>
+                           {usuario.role === 'admin' ? 'Admin' : 
+                            usuario.role === 'gestor' ? 'Gestor' :
+                            usuario.role === 'atendente' ? 'Atendente' : 'Usuário'}
+                         </Badge>
+                       </div>
+                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         {usuario.total_demandas}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-foreground">
-                        {new Date(usuario.ultimo_acesso).toLocaleDateString('pt-BR')}
-                      </span>
-                    </TableCell>
+                     <TableCell>
+                       <span className="text-sm text-foreground">
+                         {formatDateTime(usuario.updated_at).split(' ')[0]}
+                       </span>
+                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
