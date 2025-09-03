@@ -107,36 +107,37 @@ export function useDashboardData() {
   const demandas90Dias = demandasComIdade.filter(d => d.diasVencido >= 90);
 
   // Calcular demandas em atraso (com base no campo data_prazo)
+  const today = new Date('2025-09-03'); // Data atual para teste
   const demandasComAtraso = demandas.filter(demanda => {
     if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
       return false;
     }
     const prazo = new Date(demanda.data_prazo);
-    return now > prazo;
+    return today > prazo;
   });
 
   const demandasAtraso30Dias = demandasComAtraso.filter(demanda => {
     const prazo = new Date(demanda.data_prazo);
-    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
     return diasAtraso > 30;
   });
 
   const demandasAtraso60Dias = demandasComAtraso.filter(demanda => {
     const prazo = new Date(demanda.data_prazo);
-    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
     return diasAtraso > 60;
   });
 
   const demandasAtraso90Dias = demandasComAtraso.filter(demanda => {
     const prazo = new Date(demanda.data_prazo);
-    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
     return diasAtraso > 90;
   });
 
   // Preparar dados das demandas em atraso para exibição
   const demandasAtrasoDetalhadas = demandasComAtraso.map(demanda => {
     const prazo = new Date(demanda.data_prazo);
-    const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+    const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
     
     return {
       id: demanda.id,

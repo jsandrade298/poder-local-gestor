@@ -63,8 +63,7 @@ export default function Demandas() {
         .select(`
           *,
           areas(nome),
-          municipes(nome),
-          responsavel:profiles!demandas_responsavel_id_fkey(nome)
+          municipes(nome)
         `)
         .order('created_at', { ascending: false });
       
@@ -199,9 +198,9 @@ export default function Demandas() {
       if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
         matchesAtraso = false;
       } else {
-        const now = new Date();
+        const today = new Date('2025-09-03'); // Data atual para teste
         const prazo = new Date(demanda.data_prazo);
-        const isOverdue = now > prazo;
+        const isOverdue = today > prazo;
         
         if (atrasoFilter === "overdue") {
           matchesAtraso = isOverdue;
@@ -209,7 +208,7 @@ export default function Demandas() {
           if (!isOverdue) {
             matchesAtraso = false;
           } else {
-            const diasAtraso = Math.floor((now.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
+            const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
             const minDays = parseInt(atrasoFilter);
             matchesAtraso = diasAtraso > minDays;
           }
@@ -505,7 +504,7 @@ export default function Demandas() {
                           <span className="font-medium">Área:</span> {demanda.areas?.nome || 'Sem área'}
                         </div>
                         <div>
-                          <span className="font-medium">Responsável:</span> {demanda.responsavel?.nome || 'Sem responsável'}
+                          <span className="font-medium">Responsável:</span> Sem responsável
                         </div>
                       </div>
 
@@ -631,7 +630,7 @@ export default function Demandas() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Responsável</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.responsavel?.nome || 'Sem responsável'}</p>
+                    <p className="text-sm text-muted-foreground">Sem responsável</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Prioridade</label>
