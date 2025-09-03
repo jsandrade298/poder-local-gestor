@@ -35,12 +35,14 @@ export function useDashboardData() {
 
   // Calcular métricas
   const totalDemandas = demandas.length;
-  const demandasAtivas = demandas.filter(d => 
-    d.status === 'aberta' || d.status === 'em_andamento'
-  ).length;
+  const demandasAbertas = demandas.filter(d => d.status === 'aberta').length;
+  const demandasEmAndamento = demandas.filter(d => d.status === 'em_andamento').length;
+  const demandasAguardando = demandas.filter(d => d.status === 'aguardando').length;
+  const demandasResolvidas = demandas.filter(d => d.status === 'resolvida').length;
+  const demandasCanceladas = demandas.filter(d => d.status === 'cancelada').length;
   const totalMunicipes = municipes.length;
   const taxaConclusao = totalDemandas > 0 
-    ? Math.round((demandas.filter(d => d.status === 'resolvida').length / totalDemandas) * 100)
+    ? Math.round((demandasResolvidas / totalDemandas) * 100)
     : 0;
 
   // Dados para gráfico de status
@@ -107,7 +109,11 @@ export function useDashboardData() {
   return {
     metrics: {
       totalDemandas,
-      demandasAtivas,
+      demandasAbertas,
+      demandasEmAndamento,
+      demandasAguardando,
+      demandasResolvidas,
+      demandasCanceladas,
       totalMunicipes,
       taxaConclusao: `${taxaConclusao}%`
     },

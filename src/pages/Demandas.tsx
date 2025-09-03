@@ -49,10 +49,21 @@ export default function Demandas() {
     switch (status) {
       case 'aberta': return 'default';
       case 'em_andamento': return 'secondary';
-      case 'concluida': return 'default';
-      case 'nao_atendida': return 'destructive';
-      case 'arquivada': return 'outline';
+      case 'aguardando': return 'outline';
+      case 'resolvida': return 'default';
+      case 'cancelada': return 'destructive';
       default: return 'secondary';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'aberta': return 'hsl(var(--chart-1))'; // #3b82f6
+      case 'em_andamento': return 'hsl(var(--chart-2))'; // #f59e0b
+      case 'aguardando': return 'hsl(var(--chart-3))'; // #8b5cf6
+      case 'resolvida': return 'hsl(var(--chart-4))'; // #10b981
+      case 'cancelada': return 'hsl(var(--chart-5))'; // #ef4444
+      default: return 'hsl(var(--muted-foreground))';
     }
   };
 
@@ -60,9 +71,9 @@ export default function Demandas() {
     switch (status) {
       case 'aberta': return 'Aberta';
       case 'em_andamento': return 'Em Andamento';
-      case 'concluida': return 'Concluída';
-      case 'nao_atendida': return 'Não Atendida';
-      case 'arquivada': return 'Arquivada';
+      case 'aguardando': return 'Aguardando';
+      case 'resolvida': return 'Resolvida';
+      case 'cancelada': return 'Cancelada';
       default: return status;
     }
   };
@@ -149,9 +160,9 @@ export default function Demandas() {
                   <SelectItem value="all">Todos os status</SelectItem>
                   <SelectItem value="aberta">Aberta</SelectItem>
                   <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                  <SelectItem value="concluida">Concluída</SelectItem>
-                  <SelectItem value="nao_atendida">Não Atendida</SelectItem>
-                  <SelectItem value="arquivada">Arquivada</SelectItem>
+                  <SelectItem value="aguardando">Aguardando</SelectItem>
+                  <SelectItem value="resolvida">Resolvida</SelectItem>
+                  <SelectItem value="cancelada">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -197,7 +208,10 @@ export default function Demandas() {
                         <Badge variant="outline" className="text-xs">
                           #{demanda.protocolo}
                         </Badge>
-                        <Badge variant={getStatusVariant(demanda.status)}>
+                        <Badge 
+                          variant={getStatusVariant(demanda.status)}
+                          style={{ backgroundColor: getStatusColor(demanda.status), color: 'white' }}
+                        >
                           {getStatusLabel(demanda.status)}
                         </Badge>
                         <Badge variant="secondary">

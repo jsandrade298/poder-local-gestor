@@ -3,7 +3,7 @@ import { StatusChart } from "@/components/dashboard/StatusChart";
 import { AreaChart } from "@/components/dashboard/AreaChart";
 import { AgingList } from "@/components/dashboard/AgingList";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
-import { FileText, Users, Clock, TrendingUp } from "lucide-react";
+import { FileText, Users, Clock, TrendingUp, Play, Pause, CheckCircle, XCircle } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 export default function Dashboard() {
@@ -40,7 +40,7 @@ export default function Dashboard() {
         </div>
 
         {/* KPIs Principais */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-6">
           <KPICard
             title="Total de Demandas"
             value={metrics.totalDemandas}
@@ -48,11 +48,39 @@ export default function Dashboard() {
             description="Todas as demandas cadastradas"
           />
           <KPICard
-            title="Demandas Ativas"
-            value={metrics.demandasAtivas}
+            title="Demandas Abertas"
+            value={metrics.demandasAbertas}
             icon={Clock}
-            description="Em andamento ou solicitadas"
+            description="Aguardando atendimento"
           />
+          <KPICard
+            title="Em Andamento"
+            value={metrics.demandasEmAndamento}
+            icon={Play}
+            description="Sendo atendidas"
+          />
+          <KPICard
+            title="Aguardando"
+            value={metrics.demandasAguardando}
+            icon={Pause}
+            description="Pendentes"
+          />
+          <KPICard
+            title="Resolvidas"
+            value={metrics.demandasResolvidas}
+            icon={CheckCircle}
+            description="Concluídas"
+          />
+          <KPICard
+            title="Canceladas"
+            value={metrics.demandasCanceladas}
+            icon={XCircle}
+            description="Canceladas"
+          />
+        </div>
+
+        {/* Métricas Secundárias */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <KPICard
             title="Munícipes Cadastrados"
             value={metrics.totalMunicipes}

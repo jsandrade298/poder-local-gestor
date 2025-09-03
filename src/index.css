@@ -48,6 +48,13 @@
     --info: 213 94% 45%;
     --info-foreground: 210 40% 98%;
 
+    /* Chart Colors - Para consistência nos gráficos */
+    --chart-1: 214 100% 57%; /* #3b82f6 - Azul para "Aberta" */
+    --chart-2: 43 96% 56%; /* #f59e0b - Laranja para "Em Andamento" */
+    --chart-3: 262 83% 58%; /* #8b5cf6 - Roxo para "Aguardando" */
+    --chart-4: 158 64% 52%; /* #10b981 - Verde para "Resolvida" */
+    --chart-5: 0 84% 60%; /* #ef4444 - Vermelho para "Cancelada" */
+
     /* Bordas e Inputs */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
