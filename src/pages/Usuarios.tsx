@@ -307,8 +307,6 @@ export default function Usuarios() {
     });
   };
 
-  const usuariosAtivos = usuarios.filter(u => u.ativo).length;
-  const totalDemandas = usuarios.reduce((acc, u) => acc + u.total_demandas, 0);
 
   if (isLoadingUsuarios) {
     return (
@@ -589,38 +587,6 @@ export default function Usuarios() {
         </Dialog>
       </div>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-primary" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">{usuarios.length}</div>
-                <p className="text-sm text-muted-foreground">Total de Usuários</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-success">{usuariosAtivos}</div>
-            <p className="text-sm text-muted-foreground">Usuários Ativos</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-destructive">{usuarios.length - usuariosAtivos}</div>
-            <p className="text-sm text-muted-foreground">Usuários Inativos</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-0 bg-card">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{totalDemandas}</div>
-            <p className="text-sm text-muted-foreground">Demandas Atribuídas</p>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Filtros */}
       <Card className="shadow-sm border-0 bg-card">
