@@ -43,6 +43,12 @@ export default function Demandas() {
     if (areaParam) {
       setAreaFilter(areaParam);
     }
+    
+    // Aplicar filtro de responsável se vier da página de Usuários
+    const responsavelParam = searchParams.get('responsavel');
+    if (responsavelParam) {
+      setResponsavelFilter(responsavelParam);
+    }
   }, [searchParams]);
 
   const queryClient = useQueryClient();
@@ -338,6 +344,11 @@ export default function Demandas() {
               {searchParams.get('areaNome') && (
                 <span className="text-lg text-muted-foreground ml-2">
                   - Área: {decodeURIComponent(searchParams.get('areaNome') || '')}
+                </span>
+              )}
+              {searchParams.get('responsavelNome') && (
+                <span className="text-lg text-muted-foreground ml-2">
+                  - Responsável: {decodeURIComponent(searchParams.get('responsavelNome') || '')}
                 </span>
               )}
             </h1>

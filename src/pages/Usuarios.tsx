@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, MoreHorizontal, Mail, Phone, Shield, UserCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +21,10 @@ export default function Usuarios() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<any>(null);
   const [newUser, setNewUser] = useState({
     nome: "",
     email: "",
@@ -26,6 +33,7 @@ export default function Usuarios() {
     ativo: true
   });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch users with their roles and demandas count
   const { data: usuarios = [], isLoading: isLoadingUsuarios } = useQuery({
@@ -94,6 +102,63 @@ export default function Usuarios() {
     }
   });
 
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      toast({
+        title: "Usuário atualizado",
+        description: "O usuário foi atualizado com sucesso.",
+      });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar usuário: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Update user role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ role })
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      toast({
+        title: "Papel atualizado",
+        description: "O papel do usuário foi atualizado com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar papel: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
       const matchesSearch = usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,6 +175,47 @@ export default function Usuarios() {
     if (!newUser.nome.trim() || !newUser.email.trim()) return;
     
     createUserMutation.mutate(newUser);
+  };
+
+  const handleViewProfile = (usuario: any) => {
+    setSelectedUser(usuario);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditUser = (usuario: any) => {
+    setEditingUser({ ...usuario });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = () => {
+    if (!editingUser) return;
+    
+    const { id, user_roles, role, total_demandas, ativo, ...updates } = editingUser;
+    updateUserMutation.mutate({ id, updates });
+  };
+
+  const handleUpdateRole = (userId: string, newRole: string) => {
+    updateRoleMutation.mutate({ userId, role: newRole });
+  };
+
+  const handleViewUserDemandas = (userId: string, userName: string) => {
+    navigate(`/demandas?responsavel=${userId}&responsavelNome=${encodeURIComponent(userName)}`);
+  };
+
+  const handleResetPassword = (userEmail: string) => {
+    // Placeholder for password reset functionality
+    toast({
+      title: "Reset de senha",
+      description: `Link de reset seria enviado para ${userEmail}. Funcionalidade requer implementação completa de autenticação.`,
+    });
+  };
+
+  const handleToggleUserStatus = (userId: string, currentStatus: boolean) => {
+    // Placeholder for toggle status functionality
+    toast({
+      title: "Status do usuário",
+      description: `Status do usuário seria ${currentStatus ? 'desativado' : 'ativado'}. Funcionalidade requer implementação de status no banco.`,
+    });
   };
 
   const usuariosAtivos = usuarios.filter(u => u.ativo).length;
@@ -208,6 +314,131 @@ export default function Usuarios() {
                 disabled={!newUser.nome.trim() || !newUser.email.trim() || createUserMutation.isPending}
               >
                 {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Visualização de Perfil */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Perfil do Usuário</DialogTitle>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Nome</Label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.nome}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Email</Label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Telefone</Label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.telefone || "Não informado"}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Cargo</Label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.cargo || "Não informado"}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Papel</Label>
+                  <Badge variant={
+                    selectedUser.role === 'admin' ? 'destructive' : 
+                    selectedUser.role === 'gestor' ? 'default' : 
+                    selectedUser.role === 'atendente' ? 'secondary' : 'outline'
+                  }>
+                    {selectedUser.role === 'admin' ? 'Admin' : 
+                     selectedUser.role === 'gestor' ? 'Gestor' :
+                     selectedUser.role === 'atendente' ? 'Atendente' : 'Usuário'}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Total de Demandas</Label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.total_demandas}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Data de Cadastro</Label>
+                  <p className="text-sm text-muted-foreground">{formatDateTime(selectedUser.created_at).split(' ')[0]}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Edição */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Usuário</DialogTitle>
+            </DialogHeader>
+            {editingUser && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome">Nome Completo</Label>
+                  <Input
+                    id="edit-nome"
+                    value={editingUser.nome}
+                    onChange={(e) => setEditingUser({ ...editingUser, nome: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editingUser.email}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-telefone">Telefone</Label>
+                  <Input
+                    id="edit-telefone"
+                    value={editingUser.telefone || ""}
+                    onChange={(e) => setEditingUser({ ...editingUser, telefone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cargo">Cargo</Label>
+                  <Input
+                    id="edit-cargo"
+                    value={editingUser.cargo || ""}
+                    onChange={(e) => setEditingUser({ ...editingUser, cargo: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">Papel do Usuário</Label>
+                  <Select value={editingUser.role} onValueChange={(value) => handleUpdateRole(editingUser.id, value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o papel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="usuario">Usuário</SelectItem>
+                      <SelectItem value="atendente">Atendente</SelectItem>
+                      <SelectItem value="gestor">Gestor</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleUpdateUser} 
+                disabled={updateUserMutation.isPending}
+              >
+                {updateUserMutation.isPending ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -387,11 +618,22 @@ export default function Usuarios() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem>Ver Demandas</DropdownMenuItem>
-                          <DropdownMenuItem>Reset Senha</DropdownMenuItem>
-                          <DropdownMenuItem className={usuario.ativo ? "text-destructive" : "text-success"}>
+                          <DropdownMenuItem onClick={() => handleViewProfile(usuario)}>
+                            Ver Perfil
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditUser(usuario)}>
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewUserDemandas(usuario.id, usuario.nome)}>
+                            Ver Demandas
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleResetPassword(usuario.email)}>
+                            Reset Senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleUserStatus(usuario.id, usuario.ativo)}
+                            className={usuario.ativo ? "text-destructive" : "text-success"}
+                          >
                             {usuario.ativo ? "Desativar" : "Ativar"}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
