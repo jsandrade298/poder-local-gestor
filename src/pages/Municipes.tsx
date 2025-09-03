@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDateOnly } from "@/lib/dateUtils";
 
 // Dados mockados - substituir pela integração com Supabase
 const municipesMock = [
@@ -78,10 +82,7 @@ export default function Municipes() {
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Munícipe
-          </Button>
+          <NovoMunicipeDialog />
         </div>
       </div>
 
