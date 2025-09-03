@@ -44,21 +44,32 @@ export default function Tags() {
   const { data: tags = [], isLoading } = useQuery({
     queryKey: ['tags-with-counts'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Primeiro buscar todas as tags
+      const { data: tagsData, error: tagsError } = await supabase
         .from('tags')
-        .select(`
-          *,
-          municipe_tags(count)
-        `)
+        .select('*')
         .order('nome');
       
-      if (error) throw error;
+      if (tagsError) throw tagsError;
       
-      // Mapear dados para incluir contagem
-      return data.map(tag => ({
-        ...tag,
-        total_municipes: tag.municipe_tags[0]?.count || 0
-      }));
+      // Para cada tag, contar os munícipes associados
+      const tagsWithCounts = await Promise.all(
+        tagsData.map(async (tag) => {
+          const { count, error: countError } = await supabase
+            .from('municipe_tags')
+            .select('*', { count: 'exact', head: true })
+            .eq('tag_id', tag.id);
+          
+          if (countError) {
+            console.error('Erro ao contar munícipes para tag:', tag.nome, countError);
+            return { ...tag, total_municipes: 0 };
+          }
+          
+          return { ...tag, total_municipes: count || 0 };
+        })
+      );
+      
+      return tagsWithCounts;
     }
   });
 
