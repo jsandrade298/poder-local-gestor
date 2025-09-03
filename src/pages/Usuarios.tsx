@@ -31,6 +31,7 @@ export default function Usuarios() {
   const [newUser, setNewUser] = useState({
     nome: "",
     email: "",
+    senha: "",
     telefone: "",
     cargo: "",
     ativo: true
@@ -90,21 +91,57 @@ export default function Usuarios() {
     }
   });
 
-  // Create user mutation (placeholder - requires auth implementation)
+  // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof newUser) => {
-      // This would need proper auth implementation to create users
-      // For now, we'll just show a message
-      throw new Error("Criação de usuários requer implementação de autenticação completa");
+      if (!userData.senha || userData.senha.length < 6) {
+        throw new Error("A senha deve ter pelo menos 6 caracteres");
+      }
+
+      // Criar usuário no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.senha,
+        options: {
+          data: {
+            full_name: userData.nome
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Atualizar perfil com informações adicionais
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            telefone: userData.telefone,
+            cargo: userData.cargo
+          })
+          .eq('id', authData.user.id);
+
+        if (profileError) throw profileError;
+
+        // Dar papel de admin para todos os usuários (acesso completo)
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update({ role: 'admin' })
+          .eq('user_id', authData.user.id);
+
+        if (roleError) throw roleError;
+      }
+
+      return authData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       toast({
         title: "Usuário criado",
-        description: "O usuário foi criado com sucesso.",
+        description: "O usuário foi criado com sucesso com acesso completo ao sistema.",
       });
       setIsCreateDialogOpen(false);
-      setNewUser({ nome: "", email: "", telefone: "", cargo: "", ativo: true });
+      setNewUser({ nome: "", email: "", senha: "", telefone: "", cargo: "", ativo: true });
     },
     onError: (error) => {
       toast({
@@ -216,7 +253,7 @@ export default function Usuarios() {
   }, [usuarios, searchTerm, statusFilter]);
 
   const handleCreateUser = () => {
-    if (!newUser.nome.trim() || !newUser.email.trim()) return;
+    if (!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim()) return;
     
     createUserMutation.mutate(newUser);
   };
@@ -329,6 +366,16 @@ export default function Usuarios() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="senha">Senha</Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  placeholder="Senha do usuário (mínimo 6 caracteres)"
+                  value={newUser.senha}
+                  onChange={(e) => setNewUser({ ...newUser, senha: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="telefone">Telefone</Label>
                 <Input
                   id="telefone"
@@ -361,7 +408,7 @@ export default function Usuarios() {
               </Button>
               <Button 
                 onClick={handleCreateUser} 
-                disabled={!newUser.nome.trim() || !newUser.email.trim() || createUserMutation.isPending}
+                disabled={!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim() || createUserMutation.isPending}
               >
                 {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
               </Button>
