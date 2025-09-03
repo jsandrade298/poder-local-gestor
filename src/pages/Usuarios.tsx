@@ -19,7 +19,6 @@ import { formatDateTime } from '@/lib/dateUtils';
 
 export default function Usuarios() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -157,15 +156,13 @@ export default function Usuarios() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
       
       if (error) throw error;
-      return data;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
@@ -244,15 +241,10 @@ export default function Usuarios() {
 
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
-      const matchesSearch = usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || 
-                           (statusFilter === "ativo" && usuario.ativo) ||
-                           (statusFilter === "inativo" && !usuario.ativo);
-      
-      return matchesSearch && matchesStatus;
+      return usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [usuarios, searchTerm, statusFilter]);
+  }, [usuarios, searchTerm]);
 
   const handleCreateUser = () => {
     if (!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim()) return;
@@ -588,58 +580,24 @@ export default function Usuarios() {
       </div>
 
 
-      {/* Filtros */}
+      {/* Busca */}
       <Card className="shadow-sm border-0 bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Filtros</CardTitle>
+          <CardTitle className="text-base font-semibold">Buscar Usuários</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Buscar
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Nome ou email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Status
-              </label>
-              <select 
-                className="w-full p-2 border border-border rounded-md bg-background text-foreground"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">Todos os status</option>
-                <option value="ativo">Apenas ativos</option>
-                <option value="inativo">Apenas inativos</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Ações
-              </label>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  setSearchTerm("");
-                  setStatusFilter("all");
-                }}
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Limpar Filtros
-              </Button>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Buscar por nome ou email
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Digite o nome ou email do usuário..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </div>
         </CardContent>
