@@ -27,40 +27,63 @@ export function AgingList({ title, days, demandas }: AgingListProps) {
     return "secondary";
   };
 
+  const getColorClasses = () => {
+    if (days >= 90) return "text-destructive border-destructive/30";
+    if (days >= 60) return "text-warning border-warning/30";
+    return "text-info border-info/30";
+  };
+
+  const getBgClasses = () => {
+    if (days >= 90) return "bg-destructive/5";
+    if (days >= 60) return "bg-warning/5";
+    return "bg-info/5";
+  };
+
   const Icon = getIcon();
+  const colorClasses = getColorClasses();
+  const bgClasses = getBgClasses();
 
   return (
-    <Card className="shadow-sm border-0 bg-card">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Icon className="h-4 w-4" />
+    <Card className={`backdrop-blur-sm bg-card/95 border shadow-lg ${colorClasses} ${bgClasses}`}>
+      <CardHeader className="pb-4">
+        <CardTitle className={`text-lg font-semibold flex items-center gap-3`}>
+          <div className={`p-2 rounded-lg ${bgClasses}`}>
+            <Icon className={`h-5 w-5 ${colorClasses.split(' ')[0]}`} />
+          </div>
           {title}
           <Badge variant={getVariant()} className="ml-auto">
             {demandas.length}
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {demandas.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Nenhuma demanda nesta faixa
-          </p>
+          <div className="text-center py-8">
+            <Icon className={`h-8 w-8 mx-auto ${colorClasses.split(' ')[0]} opacity-50 mb-2`} />
+            <p className="text-sm text-muted-foreground">
+              Nenhuma demanda nesta faixa
+            </p>
+          </div>
         ) : (
           demandas.map((demanda) => (
             <div 
               key={demanda.id}
-              className="p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
+              className="group p-4 rounded-lg bg-background/50 border border-border/50 hover:bg-background/80 hover:border-border transition-all duration-200 hover:shadow-md"
             >
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground line-clamp-1">
+                <div className="space-y-2 flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                     {demanda.titulo}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {demanda.area} • {demanda.responsavel}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+                      {demanda.area}
+                    </span>
+                    <span>•</span>
+                    <span>{demanda.responsavel}</span>
+                  </div>
                 </div>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className={`text-xs ml-3 ${colorClasses.split(' ')[0]} border-current`}>
                   {demanda.diasVencido}d
                 </Badge>
               </div>

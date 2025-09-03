@@ -23,76 +23,80 @@ const demandas90Dias = [
 
 export default function Dashboard() {
   return (
-    <div className="space-y-6">
-      {/* Header da Dashboard */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Visão Geral do Gabinete
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhe as principais métricas e demandas em tempo real
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Demanda
-          </Button>
-        </div>
-      </div>
-
-      {/* Filtros Globais */}
-      <Card className="shadow-sm border-0 bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Filtros Globais</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Filtrar por Bairro
-              </label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os bairros" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="centro">Centro</SelectItem>
-                  <SelectItem value="vila-nova">Vila Nova</SelectItem>
-                  <SelectItem value="jardim-america">Jardim América</SelectItem>
-                  <SelectItem value="industrial">Industrial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Filtrar por Responsável
-              </label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os responsáveis" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="joao">João Silva</SelectItem>
-                  <SelectItem value="maria">Maria Santos</SelectItem>
-                  <SelectItem value="carlos">Carlos Lima</SelectItem>
-                  <SelectItem value="ana">Ana Costa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+      <div className="container mx-auto px-4 py-6 space-y-8">
+        {/* Header da Dashboard */}
+        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+              Visão Geral do Gabinete
+            </h1>
+            <p className="text-base text-muted-foreground lg:text-lg">
+              Acompanhe as principais métricas e demandas em tempo real
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+            </Button>
+            <Button size="sm" className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary-light hover:from-primary-dark hover:to-primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Demanda
+            </Button>
+          </div>
+        </div>
 
-      {/* KPIs Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Filtros Globais */}
+        <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Filter className="h-5 w-5 text-primary" />
+              Filtros Globais
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-foreground">
+                  Filtrar por Bairro
+                </label>
+                <Select>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Todos os bairros" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="centro">Centro</SelectItem>
+                    <SelectItem value="vila-nova">Vila Nova</SelectItem>
+                    <SelectItem value="jardim-america">Jardim América</SelectItem>
+                    <SelectItem value="industrial">Industrial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-foreground">
+                  Filtrar por Responsável
+                </label>
+                <Select>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Todos os responsáveis" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="joao">João Silva</SelectItem>
+                    <SelectItem value="maria">Maria Santos</SelectItem>
+                    <SelectItem value="carlos">Carlos Lima</SelectItem>
+                    <SelectItem value="ana">Ana Costa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPIs Principais */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <KPICard
           title="Total de Demandas"
           value="248"
@@ -123,33 +127,37 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StatusChart />
-        <AreaChart />
-      </div>
+        {/* Gráficos */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <StatusChart />
+          <AreaChart />
+        </div>
 
-      {/* Listas de Envelhecimento */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          Demandas por Tempo de Criação
-        </h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <AgingList
-            title="Mais de 30 dias"
-            days={30}
-            demandas={demandas30Dias}
-          />
-          <AgingList
-            title="Mais de 60 dias"
-            days={60}
-            demandas={demandas60Dias}
-          />
-          <AgingList
-            title="Mais de 90 dias"
-            days={90}
-            demandas={demandas90Dias}
-          />
+        {/* Listas de Envelhecimento */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Clock className="h-6 w-6 text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              Demandas por Tempo de Criação
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <AgingList
+              title="Mais de 30 dias"
+              days={30}
+              demandas={demandas30Dias}
+            />
+            <AgingList
+              title="Mais de 60 dias"
+              days={60}
+              demandas={demandas60Dias}
+            />
+            <AgingList
+              title="Mais de 90 dias"
+              days={90}
+              demandas={demandas90Dias}
+            />
+          </div>
         </div>
       </div>
     </div>

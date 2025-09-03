@@ -11,9 +11,10 @@ const statusData = [
 
 export function StatusChart() {
   return (
-    <Card className="shadow-sm border-0 bg-card">
+    <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
       <CardHeader>
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
           Demandas por Status
         </CardTitle>
       </CardHeader>
