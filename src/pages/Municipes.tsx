@@ -12,53 +12,93 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
 
-// Dados mockados - substituir pela integração com Supabase
-const municipesMock = [
-  {
-    id: "1",
-    nome_completo: "Maria da Silva Santos",
-    email: "maria.silva@email.com",
-    telefone: "(11) 99999-1111",
-    data_nascimento: "1985-05-15",
-    endereco: "Rua das Flores, 123 - Centro - São Paulo/SP",
-    tags: ["Idoso", "Deficiente"],
-    total_demandas: 3
-  },
-  {
-    id: "2", 
-    nome_completo: "José Santos Oliveira",
-    email: "jose.santos@email.com",
-    telefone: "(11) 99999-2222",
-    data_nascimento: "1978-12-03",
-    endereco: "Av. Principal, 456 - Vila Nova - São Paulo/SP",
-    tags: ["Comerciante"],
-    total_demandas: 1
-  },
-  {
-    id: "3",
-    nome_completo: "Ana Costa Lima",
-    email: "ana.costa@email.com", 
-    telefone: "(11) 99999-3333",
-    data_nascimento: "1992-08-20",
-    endereco: "Rua B, 789 - Jardim América - São Paulo/SP",
-    tags: ["Jovem", "Estudante"],
-    total_demandas: 2
-  }
-];
 
 export default function Municipes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
 
-  const filteredMunicipes = municipesMock.filter(municipe => {
-    const matchesSearch = municipe.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         municipe.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = tagFilter === "all" || municipe.tags.includes(tagFilter);
-    const matchesBairro = bairroFilter === "all" || municipe.endereco.includes(bairroFilter);
+  // Buscar munícipes
+  const { data: municipes = [], isLoading } = useQuery({
+    queryKey: ['municipes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select(`
+          *,
+          municipe_tags (
+            tags (
+              id,
+              nome,
+              cor
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Buscar tags para filtros
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id, nome, cor')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Buscar contagem de demandas por munícipe
+  const { data: demandasCount = [] } = useQuery({
+    queryKey: ['demandas-count-by-municipe'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('municipe_id')
+        .not('municipe_id', 'is', null);
+      
+      if (error) throw error;
+      
+      // Contar demandas por munícipe
+      const counts = data.reduce((acc, demanda) => {
+        acc[demanda.municipe_id] = (acc[demanda.municipe_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      return counts;
+    }
+  });
+
+  const filteredMunicipes = municipes.filter(municipe => {
+    const matchesSearch = municipe.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (municipe.email && municipe.email.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const municipeTags = municipe.municipe_tags?.map(mt => mt.tags).filter(Boolean) || [];
+    const matchesTag = tagFilter === "all" || municipeTags.some(tag => tag?.id === tagFilter);
+    
+    const matchesBairro = bairroFilter === "all" || 
+                         (municipe.bairro && municipe.bairro.toLowerCase().includes(bairroFilter.toLowerCase()));
     
     return matchesSearch && matchesTag && matchesBairro;
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando munícipes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -118,11 +158,17 @@ export default function Municipes() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as tags</SelectItem>
-                  <SelectItem value="Idoso">Idoso</SelectItem>
-                  <SelectItem value="Deficiente">Deficiente</SelectItem>
-                  <SelectItem value="Comerciante">Comerciante</SelectItem>
-                  <SelectItem value="Jovem">Jovem</SelectItem>
-                  <SelectItem value="Estudante">Estudante</SelectItem>
+                  {tags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: tag.cor }}
+                        />
+                        {tag.nome}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -161,14 +207,14 @@ export default function Municipes() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{municipesMock.length}</div>
+            <div className="text-2xl font-bold text-foreground">{municipes.length}</div>
             <p className="text-sm text-muted-foreground">Total de Munícipes</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {municipesMock.reduce((acc, m) => acc + m.total_demandas, 0)}
+              {Object.values(demandasCount).reduce((acc, count) => acc + count, 0)}
             </div>
             <p className="text-sm text-muted-foreground">Total de Demandas</p>
           </CardContent>
@@ -176,7 +222,7 @@ export default function Municipes() {
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {new Set(municipesMock.flatMap(m => m.tags)).size}
+              {tags.length}
             </div>
             <p className="text-sm text-muted-foreground">Tags Ativas</p>
           </CardContent>
@@ -204,46 +250,71 @@ export default function Municipes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMunicipes.map((municipe) => (
-                  <TableRow key={municipe.id}>
+                 {filteredMunicipes.map((municipe) => (
+                  <TableRow key={municipe.id} className="hover:bg-muted/50">
                     <TableCell>
                       <div>
-                        <p className="font-medium text-foreground">{municipe.nome_completo}</p>
+                        <p className="font-medium text-foreground">{municipe.nome}</p>
                         <p className="text-xs text-muted-foreground">
-                          Nascimento: {new Date(municipe.data_nascimento).toLocaleDateString('pt-BR')}
+                          {municipe.data_nascimento ? `Nascimento: ${formatDateOnly(municipe.data_nascimento)}` : 'Data de nascimento não informada'}
                         </p>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-foreground">{municipe.email}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-foreground">{municipe.telefone}</span>
-                        </div>
+                        {municipe.email && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-foreground">{municipe.email}</span>
+                          </div>
+                        )}
+                        {municipe.telefone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-foreground">{municipe.telefone}</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-xs text-foreground">{municipe.endereco}</span>
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-foreground">
+                            {[municipe.endereco, municipe.bairro, municipe.cidade].filter(Boolean).join(', ')}
+                          </p>
+                          {municipe.cep && (
+                            <p className="text-xs text-muted-foreground">CEP: {municipe.cep}</p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {municipe.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
+                        {municipe.municipe_tags?.map((mt) => (
+                          mt.tags && (
+                            <Badge 
+                              key={mt.tags.id}
+                              variant="secondary" 
+                              className="text-xs"
+                              style={{ 
+                                backgroundColor: `${mt.tags.cor}20`, 
+                                borderColor: mt.tags.cor,
+                                color: mt.tags.cor 
+                              }}
+                            >
+                              {mt.tags.nome}
+                            </Badge>
+                          )
                         ))}
+                        {(!municipe.municipe_tags || municipe.municipe_tags.length === 0) && (
+                          <span className="text-xs text-muted-foreground">Sem tags</span>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {municipe.total_demandas}
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="text-xs">
+                        {demandasCount[municipe.id] || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

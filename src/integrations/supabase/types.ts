@@ -232,6 +232,42 @@ export type Database = {
           },
         ]
       }
+      municipe_tags: {
+        Row: {
+          created_at: string
+          id: string
+          municipe_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          municipe_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          municipe_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "municipe_tags_municipe_id_fkey"
+            columns: ["municipe_id"]
+            isOneToOne: false
+            referencedRelation: "municipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "municipe_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       municipes: {
         Row: {
           bairro: string | null
