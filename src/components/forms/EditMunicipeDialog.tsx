@@ -138,11 +138,15 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
       if (updateError) throw updateError;
 
       // Gerenciar tag
-      // Primeiro, remover tag existente
-      await supabase
+      // Primeiro, remover todas as tags existentes
+      const { error: deleteError } = await supabase
         .from('municipe_tags')
         .delete()
         .eq('municipe_id', municipe.id);
+
+      if (deleteError) {
+        console.warn('Erro ao remover tags existentes:', deleteError);
+      }
 
       // Se uma nova tag foi selecionada, adicionar (não adicionar se for "none")
       if (data.tag_id && data.tag_id !== "none") {
@@ -155,6 +159,7 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
 
         if (tagError) {
           console.warn('Erro ao atualizar tag:', tagError);
+          // Não falhar a operação inteira por causa da tag
         }
       }
 

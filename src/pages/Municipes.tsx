@@ -360,6 +360,13 @@ export default function Municipes() {
   // Função para excluir munícipe
   const deleteMunicipe = useMutation({
     mutationFn: async (municipeId: string) => {
+      // Primeiro, remover todas as tags associadas ao munícipe
+      await supabase
+        .from('municipe_tags')
+        .delete()
+        .eq('municipe_id', municipeId);
+      
+      // Depois, excluir o munícipe
       const { error } = await supabase
         .from('municipes')
         .delete()
