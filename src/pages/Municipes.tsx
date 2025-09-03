@@ -16,6 +16,7 @@ export default function Municipes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
+  const [cidadeFilter, setCidadeFilter] = useState("all");
 
   // Buscar munícipes com suas tags
   const { data: municipes = [], isLoading } = useQuery({
@@ -40,6 +41,42 @@ export default function Municipes() {
     }
   });
 
+  // Buscar cidades únicas para o filtro
+  const { data: cidades = [] } = useQuery({
+    queryKey: ['cidades-municipes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('cidade')
+        .not('cidade', 'is', null)
+        .order('cidade');
+      
+      if (error) throw error;
+      
+      // Extrair cidades únicas
+      const cidadesUnicas = [...new Set(data.map(item => item.cidade))];
+      return cidadesUnicas.filter(Boolean).sort();
+    }
+  });
+
+  // Buscar bairros únicos para o filtro
+  const { data: bairros = [] } = useQuery({
+    queryKey: ['bairros-municipes'], 
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('bairro')
+        .not('bairro', 'is', null)
+        .order('bairro');
+      
+      if (error) throw error;
+      
+      // Extrair bairros únicos
+      const bairrosUnicos = [...new Set(data.map(item => item.bairro))];
+      return bairrosUnicos.filter(Boolean).sort();
+    }
+  });
+
   // Buscar tags para os filtros
   const { data: tags = [] } = useQuery({
     queryKey: ['tags'],
@@ -57,16 +94,27 @@ export default function Municipes() {
   const filteredMunicipes = municipes.filter(municipe => {
     const matchesSearch = !searchTerm || 
       municipe.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      municipe.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      municipe.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      municipe.telefone?.includes(searchTerm);
     
     const matchesTag = tagFilter === "all" || 
       (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => mt.tags?.id === tagFilter));
     
     const matchesBairro = bairroFilter === "all" || 
-      municipe.bairro?.toLowerCase().includes(bairroFilter.toLowerCase());
+      municipe.bairro?.toLowerCase() === bairroFilter.toLowerCase();
+
+    const matchesCidade = cidadeFilter === "all" ||
+      municipe.cidade?.toLowerCase() === cidadeFilter.toLowerCase();
     
-    return matchesSearch && matchesTag && matchesBairro;
+    return matchesSearch && matchesTag && matchesBairro && matchesCidade;
   });
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setTagFilter("all");
+    setBairroFilter("all");
+    setCidadeFilter("all");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
@@ -101,7 +149,7 @@ export default function Municipes() {
             <CardTitle className="text-base font-semibold">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
                   Buscar
@@ -109,7 +157,7 @@ export default function Municipes() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Nome ou email..."
+                    placeholder="Nome, email ou telefone..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -152,15 +200,40 @@ export default function Municipes() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os bairros</SelectItem>
-                    <SelectItem value="centro">Centro</SelectItem>
-                    <SelectItem value="vila nova">Vila Nova</SelectItem>
-                    <SelectItem value="jardim américa">Jardim América</SelectItem>
+                    {bairros.map((bairro) => (
+                      <SelectItem key={bairro} value={bairro.toLowerCase()}>
+                        {bairro}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Cidade
+                </label>
+                <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as cidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as cidades</SelectItem>
+                    {cidades.map((cidade) => (
+                      <SelectItem key={cidade} value={cidade.toLowerCase()}>
+                        {cidade}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-end">
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={clearFilters}
+                >
                   Limpar Filtros
                 </Button>
               </div>
