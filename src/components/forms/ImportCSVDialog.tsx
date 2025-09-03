@@ -57,14 +57,24 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef }: Imp
       ]
     ];
 
+    // Criar CSV com separador ; para melhor compatibilidade
     const csvContent = [
-      headers.join(','),
+      headers.join(';'),
       ...exampleData.map(row => 
-        row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(',')
+        row.map(field => {
+          // Escapar aspas duplas e envolver campos com vírgulas/quebras de linha
+          const escaped = field.toString().replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(';')
       )
-    ].join('\n');
+    ].join('\r\n'); // Usar CRLF para melhor compatibilidade
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Adicionar BOM para UTF-8 (resolve problemas de codificação)
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { 
+      type: 'text/csv;charset=utf-8;' 
+    });
+    
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -244,8 +254,9 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef }: Imp
               <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
               <p>• Datas devem estar no formato AAAA-MM-DD (ex: 1985-05-15)</p>
               <p>• Se um campo estiver vazio, deixe a célula em branco</p>
+              <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
+              <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
               <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
-              <p>• Campos com erro serão ignorados, mas o munícipe ainda será criado</p>
             </div>
           </div>
 

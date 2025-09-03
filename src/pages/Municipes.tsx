@@ -151,14 +151,22 @@ export default function Municipes() {
           municipe.observacoes || ''
         ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => 
-        row.map(field => `"${field.toString().replace(/"/g, '""')}"`).join(',')
-      )
-    ].join('\n');
+        // Usar ponto e vírgula como separador para melhor compatibilidade
+        const csvContent = [
+          headers.join(';'),
+          ...csvData.map(row => 
+            row.map(field => {
+              const escaped = field.toString().replace(/"/g, '""');
+              return `"${escaped}"`;
+            }).join(';')
+          )
+        ].join('\r\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Adicionar BOM para UTF-8
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csvContent], { 
+          type: 'text/csv;charset=utf-8;' 
+        });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -266,8 +274,9 @@ export default function Municipes() {
           return;
         }
 
-        // Processar header
-        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        // Processar header - aceitar tanto vírgula quanto ponto e vírgula
+        const separator = csv.includes(';') ? ';' : ',';
+        const headers = lines[0].split(separator).map(h => h.replace(/"/g, '').trim().toLowerCase());
         
         // Mapear colunas esperadas
         const expectedColumns = {
@@ -286,7 +295,7 @@ export default function Municipes() {
 
         // Processar dados
         const municipes = lines.slice(1).map(line => {
-          const values = line.split(',').map(v => v.replace(/"/g, '').trim());
+          const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
           const municipe: any = {};
 
           Object.keys(expectedColumns).forEach(key => {
