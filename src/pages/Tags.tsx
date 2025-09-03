@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash, Settings } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash, Settings, Filter } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +41,11 @@ export default function Tags() {
   const [newTagDescription, setNewTagDescription] = useState("");
   const [newTagColor, setNewTagColor] = useState(colorOptions[0]);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>([]);
+  
+  // Estados para filtros de munícipes
+  const [municipesSearchTerm, setMunicipesSearchTerm] = useState("");
+  const [selectedBairro, setSelectedBairro] = useState("all");
+  const [selectedCidade, setSelectedCidade] = useState("all");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -86,17 +92,34 @@ export default function Tags() {
     }
   });
 
-  // Buscar todos os munícipes
+  // Buscar todos os munícipes com bairro e cidade
   const { data: allMunicipes = [] } = useQuery({
     queryKey: ['all-municipes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('municipes')
-        .select('id, nome, email')
+        .select('id, nome, email, bairro, cidade')
         .order('nome');
       
       if (error) throw error;
       return data;
+    }
+  });
+
+  // Buscar listas únicas de bairros e cidades para os filtros
+  const { data: filtroOptions = { bairros: [], cidades: [] } } = useQuery({
+    queryKey: ['filtro-options'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('bairro, cidade');
+      
+      if (error) throw error;
+      
+      const bairros = [...new Set(data.map(item => item.bairro).filter(Boolean))].sort();
+      const cidades = [...new Set(data.map(item => item.cidade).filter(Boolean))].sort();
+      
+      return { bairros, cidades };
     }
   });
 
@@ -299,6 +322,25 @@ export default function Tags() {
     tag.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (tag.descricao && tag.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Filtrar munícipes disponíveis com base nos critérios de busca
+  const filteredMunicipes = allMunicipes.filter((municipe: any) => {
+    // Excluir munícipes já associados à tag
+    if (tagMunicipes.some((tm: any) => tm.id === municipe.id)) return false;
+    
+    // Filtro por nome
+    const matchesName = municipesSearchTerm === "" || 
+      municipe.nome.toLowerCase().includes(municipesSearchTerm.toLowerCase()) ||
+      (municipe.email && municipe.email.toLowerCase().includes(municipesSearchTerm.toLowerCase()));
+    
+    // Filtro por bairro
+    const matchesBairro = selectedBairro === "all" || municipe.bairro === selectedBairro;
+    
+    // Filtro por cidade
+    const matchesCidade = selectedCidade === "all" || municipe.cidade === selectedCidade;
+    
+    return matchesName && matchesBairro && matchesCidade;
+  });
 
   const handleCreateTag = () => {
     if (!newTagName.trim()) return;
@@ -756,34 +798,84 @@ export default function Tags() {
                 <h3 className="font-semibold">Adicionar Munícipes</h3>
               </div>
               
+              {/* Filtros de Busca */}
+              <div className="space-y-3 border-b pb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome..."
+                    value={municipesSearchTerm}
+                    onChange={(e) => setMunicipesSearchTerm(e.target.value)}
+                    className="pl-10 h-8"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Select value={selectedBairro} onValueChange={setSelectedBairro}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Bairro" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os bairros</SelectItem>
+                        {filtroOptions.bairros.map((bairro) => (
+                          <SelectItem key={bairro} value={bairro}>
+                            {bairro}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Select value={selectedCidade} onValueChange={setSelectedCidade}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Cidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as cidades</SelectItem>
+                        {filtroOptions.cidades.map((cidade) => (
+                          <SelectItem key={cidade} value={cidade}>
+                            {cidade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
               <ScrollArea className="h-[400px] border rounded-lg p-2">
                 {allMunicipes.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     Nenhum munícipe disponível
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {allMunicipes
-                      .filter((municipe: any) => !tagMunicipes.some((tm: any) => tm.id === municipe.id))
-                      .map((municipe: any) => (
-                        <div key={municipe.id} className="flex items-center gap-3 p-2 border rounded">
-                          <Checkbox
-                            checked={selectedMunicipes.includes(municipe.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedMunicipes([...selectedMunicipes, municipe.id]);
-                              } else {
-                                setSelectedMunicipes(selectedMunicipes.filter(id => id !== municipe.id));
-                              }
-                            }}
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium">{municipe.nome}</p>
-                            <p className="text-sm text-muted-foreground">{municipe.email}</p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                 ) : (
+                   <div className="space-y-2">
+                     {filteredMunicipes.map((municipe: any) => (
+                       <div key={municipe.id} className="flex items-center gap-3 p-2 border rounded">
+                         <Checkbox
+                           checked={selectedMunicipes.includes(municipe.id)}
+                           onCheckedChange={(checked) => {
+                             if (checked) {
+                               setSelectedMunicipes([...selectedMunicipes, municipe.id]);
+                             } else {
+                               setSelectedMunicipes(selectedMunicipes.filter(id => id !== municipe.id));
+                             }
+                           }}
+                         />
+                         <div className="flex-1">
+                           <p className="font-medium">{municipe.nome}</p>
+                           <div className="text-xs text-muted-foreground space-y-1">
+                             <p>{municipe.email}</p>
+                             {(municipe.bairro || municipe.cidade) && (
+                               <p>{[municipe.bairro, municipe.cidade].filter(Boolean).join(", ")}</p>
+                             )}
+                           </div>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
                 )}
               </ScrollArea>
               
@@ -812,6 +904,10 @@ export default function Tags() {
                 setIsManageMunicipesDialogOpen(false);
                 setSelectedMunicipes([]);
                 setSelectedTag(null);
+                // Limpar filtros
+                setMunicipesSearchTerm("");
+                setSelectedBairro("all");
+                setSelectedCidade("all");
               }}
             >
               Fechar
