@@ -49,12 +49,33 @@ export default function Areas() {
         if (!demanda.area_id) return acc;
         
         if (!acc[demanda.area_id]) {
-          acc[demanda.area_id] = { total: 0, ativas: 0 };
+          acc[demanda.area_id] = { 
+            total: 0, 
+            abertas: 0,
+            em_andamento: 0,
+            aguardando: 0,
+            resolvidas: 0,
+            canceladas: 0,
+            ativas: 0 // abertas + em_andamento + aguardando
+          };
         }
         
         acc[demanda.area_id].total += 1;
-        if (['aberta', 'em_andamento', 'aguardando'].includes(demanda.status)) {
+        
+        // Count by status
+        if (demanda.status === 'aberta') {
+          acc[demanda.area_id].abertas += 1;
           acc[demanda.area_id].ativas += 1;
+        } else if (demanda.status === 'em_andamento') {
+          acc[demanda.area_id].em_andamento += 1;
+          acc[demanda.area_id].ativas += 1;
+        } else if (demanda.status === 'aguardando') {
+          acc[demanda.area_id].aguardando += 1;
+          acc[demanda.area_id].ativas += 1;
+        } else if (demanda.status === 'resolvida') {
+          acc[demanda.area_id].resolvidas += 1;
+        } else if (demanda.status === 'cancelada') {
+          acc[demanda.area_id].canceladas += 1;
         }
         
         return acc;
@@ -66,10 +87,13 @@ export default function Areas() {
 
   // Create area mutation
   const createAreaMutation = useMutation({
-    mutationFn: async (newArea: { nome: string; descricao: string }) => {
+    mutationFn: async (newArea: { nome: string; descricao?: string }) => {
       const { data, error } = await supabase
         .from('areas')
-        .insert([newArea])
+        .insert([{
+          nome: newArea.nome,
+          descricao: newArea.descricao || null
+        }])
         .select()
         .single();
       
@@ -101,6 +125,11 @@ export default function Areas() {
       ...area,
       total_demandas: demandasCount[area.id]?.total || 0,
       demandas_ativas: demandasCount[area.id]?.ativas || 0,
+      demandas_abertas: demandasCount[area.id]?.abertas || 0,
+      demandas_em_andamento: demandasCount[area.id]?.em_andamento || 0,
+      demandas_aguardando: demandasCount[area.id]?.aguardando || 0,
+      demandas_resolvidas: demandasCount[area.id]?.resolvidas || 0,
+      demandas_canceladas: demandasCount[area.id]?.canceladas || 0,
     }));
   }, [areas, demandasCount]);
 
@@ -114,12 +143,13 @@ export default function Areas() {
     
     createAreaMutation.mutate({
       nome: newAreaName.trim(),
-      descricao: newAreaDescription.trim() || null,
+      descricao: newAreaDescription.trim() || undefined,
     });
   };
 
   const totalDemandas = areasWithCount.reduce((acc, area) => acc + area.total_demandas, 0);
   const totalAtivas = areasWithCount.reduce((acc, area) => acc + area.demandas_ativas, 0);
+  const totalResolvidas = areasWithCount.reduce((acc, area) => acc + area.demandas_resolvidas, 0);
 
   if (isLoadingAreas || isLoadingDemandas) {
     return (
@@ -200,7 +230,7 @@ export default function Areas() {
             <div className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold text-foreground">{areas.length}</div>
+                <div className="text-2xl font-bold text-foreground">{areasWithCount.length}</div>
                 <p className="text-sm text-muted-foreground">Áreas Ativas</p>
               </div>
             </div>
@@ -226,9 +256,9 @@ export default function Areas() {
         <Card className="shadow-sm border-0 bg-card">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-foreground">
-              {totalDemandas > 0 ? Math.round((totalAtivas / totalDemandas) * 100) : 0}%
+              {totalDemandas > 0 ? Math.round((totalResolvidas / totalDemandas) * 100) : 0}%
             </div>
-            <p className="text-sm text-muted-foreground">Taxa de Atividade</p>
+            <p className="text-sm text-muted-foreground">Taxa de Resolução</p>
           </CardContent>
         </Card>
       </div>
@@ -282,28 +312,32 @@ export default function Areas() {
                 <p className="text-sm text-muted-foreground">
                   {area.descricao}
                 </p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="text-center">
-                    <div className="text-xl font-bold text-foreground">{area.total_demandas}</div>
+                    <div className="text-lg font-bold text-foreground">{area.total_demandas}</div>
                     <p className="text-xs text-muted-foreground">Total</p>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-warning">{area.demandas_ativas}</div>
+                    <div className="text-lg font-bold text-warning">{area.demandas_ativas}</div>
                     <p className="text-xs text-muted-foreground">Ativas</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-success">{area.demandas_resolvidas}</div>
+                    <p className="text-xs text-muted-foreground">Resolvidas</p>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Progresso</span>
+                    <span className="text-muted-foreground">Taxa de Resolução</span>
                     <span className="text-muted-foreground">
-                      {area.total_demandas > 0 ? Math.round(((area.total_demandas - area.demandas_ativas) / area.total_demandas) * 100) : 0}%
+                      {area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0}%
                     </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div 
-                      className="bg-primary h-2 rounded-full transition-all" 
+                      className="bg-success h-2 rounded-full transition-all" 
                       style={{ 
-                        width: `${area.total_demandas > 0 ? ((area.total_demandas - area.demandas_ativas) / area.total_demandas) * 100 : 0}%` 
+                        width: `${area.total_demandas > 0 ? (area.demandas_resolvidas / area.total_demandas) * 100 : 0}%` 
                       }}
                     />
                   </div>
@@ -333,15 +367,14 @@ export default function Areas() {
                   <TableHead>Descrição</TableHead>
                   <TableHead className="text-center">Total</TableHead>
                   <TableHead className="text-center">Ativas</TableHead>
-                  <TableHead className="text-center">Concluídas</TableHead>
-                  <TableHead className="text-center">Taxa de Conclusão</TableHead>
+                  <TableHead className="text-center">Resolvidas</TableHead>
+                  <TableHead className="text-center">Taxa de Resolução</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredAreas.map((area) => {
-                  const concluidas = area.total_demandas - area.demandas_ativas;
-                  const taxaConclusao = area.total_demandas > 0 ? Math.round((concluidas / area.total_demandas) * 100) : 0;
+                  const taxaResolucao = area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0;
                   
                   return (
                     <TableRow key={area.id}>
@@ -369,11 +402,11 @@ export default function Areas() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="default">
-                          {concluidas}
+                          {area.demandas_resolvidas}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="text-sm text-foreground">{taxaConclusao}%</span>
+                        <span className="text-sm text-foreground">{taxaResolucao}%</span>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
