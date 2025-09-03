@@ -104,8 +104,8 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
 
   // Atualizar tag_id quando currentTag carrega
   useEffect(() => {
-    if (currentTag) {
-      setFormData(prev => ({ ...prev, tag_id: currentTag }));
+    if (currentTag !== undefined) {
+      setFormData(prev => ({ ...prev, tag_id: currentTag || "none" }));
     }
   }, [currentTag]);
 
@@ -144,8 +144,8 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
         .delete()
         .eq('municipe_id', municipe.id);
 
-      // Se uma nova tag foi selecionada, adicionar
-      if (data.tag_id) {
+      // Se uma nova tag foi selecionada, adicionar (não adicionar se for "none")
+      if (data.tag_id && data.tag_id !== "none") {
         const { error: tagError } = await supabase
           .from('municipe_tags')
           .insert({
@@ -341,7 +341,7 @@ export function EditMunicipeDialog({ municipe, trigger }: EditMunicipeDialogProp
                   <SelectValue placeholder="Selecione uma tag" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma tag</SelectItem>
+                  <SelectItem value="none">Nenhuma tag</SelectItem>
                   {tags.map((tag) => (
                     <SelectItem key={tag.id} value={tag.id}>
                       <div className="flex items-center gap-2">

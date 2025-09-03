@@ -5,13 +5,32 @@
 export function formatDateOnly(dateString: string | Date): string {
   if (!dateString) return '';
   
-  // Para campos DATE do PostgreSQL, precisamos tratar como data local
-  // para evitar problemas de timezone
-  const date = typeof dateString === 'string' 
-    ? new Date(dateString + 'T12:00:00') // Adiciona meio-dia para evitar problemas de timezone
-    : dateString;
-  
-  return date.toLocaleDateString('pt-BR');
+  try {
+    let date: Date;
+    
+    if (typeof dateString === 'string') {
+      // Se a string contém 'T' (timestamp), usar diretamente
+      // Se não contém 'T' (date only), adicionar meio-dia
+      if (dateString.includes('T')) {
+        date = new Date(dateString);
+      } else {
+        date = new Date(dateString + 'T12:00:00');
+      }
+    } else {
+      date = dateString;
+    }
+    
+    // Verificar se a data é válida
+    if (isNaN(date.getTime())) {
+      console.error('Data inválida:', dateString);
+      return 'Data inválida';
+    }
+    
+    return date.toLocaleDateString('pt-BR');
+  } catch (error) {
+    console.error('Erro ao formatar data:', error, 'Valor:', dateString);
+    return 'Data inválida';
+  }
 }
 
 /**
@@ -20,6 +39,18 @@ export function formatDateOnly(dateString: string | Date): string {
 export function formatDateTime(dateString: string | Date): string {
   if (!dateString) return '';
   
-  const date = new Date(dateString);
-  return date.toLocaleDateString('pt-BR') + ' às ' + date.toLocaleTimeString('pt-BR');
+  try {
+    const date = new Date(dateString);
+    
+    // Verificar se a data é válida
+    if (isNaN(date.getTime())) {
+      console.error('Data/hora inválida:', dateString);
+      return 'Data inválida';
+    }
+    
+    return date.toLocaleDateString('pt-BR') + ' às ' + date.toLocaleTimeString('pt-BR');
+  } catch (error) {
+    console.error('Erro ao formatar data/hora:', error, 'Valor:', dateString);
+    return 'Data inválida';
+  }
 }
