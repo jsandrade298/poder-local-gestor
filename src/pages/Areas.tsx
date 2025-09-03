@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3, Clock, Play, Pause, CheckCircle, XCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,10 @@ export default function Areas() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingArea, setEditingArea] = useState<any>(null);
+  const [editAreaName, setEditAreaName] = useState("");
+  const [editAreaDescription, setEditAreaDescription] = useState("");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -121,6 +126,69 @@ export default function Areas() {
     }
   });
 
+  // Update area mutation
+  const updateAreaMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: { nome: string; descricao?: string } }) => {
+      const { data, error } = await supabase
+        .from('areas')
+        .update({
+          nome: updates.nome,
+          descricao: updates.descricao || null
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      toast({
+        title: "Área atualizada",
+        description: "A área foi atualizada com sucesso.",
+      });
+      setIsEditDialogOpen(false);
+      setEditingArea(null);
+      setEditAreaName("");
+      setEditAreaDescription("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar área: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete area mutation
+  const deleteAreaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('areas')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-count-by-area'] });
+      toast({
+        title: "Área excluída",
+        description: "A área foi excluída com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir área: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Combine areas with demandas count
   const areasWithCount = useMemo(() => {
     return areas.map(area => ({
@@ -147,6 +215,29 @@ export default function Areas() {
       nome: newAreaName.trim(),
       descricao: newAreaDescription.trim() || undefined,
     });
+  };
+
+  const handleEditArea = (area: any) => {
+    setEditingArea(area);
+    setEditAreaName(area.nome);
+    setEditAreaDescription(area.descricao || "");
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateArea = () => {
+    if (!editAreaName.trim() || !editingArea) return;
+    
+    updateAreaMutation.mutate({
+      id: editingArea.id,
+      updates: {
+        nome: editAreaName.trim(),
+        descricao: editAreaDescription.trim() || undefined,
+      }
+    });
+  };
+
+  const handleDeleteArea = (areaId: string) => {
+    deleteAreaMutation.mutate(areaId);
   };
 
   const handleViewDemandas = (areaId: string, areaNome: string) => {
@@ -223,6 +314,46 @@ export default function Areas() {
                 disabled={!newAreaName.trim() || createAreaMutation.isPending}
               >
                 {createAreaMutation.isPending ? "Criando..." : "Criar Área"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Edição */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Área de Atuação</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nome">Nome da Área</Label>
+                <Input
+                  id="edit-nome"
+                  placeholder="Ex: Infraestrutura, Saúde..."
+                  value={editAreaName}
+                  onChange={(e) => setEditAreaName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-descricao">Descrição</Label>
+                <Textarea
+                  id="edit-descricao"
+                  placeholder="Descreva o escopo desta área de atuação..."
+                  value={editAreaDescription}
+                  onChange={(e) => setEditAreaDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleUpdateArea} 
+                disabled={!editAreaName.trim() || updateAreaMutation.isPending}
+              >
+                {updateAreaMutation.isPending ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -323,10 +454,33 @@ export default function Areas() {
                     <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
                       Ver Demandas
                     </DropdownMenuItem>
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
-                      Excluir
+                    <DropdownMenuItem onClick={() => handleEditArea(area)}>
+                      Editar
                     </DropdownMenuItem>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <span className="text-destructive">Excluir</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteArea(area.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -490,10 +644,33 @@ export default function Areas() {
                             <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
                               Ver Demandas
                             </DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Excluir
+                            <DropdownMenuItem onClick={() => handleEditArea(area)}>
+                              Editar
                             </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <span className="text-destructive">Excluir</span>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteArea(area.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
