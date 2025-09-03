@@ -273,10 +273,18 @@ export default function Usuarios() {
   const handleUpdateUser = () => {
     if (!editingUser) return;
     
-    console.log('👤 Usuário sendo editado:', editingUser);
-    const { id, user_roles, role, total_demandas, ativo, ...updates } = editingUser;
-    console.log('📝 Updates que serão enviados:', updates);
-    updateUserMutation.mutate({ id, updates });
+    console.log('👤 Usuário sendo editado (completo):', editingUser);
+    
+    // Enviar apenas os campos que podem ser atualizados
+    const updates = {
+      nome: editingUser.nome,
+      email: editingUser.email,
+      telefone: editingUser.telefone,
+      cargo: editingUser.cargo
+    };
+    
+    console.log('📝 Updates específicos sendo enviados:', updates);
+    updateUserMutation.mutate({ id: editingUser.id, updates });
   };
 
   const handleUpdateRole = (userId: string, newRole: string) => {
