@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download } from "lucide-react";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { toast } from "sonner";
 
 export default function Demandas() {
@@ -26,6 +27,22 @@ export default function Demandas() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const queryClient = useQueryClient();
+
+  // Buscar anexos para a demanda selecionada
+  const { data: anexosSelecionados = [] } = useQuery({
+    queryKey: ['anexos', selectedDemanda?.id],
+    queryFn: async () => {
+      if (!selectedDemanda?.id) return [];
+      const { data, error } = await supabase
+        .from('anexos')
+        .select('*')
+        .eq('demanda_id', selectedDemanda.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDemanda?.id && isViewDialogOpen
+  });
 
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas'],
@@ -168,9 +185,53 @@ export default function Demandas() {
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro;
   });
 
+  // Função para download de anexo
+  const downloadAnexo = async (anexo: any) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('demanda-anexos')
+        .download(anexo.url_arquivo);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = anexo.nome_arquivo;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+      toast.error("Erro ao baixar arquivo");
+    }
+  };
+
   // Mutação para excluir demanda
   const deleteMutation = useMutation({
     mutationFn: async (demandaId: string) => {
+      // Primeiro, deletar os anexos relacionados
+      const { data: anexos } = await supabase
+        .from('anexos')
+        .select('url_arquivo')
+        .eq('demanda_id', demandaId);
+
+      if (anexos && anexos.length > 0) {
+        // Deletar arquivos do storage
+        const filePaths = anexos.map(anexo => anexo.url_arquivo);
+        await supabase.storage
+          .from('demanda-anexos')
+          .remove(filePaths);
+
+        // Deletar registros da tabela anexos
+        await supabase
+          .from('anexos')
+          .delete()
+          .eq('demanda_id', demandaId);
+      }
+
+      // Depois deletar a demanda
       const { error } = await supabase
         .from('demandas')
         .delete()
@@ -184,7 +245,7 @@ export default function Demandas() {
     },
     onError: (error) => {
       console.error('Erro ao excluir demanda:', error);
-      toast.error("Erro ao excluir demanda");
+      toast.error("Erro ao excluir demanda: " + error.message);
     }
   });
 
@@ -473,6 +534,9 @@ export default function Demandas() {
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Detalhes da Demanda</DialogTitle>
+              <DialogDescription>
+                Visualize todas as informações detalhadas da demanda selecionada.
+              </DialogDescription>
             </DialogHeader>
             {selectedDemanda && (
               <div className="space-y-4">
@@ -581,6 +645,34 @@ export default function Demandas() {
                   </div>
                 )}
                 
+                
+                {/* Seção de Anexos */}
+                {anexosSelecionados.length > 0 && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Anexos ({anexosSelecionados.length})</label>
+                    <div className="grid gap-2">
+                      {anexosSelecionados.map((anexo) => (
+                        <div key={anexo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{anexo.nome_arquivo}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadAnexo(anexo)}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div>
                     <label className="text-sm font-medium">Criado em</label>
@@ -602,26 +694,12 @@ export default function Demandas() {
           </DialogContent>
         </Dialog>
         
-        {/* Dialog de Edição - Por enquanto apenas um placeholder */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Demanda</DialogTitle>
-            </DialogHeader>
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                Funcionalidade de edição será implementada em breve.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditDialogOpen(false)}
-                className="mt-4"
-              >
-                Fechar
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Dialog de Edição */}
+        <EditDemandaDialog 
+          open={isEditDialogOpen} 
+          onOpenChange={setIsEditDialogOpen} 
+          demanda={selectedDemanda}
+        />
       </div>
     </div>
   );
