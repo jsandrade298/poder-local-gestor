@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2 } from "lucide-react";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { toast } from "sonner";
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,6 +21,11 @@ export default function Demandas() {
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
+  const [selectedDemanda, setSelectedDemanda] = useState<any>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const queryClient = useQueryClient();
 
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas'],
@@ -159,6 +167,40 @@ export default function Demandas() {
 
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro;
   });
+
+  // Mutação para excluir demanda
+  const deleteMutation = useMutation({
+    mutationFn: async (demandaId: string) => {
+      const { error } = await supabase
+        .from('demandas')
+        .delete()
+        .eq('id', demandaId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      toast.success("Demanda excluída com sucesso!");
+    },
+    onError: (error) => {
+      console.error('Erro ao excluir demanda:', error);
+      toast.error("Erro ao excluir demanda");
+    }
+  });
+
+  const handleViewDemanda = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditDemanda = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteDemanda = (demandaId: string) => {
+    deleteMutation.mutate(demandaId);
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -382,19 +424,40 @@ export default function Demandas() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="bg-background border">
+                          <DropdownMenuItem onClick={() => handleViewDemanda(demanda)}>
                             <Eye className="h-4 w-4 mr-2" />
                             Ver Detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditDemanda(demanda)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir a demanda "{demanda.titulo}"? Esta ação não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDeleteDemanda(demanda.id)}
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -404,6 +467,161 @@ export default function Demandas() {
             ))
           )}
         </div>
+
+        {/* Dialog de Visualização */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detalhes da Demanda</DialogTitle>
+            </DialogHeader>
+            {selectedDemanda && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Protocolo</label>
+                    <p className="text-sm text-muted-foreground">#{selectedDemanda.protocolo}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Status</label>
+                    <p className="text-sm">
+                      <Badge 
+                        variant={getStatusVariant(selectedDemanda.status)}
+                        style={{ backgroundColor: getStatusColor(selectedDemanda.status), color: 'white' }}
+                      >
+                        {getStatusLabel(selectedDemanda.status)}
+                      </Badge>
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Título</label>
+                  <p className="text-sm text-muted-foreground">{selectedDemanda.titulo}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Descrição</label>
+                  <p className="text-sm text-muted-foreground">{selectedDemanda.descricao}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Munícipe</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.municipes?.nome || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Área</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.areas?.nome || 'Sem área'}</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Responsável</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.responsavel?.nome || 'Sem responsável'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Prioridade</label>
+                    <p className="text-sm">
+                      <Badge 
+                        variant="secondary"
+                        style={{ backgroundColor: getPrioridadeColor(selectedDemanda.prioridade), color: 'white' }}
+                      >
+                        {getPrioridadeLabel(selectedDemanda.prioridade)}
+                      </Badge>
+                    </p>
+                  </div>
+                </div>
+                
+                {selectedDemanda.data_prazo && (
+                  <div>
+                    <label className="text-sm font-medium">Prazo</label>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(selectedDemanda.data_prazo).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Cidade</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.cidade || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Bairro</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.bairro || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">CEP</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.cep || 'N/A'}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Endereço</label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedDemanda.logradouro && selectedDemanda.numero 
+                      ? `${selectedDemanda.logradouro}, ${selectedDemanda.numero}${selectedDemanda.complemento ? `, ${selectedDemanda.complemento}` : ''}`
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                
+                {selectedDemanda.observacoes && (
+                  <div>
+                    <label className="text-sm font-medium">Observações</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.observacoes}</p>
+                  </div>
+                )}
+                
+                {selectedDemanda.resolucao && (
+                  <div>
+                    <label className="text-sm font-medium">Resolução</label>
+                    <p className="text-sm text-muted-foreground">{selectedDemanda.resolucao}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div>
+                    <label className="text-sm font-medium">Criado em</label>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(selectedDemanda.created_at).toLocaleDateString('pt-BR')} às{' '}
+                      {new Date(selectedDemanda.created_at).toLocaleTimeString('pt-BR')}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Atualizado em</label>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(selectedDemanda.updated_at).toLocaleDateString('pt-BR')} às{' '}
+                      {new Date(selectedDemanda.updated_at).toLocaleTimeString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+        
+        {/* Dialog de Edição - Por enquanto apenas um placeholder */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Demanda</DialogTitle>
+            </DialogHeader>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">
+                Funcionalidade de edição será implementada em breve.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                className="mt-4"
+              >
+                Fechar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
