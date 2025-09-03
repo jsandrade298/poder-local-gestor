@@ -1,5 +1,26 @@
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App.tsx'
+import Login from './pages/Login.tsx'
 import './index.css'
 
-createRoot(document.getElementById("root")!).render(<App />);
+const AppRouter = () => (
+  <BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<App />} />
+      <Route path="*" element={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Página não encontrada</h1>
+            <a href="/" className="text-blue-600 hover:text-blue-800">
+              ← Voltar para início
+            </a>
+          </div>
+        </div>
+      } />
+    </Routes>
+  </BrowserRouter>
+)
+
+createRoot(document.getElementById("root")!).render(<AppRouter />);

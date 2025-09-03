@@ -1,307 +1,126 @@
-import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mail, Lock, UserCheck, User } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore, useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
+import React, { useState } from 'react';
 
-export default function Login() {
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const { signIn, signUp, loading: authLoading } = useAuthStore();
-  
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: ''
-  });
-  
-  const [signupForm, setSignupForm] = useState({
-    nome: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
+  const [nome, setNome] = useState('');
 
-  // Redirecionar se já está autenticado
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      navigate('/');
-    }
-  }, [isAuthenticated, authLoading, navigate]);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    const { error } = await signIn(loginForm.email, loginForm.password);
-    
-    if (error) {
-      setError(error);
-      toast({
-        title: 'Erro no login',
-        description: error,
-        variant: 'destructive'
-      });
-    } else {
-      toast({
-        title: 'Login realizado com sucesso!',
-        description: 'Bem-vindo ao sistema de gestão de gabinete.'
-      });
-      navigate('/');
-    }
-    
-    setLoading(false);
+    console.log('Tentativa de login:', { email, password });
+    alert(`${isSignup ? 'Cadastro' : 'Login'} realizado! Email: ${email}`);
   };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (signupForm.password !== signupForm.confirmPassword) {
-      setError('As senhas não coincidem');
-      return;
-    }
-
-    if (signupForm.password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
-      return;
-    }
-
-    setLoading(true);
-
-    const { error } = await signUp(signupForm.email, signupForm.password, signupForm.nome);
-    
-    if (error) {
-      setError(error);
-      toast({
-        title: 'Erro no cadastro',
-        description: error,
-        variant: 'destructive'
-      });
-    } else {
-      toast({
-        title: 'Cadastro realizado com sucesso!',
-        description: 'Verifique seu email para ativar a conta.'
-      });
-      // Resetar formulário
-      setSignupForm({
-        nome: '',
-        email: '',
-        password: '',
-        confirmPassword: ''
-      });
-    }
-    
-    setLoading(false);
-  };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Carregando...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <UserCheck className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Sistema de Gestão
+            </h1>
+            <p className="text-gray-600">
+              Gabinete Político - Acesso Restrito
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Sistema de Gestão
-          </h1>
-          <p className="text-muted-foreground">
-            Gabinete Político - Acesso Restrito
-          </p>
-        </div>
-
-        <Card className="shadow-lg border-0 bg-card/80 backdrop-blur-sm">
-          <CardHeader className="text-center space-y-1">
-            <CardTitle className="text-xl">Sistema de Gestão</CardTitle>
-            <CardDescription>
-              Acesse sua conta ou cadastre-se para começar
-            </CardDescription>
-          </CardHeader>
           
-          <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Entrar</TabsTrigger>
-                <TabsTrigger value="signup">Cadastrar</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login" className="mt-6">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-sm font-medium">
-                      E-mail
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        className="pl-10"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
+          <div className="mb-4">
+            <div className="flex rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  !isSignup 
+                    ? 'bg-white text-gray-900 shadow' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                onClick={() => setIsSignup(false)}
+              >
+                Entrar
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  isSignup 
+                    ? 'bg-white text-gray-900 shadow' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                onClick={() => setIsSignup(true)}
+              >
+                Cadastrar
+              </button>
+            </div>
+          </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-sm font-medium">
-                      Senha
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="pl-10"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignup && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome completo
+                </label>
+                <input
+                  type="text"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Seu nome completo"
+                  required={isSignup}
+                />
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                E-mail
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="seu@email.com"
+                required
+              />
+            </div>
 
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Senha
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••••••"
+                required
+              />
+            </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={loading}
-                  >
-                    {loading ? "Entrando..." : "Entrar"}
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup" className="mt-6">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-nome" className="text-sm font-medium">
-                      Nome completo
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-nome"
-                        type="text"
-                        placeholder="Seu nome completo"
-                        className="pl-10"
-                        value={signupForm.nome}
-                        onChange={(e) => setSignupForm(prev => ({ ...prev, nome: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium">
-                      E-mail
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        className="pl-10"
-                        value={signupForm.email}
-                        onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium">
-                      Senha
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="Mínimo 6 caracteres"
-                        className="pl-10"
-                        value={signupForm.password}
-                        onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm" className="text-sm font-medium">
-                      Confirmar senha
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-confirm"
-                        type="password"
-                        placeholder="Confirme sua senha"
-                        className="pl-10"
-                        value={signupForm.confirmPassword}
-                        onChange={(e) => setSignupForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        required
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              {isSignup ? 'Cadastrar' : 'Entrar'}
+            </button>
+          </form>
 
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={loading}
-                  >
-                    {loading ? "Cadastrando..." : "Cadastrar"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <div className="text-center mt-6 text-xs text-muted-foreground">
+          <div className="mt-6 text-center">
+            <a 
+              href="/" 
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              ← Voltar para página inicial
+            </a>
+          </div>
+        </div>
+        
+        <div className="text-center mt-4 text-xs text-gray-500">
           Sistema protegido - Acesso apenas para usuários autorizados
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Login;
