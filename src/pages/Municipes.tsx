@@ -650,20 +650,18 @@ export default function Municipes() {
                             <DropdownMenuItem onClick={() => handleViewDetails(municipe)}>
                               Ver detalhes
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <EditMunicipeDialog 
-                                municipe={municipe}
-                                trigger={
-                                  <span className="flex items-center w-full cursor-pointer">
-                                    Editar
-                                  </span>
-                                }
-                              />
-                            </DropdownMenuItem>
+                            <EditMunicipeDialog 
+                              municipe={municipe}
+                              trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  Editar
+                                </DropdownMenuItem>
+                              }
+                            />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <span className="text-destructive cursor-pointer">Excluir</span>
+                                  <span className="text-destructive">Excluir</span>
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
