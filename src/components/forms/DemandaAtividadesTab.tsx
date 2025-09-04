@@ -37,6 +37,7 @@ const formSchema = z.object({
   descricao: z.string().optional(),
   data_atividade: z.string().min(1, "Data da atividade é obrigatória"),
   propositura: z.string().optional(),
+  link_propositura: z.string().optional(),
 });
 
 interface DemandaAtividadesTabProps {
@@ -47,9 +48,6 @@ interface DemandaAtividadesTabProps {
 
 const tiposAtividade = [
   { value: "comentario", label: "Comentário", icon: MessageSquare, color: "bg-blue-500" },
-  { value: "telefone", label: "Ligação", icon: Phone, color: "bg-green-500" },
-  { value: "email", label: "E-mail", icon: Mail, color: "bg-purple-500" },
-  { value: "reuniao", label: "Reunião", icon: Users, color: "bg-orange-500" },
   { value: "visita", label: "Visita Técnica", icon: MapPin, color: "bg-red-500" },
   { value: "atualizacao", label: "Atualização", icon: Edit3, color: "bg-gray-500" },
 ];
@@ -83,6 +81,7 @@ export function DemandaAtividadesTab({
       descricao: "",
       data_atividade: new Date().toISOString().slice(0, 16),
       propositura: "",
+      link_propositura: "",
     },
   });
 
