@@ -46,68 +46,47 @@ serve(async (req) => {
 
       const instancesWithStatus = [];
       
-      for (const instance of allInstances || []) {
-        try {
-          const statusHeaders = {
+      // Primeiro, tentar buscar todas as instâncias de uma vez
+      let connectedInstances = [];
+      try {
+        const fetchAllUrl = `https://api.evoapicloud.com/instance/fetchInstances`;
+        const fetchAllResponse = await fetch(fetchAllUrl, {
+          method: 'GET',
+          headers: {
             'Content-Type': 'application/json',
-            'apikey': instance.instance_token,
-          };
-          
-          console.log(`Checking status for ${instance.instance_name}`);
-          
-          const statusResponse = await fetch(
-            `${instance.api_url}/instance/connectionState/${instance.instance_id}`,
-            { method: 'GET', headers: statusHeaders }
-          );
-
-          let connectionStatus = 'disconnected';
-          let profileName = null;
-          let number = null;
-          
-          if (statusResponse.ok) {
-            const statusText = await statusResponse.text();
-            try {
-              const statusData = JSON.parse(statusText);
-              console.log(`Status for ${instance.instance_name}:`, statusData);
-              
-              // Verificar TODOS os formatos possíveis
-              const isConnected = 
-                statusData?.state === 'open' ||
-                statusData?.instance?.state === 'open' ||
-                statusData?.instance?.connectionStatus === 'open' ||
-                statusData?.connectionStatus === 'open' ||
-                statusData?.status === 'open' ||
-                statusData?.connection === 'open' ||
-                statusData?.connected === true ||
-                statusData?.instance?.connected === true;
-              
-              connectionStatus = isConnected ? 'connected' : 'disconnected';
-              
-              const profileInfo = statusData?.instance || statusData;
-              profileName = profileInfo?.profileName || profileInfo?.pushname || profileInfo?.name;
-              number = profileInfo?.number || profileInfo?.phone || profileInfo?.jid?.split('@')[0];
-            } catch (e) {
-              console.error(`Failed to parse status for ${instance.instance_name}`);
-            }
-          }
-
-          instancesWithStatus.push({
-            instanceName: instance.instance_name,
-            displayName: instance.display_name,
-            status: connectionStatus,
-            profileName: profileName,
-            number: number
-          });
-        } catch (error) {
-          console.error(`Error checking ${instance.instance_name}:`, error);
-          instancesWithStatus.push({
-            instanceName: instance.instance_name,
-            displayName: instance.display_name,
-            status: 'disconnected',
-            profileName: null,
-            number: null
-          });
+            'apikey': allInstances[0]?.instance_token, // Usar o token de qualquer instância
+          },
+        });
+        
+        if (fetchAllResponse.ok) {
+          const allData = await fetchAllResponse.json();
+          connectedInstances = Array.isArray(allData) ? allData : (allData.instances || []);
+          console.log('Connected instances from API:', connectedInstances);
         }
+      } catch (e) {
+        console.log('Could not fetch all instances at once');
+      }
+      
+      for (const instance of allInstances || []) {
+        // Verificar se está na lista de conectadas
+        const connectedInstance = connectedInstances.find(ci => 
+          ci.instanceId === instance.instance_id || 
+          ci.instance_id === instance.instance_id ||
+          ci.instanceName === instance.instance_name
+        );
+        
+        const isConnected = connectedInstance && 
+          (connectedInstance.state === 'open' || 
+           connectedInstance.status === 'open' || 
+           connectedInstance.connected === true);
+        
+        instancesWithStatus.push({
+          instanceName: instance.instance_name,
+          displayName: instance.display_name,
+          status: isConnected ? 'connected' : 'disconnected',
+          profileName: connectedInstance?.profileName || connectedInstance?.pushname,
+          number: connectedInstance?.number || connectedInstance?.phone
+        });
       }
       
       return new Response(
@@ -314,72 +293,157 @@ serve(async (req) => {
         }
         break;
 
-      case 'instance_status':
-        try {
-          const statusUrl = `${instanceConfig.api_url}/instance/connectionState/${instanceConfig.instance_id}`;
-          console.log('Checking status at:', statusUrl);
-          
-          const statusResponse = await fetch(statusUrl, {
-            method: 'GET',
-            headers: apiHeaders,
-          });
-
-          console.log('Status response:', statusResponse.status);
-
-          if (statusResponse.ok) {
-            const statusText = await statusResponse.text();
-            console.log('Raw status response:', statusText);
+        case 'instance_status':
+          try {
+            console.log('=== Checking instance status ===');
+            console.log('Instance:', instanceName);
+            console.log('Instance ID:', instanceConfig.instance_id);
             
-            let statusData;
-            try {
-              statusData = JSON.parse(statusText);
-            } catch (e) {
-              console.error('Failed to parse status response');
-              result = { status: 'disconnected' };
-              break;
+            // Tentar múltiplos endpoints da Evolution API
+            const endpoints = [
+              `/instance/connectionState/${instanceConfig.instance_id}`,
+              `/instance/status/${instanceConfig.instance_id}`,
+              `/instance/state/${instanceConfig.instance_id}`,
+              `/instance/info/${instanceConfig.instance_id}`,
+              `/instance/fetchInstances`, // Buscar todas e filtrar
+            ];
+            
+            let finalStatus = 'disconnected';
+            let profileData = {};
+            
+            for (const endpoint of endpoints) {
+              try {
+                const url = `${instanceConfig.api_url}${endpoint}`;
+                console.log(`Trying endpoint: ${url}`);
+                
+                const response = await fetch(url, {
+                  method: 'GET',
+                  headers: apiHeaders,
+                });
+                
+                if (response.ok) {
+                  const text = await response.text();
+                  console.log(`Response from ${endpoint}:`, text.substring(0, 500));
+                  
+                  try {
+                    const data = JSON.parse(text);
+                    
+                    // Se for o fetchInstances, procurar nossa instância
+                    if (endpoint.includes('fetchInstances')) {
+                      const instances = Array.isArray(data) ? data : (data.instances || []);
+                      const ourInstance = instances.find(
+                        inst => inst.instanceId === instanceConfig.instance_id || 
+                               inst.instance_id === instanceConfig.instance_id ||
+                               inst.instanceName === instanceName
+                      );
+                      
+                      if (ourInstance) {
+                        console.log('Found our instance in list:', ourInstance);
+                        const isConnected = 
+                          ourInstance.state === 'open' || 
+                          ourInstance.status === 'open' ||
+                          ourInstance.connectionStatus === 'open' ||
+                          ourInstance.connected === true;
+                        
+                        if (isConnected) {
+                          finalStatus = 'connected';
+                          profileData = ourInstance;
+                          break;
+                        }
+                      }
+                    } else {
+                      // Verificar status em vários campos possíveis
+                      const isConnected = 
+                        data?.state === 'open' ||
+                        data?.status === 'open' ||
+                        data?.instance?.state === 'open' ||
+                        data?.instance?.status === 'open' ||
+                        data?.instance?.connectionStatus === 'open' ||
+                        data?.connectionStatus === 'open' ||
+                        data?.connection === 'open' ||
+                        data?.connected === true ||
+                        data?.instance?.connected === true ||
+                        data?.instance?.connection === 'open' ||
+                        // Adicionar mais verificações para Evolution API Cloud
+                        data?.instance?.ownerJid !== null ||
+                        data?.instance?.phoneNumber !== null ||
+                        data?.phoneConnected === true;
+                      
+                      console.log('Connection check result:', isConnected);
+                      console.log('Data keys:', Object.keys(data));
+                      if (data.instance) {
+                        console.log('Instance keys:', Object.keys(data.instance));
+                      }
+                      
+                      if (isConnected) {
+                        finalStatus = 'connected';
+                        profileData = data?.instance || data;
+                        break; // Encontrou conectado, parar de tentar
+                      }
+                    }
+                  } catch (parseError) {
+                    console.error(`Failed to parse response from ${endpoint}`);
+                  }
+                } else {
+                  console.log(`Endpoint ${endpoint} returned status:`, response.status);
+                }
+              } catch (endpointError) {
+                console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+              }
             }
             
-            console.log('Parsed status data:', statusData);
-            
-            // Evolution API Cloud pode retornar o status em diferentes formatos
-            // Verificar TODOS os possíveis campos
-            const isConnected = 
-              statusData?.state === 'open' ||
-              statusData?.instance?.state === 'open' ||
-              statusData?.instance?.connectionStatus === 'open' ||
-              statusData?.connectionStatus === 'open' ||
-              statusData?.status === 'open' ||
-              statusData?.connection === 'open' ||
-              statusData?.connected === true ||
-              statusData?.instance?.connected === true;
-            
-            // Pegar informações do perfil se disponível
-            const profileInfo = statusData?.instance || statusData;
+            // Tentar uma última verificação via instâncias ativas
+            if (finalStatus === 'disconnected') {
+              try {
+                const allInstancesUrl = `${instanceConfig.api_url}/instance/fetchInstances`;
+                const allResponse = await fetch(allInstancesUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': instanceConfig.instance_token,
+                  },
+                });
+                
+                if (allResponse.ok) {
+                  const allData = await allResponse.json();
+                  console.log('All instances check:', allData);
+                  
+                  const instances = Array.isArray(allData) ? allData : (allData.instances || []);
+                  const connected = instances.find(inst => 
+                    (inst.instanceName === instanceName || 
+                     inst.instanceId === instanceConfig.instance_id ||
+                     inst.instance_id === instanceConfig.instance_id) &&
+                    (inst.state === 'open' || inst.status === 'open' || inst.connected === true)
+                  );
+                  
+                  if (connected) {
+                    console.log('Found connected instance:', connected);
+                    finalStatus = 'connected';
+                    profileData = connected;
+                  }
+                }
+              } catch (e) {
+                console.error('Final instances check failed:', e);
+              }
+            }
             
             result = {
-              status: isConnected ? 'connected' : 'disconnected',
-              state: statusData?.state || statusData?.instance?.state,
-              profileName: profileInfo?.profileName || profileInfo?.pushname || profileInfo?.name,
-              phoneNumber: profileInfo?.number || profileInfo?.phone || profileInfo?.jid?.split('@')[0],
-              rawData: statusData // Para debug
+              status: finalStatus,
+              profileName: profileData?.profileName || profileData?.pushname || profileData?.name,
+              phoneNumber: profileData?.number || profileData?.phone || profileData?.ownerJid?.split('@')[0],
+              details: profileData
             };
             
-            console.log('Final status result:', result);
-          } else {
-            console.log('Status check failed with:', statusResponse.status);
+            console.log('=== Final status result ===');
+            console.log(result);
+          } catch (error) {
+            console.error('Status check error:', error);
             result = {
               status: 'disconnected',
-              error: `HTTP ${statusResponse.status}`
+              error: error.message
             };
           }
-        } catch (error) {
-          console.error('Status check error:', error);
-          result = {
-            status: 'disconnected',
-            error: error.message
-          };
-        }
-        break;
+          break;
 
       case 'disconnect_instance':
         try {

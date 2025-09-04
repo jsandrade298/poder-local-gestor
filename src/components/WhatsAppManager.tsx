@@ -423,56 +423,99 @@ export function WhatsAppManager() {
         </Button>
       </div>
 
-      {/* Botão de Debug - TEMPORÁRIO */}
-      <div className="mb-4 p-4 border rounded-lg bg-gray-50">
-        <h3 className="font-semibold mb-2">Debug Status (Temporário)</h3>
-        <div className="flex gap-2">
+      {/* Botão de Debug Detalhado - TEMPORÁRIO */}
+      <div className="mb-4 p-4 border rounded-lg bg-yellow-50">
+        <h3 className="font-semibold mb-2">🔍 Debug Detalhado Evolution API</h3>
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            size="sm"
             onClick={async () => {
-              try {
-                const result = await callEdgeFunction('instance_status', 'gabinete-whats-02');
-                console.log('Status gabinete-whats-02:', result);
-                alert(`Status: ${result.status}\nRaw Data: ${JSON.stringify(result.rawData, null, 2)}`);
-              } catch (error) {
-                console.error('Debug error:', error);
-                alert('Erro: ' + error.message);
+              console.log('=== Teste Manual Evolution API ===');
+              
+              // Dados da instância gabinete-whats-02
+              const apiUrl = 'https://api.evoapicloud.com';
+              const instanceId = '06331c62-88b5-4d67-844c-aba9c41ef417';
+              const token = 'AAC55AAC988A-4E56-90E3-694CBE9CD17A';
+              
+              const endpoints = [
+                `/instance/connectionState/${instanceId}`,
+                `/instance/fetchInstances`,
+                `/instance/status/${instanceId}`,
+                `/instance/info/${instanceId}`,
+              ];
+              
+              for (const endpoint of endpoints) {
+                try {
+                  console.log(`Testing: ${endpoint}`);
+                  const response = await fetch(`${apiUrl}${endpoint}`, {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'apikey': token,
+                    },
+                  });
+                  
+                  const text = await response.text();
+                  console.log(`Response from ${endpoint}:`, text);
+                  
+                  try {
+                    const data = JSON.parse(text);
+                    console.log(`Parsed data from ${endpoint}:`, data);
+                    
+                    // Se for fetchInstances, procurar nossa instância
+                    if (endpoint.includes('fetchInstances')) {
+                      const instances = Array.isArray(data) ? data : data.instances;
+                      const ourInstance = instances?.find(i => 
+                        i.instanceId === instanceId || 
+                        i.instance_id === instanceId ||
+                        i.instanceName === 'gabinete-whats-02'
+                      );
+                      if (ourInstance) {
+                        console.log('Nossa instância:', ourInstance);
+                        alert(`Instância encontrada!\nStatus: ${ourInstance.state || ourInstance.status}\nDados: ${JSON.stringify(ourInstance, null, 2)}`);
+                      }
+                    }
+                  } catch (e) {
+                    console.log('Parse error:', e);
+                  }
+                } catch (error) {
+                  console.error(`Error testing ${endpoint}:`, error);
+                }
               }
             }}
           >
-            🔍 Debug gabinete-whats-02
+            Testar Todos Endpoints
           </Button>
           
           <Button
             variant="outline"
+            size="sm"
             onClick={async () => {
-              try {
-                // Forçar atualização manual do status
-                const result = await callEdgeFunction('instance_status', 'gabinete-whats-02');
-                
-                if (result) {
-                  setInstances(prev => prev.map(inst => 
-                    inst.name === 'gabinete-whats-02' 
-                      ? { 
-                          ...inst, 
-                          status: result.status === 'connected' ? 'connected' : 'disconnected',
-                          profileName: result.profileName,
-                          number: result.phoneNumber || result.number
-                        }
-                      : inst
-                  ));
-                  
-                  toast({
-                    title: 'Status Atualizado',
-                    description: `gabinete-whats-02: ${result.status}`,
-                  });
-                }
-              } catch (error) {
-                console.error('Force update error:', error);
-              }
+              // Forçar status como conectado para teste
+              setInstances(prev => prev.map(inst => 
+                inst.name === 'gabinete-whats-02' 
+                  ? { ...inst, status: 'connected' }
+                  : inst
+              ));
+              toast({
+                title: 'Forçado para Conectado',
+                description: 'Status alterado manualmente para teste',
+              });
             }}
           >
-            🔄 Forçar Atualização Status
+            Forçar Conectado (Teste)
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Ver estado atual das instâncias
+              console.log('Estado atual das instâncias:', instances);
+              alert(`Estado atual:\n${JSON.stringify(instances, null, 2)}`);
+            }}
+          >
+            Ver Estado Local
           </Button>
         </div>
       </div>
