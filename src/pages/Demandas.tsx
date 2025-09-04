@@ -34,46 +34,12 @@ export default function Demandas() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
+  const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
 
   const [searchParams] = useSearchParams();
-  
-  useEffect(() => {
-    const atrasoParam = searchParams.get('atraso');
-    if (atrasoParam) {
-      setAtrasoFilter(atrasoParam);
-    }
-    
-    // Aplicar filtro de área se vier da página de Áreas
-    const areaParam = searchParams.get('area');
-    if (areaParam) {
-      setAreaFilter(areaParam);
-    }
-    
-    // Aplicar filtro de responsável se vier da página de Usuários
-    const responsavelParam = searchParams.get('responsavel');
-    if (responsavelParam) {
-      setResponsavelFilter(responsavelParam);
-    }
-  }, [searchParams]);
-
   const queryClient = useQueryClient();
 
-  // Buscar anexos para a demanda selecionada
-  const { data: anexosSelecionados = [] } = useQuery({
-    queryKey: ['anexos', selectedDemanda?.id],
-    queryFn: async () => {
-      if (!selectedDemanda?.id) return [];
-      const { data, error } = await supabase
-        .from('anexos')
-        .select('*')
-        .eq('demanda_id', selectedDemanda.id);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedDemanda?.id && isViewDialogOpen
-  });
-
+  // Buscar demandas primeiro
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas'],
     queryFn: async () => {
@@ -89,6 +55,59 @@ export default function Demandas() {
       if (error) throw error;
       return data;
     }
+  });
+  
+  useEffect(() => {
+    const atrasoParam = searchParams.get('atraso');
+    if (atrasoParam) {
+      setAtrasoFilter(atrasoParam);
+    }
+    
+    // Aplicar filtro de área se vier da página de Áreas
+    const areaParam = searchParams.get('area');
+    if (areaParam) {
+      setAreaFilter(areaParam);
+    }
+    
+    // Processar redirecionamento de notificação
+    const protocolo = searchParams.get('protocolo');
+    const atividadeId = searchParams.get('atividade');
+    
+    if (protocolo && atividadeId && demandas.length > 0) {
+      // Encontrar e abrir a demanda específica
+      const demanda = demandas?.find(d => d.protocolo === protocolo);
+      if (demanda) {
+        setSelectedDemanda(demanda);
+        setIsViewDialogOpen(true);
+        setHighlightedActivityId(atividadeId);
+        
+        // Limpar os parâmetros da URL após o redirecionamento
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+    
+    // Aplicar filtro de responsável se vier da página de Usuários
+    const responsavelParam = searchParams.get('responsavel');
+    if (responsavelParam) {
+      setResponsavelFilter(responsavelParam);
+    }
+  }, [searchParams, demandas]);
+
+  // Buscar anexos para a demanda selecionada
+  const { data: anexosSelecionados = [] } = useQuery({
+    queryKey: ['anexos', selectedDemanda?.id],
+    queryFn: async () => {
+      if (!selectedDemanda?.id) return [];
+      const { data, error } = await supabase
+        .from('anexos')
+        .select('*')
+        .eq('demanda_id', selectedDemanda.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDemanda?.id && isViewDialogOpen
   });
 
   const { data: areas = [] } = useQuery({
@@ -1066,7 +1085,11 @@ export default function Demandas() {
 
                 <TabsContent value="atividades" className="flex-1 overflow-y-auto">
                   <div className="p-1">
-                    <DemandaAtividadesTab demandaId={selectedDemanda.id} />
+                    <DemandaAtividadesTab 
+                      demandaId={selectedDemanda.id} 
+                      highlightedActivityId={highlightedActivityId}
+                      onActivityHighlighted={() => setHighlightedActivityId(null)}
+                    />
                   </div>
                 </TabsContent>
               </Tabs>

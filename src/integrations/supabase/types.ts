@@ -373,6 +373,80 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacoes: {
+        Row: {
+          atividade_id: string | null
+          created_at: string
+          demanda_id: string | null
+          destinatario_id: string
+          id: string
+          lida: boolean
+          mensagem: string
+          remetente_id: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          url_destino: string | null
+        }
+        Insert: {
+          atividade_id?: string | null
+          created_at?: string
+          demanda_id?: string | null
+          destinatario_id: string
+          id?: string
+          lida?: boolean
+          mensagem: string
+          remetente_id: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+          url_destino?: string | null
+        }
+        Update: {
+          atividade_id?: string | null
+          created_at?: string
+          demanda_id?: string | null
+          destinatario_id?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string
+          remetente_id?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          url_destino?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_atividade_id_fkey"
+            columns: ["atividade_id"]
+            isOneToOne: false
+            referencedRelation: "demanda_atividades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_remetente_id_fkey"
+            columns: ["remetente_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           cargo: string | null

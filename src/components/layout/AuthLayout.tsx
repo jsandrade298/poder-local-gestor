@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +57,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             </div>
             
             <div className="flex items-center gap-4">
+              <NotificationsDropdown />
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 <span className="text-sm text-muted-foreground">

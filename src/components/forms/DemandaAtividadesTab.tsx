@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea, extractMentionsFromText, renderMentionText } from "@/components/ui/MentionTextarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +40,8 @@ const formSchema = z.object({
 
 interface DemandaAtividadesTabProps {
   demandaId: string;
+  highlightedActivityId?: string | null;
+  onActivityHighlighted?: () => void;
 }
 
 const tiposAtividade = [
@@ -50,7 +53,11 @@ const tiposAtividade = [
   { value: "atualizacao", label: "Atualização", icon: Edit3, color: "bg-gray-500" },
 ];
 
-export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
+export function DemandaAtividadesTab({ 
+  demandaId, 
+  highlightedActivityId,
+  onActivityHighlighted 
+}: DemandaAtividadesTabProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any>(null);
   const { toast } = useToast();
@@ -94,16 +101,27 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error("Usuário não autenticado");
 
-      const { error } = await supabase
+      // Inserir atividade
+      const { data: atividade, error } = await supabase
         .from('demanda_atividades')
         .insert({
           demanda_id: demandaId,
           created_by: user.user.id,
           ...values,
           data_atividade: new Date(values.data_atividade).toISOString(),
-        });
+        })
+        .select()
+        .single();
       
       if (error) throw error;
+
+      // Extrair menções e criar notificações
+      const mentions = extractMentionsFromText(values.descricao || '');
+      if (mentions.length > 0) {
+        await createNotifications(mentions, atividade, user.user.id);
+      }
+
+      return atividade;
     },
     onSuccess: () => {
       toast({
@@ -136,6 +154,16 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
         .eq('id', id);
       
       if (error) throw error;
+
+      // Para atualizações, também verificar novas menções
+      const mentions = extractMentionsFromText(values.descricao || '');
+      if (mentions.length > 0) {
+        const { data: user } = await supabase.auth.getUser();
+        if (user.user) {
+          const atividade = { id, demanda_id: demandaId, titulo: values.titulo };
+          await createNotifications(mentions, atividade, user.user.id);
+        }
+      }
     },
     onSuccess: () => {
       toast({
@@ -155,6 +183,41 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
       });
     },
   });
+
+  // Função para criar notificações das menções
+  const createNotifications = async (mentionedUserIds: string[], atividade: any, remetenteId: string) => {
+    try {
+      // Filtrar para não notificar o próprio usuário
+      const filteredMentions = mentionedUserIds.filter(id => id !== remetenteId);
+      
+      if (filteredMentions.length === 0) return;
+
+      // Buscar informações da demanda para URL
+      const { data: demanda } = await supabase
+        .from('demandas')
+        .select('protocolo, titulo')
+        .eq('id', demandaId)
+        .single();
+
+      const notifications = filteredMentions.map(userId => ({
+        destinatario_id: userId,
+        remetente_id: remetenteId,
+        tipo: 'mencao',
+        titulo: `Você foi mencionado em uma atividade`,
+        mensagem: `Você foi mencionado na atividade "${atividade.titulo}" da demanda #${demanda?.protocolo || 'N/A'}`,
+        url_destino: `/demandas?protocolo=${demanda?.protocolo}&atividade=${atividade.id}`,
+        demanda_id: demandaId,
+        atividade_id: atividade.id,
+      }));
+
+      await supabase
+        .from('notificacoes')
+        .insert(notifications);
+        
+    } catch (error) {
+      console.error('Erro ao criar notificações:', error);
+    }
+  };
 
   // Deletar atividade
   const deleteActivity = useMutation({
@@ -311,10 +374,11 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
                     <FormItem>
                       <FormLabel>Descrição</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Detalhes da atividade..." 
+                        <MentionTextarea 
+                          value={field.value || ''} 
+                          onChange={field.onChange}
+                          placeholder="Detalhes da atividade... (Use @nome para mencionar usuários)" 
                           className="min-h-[100px]" 
-                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
@@ -430,9 +494,9 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
                         <h4 className="font-medium text-sm mb-2">{atividade.titulo}</h4>
                         
                         {atividade.descricao && (
-                          <p className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
-                            {atividade.descricao}
-                          </p>
+                          <div className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
+                            {renderMentionText(atividade.descricao)}
+                          </div>
                         )}
                         
                         {/* Informações do usuário */}
