@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Bell, BellDot, Check, User, MessageSquare, AlertCircle } from "lucide-react";
+import { Bell, BellDot, Check, User, MessageSquare, AlertCircle, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -80,6 +80,28 @@ export function NotificationsDropdown() {
       toast({
         title: "Notificações marcadas",
         description: "Todas as notificações foram marcadas como lidas.",
+      });
+    },
+  });
+
+  // Limpar todas as notificações
+  const limparNotificacoes = useMutation({
+    mutationFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+
+      const { error } = await supabase
+        .from('notificacoes')
+        .delete()
+        .eq('destinatario_id', user.user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificacoes'] });
+      toast({
+        title: "Notificações removidas",
+        description: "Todas as notificações foram removidas permanentemente.",
       });
     },
   });
@@ -167,17 +189,31 @@ export function NotificationsDropdown() {
       <PopoverContent className="w-80 md:w-96 p-0" align="end">
         <div className="flex items-center justify-between p-4 border-b">
           <h4 className="font-semibold">Notificações</h4>
-          {notificacaosPendentes > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => marcarTodasComoLidas.mutate()}
-              disabled={marcarTodasComoLidas.isPending}
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Marcar todas como lidas
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {notificacaosPendentes > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => marcarTodasComoLidas.mutate()}
+                disabled={marcarTodasComoLidas.isPending}
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Marcar como lidas
+              </Button>
+            )}
+            {notificacoes.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => limparNotificacoes.mutate()}
+                disabled={limparNotificacoes.isPending}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Limpar todas
+              </Button>
+            )}
+          </div>
         </div>
         
         <ScrollArea className="h-80 max-h-[60vh]">
