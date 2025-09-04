@@ -410,7 +410,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                           key={municipe.id}
                           onClick={() => {
                             setSelectedMunicipes(prev => [...prev, municipe.id]);
-                            setSearchMunicipe("");
+                            // Não limpar o campo de busca para permitir seleção múltipla
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
                         >
