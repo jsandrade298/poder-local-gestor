@@ -23,6 +23,7 @@ serve(async (req) => {
     }
 
     console.log(`Evolution API URL: ${evolutionApiUrl}`);
+    console.log(`Evolution API Key configured: ${evolutionApiKey ? 'Yes' : 'No'}`);
     console.log(`Action: ${action}`);
     console.log(`Instance: ${instanceName}`);
 
