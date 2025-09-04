@@ -33,6 +33,7 @@ export default function Agenda() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [eventsSource, setEventsSource] = useState<'cal.com' | 'mock' | 'loading'>('loading');
 
   // Carregar eventos reais da Cal.com
   useEffect(() => {
@@ -41,24 +42,33 @@ export default function Agenda() {
 
   const loadCalEvents = async () => {
     setLoadingEvents(true);
+    setEventsSource('loading');
+    
     try {
+      console.log('Buscando eventos da Cal.com...');
       const { data, error } = await supabase.functions.invoke('cal-events');
       
       if (error) {
         console.error('Erro ao buscar eventos:', error);
-        // Em caso de erro, usar eventos de exemplo
+        setEventsSource('mock');
         loadMockEvents();
         return;
       }
 
+      console.log('Resposta da API:', data);
+
       if (data?.events && data.events.length > 0) {
         setEvents(data.events);
+        setEventsSource(data.source || 'cal.com');
+        console.log(`Carregados ${data.events.length} eventos da fonte: ${data.source}`);
       } else {
-        // Se não há eventos na Cal.com, mostrar eventos de exemplo
+        console.log('Nenhum evento encontrado, usando eventos mock');
+        setEventsSource('mock');
         loadMockEvents();
       }
     } catch (error) {
       console.error('Erro na requisição:', error);
+      setEventsSource('mock');
       loadMockEvents();
     } finally {
       setLoadingEvents(false);
@@ -156,9 +166,21 @@ export default function Agenda() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
-          <p className="text-muted-foreground">
-            Visualize e gerencie seus agendamentos
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground">
+              Visualize e gerencie seus agendamentos
+            </p>
+            {eventsSource === 'cal.com' && (
+              <Badge variant="default" className="bg-green-500">
+                Cal.com
+              </Badge>
+            )}
+            {eventsSource === 'mock' && (
+              <Badge variant="secondary">
+                Demonstração
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button 
@@ -473,6 +495,55 @@ export default function Agenda() {
                   <Eye className="h-4 w-4" />
                   <AlertDescription>
                     Configure eventos específicos ou tipos de agendamento personalizados
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+
+            {/* Configuração da API */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Configuração da API Cal.com</CardTitle>
+                <CardDescription>
+                  Para ver seus eventos reais, configure a API key do Cal.com
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted/50 border-l-4 border-primary p-4 rounded">
+                  <h4 className="font-semibold mb-2">Como obter sua API Key:</h4>
+                  <ol className="text-sm space-y-2 list-decimal list-inside">
+                    <li>Acesse <a href="https://app.cal.com/settings/developer/api-keys" target="_blank" className="text-primary hover:underline">cal.com/settings/developer/api-keys</a></li>
+                    <li>Clique em "Create New API Key"</li>
+                    <li>Dê um nome para a chave (ex: "Minha Agenda")</li>
+                    <li>Copie a API key gerada</li>
+                    <li>Cole no campo secreto que apareceu no chat</li>
+                  </ol>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">Status da API:</p>
+                    <p className="text-sm text-muted-foreground">
+                      {eventsSource === 'cal.com' ? 'Conectado - Eventos reais' : 
+                       eventsSource === 'mock' ? 'Usando eventos de demonstração' : 'Carregando...'}
+                    </p>
+                  </div>
+                  {eventsSource === 'cal.com' && (
+                    <Badge variant="default" className="bg-green-500">
+                      ✓ Conectado
+                    </Badge>
+                  )}
+                  {eventsSource === 'mock' && (
+                    <Badge variant="secondary">
+                      Demo
+                    </Badge>
+                  )}
+                </div>
+
+                <Alert>
+                  <Clock className="h-4 w-4" />
+                  <AlertDescription>
+                    Após configurar a API key, clique no botão "Atualizar" para buscar seus eventos reais.
                   </AlertDescription>
                 </Alert>
               </CardContent>
