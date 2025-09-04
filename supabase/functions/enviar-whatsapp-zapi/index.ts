@@ -100,15 +100,20 @@ serve(async (req) => {
         console.log(`Tentando enviar para: ${numeroCompleto}`);
         console.log(`URL: ${baseUrl}/send-text`);
         
-        const response = await fetch(`${baseUrl}/send-text`, {
+        const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
+        
+        console.log(`URL completa: ${zapiUrl}`);
+        console.log(`Número formatado: ${numeroCompleto}`);
+        console.log(`Mensagem: ${mensagem}`);
+
+        const response = await fetch(zapiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             phone: numeroCompleto,
-            message: mensagem,
-            delayMessage: 1
+            message: mensagem
           }),
         });
 
