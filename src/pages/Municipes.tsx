@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
@@ -15,6 +15,7 @@ import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
 import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
 import { MunicipeDemandasDialog } from "@/components/forms/MunicipeDemandasDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -33,6 +34,8 @@ export default function Municipes() {
   const [municipeParaDemandas, setMunicipeParaDemandas] = useState<any>(null);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
+  const [duplicates, setDuplicates] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
   const { toast } = useToast();
@@ -430,6 +433,128 @@ export default function Municipes() {
     }
   };
 
+  // Função para detectar duplicados por telefone
+  const findDuplicates = () => {
+    const phoneGroups: { [key: string]: any[] } = {};
+    
+    // Agrupar munícipes por telefone (ignorar null/empty)
+    municipes.forEach(municipe => {
+      if (municipe.telefone && municipe.telefone.trim() !== '') {
+        const cleanPhone = municipe.telefone.replace(/\D/g, ''); // Remove caracteres não numéricos
+        if (cleanPhone.length >= 10) { // Apenas telefones válidos
+          if (!phoneGroups[cleanPhone]) {
+            phoneGroups[cleanPhone] = [];
+          }
+          phoneGroups[cleanPhone].push(municipe);
+        }
+      }
+    });
+    
+    // Filtrar apenas grupos com mais de 1 munícipe (duplicados)
+    const duplicateGroups = Object.values(phoneGroups).filter(group => group.length > 1);
+    const allDuplicates = duplicateGroups.flat();
+    
+    if (allDuplicates.length === 0) {
+      toast({
+        title: "Nenhum duplicado encontrado",
+        description: "Não foram encontrados munícipes com telefones duplicados."
+      });
+      return;
+    }
+    
+    setDuplicates(allDuplicates);
+    setShowDuplicatesDialog(true);
+  };
+
+  // Função para excluir duplicados (manter apenas o mais recente de cada grupo)
+  const removeDuplicates = useMutation({
+    mutationFn: async () => {
+      const phoneGroups: { [key: string]: any[] } = {};
+      
+      // Agrupar duplicados por telefone
+      duplicates.forEach(municipe => {
+        const cleanPhone = municipe.telefone.replace(/\D/g, '');
+        if (!phoneGroups[cleanPhone]) {
+          phoneGroups[cleanPhone] = [];
+        }
+        phoneGroups[cleanPhone].push(municipe);
+      });
+      
+      const toDelete: string[] = [];
+      
+      // Para cada grupo, manter apenas o mais recente e marcar outros para exclusão
+      Object.values(phoneGroups).forEach(group => {
+        if (group.length > 1) {
+          // Ordenar por data de criação (mais recente primeiro)
+          const sorted = group.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          
+          // Manter o primeiro (mais recente) e excluir os outros
+          for (let i = 1; i < sorted.length; i++) {
+            toDelete.push(sorted[i].id);
+          }
+        }
+      });
+      
+      if (toDelete.length === 0) return { deleted: 0, errors: [] };
+      
+      const results = [];
+      
+      for (const municipeId of toDelete) {
+        try {
+          // Remover tags associadas
+          await supabase
+            .from('municipe_tags')
+            .delete()
+            .eq('municipe_id', municipeId);
+          
+          // Excluir munícipe
+          const { error } = await supabase
+            .from('municipes')
+            .delete()
+            .eq('id', municipeId);
+          
+          if (error) {
+            results.push({ id: municipeId, success: false, error: error.message });
+          } else {
+            results.push({ id: municipeId, success: true });
+          }
+        } catch (err) {
+          results.push({ id: municipeId, success: false, error: 'Erro inesperado' });
+        }
+      }
+      
+      return {
+        deleted: results.filter(r => r.success).length,
+        errors: results.filter(r => !r.success)
+      };
+    },
+    onSuccess: (result) => {
+      toast({
+        title: `${result.deleted} duplicados removidos!`,
+        description: result.errors.length > 0 
+          ? `${result.errors.length} erro(s) encontrado(s).`
+          : "Operação concluída com sucesso."
+      });
+      
+      if (result.errors.length > 0) {
+        console.error('Erros na remoção de duplicados:', result.errors);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      setShowDuplicatesDialog(false);
+      setDuplicates([]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao remover duplicados",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Função para excluir munícipes em massa
   const deleteMunicipesInBatch = useMutation({
     mutationFn: async (municipeIds: string[]) => {
@@ -565,6 +690,15 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={findDuplicates}
+              className="gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Detectar Duplicados
+            </Button>
             <ImportCSVDialog
               onFileSelect={handleFileImport}
               isImporting={importMunicipes.isPending}
@@ -916,7 +1050,6 @@ export default function Municipes() {
                   }}
                   className="h-8 w-8 p-0 hover:bg-muted"
                 >
-                  <Eye className="h-4 w-4" />
                 </Button>
               </div>
               
@@ -967,6 +1100,125 @@ export default function Municipes() {
             </div>
           </div>
         )}
+
+        {/* Dialog de Duplicados */}
+        <Dialog open={showDuplicatesDialog} onOpenChange={setShowDuplicatesDialog}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Munícipes Duplicados Encontrados
+              </DialogTitle>
+              <DialogDescription>
+                {duplicates.length} munícipe(s) com telefones duplicados. Você pode remover os duplicados mantendo apenas o cadastro mais recente de cada telefone.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {(() => {
+                const phoneGroups: { [key: string]: any[] } = {};
+                duplicates.forEach(municipe => {
+                  const cleanPhone = municipe.telefone.replace(/\D/g, '');
+                  if (!phoneGroups[cleanPhone]) {
+                    phoneGroups[cleanPhone] = [];
+                  }
+                  phoneGroups[cleanPhone].push(municipe);
+                });
+
+                return Object.entries(phoneGroups).map(([phone, group]) => {
+                  const sorted = group.sort((a, b) => 
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  );
+
+                  return (
+                    <Card key={phone} className="border-l-4 border-l-yellow-500">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          Telefone: {group[0].telefone}
+                          <Badge variant="secondary">{group.length} duplicados</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {sorted.map((municipe, index) => (
+                            <div 
+                              key={municipe.id} 
+                              className={`p-3 rounded-lg border ${
+                                index === 0 
+                                  ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' 
+                                  : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-sm">
+                                    {municipe.nome}
+                                    {index === 0 && (
+                                      <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-800">
+                                        Será mantido
+                                      </Badge>
+                                    )}
+                                    {index > 0 && (
+                                      <Badge variant="outline" className="ml-2 text-xs bg-red-100 text-red-800">
+                                        Será removido
+                                      </Badge>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Email: {municipe.email || 'Não informado'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Cadastrado em: {new Date(municipe.created_at).toLocaleDateString('pt-BR')}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="border-t pt-4 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-green-600">Mantidos:</span> {
+                  Object.keys(duplicates.reduce((acc, m) => {
+                    const phone = m.telefone.replace(/\D/g, '');
+                    if (!acc[phone]) acc[phone] = true;
+                    return acc;
+                  }, {})).length
+                } • 
+                <span className="font-medium text-red-600 ml-2">Removidos:</span> {
+                  duplicates.length - Object.keys(duplicates.reduce((acc, m) => {
+                    const phone = m.telefone.replace(/\D/g, '');
+                    if (!acc[phone]) acc[phone] = true;
+                    return acc;
+                  }, {})).length
+                }
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDuplicatesDialog(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => removeDuplicates.mutate()}
+                  disabled={removeDuplicates.isPending}
+                >
+                  {removeDuplicates.isPending ? 'Removendo...' : 'Remover Duplicados'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
