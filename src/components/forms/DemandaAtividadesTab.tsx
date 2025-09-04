@@ -116,7 +116,7 @@ export function DemandaAtividadesTab({
           )
         `)
         .eq('demanda_id', demandaId)
-        .order('data_atividade', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data || [];
@@ -652,18 +652,9 @@ export function DemandaAtividadesTab({
                             
                             {atividade.link_propositura && (
                               <div>
-                                <a 
-                                  href={atividade.link_propositura}
-                                  target="_blank" 
-                                  rel="noopener noreferrer nofollow"
-                                  className="text-xs text-primary hover:underline break-all"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    window.open(atividade.link_propositura, '_blank', 'noopener,noreferrer');
-                                  }}
-                                >
+                                <span className="text-xs text-muted-foreground break-all">
                                   {atividade.link_propositura}
-                                </a>
+                                </span>
                               </div>
                             )}
                           </div>
