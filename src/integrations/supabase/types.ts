@@ -522,6 +522,51 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_instances: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          display_name: string
+          id: string
+          instance_name: string
+          last_connected_at: string | null
+          phone_number: string | null
+          profile_name: string | null
+          profile_picture_url: string | null
+          qr_code: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          display_name: string
+          id?: string
+          instance_name: string
+          last_connected_at?: string | null
+          phone_number?: string | null
+          profile_name?: string | null
+          profile_picture_url?: string | null
+          qr_code?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          instance_name?: string
+          last_connected_at?: string | null
+          phone_number?: string | null
+          profile_name?: string | null
+          profile_picture_url?: string | null
+          qr_code?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
