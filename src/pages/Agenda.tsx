@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Calendar, CalendarIcon, Clock, MapPin, Users, ExternalLink, Plus } from "lucide-react";
+import { Calendar, CalendarIcon, Clock, MapPin, Users, ExternalLink, Plus, Globe } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/dateUtils";
 
@@ -225,7 +226,7 @@ export default function Agenda() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
@@ -243,143 +244,189 @@ export default function Agenda() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Eventos de hoje */}
-        <div className="lg:col-span-2">
-          <Card>
+      <Tabs defaultValue="eventos" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="eventos" className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            Eventos
+          </TabsTrigger>
+          <TabsTrigger value="navegador" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Google Calendar
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="eventos" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Eventos de hoje */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="h-5 w-5" />
+                    Próximos Eventos
+                  </CardTitle>
+                  <CardDescription>
+                    {events.length} evento(s) encontrado(s)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[600px]">
+                    {events.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Nenhum evento encontrado.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {events.map((event) => {
+                          const status = getEventStatus(event);
+                          return (
+                            <Card key={event.id} className="p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold">{event.summary}</h3>
+                                    <Badge 
+                                      variant="secondary" 
+                                      className={`text-white ${status.color}`}
+                                    >
+                                      {status.label}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="h-4 w-4" />
+                                      {formatEventTime(event)}
+                                    </div>
+                                    {event.location && (
+                                      <div className="flex items-center gap-1">
+                                        <MapPin className="h-4 w-4" />
+                                        {event.location}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              </div>
+                              
+                              {event.description && (
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {event.description}
+                                </p>
+                              )}
+                              
+                              {event.attendees && event.attendees.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-4 w-4 text-muted-foreground" />
+                                  <div className="flex items-center gap-1">
+                                    {event.attendees.slice(0, 3).map((attendee, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs">
+                                        {attendee.displayName || attendee.email}
+                                      </Badge>
+                                    ))}
+                                    {event.attendees.length > 3 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{event.attendees.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar com resumo */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Resumo do Dia</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total de eventos:</span>
+                    <Badge variant="secondary">{events.length}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Em andamento:</span>
+                    <Badge className="bg-green-500">
+                      {events.filter(e => getEventStatus(e).status === 'ongoing').length}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Próximos:</span>
+                    <Badge className="bg-blue-500">
+                      {events.filter(e => getEventStatus(e).status === 'upcoming').length}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Ações Rápidas</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start" asChild>
+                    <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Criar Evento
+                    </a>
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" asChild>
+                    <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Abrir Google Calendar
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="navegador" className="mt-6">
+          <Card className="w-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                Próximos Eventos
+                <Globe className="h-5 w-5" />
+                Google Calendar - Navegador
               </CardTitle>
               <CardDescription>
-                {events.length} evento(s) encontrado(s)
+                Acesse diretamente sua agenda do Google para criar e editar eventos
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[600px]">
-                {events.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhum evento encontrado.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {events.map((event) => {
-                      const status = getEventStatus(event);
-                      return (
-                        <Card key={event.id} className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-semibold">{event.summary}</h3>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={`text-white ${status.color}`}
-                                >
-                                  {status.label}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
-                                  {formatEventTime(event)}
-                                </div>
-                                {event.location && (
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4" />
-                                    {event.location}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <Button variant="ghost" size="sm" asChild>
-                              <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                          
-                          {event.description && (
-                            <p className="text-sm text-muted-foreground mb-3">
-                              {event.description}
-                            </p>
-                          )}
-                          
-                          {event.attendees && event.attendees.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              <div className="flex items-center gap-1">
-                                {event.attendees.slice(0, 3).map((attendee, index) => (
-                                  <Badge key={index} variant="outline" className="text-xs">
-                                    {attendee.displayName || attendee.email}
-                                  </Badge>
-                                ))}
-                                {event.attendees.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{event.attendees.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar com resumo */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Resumo do Dia</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total de eventos:</span>
-                <Badge variant="secondary">{events.length}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Em andamento:</span>
-                <Badge className="bg-green-500">
-                  {events.filter(e => getEventStatus(e).status === 'ongoing').length}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Próximos:</span>
-                <Badge className="bg-blue-500">
-                  {events.filter(e => getEventStatus(e).status === 'upcoming').length}
-                </Badge>
+            <CardContent className="p-0">
+              <div className="w-full h-[700px] rounded-lg overflow-hidden border">
+                <iframe
+                  src="https://calendar.google.com/calendar/embed?showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=1&showTz=0&height=700&wkst=1&bgcolor=%23ffffff"
+                  style={{
+                    border: 0,
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '8px'
+                  }}
+                  frameBorder="0"
+                  scrolling="no"
+                  title="Google Calendar"
+                  allow="camera; microphone; display-capture"
+                />
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Ações Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Criar Evento
-                </a>
-              </Button>
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Google Calendar
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
