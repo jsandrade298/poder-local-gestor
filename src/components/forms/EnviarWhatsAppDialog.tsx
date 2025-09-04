@@ -372,7 +372,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 <Label>Selecionar Munícipes</Label>
                 
                 {selectedMunicipes.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto p-3 bg-muted rounded-lg border">
+                  <div className="min-h-[100px] max-h-48 overflow-y-auto p-3 bg-muted rounded-lg border">
                     <div className="flex flex-wrap gap-2">
                       {selectedMunicipes.map(id => {
                         const municipe = municipes?.find(m => m.id === id);
@@ -410,14 +410,17 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                           <button
                             key={municipe.id}
                             onClick={() => {
-                              if (!isSelected) {
+                              if (isSelected) {
+                                // Remove da seleção se já estiver selecionado
+                                setSelectedMunicipes(prev => prev.filter(id => id !== municipe.id));
+                              } else {
+                                // Adiciona à seleção se não estiver selecionado
                                 setSelectedMunicipes(prev => [...prev, municipe.id]);
                               }
                             }}
-                            disabled={isSelected}
                             className={`w-full text-left px-3 py-2 transition-colors ${
                               isSelected 
-                                ? 'bg-primary/10 text-muted-foreground cursor-not-allowed' 
+                                ? 'bg-primary/10 text-primary' 
                                 : 'hover:bg-muted'
                             }`}
                           >
