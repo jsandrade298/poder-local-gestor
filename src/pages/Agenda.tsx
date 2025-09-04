@@ -8,10 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Agenda() {
-  const [calUsername, setCalUsername] = useState("demo");
+  const [calUsername, setCalUsername] = useState("agenda-clovis-am3eym");
   const [customCalUrl, setCustomCalUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeCalUrl, setActiveCalUrl] = useState("https://cal.com/demo");
+  const [activeCalUrl, setActiveCalUrl] = useState("https://cal.com/agenda-clovis-am3eym");
 
   const handleConnectCal = () => {
     if (calUsername.trim()) {
