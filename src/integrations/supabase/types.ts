@@ -117,6 +117,7 @@ export type Database = {
           demanda_id: string
           descricao: string | null
           id: string
+          propositura: string | null
           tipo_atividade: string
           titulo: string
           updated_at: string
@@ -128,6 +129,7 @@ export type Database = {
           demanda_id: string
           descricao?: string | null
           id?: string
+          propositura?: string | null
           tipo_atividade?: string
           titulo: string
           updated_at?: string
@@ -139,6 +141,7 @@ export type Database = {
           demanda_id?: string
           descricao?: string | null
           id?: string
+          propositura?: string | null
           tipo_atividade?: string
           titulo?: string
           updated_at?: string

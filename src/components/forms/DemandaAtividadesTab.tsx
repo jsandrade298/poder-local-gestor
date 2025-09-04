@@ -36,6 +36,7 @@ const formSchema = z.object({
   titulo: z.string().min(1, "Título é obrigatório"),
   descricao: z.string().optional(),
   data_atividade: z.string().min(1, "Data da atividade é obrigatória"),
+  propositura: z.string().optional(),
 });
 
 interface DemandaAtividadesTabProps {
@@ -51,6 +52,17 @@ const tiposAtividade = [
   { value: "reuniao", label: "Reunião", icon: Users, color: "bg-orange-500" },
   { value: "visita", label: "Visita Técnica", icon: MapPin, color: "bg-red-500" },
   { value: "atualizacao", label: "Atualização", icon: Edit3, color: "bg-gray-500" },
+];
+
+const proposituras = [
+  { value: "projeto_decreto_legislativo", label: "Projeto de Decreto Legislativo" },
+  { value: "projeto_lei", label: "Projeto de Lei" },
+  { value: "req_informacao_art58", label: "Req. Informação (art. 58 LOM)" },
+  { value: "voto_mocao", label: "Voto ou Moção" },
+  { value: "requerimento", label: "Requerimento" },
+  { value: "indicacao", label: "Indicação" },
+  { value: "emenda", label: "Emenda" },
+  { value: "projeto_resolucao", label: "Projeto de Resolução" },
 ];
 
 export function DemandaAtividadesTab({ 
@@ -70,6 +82,7 @@ export function DemandaAtividadesTab({
       titulo: "",
       descricao: "",
       data_atividade: new Date().toISOString().slice(0, 16),
+      propositura: "",
     },
   });
 
@@ -260,6 +273,7 @@ export function DemandaAtividadesTab({
       titulo: atividade.titulo,
       descricao: atividade.descricao || "",
       data_atividade: new Date(atividade.data_atividade).toISOString().slice(0, 16),
+      propositura: atividade.propositura || "",
     });
     setShowForm(true);
   };
@@ -272,6 +286,10 @@ export function DemandaAtividadesTab({
 
   const getTipoAtividade = (tipo: string) => {
     return tiposAtividade.find(t => t.value === tipo) || tiposAtividade[0];
+  };
+
+  const getPropositura = (propositura: string) => {
+    return proposituras.find(p => p.value === propositura);
   };
 
   if (isLoading) {
@@ -381,6 +399,32 @@ export function DemandaAtividadesTab({
                           className="min-h-[100px]" 
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="propositura"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Propositura (Opcional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma propositura" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Nenhuma</SelectItem>
+                          {proposituras.map((propositura) => (
+                            <SelectItem key={propositura.value} value={propositura.value}>
+                              {propositura.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -496,6 +540,14 @@ export function DemandaAtividadesTab({
                         {atividade.descricao && (
                           <div className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
                             {renderMentionText(atividade.descricao)}
+                          </div>
+                        )}
+                        
+                        {atividade.propositura && (
+                          <div className="mb-3">
+                            <Badge variant="secondary" className="text-xs">
+                              {getPropositura(atividade.propositura)?.label || atividade.propositura}
+                            </Badge>
                           </div>
                         )}
                         
