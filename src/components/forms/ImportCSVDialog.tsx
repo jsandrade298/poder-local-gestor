@@ -8,9 +8,10 @@ interface ImportCSVDialogProps {
   onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isImporting: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  onImportStart?: () => void;
 }
 
-export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef }: ImportCSVDialogProps) {
+export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, onImportStart }: ImportCSVDialogProps) {
   const [open, setOpen] = useState(false);
 
   const downloadTemplate = () => {
@@ -87,7 +88,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef }: Imp
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
-    setOpen(false);
+    // Não fechar o modal imediatamente - esperar a seleção do arquivo
   };
 
   return (
@@ -283,7 +284,11 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef }: Imp
           ref={fileInputRef}
           type="file"
           accept=".csv"
-          onChange={onFileSelect}
+          onChange={(e) => {
+            onFileSelect(e);
+            setOpen(false); // Fechar modal após seleção do arquivo
+            onImportStart?.();
+          }}
           className="hidden"
         />
       </DialogContent>

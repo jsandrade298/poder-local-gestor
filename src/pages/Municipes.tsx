@@ -254,8 +254,13 @@ export default function Municipes() {
 
   // Função para processar arquivo CSV
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📄 handleFileImport chamado:', event);
     const file = event.target.files?.[0];
-    if (!file) return;
+    console.log('📄 Arquivo selecionado:', file);
+    if (!file) {
+      console.log('❌ Nenhum arquivo selecionado');
+      return;
+    }
 
     if (!file.name.toLowerCase().endsWith('.csv')) {
       toast({
@@ -428,6 +433,12 @@ export default function Municipes() {
               onFileSelect={handleFileImport}
               isImporting={importMunicipes.isPending}
               fileInputRef={fileInputRef}
+              onImportStart={() => {
+                toast({
+                  title: "Processando arquivo...",
+                  description: "Aguarde enquanto importamos os dados."
+                });
+              }}
             />
             <Button 
               variant="outline" 
