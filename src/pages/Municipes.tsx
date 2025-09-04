@@ -678,7 +678,7 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
-            <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
+            <EnviarWhatsAppDialog />
             <Button 
               variant="outline" 
               size="sm"

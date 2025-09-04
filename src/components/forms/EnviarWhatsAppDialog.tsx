@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,6 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
-import { WhatsAppProgressModal } from "./WhatsAppProgressModal";
 
 interface EnviarWhatsAppDialogProps {
   municipesSelecionados?: string[];
@@ -45,18 +44,12 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [mensagem, setMensagem] = useState("");
   const [incluirTodos, setIncluirTodos] = useState(false);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>(municipesSelecionados);
-
-  // Atualizar selectedMunicipes quando municipesSelecionados mudar
-  useEffect(() => {
-    setSelectedMunicipes(municipesSelecionados);
-  }, [municipesSelecionados]);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
   const [tempoMinimo, setTempoMinimo] = useState(1);
   const [tempoMaximo, setTempoMaximo] = useState(3);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const [sendingStatus, setSendingStatus] = useState<any>(null);
-  const [showProgressModal, setShowProgressModal] = useState(false);
   const { toast } = useToast();
 
   // Buscar munícipes
@@ -171,23 +164,6 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     },
   });
 
-  const handleConfirmSend = () => {
-    const telefones = incluirTodos 
-      ? []
-      : selectedMunicipes
-          .map(id => municipes?.find(m => m.id === id)?.telefone)
-          .filter(Boolean);
-
-    enviarWhatsApp.mutate({
-      telefones,
-      mensagem,
-      incluirTodos,
-      instanceName: selectedInstance,
-      tempoMinimo,
-      tempoMaximo,
-    });
-  };
-
   const handleEnviar = () => {
     if (!mensagem.trim() && mediaFiles.length === 0) {
       toast({
@@ -216,9 +192,20 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       return;
     }
 
-    // Abrir modal de progresso
-    setShowProgressModal(true);
-    setOpen(false);
+    const telefones = incluirTodos 
+      ? []
+      : selectedMunicipes
+          .map(id => municipes?.find(m => m.id === id)?.telefone)
+          .filter(Boolean);
+
+    enviarWhatsApp.mutate({
+      telefones,
+      mensagem,
+      incluirTodos,
+      instanceName: selectedInstance,
+      tempoMinimo,
+      tempoMaximo,
+    });
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,16 +290,8 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     ? (municipes?.length || 0)
     : selectedMunicipes.length;
 
-  // Preparar dados dos destinatários para o modal de progresso
-  const destinatariosParaModal = incluirTodos 
-    ? (municipes?.filter(m => m.telefone) || [])
-    : selectedMunicipes
-        .map(id => municipes?.find(m => m.id === id))
-        .filter((m): m is NonNullable<typeof m> => m != null && !!m.telefone);
-
   return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <MessageSquare className="h-4 w-4" />
@@ -576,17 +555,5 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
         </div>
       </DialogContent>
     </Dialog>
-
-    <WhatsAppProgressModal
-      open={showProgressModal}
-      onOpenChange={setShowProgressModal}
-      destinatarios={destinatariosParaModal}
-      tempoMinimo={tempoMinimo}
-      tempoMaximo={tempoMaximo}
-      onConfirmSend={handleConfirmSend}
-      isLoading={enviarWhatsApp.isPending}
-      sendingResults={sendingStatus}
-    />
-    </>
   );
 }
