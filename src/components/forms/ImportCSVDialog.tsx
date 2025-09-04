@@ -221,7 +221,13 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
 
                 {/* Botões de ação */}
                 <div className="flex gap-2 mt-4">
-                  <Button variant="outline" onClick={handleStartOver}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      handleStartOver();
+                      handleImportClick();
+                    }}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
                     Importar Outro Arquivo
                   </Button>
