@@ -69,17 +69,21 @@ export default function Demandas() {
       setAreaFilter(areaParam);
     }
     
-    // Processar redirecionamento de notificação
+    // Processar redirecionamento de notificação ou de outros locais
     const protocolo = searchParams.get('protocolo');
     const atividadeId = searchParams.get('atividade');
     
-    if (protocolo && atividadeId && demandas.length > 0) {
+    if (protocolo && demandas.length > 0) {
       // Encontrar e abrir a demanda específica
       const demanda = demandas?.find(d => d.protocolo === protocolo);
       if (demanda) {
         setSelectedDemanda(demanda);
         setIsViewDialogOpen(true);
-        setHighlightedActivityId(atividadeId);
+        
+        // Se há uma atividade específica, destacá-la
+        if (atividadeId) {
+          setHighlightedActivityId(atividadeId);
+        }
         
         // Limpar os parâmetros da URL após o redirecionamento
         const newUrl = window.location.pathname;
