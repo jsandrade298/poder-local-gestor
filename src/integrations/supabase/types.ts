@@ -151,6 +151,13 @@ export type Database = {
             referencedRelation: "demandas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_demanda_atividades_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       demanda_tags: {

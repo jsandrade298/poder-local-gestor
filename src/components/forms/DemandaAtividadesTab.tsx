@@ -74,7 +74,7 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
         .from('demanda_atividades')
         .select(`
           *,
-          profiles:created_by (
+          created_by_profile:profiles!fk_demanda_atividades_created_by (
             nome,
             email
           )
@@ -439,11 +439,11 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-xs">
-                              {atividade.profiles?.nome?.charAt(0) || "?"}
+                              {atividade.created_by_profile?.nome?.charAt(0) || "U"}
                             </AvatarFallback>
                           </Avatar>
                           <span>
-                            Por {atividade.profiles?.nome || "Usuário"} em {formatDateTime(atividade.created_at)}
+                            Por {atividade.created_by_profile?.nome || "Usuário"} em {formatDateTime(atividade.created_at)}
                           </span>
                         </div>
                       </div>
