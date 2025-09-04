@@ -525,10 +525,13 @@ export type Database = {
       whatsapp_instances: {
         Row: {
           active: boolean | null
+          api_url: string | null
           created_at: string
           display_name: string
           id: string
+          instance_id: string | null
           instance_name: string
+          instance_token: string | null
           last_connected_at: string | null
           phone_number: string | null
           profile_name: string | null
@@ -539,10 +542,13 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          api_url?: string | null
           created_at?: string
           display_name: string
           id?: string
+          instance_id?: string | null
           instance_name: string
+          instance_token?: string | null
           last_connected_at?: string | null
           phone_number?: string | null
           profile_name?: string | null
@@ -553,10 +559,13 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          api_url?: string | null
           created_at?: string
           display_name?: string
           id?: string
+          instance_id?: string | null
           instance_name?: string
+          instance_token?: string | null
           last_connected_at?: string | null
           phone_number?: string | null
           profile_name?: string | null

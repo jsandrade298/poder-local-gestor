@@ -1,10 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,71 +21,41 @@ serve(async (req) => {
   try {
     const { action, instanceName } = await req.json();
     
-    console.log('=== DEBUGGING ENVIRONMENT VARIABLES ===');
-    console.log('All env keys:', Object.keys(Deno.env.toObject()));
-    
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-    
-    console.log(`EVOLUTION_API_URL: "${evolutionApiUrl}"`);
-    console.log(`EVOLUTION_API_KEY: "${evolutionApiKey}"`);
-    console.log(`URL is truthy: ${!!evolutionApiUrl}`);
-    console.log(`KEY is truthy: ${!!evolutionApiKey}`);
-    console.log('=== END DEBUGGING ===');
+    console.log(`Action: ${action}, Instance: ${instanceName}`);
 
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error(`Evolution API não configurado. URL: ${evolutionApiUrl}, KEY: ${evolutionApiKey ? 'SET' : 'NOT_SET'}`);
+    // Buscar configurações da instância no banco de dados
+    const { data: instanceConfig, error: configError } = await supabase
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('instance_name', instanceName)
+      .single();
+
+    if (configError || !instanceConfig) {
+      throw new Error(`Configuração da instância ${instanceName} não encontrada`);
     }
 
-    console.log(`Evolution API URL: ${evolutionApiUrl}`);
-    console.log(`Evolution API Key configured: ${evolutionApiKey ? 'Yes' : 'No'}`);
-    console.log(`Action: ${action}`);
-    console.log(`Instance: ${instanceName}`);
+    if (!instanceConfig.api_url || !instanceConfig.instance_token) {
+      throw new Error(`Configuração incompleta para a instância ${instanceName}`);
+    }
+
+    console.log(`Using API URL: ${instanceConfig.api_url}`);
+    console.log(`Instance ID: ${instanceConfig.instance_id}`);
 
     const headers = {
       'Content-Type': 'application/json',
-      'apikey': evolutionApiKey,
+      'apikey': instanceConfig.instance_token,
     };
 
     let result;
 
     switch (action) {
       case 'create_instance':
-        if (!instanceName) {
-          throw new Error('Nome da instância é obrigatório');
-        }
-
-        const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            instanceName: instanceName,
-            token: evolutionApiKey,
-            qrcode: true,
-            number: "",
-            typebot: "",
-            webhook: "",
-            webhook_by_events: false,
-            events: [],
-            reject_call: false,
-            msg_call: "",
-            groups_ignore: true,
-            always_online: false,
-            read_messages: false,
-            read_status: false,
-            websocket_enabled: false,
-            websocket_events: []
-          }),
-        });
-
-        if (!createResponse.ok) {
-          const errorText = await createResponse.text();
-          console.error('Erro ao criar instância:', errorText);
-          throw new Error(`Erro ao criar instância: ${createResponse.status} - ${errorText}`);
-        }
-
-        result = await createResponse.json();
-        console.log('Instância criada:', result);
+        // Para instâncias já configuradas, não precisamos criar novamente
+        result = {
+          success: true,
+          message: `Instância ${instanceName} já está configurada`,
+          instanceName: instanceName
+        };
         break;
 
       case 'connect_instance':
@@ -87,7 +63,7 @@ serve(async (req) => {
           throw new Error('Nome da instância é obrigatório');
         }
 
-        const connectResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+        const connectResponse = await fetch(`${instanceConfig.api_url}/instance/connect/${instanceName}`, {
           method: 'GET',
           headers,
         });
@@ -103,27 +79,60 @@ serve(async (req) => {
         break;
 
       case 'list_instances':
-        const listResponse = await fetch(`${evolutionApiUrl}/instance/fetchInstances`, {
-          method: 'GET',
-          headers,
-        });
+        // Buscar todas as instâncias do banco
+        const { data: allInstances, error: listError } = await supabase
+          .from('whatsapp_instances')
+          .select('*')
+          .eq('active', true);
 
-        if (!listResponse.ok) {
-          const errorText = await listResponse.text();
-          console.error('Erro ao listar instâncias:', errorText);
-          throw new Error(`Erro ao listar instâncias: ${listResponse.status} - ${errorText}`);
+        if (listError) {
+          throw new Error('Erro ao buscar instâncias do banco de dados');
         }
 
-        const instances = await listResponse.json();
-        console.log('Instâncias encontradas:', instances);
+        // Para cada instância, verificar status na API
+        const instancesWithStatus = [];
+        for (const instance of allInstances || []) {
+          try {
+            const statusResponse = await fetch(`${instance.api_url}/instance/connectionState/${instance.instance_name}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': instance.instance_token,
+              },
+            });
+
+            let connectionStatus = 'disconnected';
+            let profileName = null;
+            let phoneNumber = null;
+
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
+              connectionStatus = statusData.instance?.connectionStatus || 'disconnected';
+              profileName = statusData.instance?.profileName;
+              phoneNumber = statusData.instance?.number;
+            }
+
+            instancesWithStatus.push({
+              instanceName: instance.instance_name,
+              displayName: instance.display_name,
+              status: connectionStatus,
+              profileName: profileName,
+              number: phoneNumber
+            });
+          } catch (error) {
+            console.error(`Erro ao verificar status da instância ${instance.instance_name}:`, error);
+            instancesWithStatus.push({
+              instanceName: instance.instance_name,
+              displayName: instance.display_name,
+              status: 'disconnected',
+              profileName: null,
+              number: null
+            });
+          }
+        }
         
         result = {
-          instances: Array.isArray(instances) ? instances.map((inst: any) => ({
-            instanceName: inst.instance?.instanceName || inst.instanceName,
-            status: inst.instance?.connectionStatus || inst.connectionStatus || 'disconnected',
-            profileName: inst.instance?.profileName || inst.profileName,
-            number: inst.instance?.number || inst.number
-          })) : []
+          instances: instancesWithStatus
         };
         break;
 
@@ -132,7 +141,7 @@ serve(async (req) => {
           throw new Error('Nome da instância é obrigatório');
         }
 
-        const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+        const statusResponse = await fetch(`${instanceConfig.api_url}/instance/connectionState/${instanceName}`, {
           method: 'GET',
           headers,
         });
@@ -147,11 +156,9 @@ serve(async (req) => {
         console.log('Status da instância:', statusData);
         
         result = {
-          status: {
-            status: statusData.instance?.connectionStatus || 'disconnected',
-            profileName: statusData.instance?.profileName,
-            number: statusData.instance?.number
-          }
+          status: statusData.instance?.connectionStatus || 'disconnected',
+          profileName: statusData.instance?.profileName,
+          phoneNumber: statusData.instance?.number
         };
         break;
 
