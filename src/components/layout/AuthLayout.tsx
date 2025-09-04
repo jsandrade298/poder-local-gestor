@@ -66,12 +66,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                 variant="outline" 
                 size="sm" 
                 onClick={async () => {
-                  try {
-                    await signOut();
-                  } catch (error) {
-                    // Em caso de erro, forçar navegação para login
-                    window.location.href = '/login';
-                  }
+                  await signOut();
+                  // Garantir redirecionamento mesmo em caso de erro
+                  window.location.href = '/login';
                 }}
               >
                 <LogOut className="h-4 w-4 mr-2" />

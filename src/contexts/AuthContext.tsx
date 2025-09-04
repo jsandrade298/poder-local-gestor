@@ -69,8 +69,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       // Se houver erro no logout (sessão inválida), limpar estado local mesmo assim
       console.log('Erro no logout, limpando estado local:', error);
+    } finally {
+      // Sempre limpar o estado local
       setSession(null);
       setUser(null);
+      // Forçar limpeza do localStorage também
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
     }
   };
 
