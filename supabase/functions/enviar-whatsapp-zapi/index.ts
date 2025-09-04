@@ -104,11 +104,11 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Client-Token': zapiToken,
           },
           body: JSON.stringify({
             phone: numeroCompleto,
-            message: mensagem
+            message: mensagem,
+            delayMessage: 1
           }),
         });
 
