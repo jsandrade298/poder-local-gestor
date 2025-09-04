@@ -125,7 +125,13 @@ export function WhatsAppManager() {
     
     try {
       const result = await callEdgeFunction('instance_status', instanceName);
-      const isConnected = result?.status === 'connected';
+      console.log(`Status result for ${instanceName}:`, result);
+      
+      // Verificar se está conectado baseado em múltiplos campos possíveis
+      const isConnected = 
+        result?.status === 'connected' || 
+        result?.state === 'open' ||
+        result?.connected === true;
       
       setInstances(prev => prev.map(inst => 
         inst.name === instanceName 
@@ -415,6 +421,60 @@ export function WhatsAppManager() {
           )}
           Verificar Todas
         </Button>
+      </div>
+
+      {/* Botão de Debug - TEMPORÁRIO */}
+      <div className="mb-4 p-4 border rounded-lg bg-gray-50">
+        <h3 className="font-semibold mb-2">Debug Status (Temporário)</h3>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const result = await callEdgeFunction('instance_status', 'gabinete-whats-02');
+                console.log('Status gabinete-whats-02:', result);
+                alert(`Status: ${result.status}\nRaw Data: ${JSON.stringify(result.rawData, null, 2)}`);
+              } catch (error) {
+                console.error('Debug error:', error);
+                alert('Erro: ' + error.message);
+              }
+            }}
+          >
+            🔍 Debug gabinete-whats-02
+          </Button>
+          
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                // Forçar atualização manual do status
+                const result = await callEdgeFunction('instance_status', 'gabinete-whats-02');
+                
+                if (result) {
+                  setInstances(prev => prev.map(inst => 
+                    inst.name === 'gabinete-whats-02' 
+                      ? { 
+                          ...inst, 
+                          status: result.status === 'connected' ? 'connected' : 'disconnected',
+                          profileName: result.profileName,
+                          number: result.phoneNumber || result.number
+                        }
+                      : inst
+                  ));
+                  
+                  toast({
+                    title: 'Status Atualizado',
+                    description: `gabinete-whats-02: ${result.status}`,
+                  });
+                }
+              } catch (error) {
+                console.error('Force update error:', error);
+              }
+            }}
+          >
+            🔄 Forçar Atualização Status
+          </Button>
+        </div>
       </div>
 
       {/* Grid de Instâncias */}
