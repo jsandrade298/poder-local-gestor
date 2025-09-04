@@ -207,10 +207,10 @@ export function NotificationsDropdown() {
                 size="sm"
                 onClick={() => limparNotificacoes.mutate()}
                 disabled={limparNotificacoes.isPending}
-                className="text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                title="Limpar todas as notificações"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Limpar todas
+                <Trash2 className="h-4 w-4" />
               </Button>
             )}
           </div>
