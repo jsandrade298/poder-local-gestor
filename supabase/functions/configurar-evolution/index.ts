@@ -7,121 +7,144 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, instanceName } = await req.json();
+    const { action, instanceName, phone, message } = await req.json();
     
     console.log(`Action: ${action}, Instance: ${instanceName}`);
 
-    // Buscar configurações da instância no banco de dados
+    // Buscar configurações da instância
     const { data: instanceConfig, error: configError } = await supabase
       .from('whatsapp_instances')
       .select('*')
       .eq('instance_name', instanceName)
-      .single();
+      .maybeSingle();
 
     if (configError || !instanceConfig) {
-      throw new Error(`Configuração da instância ${instanceName} não encontrada`);
+      throw new Error(`Instância ${instanceName} não encontrada`);
     }
 
-    if (!instanceConfig.api_url || !instanceConfig.instance_token) {
-      throw new Error(`Configuração incompleta para a instância ${instanceName}`);
-    }
-
-    console.log(`Using API URL: ${instanceConfig.api_url}`);
-    console.log(`Instance ID: ${instanceConfig.instance_id}`);
-    console.log(`Token (first 10 chars): ${instanceConfig.instance_token.substring(0, 10)}...`);
-
-    // Headers para Evolution API - testando diferentes formatos
+    // Headers para Evolution API Cloud
     const headers = {
       'Content-Type': 'application/json',
       'apikey': instanceConfig.instance_token,
-      'Authorization': `ApiKey ${instanceConfig.instance_token}`,
-      'X-API-Key': instanceConfig.instance_token,
     };
 
     let result;
 
     switch (action) {
-      case 'create_instance':
-        // Para instâncias já configuradas, não precisamos criar novamente
-        result = {
-          success: true,
-          message: `Instância ${instanceName} já está configurada`,
-          instanceName: instanceName
-        };
+      case 'connect_instance':
+        try {
+          // Verificar status primeiro
+          const statusUrl = `${instanceConfig.api_url}/instance/connectionState/${instanceConfig.instance_id}`;
+          console.log('Verificando status:', statusUrl);
+          
+          const statusResponse = await fetch(statusUrl, {
+            method: 'GET',
+            headers,
+          });
+
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            console.log('Status atual:', statusData);
+            
+            if (statusData.state === 'open' || statusData.instance?.state === 'open') {
+              result = {
+                success: true,
+                status: 'connected',
+                message: 'WhatsApp já está conectado'
+              };
+              break;
+            }
+          }
+
+          // Gerar QR Code
+          const qrUrl = `${instanceConfig.api_url}/instance/connect/${instanceConfig.instance_id}`;
+          console.log('Gerando QR Code:', qrUrl);
+          
+          const qrResponse = await fetch(qrUrl, {
+            method: 'GET',
+            headers,
+          });
+
+          if (qrResponse.ok) {
+            const qrData = await qrResponse.json();
+            console.log('QR Code response:', qrData);
+            
+            // Evolution API Cloud retorna o QR em diferentes formatos
+            const qrcode = qrData.qrcode?.base64 || qrData.base64 || qrData.qr || qrData.code;
+            
+            if (qrcode) {
+              // Se não tem o prefixo data:image, adicionar
+              const qrcodeFormatted = qrcode.startsWith('data:image') 
+                ? qrcode 
+                : `data:image/png;base64,${qrcode}`;
+                
+              result = {
+                success: true,
+                status: 'connecting',
+                qrcode: qrcodeFormatted,
+                message: 'QR Code gerado com sucesso'
+              };
+            } else {
+              result = {
+                success: true,
+                status: 'connecting',
+                pairingCode: qrData.pairingCode || qrData.code,
+                message: 'Use o código de pareamento no WhatsApp'
+              };
+            }
+          } else {
+            const errorText = await qrResponse.text();
+            console.error('Erro ao gerar QR:', errorText);
+            throw new Error(`Erro ao gerar QR Code: ${qrResponse.status}`);
+          }
+        } catch (error) {
+          console.error('Erro completo:', error);
+          throw error;
+        }
         break;
 
-      case 'connect_instance':
-        if (!instanceName) {
-          throw new Error('Nome da instância é obrigatório');
-        }
-
-        console.log(`Attempting connection to: ${instanceConfig.api_url}/instance/connect/${instanceName}`);
-        console.log(`Using headers:`, JSON.stringify(headers, null, 2));
-        
-        const connectResponse = await fetch(`${instanceConfig.api_url}/instance/connect/${instanceName}`, {
+      case 'instance_status':
+        const statusUrl = `${instanceConfig.api_url}/instance/connectionState/${instanceConfig.instance_id}`;
+        const statusResponse = await fetch(statusUrl, {
           method: 'GET',
           headers,
         });
 
-        console.log(`Response status: ${connectResponse.status}`);
-        console.log(`Response headers:`, JSON.stringify(Object.fromEntries(connectResponse.headers.entries()), null, 2));
-
-        if (!connectResponse.ok) {
-          const errorText = await connectResponse.text();
-          console.error('Erro ao conectar instância:', errorText);
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          const isConnected = statusData.state === 'open' || statusData.instance?.state === 'open';
           
-          // Tentar com apikey em vez de Authorization
-          const alternativeHeaders = {
-            'Content-Type': 'application/json',
-            'apikey': instanceConfig.instance_token,
+          result = {
+            status: isConnected ? 'connected' : 'disconnected',
+            state: statusData.state,
+            instance: statusData.instance
           };
-          
-          console.log('Tentando com headers alternativos:', JSON.stringify(alternativeHeaders, null, 2));
-          
-          const retryResponse = await fetch(`${instanceConfig.api_url}/instance/connect/${instanceName}`, {
-            method: 'GET',
-            headers: alternativeHeaders,
-          });
-          
-          if (!retryResponse.ok) {
-            const retryErrorText = await retryResponse.text();
-            console.error('Erro na segunda tentativa:', retryErrorText);
-            throw new Error(`Erro ao conectar instância: ${retryResponse.status} - ${retryErrorText}`);
-          }
-          
-          result = await retryResponse.json();
         } else {
-          result = await connectResponse.json();
+          result = {
+            status: 'disconnected',
+            state: 'close'
+          };
         }
-        
-        console.log('Resposta da conexão:', result);
         break;
 
       case 'list_instances':
-        // Buscar todas as instâncias do banco
-        const { data: allInstances, error: listError } = await supabase
+        const { data: allInstances } = await supabase
           .from('whatsapp_instances')
           .select('*')
           .eq('active', true);
 
-        if (listError) {
-          throw new Error('Erro ao buscar instâncias do banco de dados');
-        }
-
-        // Para cada instância, verificar status na API
         const instancesWithStatus = [];
+        
         for (const instance of allInstances || []) {
           try {
             const statusHeaders = {
@@ -129,75 +152,76 @@ serve(async (req) => {
               'apikey': instance.instance_token,
             };
             
-            const statusResponse = await fetch(`${instance.api_url}/instance/connectionState/${instance.instance_name}`, {
-              method: 'GET',
-              headers: statusHeaders,
-            });
+            const statusResponse = await fetch(
+              `${instance.api_url}/instance/connectionState/${instance.instance_id}`,
+              { method: 'GET', headers: statusHeaders }
+            );
 
             let connectionStatus = 'disconnected';
-            let profileName = null;
-            let phoneNumber = null;
-
+            
             if (statusResponse.ok) {
               const statusData = await statusResponse.json();
-              connectionStatus = statusData.instance?.connectionStatus || 'disconnected';
-              profileName = statusData.instance?.profileName;
-              phoneNumber = statusData.instance?.number;
+              connectionStatus = (statusData.state === 'open' || statusData.instance?.state === 'open') 
+                ? 'connected' 
+                : 'disconnected';
             }
 
             instancesWithStatus.push({
               instanceName: instance.instance_name,
               displayName: instance.display_name,
-              status: connectionStatus,
-              profileName: profileName,
-              number: phoneNumber
+              status: connectionStatus
             });
           } catch (error) {
-            console.error(`Erro ao verificar status da instância ${instance.instance_name}:`, error);
+            console.error(`Erro ao verificar ${instance.instance_name}:`, error);
             instancesWithStatus.push({
               instanceName: instance.instance_name,
               displayName: instance.display_name,
-              status: 'disconnected',
-              profileName: null,
-              number: null
+              status: 'disconnected'
             });
           }
         }
         
-        result = {
-          instances: instancesWithStatus
-        };
+        result = { instances: instancesWithStatus };
         break;
 
-      case 'instance_status':
-        if (!instanceName) {
-          throw new Error('Nome da instância é obrigatório');
-        }
-
-        const statusHeaders = {
-          'Content-Type': 'application/json',
-          'apikey': instanceConfig.instance_token,
-        };
-
-        const statusResponse = await fetch(`${instanceConfig.api_url}/instance/connectionState/${instanceName}`, {
-          method: 'GET',
-          headers: statusHeaders,
+      case 'disconnect_instance':
+        const logoutUrl = `${instanceConfig.api_url}/instance/logout/${instanceConfig.instance_id}`;
+        const logoutResponse = await fetch(logoutUrl, {
+          method: 'DELETE',
+          headers,
         });
 
-        if (!statusResponse.ok) {
-          const errorText = await statusResponse.text();
-          console.error('Erro ao verificar status:', errorText);
-          throw new Error(`Erro ao verificar status: ${statusResponse.status} - ${errorText}`);
+        if (logoutResponse.ok) {
+          result = {
+            success: true,
+            message: 'Instância desconectada com sucesso'
+          };
+        } else {
+          throw new Error('Erro ao desconectar instância');
         }
+        break;
 
-        const statusData = await statusResponse.json();
-        console.log('Status da instância:', statusData);
-        
-        result = {
-          status: statusData.instance?.connectionStatus || 'disconnected',
-          profileName: statusData.instance?.profileName,
-          phoneNumber: statusData.instance?.number
-        };
+      case 'send_message':
+        const sendUrl = `${instanceConfig.api_url}/message/sendText/${instanceConfig.instance_id}`;
+        const sendResponse = await fetch(sendUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            number: phone,
+            text: message
+          })
+        });
+
+        if (sendResponse.ok) {
+          const sendData = await sendResponse.json();
+          result = {
+            success: true,
+            message: 'Mensagem enviada',
+            data: sendData
+          };
+        } else {
+          throw new Error('Erro ao enviar mensagem');
+        }
         break;
 
       default:
@@ -209,10 +233,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Erro na função configurar-evolution:', error);
+    console.error('Erro na Edge Function:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: 'Verifique se o Evolution API está rodando e as credenciais estão corretas'
+      details: 'Verifique os logs para mais detalhes'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
