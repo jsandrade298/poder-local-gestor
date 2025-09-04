@@ -301,6 +301,9 @@ export default function Municipes() {
         const separator = csv.includes(';') ? ';' : ',';
         const headers = lines[0].split(separator).map(h => h.replace(/"/g, '').trim().toLowerCase());
         
+        console.log('📋 Headers encontrados:', headers);
+        console.log('📋 Separador usado:', separator);
+        
         // Mapear colunas esperadas
         const expectedColumns = {
           nome: ['nome', 'nome completo', 'name'],
@@ -325,7 +328,7 @@ export default function Municipes() {
         const tagMap = new Map(existingTags?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
 
         // Processar dados
-        const municipes = lines.slice(1).map(line => {
+        const municipes = lines.slice(1).map((line, index) => {
           const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
           const municipe: any = {};
 
@@ -362,8 +365,13 @@ export default function Municipes() {
              }
            });
 
+           console.log(`📋 Linha ${index + 2}: ${JSON.stringify(municipe)}`);
            return municipe;
-        }).filter(m => m.nome && m.nome.trim() !== ''); // Só importar se tiver nome
+        }).filter(m => {
+          const hasName = m.nome && m.nome.trim() !== '';
+          console.log(`📋 Munícipe ${m.nome || 'sem nome'}: ${hasName ? 'válido' : 'inválido'}`);
+          return hasName;
+        }); // Só importar se tiver nome
 
         if (municipes.length === 0) {
           toast({
