@@ -164,7 +164,7 @@ export function NotificationsDropdown() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-80 md:w-96 p-0" align="end">
         <div className="flex items-center justify-between p-4 border-b">
           <h4 className="font-semibold">Notificações</h4>
           {notificacaosPendentes > 0 && (
@@ -180,7 +180,7 @@ export function NotificationsDropdown() {
           )}
         </div>
         
-        <ScrollArea className="h-80">
+        <ScrollArea className="h-80 max-h-[60vh]">
           {isLoading ? (
             <div className="p-4 text-center text-muted-foreground">
               Carregando notificações...
@@ -200,13 +200,13 @@ export function NotificationsDropdown() {
                     }`}
                     onClick={() => handleNotificationClick(notificacao)}
                   >
-                    <CardContent className="p-3">
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-full ${getTipoColor(notificacao.tipo)} text-white flex-shrink-0`}>
-                          {getTipoIcon(notificacao.tipo)}
-                        </div>
+                     <CardContent className="p-3">
+                       <div className="flex items-start gap-2">
+                         <div className={`p-1.5 rounded-full ${getTipoColor(notificacao.tipo)} text-white flex-shrink-0`}>
+                           {getTipoIcon(notificacao.tipo)}
+                         </div>
                         
-                        <div className="flex-1 min-w-0 max-w-full">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-sm font-medium truncate">
                               {notificacao.titulo}
@@ -216,18 +216,21 @@ export function NotificationsDropdown() {
                             )}
                           </div>
                           
-                           <p className="text-xs text-muted-foreground mb-2 break-words">
-                             {notificacao.mensagem}
+                           <p className="text-xs text-muted-foreground mb-1 break-words overflow-hidden">
+                             {notificacao.mensagem.length > 80 ? 
+                               `${notificacao.mensagem.substring(0, 80)}...` : 
+                               notificacao.mensagem
+                             }
                            </p>
                           
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>
-                              De: {notificacao.remetente?.nome || 'Sistema'}
-                            </span>
-                            <span>
-                              {formatDateTime(notificacao.created_at)}
-                            </span>
-                          </div>
+                           <div className="flex items-center justify-between text-xs text-muted-foreground">
+                             <span className="truncate max-w-[120px]">
+                               De: {notificacao.remetente?.nome || 'Sistema'}
+                             </span>
+                             <span className="flex-shrink-0">
+                               {formatDateTime(notificacao.created_at)}
+                             </span>
+                           </div>
                         </div>
                       </div>
                     </CardContent>

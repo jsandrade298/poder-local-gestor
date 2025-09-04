@@ -80,6 +80,9 @@
   border-radius: 4px !important;
   padding: 2px 4px !important;
   margin: 0 1px !important;
+  display: inline !important;
+  z-index: 1 !important;
+  position: relative !important;
 }
 
 /* Modo escuro */
