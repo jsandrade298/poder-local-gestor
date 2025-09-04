@@ -570,35 +570,6 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
-            {selectedMunicipes.length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir {selectedMunicipes.length} selecionado(s)
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tem certeza que deseja excluir {selectedMunicipes.length} munícipe(s) selecionado(s)? 
-                      Esta ação não pode ser desfeita.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={() => deleteMunicipesInBatch.mutate(selectedMunicipes)}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Excluir
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            
             <ImportCSVDialog
               onFileSelect={handleFileImport}
               isImporting={importMunicipes.isPending}
@@ -922,6 +893,85 @@ export default function Municipes() {
           open={showDemandasDialog}
           onOpenChange={setShowDemandasDialog}
         />
+
+        {/* Botão Flutuante de Ações em Massa */}
+        {selectedMunicipes.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-50 animate-scale-in">
+            <div className="bg-card border border-border rounded-2xl shadow-lg backdrop-blur-sm p-4 min-w-[280px]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                    <CheckSquare className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedMunicipes.length} selecionado{selectedMunicipes.length > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Clique para gerenciar
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedMunicipes([]);
+                    setSelectAll(false);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-muted"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="flex gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-all duration-200 hover:scale-105"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir {selectedMunicipes.length} munícipe(s) selecionado(s)? 
+                        Esta ação não pode ser desfeita e removerá todos os dados associados.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => deleteMunicipesInBatch.mutate(selectedMunicipes)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir {selectedMunicipes.length} munícipe(s)
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedMunicipes([]);
+                    setSelectAll(false);
+                  }}
+                  className="transition-all duration-200 hover:scale-105"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
