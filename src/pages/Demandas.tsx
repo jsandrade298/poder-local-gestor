@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload } from "lucide-react";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
+import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
@@ -29,6 +30,8 @@ export default function Demandas() {
   const [selectedDemanda, setSelectedDemanda] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importResults, setImportResults] = useState<any[]>([]);
 
   const [searchParams] = useSearchParams();
   
@@ -322,6 +325,279 @@ export default function Demandas() {
     setAtrasoFilter("all");
   };
 
+  // Função para exportar CSV
+  const exportToCSV = () => {
+    const headers = [
+      'protocolo',
+      'titulo',
+      'descricao',
+      'municipe_nome',
+      'area_nome',
+      'responsavel_nome',
+      'status',
+      'prioridade',
+      'logradouro',
+      'numero',
+      'bairro',
+      'cidade',
+      'cep',
+      'complemento',
+      'data_prazo',
+      'observacoes',
+      'created_at'
+    ];
+
+    const csvData = filteredDemandas.map(demanda => [
+      demanda.protocolo || '',
+      demanda.titulo || '',
+      demanda.descricao || '',
+      demanda.municipes?.nome || '',
+      demanda.areas?.nome || '',
+      '', // responsavel_nome - buscar depois se necessário
+      demanda.status || '',
+      demanda.prioridade || '',
+      demanda.logradouro || '',
+      demanda.numero || '',
+      demanda.bairro || '',
+      demanda.cidade || '',
+      demanda.cep || '',
+      demanda.complemento || '',
+      demanda.data_prazo ? formatDateOnly(demanda.data_prazo) : '',
+      demanda.observacoes || '',
+      formatDateTime(demanda.created_at)
+    ]);
+
+    // Usar ponto e vírgula como separador para melhor compatibilidade
+    const csvContent = [
+      headers.join(';'),
+      ...csvData.map(row => 
+        row.map(field => {
+          const escaped = field.toString().replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(';')
+      )
+    ].join('\r\n');
+
+    // Adicionar BOM para UTF-8
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { 
+      type: 'text/csv;charset=utf-8;' 
+    });
+    
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `demandas_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success(`CSV exportado com sucesso! ${filteredDemandas.length} demandas exportadas.`);
+  };
+
+  // Função para processar CSV importado
+  const importDemandas = useMutation({
+    mutationFn: async (demandas: any[]) => {
+      const results = [];
+      
+      for (const demanda of demandas) {
+        try {
+          const { data, error } = await supabase
+            .from('demandas')
+            .insert({
+              titulo: demanda.titulo,
+              descricao: demanda.descricao,
+              municipe_id: demanda.municipeId,
+              area_id: demanda.areaId || null,
+              responsavel_id: demanda.responsavelId || null,
+              status: demanda.status || 'aberta',
+              prioridade: demanda.prioridade || 'media',
+              logradouro: demanda.logradouro || null,
+              numero: demanda.numero || null,
+              bairro: demanda.bairro || null,
+              cidade: demanda.cidade || 'São Paulo',
+              cep: demanda.cep || null,
+              complemento: demanda.complemento || null,
+              data_prazo: demanda.data_prazo || null,
+              observacoes: demanda.observacoes || null,
+              criado_por: (await supabase.auth.getUser()).data.user?.id
+            })
+            .select('id')
+            .single();
+
+          if (error) {
+            results.push({ success: false, titulo: demanda.titulo, error: error.message });
+          } else {
+            // Se tem tag, tentar associar
+            if (demanda.tagId) {
+              const { error: tagError } = await supabase
+                .from('demanda_tags')
+                .insert({
+                  demanda_id: data.id,
+                  tag_id: demanda.tagId
+                });
+              
+              if (tagError) {
+                console.warn(`Erro ao associar tag para ${demanda.titulo}:`, tagError);
+              }
+            }
+            
+            results.push({ success: true, titulo: demanda.titulo, id: data.id });
+          }
+        } catch (err) {
+          results.push({ success: false, titulo: demanda.titulo, error: 'Erro inesperado' });
+        }
+      }
+      
+      return results;
+    },
+    onSuccess: (results) => {
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+      
+      setImportResults(results);
+      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      
+      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
+    },
+    onError: (error) => {
+      setImportResults([{ success: false, titulo: 'Erro', error: error.message }]);
+      console.error('❌ Erro na importação:', error);
+    }
+  });
+
+  // Função para processar arquivo CSV
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error("Por favor, selecione um arquivo CSV.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const csv = e.target?.result as string;
+        const lines = csv.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
+          return;
+        }
+
+        // Processar header
+        const separator = csv.includes(';') ? ';' : ',';
+        const headers = lines[0].split(separator).map(h => h.replace(/"/g, '').trim().toLowerCase());
+        
+        // Mapear colunas esperadas
+        const expectedColumns = {
+          titulo: ['titulo', 'title'],
+          descricao: ['descricao', 'description'],
+          municipe_nome: ['municipe_nome', 'municipe', 'citizen'],
+          area_nome: ['area_nome', 'area'],
+          responsavel_nome: ['responsavel_nome', 'responsavel', 'responsible'],
+          status: ['status'],
+          prioridade: ['prioridade', 'priority'],
+          logradouro: ['logradouro', 'endereco', 'endereço', 'address', 'rua'],
+          numero: ['numero', 'número', 'number'],
+          bairro: ['bairro', 'neighborhood'],
+          cidade: ['cidade', 'city'],
+          cep: ['cep', 'zip'],
+          complemento: ['complemento', 'complement'],
+          data_prazo: ['data_prazo', 'prazo', 'deadline'],
+          observacoes: ['observacoes', 'observações', 'notes'],
+          tag: ['tag', 'tags', 'etiqueta']
+        };
+
+        // Buscar dados necessários para mapeamento
+        const [existingMunicipes, existingAreas, existingResponsaveis, existingTags] = await Promise.all([
+          supabase.from('municipes').select('id, nome'),
+          supabase.from('areas').select('id, nome'),
+          supabase.from('profiles').select('id, nome'),
+          supabase.from('tags').select('id, nome')
+        ]);
+
+        const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase(), m.id]) || []);
+        const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase(), a.id]) || []);
+        const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase(), r.id]) || []);
+        const tagMap = new Map(existingTags.data?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
+
+        // Processar dados
+        const demandas = lines.slice(1).map(line => {
+          const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
+          const demanda: any = {};
+
+          Object.keys(expectedColumns).forEach(key => {
+            const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
+            const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
+            
+            if (headerIndex !== -1 && values[headerIndex]) {
+              const value = values[headerIndex];
+              
+              if (key === 'data_prazo') {
+                try {
+                  const date = new Date(value);
+                  if (!isNaN(date.getTime())) {
+                    demanda[key] = date.toISOString().split('T')[0];
+                  }
+                } catch {
+                  // Ignorar datas inválidas
+                }
+              } else if (key === 'municipe_nome') {
+                const municipeId = municipeMap.get(value.toLowerCase().trim());
+                if (municipeId) {
+                  demanda.municipeId = municipeId;
+                } else {
+                  demanda.municipeError = `Munícipe "${value}" não encontrado`;
+                }
+              } else if (key === 'area_nome') {
+                const areaId = areaMap.get(value.toLowerCase().trim());
+                if (areaId) {
+                  demanda.areaId = areaId;
+                }
+              } else if (key === 'responsavel_nome') {
+                const responsavelId = responsavelMap.get(value.toLowerCase().trim());
+                if (responsavelId) {
+                  demanda.responsavelId = responsavelId;
+                }
+              } else if (key === 'tag') {
+                const tagId = tagMap.get(value.toLowerCase().trim());
+                if (tagId) {
+                  demanda.tagId = tagId;
+                }
+              } else {
+                demanda[key] = value;
+              }
+            }
+          });
+
+          return demanda;
+        }).filter(d => d.titulo && d.titulo.trim() !== '' && d.descricao && d.descricao.trim() !== '' && d.municipeId);
+
+        if (demandas.length === 0) {
+          toast.error("Nenhuma demanda válida encontrada. Verifique os campos obrigatórios: título, descrição e munícipe.");
+          return;
+        }
+
+        // Limpar resultados anteriores antes de nova importação
+        setImportResults([]);
+        importDemandas.mutate(demandas);
+      } catch (error) {
+        toast.error("Erro ao processar arquivo CSV. Verifique se o formato está correto.");
+      }
+    };
+    
+    reader.readAsText(file, 'UTF-8');
+    
+    // Limpar input para permitir re-upload do mesmo arquivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
@@ -356,7 +632,23 @@ export default function Demandas() {
               Acompanhe e gerencie todas as demandas do gabinete
             </p>
           </div>
-          <NovaDemandaDialog />
+          <div className="flex items-center gap-2">
+            <ImportCSVDialogDemandas 
+              onFileSelect={handleFileImport}
+              isImporting={importDemandas.isPending}
+              fileInputRef={fileInputRef}
+              importResults={importResults}
+            />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={exportToCSV}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+            <NovaDemandaDialog />
+          </div>
         </div>
 
         {/* Filtros */}
