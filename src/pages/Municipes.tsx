@@ -14,6 +14,7 @@ import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
 import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
 import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
 import { MunicipeDemandasDialog } from "@/components/forms/MunicipeDemandasDialog";
+import { EnviarWhatsAppDialog } from "@/components/forms/EnviarWhatsAppDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -677,6 +678,7 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
+            <EnviarWhatsAppDialog />
             <Button 
               variant="outline" 
               size="sm"
@@ -1041,6 +1043,8 @@ export default function Municipes() {
               </div>
               
               <div className="flex gap-2">
+                <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
+                
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button 
