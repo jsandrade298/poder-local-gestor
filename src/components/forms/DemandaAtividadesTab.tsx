@@ -601,36 +601,36 @@ export function DemandaAtividadesTab({
                         <h4 className="font-medium text-sm mb-2">{atividade.titulo}</h4>
                         
                         {atividade.descricao && (
-                          <div className="text-sm text-muted-foreground mb-3 whitespace-pre-wrap">
+                          <div className="text-sm text-foreground mb-3 whitespace-pre-wrap">
                             {renderMentionText(atividade.descricao)}
                           </div>
                         )}
                         
                         {(atividade.propositura || atividade.status_propositura || atividade.link_propositura) && (
                           <div className="mb-3 space-y-2">
-                            {atividade.propositura && (
-                              <div>
-                                <Badge variant="secondary" className="text-xs">
-                                  {getPropositura(atividade.propositura)?.label || atividade.propositura}
-                                </Badge>
-                              </div>
-                            )}
-                            
-                            {atividade.status_propositura && (
-                              <div>
-                                <Badge variant="outline" className="text-xs">
-                                  Status: {getStatusPropositura(atividade.status_propositura)?.label || atividade.status_propositura}
-                                </Badge>
+                            {(atividade.propositura || atividade.status_propositura) && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {atividade.propositura && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {getPropositura(atividade.propositura)?.label || atividade.propositura}
+                                  </Badge>
+                                )}
+                                
+                                {atividade.status_propositura && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {getStatusPropositura(atividade.status_propositura)?.label || atividade.status_propositura}
+                                  </Badge>
+                                )}
                               </div>
                             )}
                             
                             {atividade.link_propositura && (
                               <div>
                                 <a 
-                                  href={atividade.link_propositura} 
+                                  href={atividade.link_propositura.startsWith('http') ? atividade.link_propositura : `https://${atividade.link_propositura}`}
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  className="text-xs text-primary hover:underline"
+                                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
                                 >
                                   🔗 Link da propositura
                                 </a>
