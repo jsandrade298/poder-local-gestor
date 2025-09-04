@@ -36,6 +36,7 @@ export default function Municipes() {
   const [selectAll, setSelectAll] = useState(false);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [duplicates, setDuplicates] = useState<any[]>([]);
+  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
   const { toast } = useToast();
@@ -462,41 +463,26 @@ export default function Municipes() {
       return;
     }
     
+    // Inicializar seleção automática dos duplicados mais antigos
+    const toRemove = new Set<string>();
+    duplicateGroups.forEach(group => {
+      const sorted = group.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      // Marcar todos exceto o mais recente para remoção
+      sorted.slice(1).forEach(municipe => toRemove.add(municipe.id));
+    });
+    
     setDuplicates(allDuplicates);
+    setSelectedForRemoval(toRemove);
     setShowDuplicatesDialog(true);
   };
 
-  // Função para excluir duplicados (manter apenas o mais recente de cada grupo)
+  // Função para excluir duplicados baseado na seleção do usuário
   const removeDuplicates = useMutation({
     mutationFn: async () => {
-      const phoneGroups: { [key: string]: any[] } = {};
-      
-      // Agrupar duplicados por telefone
-      duplicates.forEach(municipe => {
-        const cleanPhone = municipe.telefone.replace(/\D/g, '');
-        if (!phoneGroups[cleanPhone]) {
-          phoneGroups[cleanPhone] = [];
-        }
-        phoneGroups[cleanPhone].push(municipe);
-      });
-      
-      const toDelete: string[] = [];
-      
-      // Para cada grupo, manter apenas o mais recente e marcar outros para exclusão
-      Object.values(phoneGroups).forEach(group => {
-        if (group.length > 1) {
-          // Ordenar por data de criação (mais recente primeiro)
-          const sorted = group.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-          
-          // Manter o primeiro (mais recente) e excluir os outros
-          for (let i = 1; i < sorted.length; i++) {
-            toDelete.push(sorted[i].id);
-          }
-        }
-      });
-      
+      const toDelete = Array.from(selectedForRemoval);
+
       if (toDelete.length === 0) return { deleted: 0, errors: [] };
       
       const results = [];
@@ -545,6 +531,7 @@ export default function Municipes() {
       queryClient.invalidateQueries({ queryKey: ['municipes'] });
       setShowDuplicatesDialog(false);
       setDuplicates([]);
+      setSelectedForRemoval(new Set());
     },
     onError: (error) => {
       toast({
@@ -1140,41 +1127,68 @@ export default function Municipes() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-2">
-                          {sorted.map((municipe, index) => (
-                            <div 
-                              key={municipe.id} 
-                              className={`p-3 rounded-lg border ${
-                                index === 0 
-                                  ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' 
-                                  : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-medium text-sm">
-                                    {municipe.nome}
-                                    {index === 0 && (
-                                      <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-800">
-                                        Será mantido
-                                      </Badge>
-                                    )}
-                                    {index > 0 && (
-                                      <Badge variant="outline" className="ml-2 text-xs bg-red-100 text-red-800">
-                                        Será removido
-                                      </Badge>
-                                    )}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Email: {municipe.email || 'Não informado'}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Cadastrado em: {new Date(municipe.created_at).toLocaleDateString('pt-BR')}
-                                  </p>
+                       <div className="space-y-2">
+                          {sorted.map((municipe, index) => {
+                            const isSelectedForRemoval = selectedForRemoval.has(municipe.id);
+                            const isKept = index === 0 && !isSelectedForRemoval;
+                            const willBeRemoved = index > 0 || isSelectedForRemoval;
+                            
+                            return (
+                              <div 
+                                key={municipe.id} 
+                                className={`p-3 rounded-lg border ${
+                                  isKept
+                                    ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' 
+                                    : willBeRemoved
+                                    ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+                                    : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">
+                                      {municipe.nome}
+                                      {isKept && (
+                                        <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                          Será mantido
+                                        </Badge>
+                                      )}
+                                      {willBeRemoved && (
+                                        <Badge variant="outline" className="ml-2 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">
+                                          Será removido
+                                        </Badge>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Email: {municipe.email || 'Não informado'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Cadastrado em: {new Date(municipe.created_at).toLocaleDateString('pt-BR')}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Checkbox para controlar remoção */}
+                                  <div className="flex items-center space-x-2 ml-4">
+                                    <Checkbox
+                                      checked={selectedForRemoval.has(municipe.id)}
+                                      onCheckedChange={(checked) => {
+                                        const newSelected = new Set(selectedForRemoval);
+                                        if (checked) {
+                                          newSelected.add(municipe.id);
+                                        } else {
+                                          newSelected.delete(municipe.id);
+                                        }
+                                        setSelectedForRemoval(newSelected);
+                                      }}
+                                    />
+                                    <label className="text-xs text-muted-foreground">
+                                      Remover
+                                    </label>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </CardContent>
                     </Card>
@@ -1186,18 +1200,10 @@ export default function Municipes() {
             <div className="border-t pt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 <span className="font-medium text-green-600">Mantidos:</span> {
-                  Object.keys(duplicates.reduce((acc, m) => {
-                    const phone = m.telefone.replace(/\D/g, '');
-                    if (!acc[phone]) acc[phone] = true;
-                    return acc;
-                  }, {})).length
+                  duplicates.length - selectedForRemoval.size
                 } • 
                 <span className="font-medium text-red-600 ml-2">Removidos:</span> {
-                  duplicates.length - Object.keys(duplicates.reduce((acc, m) => {
-                    const phone = m.telefone.replace(/\D/g, '');
-                    if (!acc[phone]) acc[phone] = true;
-                    return acc;
-                  }, {})).length
+                  selectedForRemoval.size
                 }
               </div>
               
@@ -1211,9 +1217,9 @@ export default function Municipes() {
                 <Button
                   variant="destructive"
                   onClick={() => removeDuplicates.mutate()}
-                  disabled={removeDuplicates.isPending}
+                  disabled={removeDuplicates.isPending || selectedForRemoval.size === 0}
                 >
-                  {removeDuplicates.isPending ? 'Removendo...' : 'Remover Duplicados'}
+                  {removeDuplicates.isPending ? 'Removendo...' : `Remover ${selectedForRemoval.size} Duplicado(s)`}
                 </Button>
               </div>
             </div>
