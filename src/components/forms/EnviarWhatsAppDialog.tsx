@@ -118,27 +118,45 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       tempoMaximo: number;
       mediaFiles: MediaFile[];
     }) => {
-      // Upload de arquivos de mídia para o Supabase Storage
+      // Função para sanitizar nome do arquivo
+      const sanitizeKey = (original: string) => {
+        return `${Date.now()}-${original}`
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+          .replace(/[^\w.-]+/g, '_');                       // troca espaços, () etc por _
+      };
+
+      // Upload de arquivos de mídia para o Supabase Storage com URL assinada
       const uploadedMedia = [];
       for (const media of mediaFiles) {
-        const fileName = `${Date.now()}-${media.file.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const sanitizedFileName = sanitizeKey(media.file.name);
+        
+        const { error: uploadError } = await supabase.storage
           .from('demanda-anexos')
-          .upload(fileName, media.file);
+          .upload(sanitizedFileName, media.file, { 
+            upsert: true, 
+            contentType: media.file.type 
+          });
 
         if (uploadError) {
           console.error('Erro ao fazer upload:', uploadError);
-          throw new Error(`Erro ao fazer upload do arquivo ${media.file.name}`);
+          throw new Error(`Erro ao fazer upload do arquivo ${media.file.name}: ${uploadError.message}`);
         }
 
-        const { data: { publicUrl } } = supabase.storage
+        // Criar URL assinada (válida por 1 hora)
+        const { data: signedData, error: signError } = await supabase.storage
           .from('demanda-anexos')
-          .getPublicUrl(fileName);
+          .createSignedUrl(sanitizedFileName, 60 * 60);
+
+        if (signError) {
+          console.error('Erro ao criar URL assinada:', signError);
+          throw new Error(`Erro ao criar URL do arquivo ${media.file.name}: ${signError.message}`);
+        }
 
         uploadedMedia.push({
           type: media.type,
-          url: publicUrl,
-          filename: media.file.name
+          url: signedData.signedUrl,
+          filename: sanitizedFileName,
+          fileName: media.file.name // nome original para exibição
         });
       }
 

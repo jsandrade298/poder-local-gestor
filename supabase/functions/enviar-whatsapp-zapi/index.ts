@@ -5,6 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 function normalizeBrNumber(raw: string): { digits: string | null; jid: string | null } {
@@ -30,10 +31,11 @@ function normalizeBrNumber(raw: string): { digits: string | null; jid: string | 
     return { digits: null, jid: null };
   }
 
-  // Para Evolution API, teste primeiro sem código do país
+  // Adiciona DDI 55 para Evolution API
+  const full = "55" + digits;
   return { 
-    digits: digits, // Apenas DDD + número
-    jid: digits + "@s.whatsapp.net" 
+    digits: full,
+    jid: full + "@s.whatsapp.net" 
   };
 }
 
@@ -116,11 +118,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    // valida instância
+    // valida instância - aceita instance_name OU display_name
     const { data: instance, error: instErr } = await supabase
       .from("whatsapp_instances")
       .select("*")
-      .eq("instance_name", instanceName)
+      .or(`instance_name.eq.${instanceName},display_name.eq.${instanceName}`)
       .eq("active", true)
       .single();
 
@@ -248,12 +250,8 @@ serve(async (req) => {
           await new Promise((r) => setTimeout(r, 500));
         }
 
-        // 2) Só enviar texto separado se não tiver mídia que suporte caption
-        const temMidiaComCaption = mediaFiles.some(m => 
-          ['image', 'video'].includes(m.type)
-        );
-
-        if (mensagem && String(mensagem).trim().length && !temMidiaComCaption) {
+        // 2) Enviar TEXTO SEMPRE que houver mensagem
+        if (mensagem && String(mensagem).trim().length) {
           console.log(`💬 Enviando texto para ${digits}`);
           
           const sendText = async (numberValue: string) => {
