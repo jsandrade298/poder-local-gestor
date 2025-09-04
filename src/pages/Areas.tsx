@@ -515,25 +515,25 @@ export default function Areas() {
                   <p className="text-sm text-muted-foreground">
                     {area.descricao || "Sem descrição"}
                   </p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="text-center">
-                      <div className="text-lg font-bold text-foreground">{area.total_demandas}</div>
+                      <div className="text-sm md:text-lg font-bold text-foreground">{area.total_demandas}</div>
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
+                      <div className="text-sm md:text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
                       <p className="text-xs text-muted-foreground">Abertas</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
+                      <div className="text-sm md:text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
                       <p className="text-xs text-muted-foreground">Andamento</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
+                      <div className="text-sm md:text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
                       <p className="text-xs text-muted-foreground">Aguardando</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-success">{area.demandas_resolvidas}</div>
+                      <div className="text-sm md:text-lg font-bold text-success">{area.demandas_resolvidas}</div>
                       <p className="text-xs text-muted-foreground">Resolvidas</p>
                     </div>
                   </div>
