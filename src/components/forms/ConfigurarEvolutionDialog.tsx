@@ -231,6 +231,96 @@ export function ConfigurarEvolutionDialog({ children }: { children: React.ReactN
           </Button>
         </div>
 
+        {/* Debug Section - TEMPORÁRIO */}
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="text-orange-800 text-sm">🔧 Debug - Teste de Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    console.log('=== DEBUG: Testando gabinete-whats-02 ===');
+                    const { data, error } = await supabase.functions.invoke('configurar-evolution', {
+                      body: { 
+                        action: 'instance_status',
+                        instanceName: 'gabinete-whats-02'
+                      }
+                    });
+                    
+                    console.log('Response data:', data);
+                    console.log('Response error:', error);
+                    
+                    const alertMessage = `
+Debug gabinete-whats-02:
+- Error: ${error ? JSON.stringify(error) : 'Nenhum'}
+- Data: ${data ? JSON.stringify(data, null, 2) : 'Nenhum'}
+- Status: ${data?.status || 'undefined'}
+- RawData: ${data?.rawData ? JSON.stringify(data.rawData, null, 2) : 'Nenhum'}
+                    `;
+                    
+                    alert(alertMessage);
+                  } catch (err) {
+                    console.error('Debug error:', err);
+                    alert('Erro no debug: ' + err.message);
+                  }
+                }}
+              >
+                🔍 Debug gabinete-whats-02
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    console.log('=== FORÇAR UPDATE: gabinete-whats-02 ===');
+                    const { data, error } = await supabase.functions.invoke('configurar-evolution', {
+                      body: { 
+                        action: 'instance_status',
+                        instanceName: 'gabinete-whats-02'
+                      }
+                    });
+                    
+                    if (!error && data) {
+                      // Atualizar no banco
+                      const status = data.status === 'connected' ? 'connected' : 'disconnected';
+                      await supabase
+                        .from('whatsapp_instances')
+                        .update({
+                          status,
+                          profile_name: data.profileName,
+                          phone_number: data.phoneNumber || data.number
+                        })
+                        .eq('instance_name', 'gabinete-whats-02');
+                      
+                      // Atualizar estado local
+                      setInstances(prev => prev.map(inst => 
+                        inst.instance_name === 'gabinete-whats-02' 
+                          ? { ...inst, status, profile_name: data.profileName, phone_number: data.phoneNumber || data.number }
+                          : inst
+                      ));
+                      
+                      toast({
+                        title: 'Status Forçado',
+                        description: `gabinete-whats-02: ${status}`,
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Force update error:', err);
+                  }
+                }}
+              >
+                🔄 Forçar Update
+              </Button>
+            </div>
+            <p className="text-xs text-orange-700">Use os botões acima para debugar e me envie o que aparece no console/alert</p>
+          </CardContent>
+        </Card>
+
         {/* QR Code */}
         {qrCode && selectedInstance && (
           <Card>
