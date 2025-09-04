@@ -59,6 +59,7 @@ serve(async (req) => {
 
     const resultados = [];
     const baseUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}`;
+    console.log(`Base URL construída: ${baseUrl}`);
 
     for (const telefone of telefonesList) {
       try {
