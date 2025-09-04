@@ -6,6 +6,7 @@ import { FileText, Calendar, User, Building2, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { useNavigate } from "react-router-dom";
 
 interface MunicipeDemandasDialogProps {
   municipe: any;
@@ -14,6 +15,7 @@ interface MunicipeDemandasDialogProps {
 }
 
 export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: MunicipeDemandasDialogProps) {
+  const navigate = useNavigate();
   // Buscar demandas do munícipe
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-municipe', municipe?.id],
@@ -222,14 +224,14 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                       const prioridadeBadge = getPrioridadeBadge(demanda.prioridade);
                       
                       return (
-                        <TableRow 
-                          key={demanda.id} 
-                          className="hover:bg-muted/50 cursor-pointer"
-                          onClick={() => {
-                            // Abrir demanda em modal ou navegar para página de detalhes
-                            window.open(`/demandas?protocolo=${demanda.protocolo}`, '_blank');
-                          }}
-                        >
+                         <TableRow 
+                           key={demanda.id} 
+                           className="hover:bg-muted/50 cursor-pointer"
+                           onClick={() => {
+                             onOpenChange(false);
+                             navigate(`/demandas?protocolo=${demanda.protocolo}`);
+                           }}
+                         >
                           <TableCell>
                             <span className="font-mono text-sm">{demanda.protocolo}</span>
                           </TableCell>
