@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
+import { ConfigurarEvolutionDialog } from "@/components/forms/ConfigurarEvolutionDialog";
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -348,6 +349,24 @@ export default function Configuracoes() {
                 </p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Integrações WhatsApp */}
+      <Card className="shadow-sm border-0 bg-card">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Integrações WhatsApp
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Configure suas instâncias do WhatsApp para envio de mensagens automáticas
+            </p>
+            <ConfigurarEvolutionDialog />
           </div>
         </CardContent>
       </Card>
