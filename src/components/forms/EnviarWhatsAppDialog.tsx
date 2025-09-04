@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +45,11 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [mensagem, setMensagem] = useState("");
   const [incluirTodos, setIncluirTodos] = useState(false);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>(municipesSelecionados);
+
+  // Atualizar selectedMunicipes quando municipesSelecionados mudar
+  useEffect(() => {
+    setSelectedMunicipes(municipesSelecionados);
+  }, [municipesSelecionados]);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
   const [tempoMinimo, setTempoMinimo] = useState(1);
   const [tempoMaximo, setTempoMaximo] = useState(3);
