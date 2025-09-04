@@ -27,6 +27,7 @@ export default function Municipes() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [municipeToEdit, setMunicipeToEdit] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importResults, setImportResults] = useState<any[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -236,19 +237,15 @@ export default function Municipes() {
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
       
+      setImportResults(results);
       queryClient.invalidateQueries({ queryKey: ['municipes'] });
       
-      toast({
-        title: "Importação concluída!",
-        description: `${successCount} munícipes importados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
-      });
+      // Não usar toast aqui - mostrar no modal
+      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
     },
     onError: (error) => {
-      toast({
-        title: "Erro na importação",
-        description: error.message,
-        variant: "destructive"
-      });
+      setImportResults([{ success: false, nome: 'Erro', error: error.message }]);
+      console.error('❌ Erro na importação:', error);
     }
   });
 
@@ -346,6 +343,8 @@ export default function Municipes() {
           return;
         }
 
+        // Limpar resultados anteriores antes de nova importação
+        setImportResults([]);
         importMunicipes.mutate(municipes);
       } catch (error) {
         toast({
@@ -433,12 +432,7 @@ export default function Municipes() {
               onFileSelect={handleFileImport}
               isImporting={importMunicipes.isPending}
               fileInputRef={fileInputRef}
-              onImportStart={() => {
-                toast({
-                  title: "Processando arquivo...",
-                  description: "Aguarde enquanto importamos os dados."
-                });
-              }}
+              importResults={importResults}
             />
             <Button 
               variant="outline" 

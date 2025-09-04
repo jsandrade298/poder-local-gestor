@@ -1,18 +1,27 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Download, FileText, CheckCircle } from "lucide-react";
+import { Upload, Download, FileText, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+
+interface ImportResult {
+  success: boolean;
+  nome: string;
+  error?: string;
+  id?: string;
+}
 
 interface ImportCSVDialogProps {
   onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isImporting: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  onImportStart?: () => void;
+  importResults?: ImportResult[];
 }
 
-export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, onImportStart }: ImportCSVDialogProps) {
+export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, importResults }: ImportCSVDialogProps) {
   const [open, setOpen] = useState(false);
+  const [showingResults, setShowingResults] = useState(false);
 
   const downloadTemplate = () => {
     const headers = [
@@ -88,11 +97,31 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, onImp
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
-    // Não fechar o modal imediatamente - esperar a seleção do arquivo
   };
 
+  // Função para resetar o estado quando o modal abrir
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (newOpen) {
+      setShowingResults(false);
+    }
+  };
+
+  // Função para voltar ao início do processo
+  const handleStartOver = () => {
+    setShowingResults(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Calcular estatísticas dos resultados
+  const successCount = importResults?.filter(r => r.success).length || 0;
+  const errorCount = importResults?.filter(r => !r.success).length || 0;
+  const totalCount = importResults?.length || 0;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button 
           variant="outline" 
@@ -112,171 +141,268 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, onImp
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Passo a Passo */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Passo a Passo</h3>
-            
-            <div className="space-y-3">
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                      1
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Baixe a planilha modelo</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Clique no botão abaixo para baixar um arquivo CSV com o formato correto e exemplos de dados.
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={downloadTemplate}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Baixar Modelo CSV
-                      </Button>
-                    </div>
+          {/* Mostrar progresso de importação */}
+          {isImporting && (
+            <Card className="border-blue-500/20 bg-blue-500/5">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <div>
+                    <h3 className="font-semibold text-lg">Processando arquivo...</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Importando os dados dos munícipes. Aguarde...
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <Progress value={undefined} className="h-2" />
+              </CardContent>
+            </Card>
+          )}
 
-              <Card className="border-orange-500/20 bg-orange-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                      2
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Preencha seus dados</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Abra o arquivo no Excel, Google Sheets ou similar. Substitua os dados de exemplo pelos seus dados reais.
-                        Mantenha os cabeçalhos da primeira linha.
-                      </p>
-                    </div>
+          {/* Mostrar resultados da importação */}
+          {importResults && importResults.length > 0 && !isImporting && (
+            <Card className={`border-2 ${successCount > 0 ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  {successCount > 0 ? (
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                  ) : (
+                    <AlertCircle className="h-6 w-6 text-red-500" />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-lg">Importação Concluída!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {successCount > 0 
+                        ? `${successCount} munícipes importados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
+                        : `Não foi possível importar nenhum munícipe. ${errorCount} erros encontrados.`
+                      }
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              <Card className="border-green-500/20 bg-green-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                      3
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Salve como CSV</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Salve o arquivo como CSV (valores separados por vírgula). No Excel: "Salvar Como" → "CSV (separado por vírgulas)".
-                      </p>
-                    </div>
+                {/* Estatísticas */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-3 bg-background rounded-lg">
+                    <div className="text-2xl font-bold text-foreground">{totalCount}</div>
+                    <div className="text-sm text-muted-foreground">Total</div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="text-center p-3 bg-background rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{successCount}</div>
+                    <div className="text-sm text-muted-foreground">Sucesso</div>
+                  </div>
+                  <div className="text-center p-3 bg-background rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+                    <div className="text-sm text-muted-foreground">Erros</div>
+                  </div>
+                </div>
 
-              <Card className="border-blue-500/20 bg-blue-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                      4
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Importe o arquivo</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Clique em "Selecionar Arquivo CSV" abaixo e escolha o arquivo que você preparou.
-                      </p>
+                {/* Lista de erros se houver */}
+                {errorCount > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-red-600">Erros encontrados:</h4>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {importResults
+                        .filter(r => !r.success)
+                        .slice(0, 5) // Mostrar apenas os primeiros 5 erros
+                        .map((result, index) => (
+                          <div key={index} className="text-sm bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                            <strong>{result.nome}</strong>: {result.error}
+                          </div>
+                        ))
+                      }
+                      {importResults.filter(r => !r.success).length > 5 && (
+                        <div className="text-sm text-muted-foreground">
+                          ... e mais {importResults.filter(r => !r.success).length - 5} erros
+                        </div>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                )}
 
-          {/* Informações sobre os campos */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold">Campos Disponíveis</h3>
-            <Card>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span><strong>nome</strong> (obrigatório)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>telefone</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>email</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>logradouro</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>numero</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>bairro</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>cidade</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>cep</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>complemento</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>data_nascimento (AAAA-MM-DD)</span>
-                  </div>
-                  <div className="flex items-center gap-2 md:col-span-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>observacoes</span>
-                  </div>
+                {/* Botões de ação */}
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" onClick={handleStartOver}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Outro Arquivo
+                  </Button>
+                  <Button onClick={() => setOpen(false)}>
+                    Fechar
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          </div>
+          )}
 
-          {/* Dicas importantes */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold">Dicas Importantes</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
-              <p>• Datas devem estar no formato AAAA-MM-DD (ex: 1985-05-15)</p>
-              <p>• Se um campo estiver vazio, deixe a célula em branco</p>
-              <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
-              <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
-              <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
-            </div>
-          </div>
+          {/* Instruções de importação (mostrar apenas se não estiver importando nem mostrando resultados) */}
+          {!isImporting && (!importResults || importResults.length === 0) && (
+            <>
+              {/* Passo a Passo */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Passo a Passo</h3>
+                
+                <div className="space-y-3">
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                          1
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Baixe a planilha modelo</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Clique no botão abaixo para baixar um arquivo CSV com o formato correto e exemplos de dados.
+                          </p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={downloadTemplate}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar Modelo CSV
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-          {/* Botões de ação */}
-          <div className="flex justify-between gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={downloadTemplate}>
-                <Download className="h-4 w-4 mr-2" />
-                Baixar Modelo
-              </Button>
-              <Button onClick={handleImportClick}>
-                <Upload className="h-4 w-4 mr-2" />
-                Selecionar Arquivo CSV
-              </Button>
-            </div>
-          </div>
+                  <Card className="border-orange-500/20 bg-orange-500/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                          2
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Preencha seus dados</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Abra o arquivo no Excel, Google Sheets ou similar. Substitua os dados de exemplo pelos seus dados reais.
+                            Mantenha os cabeçalhos da primeira linha.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-green-500/20 bg-green-500/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                          3
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Salve como CSV</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Salve o arquivo como CSV (valores separados por vírgula). No Excel: "Salvar Como" → "CSV (separado por vírgulas)".
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-blue-500/20 bg-blue-500/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                          4
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Importe o arquivo</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Clique em "Selecionar Arquivo CSV" abaixo e escolha o arquivo que você preparou.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Informações sobre os campos */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Campos Disponíveis</h3>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span><strong>nome</strong> (obrigatório)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>telefone</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>email</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>logradouro</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>numero</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>bairro</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>cidade</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>cep</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>complemento</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>data_nascimento (AAAA-MM-DD)</span>
+                      </div>
+                      <div className="flex items-center gap-2 md:col-span-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>observacoes</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Dicas importantes */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Dicas Importantes</h3>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
+                  <p>• Datas devem estar no formato AAAA-MM-DD (ex: 1985-05-15)</p>
+                  <p>• Se um campo estiver vazio, deixe a célula em branco</p>
+                  <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
+                  <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
+                  <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="flex justify-between gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={downloadTemplate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Baixar Modelo
+                  </Button>
+                  <Button onClick={handleImportClick}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Selecionar Arquivo CSV
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Input oculto para seleção de arquivo */}
@@ -284,11 +410,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, onImp
           ref={fileInputRef}
           type="file"
           accept=".csv"
-          onChange={(e) => {
-            onFileSelect(e);
-            setOpen(false); // Fechar modal após seleção do arquivo
-            onImportStart?.();
-          }}
+          onChange={onFileSelect}
           className="hidden"
         />
       </DialogContent>
