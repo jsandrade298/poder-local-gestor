@@ -11,6 +11,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { supabase } from "@/integrations/supabase/client";
 
 interface CalendarEvent {
   id: string;
@@ -31,14 +32,41 @@ export default function Agenda() {
   const [activeCalUrl, setActiveCalUrl] = useState("https://cal.com/agenda-clovis-am3eym");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
-  // Carregar eventos mock (substituir por API real)
+  // Carregar eventos reais da Cal.com
   useEffect(() => {
-    loadEvents();
+    loadCalEvents();
   }, []);
 
-  const loadEvents = () => {
-    // Eventos de exemplo - substituir por integração real com Cal.com/Google Calendar
+  const loadCalEvents = async () => {
+    setLoadingEvents(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cal-events');
+      
+      if (error) {
+        console.error('Erro ao buscar eventos:', error);
+        // Em caso de erro, usar eventos de exemplo
+        loadMockEvents();
+        return;
+      }
+
+      if (data?.events && data.events.length > 0) {
+        setEvents(data.events);
+      } else {
+        // Se não há eventos na Cal.com, mostrar eventos de exemplo
+        loadMockEvents();
+      }
+    } catch (error) {
+      console.error('Erro na requisição:', error);
+      loadMockEvents();
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  const loadMockEvents = () => {
+    // Eventos de exemplo caso a API não esteja configurada ou sem eventos
     const mockEvents: CalendarEvent[] = [
       {
         id: "1",
@@ -69,16 +97,6 @@ export default function Agenda() {
         location: "Auditório Municipal", 
         attendees: ["equipe@prefeitura.com", "cidadaos@municipio.com"],
         color: "#8B5CF6"
-      },
-      {
-        id: "4",
-        title: "Reunião Semanal - Equipe",
-        start: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString(),
-        description: "Alinhamento de projetos e demandas da semana",
-        location: "Sala de Reuniões",
-        attendees: ["equipe@gabinete.com"],
-        color: "#F59E0B"
       }
     ];
     
@@ -143,9 +161,14 @@ export default function Agenda() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={loadEvents} variant="outline" size="sm">
+          <Button 
+            onClick={loadCalEvents} 
+            variant="outline" 
+            size="sm"
+            disabled={loadingEvents}
+          >
             <Clock className="h-4 w-4 mr-2" />
-            Atualizar
+            {loadingEvents ? "Carregando..." : "Atualizar"}
           </Button>
           <Button onClick={openInNewTab} variant="outline" size="sm">
             <Link2 className="h-4 w-4 mr-2" />
