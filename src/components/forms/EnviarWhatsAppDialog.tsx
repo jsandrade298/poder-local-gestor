@@ -279,11 +279,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     }
   };
 
-  // Filtrar munícipes para busca
+  // Filtrar munícipes para busca - mostrar todos que correspondem à busca
   const filteredMunicipes = municipes?.filter(m => 
-    !selectedMunicipes.includes(m.id) && 
-    (m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
-     m.telefone?.includes(searchMunicipe))
+    m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
+     m.telefone?.includes(searchMunicipe)
   ) || [];
 
   const totalDestinatarios = incluirTodos 
@@ -405,19 +404,35 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 {searchMunicipe && (
                   <div className="max-h-40 overflow-y-auto border rounded-lg">
                     {filteredMunicipes.length > 0 ? (
-                      filteredMunicipes.map(municipe => (
-                        <button
-                          key={municipe.id}
-                          onClick={() => {
-                            setSelectedMunicipes(prev => [...prev, municipe.id]);
-                            // Não limpar o campo de busca para permitir seleção múltipla
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
-                        >
-                          <div className="font-medium">{municipe.nome}</div>
-                          <div className="text-sm text-muted-foreground">{municipe.telefone}</div>
-                        </button>
-                      ))
+                      filteredMunicipes.map(municipe => {
+                        const isSelected = selectedMunicipes.includes(municipe.id);
+                        return (
+                          <button
+                            key={municipe.id}
+                            onClick={() => {
+                              if (!isSelected) {
+                                setSelectedMunicipes(prev => [...prev, municipe.id]);
+                              }
+                            }}
+                            disabled={isSelected}
+                            className={`w-full text-left px-3 py-2 transition-colors ${
+                              isSelected 
+                                ? 'bg-primary/10 text-muted-foreground cursor-not-allowed' 
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium">{municipe.nome}</div>
+                                <div className="text-sm text-muted-foreground">{municipe.telefone}</div>
+                              </div>
+                              {isSelected && (
+                                <Badge variant="secondary" className="text-xs">Selecionado</Badge>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
                     ) : (
                       <div className="p-3 text-center text-muted-foreground">
                         Nenhum munícipe encontrado
