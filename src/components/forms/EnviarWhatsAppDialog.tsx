@@ -56,7 +56,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       mensagem: string;
       incluirTodos: boolean;
     }) => {
-      const { data, error } = await supabase.functions.invoke("enviar-whatsapp-twilio", {
+      const { data, error } = await supabase.functions.invoke("enviar-whatsapp-zapi", {
         body: { telefones, mensagem, incluirTodos },
       });
 
