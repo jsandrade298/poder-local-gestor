@@ -96,6 +96,9 @@ serve(async (req) => {
         
         console.log(`Enviando para: ${telefone} -> ${numeroCompleto}`);
 
+        console.log(`Tentando enviar para: ${numeroCompleto}`);
+        console.log(`URL: ${baseUrl}/send-text`);
+        
         const response = await fetch(`${baseUrl}/send-text`, {
           method: 'POST',
           headers: {
@@ -108,7 +111,9 @@ serve(async (req) => {
           }),
         });
 
+        console.log(`Response status: ${response.status}`);
         const result = await response.json();
+        console.log(`Response result:`, JSON.stringify(result));
         
         if (response.ok) {
           console.log(`Mensagem enviada para ${telefone}:`, result);
