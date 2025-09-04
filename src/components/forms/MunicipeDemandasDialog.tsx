@@ -25,7 +25,6 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
         .select(`
           *,
           areas(nome),
-          profiles!demandas_responsavel_id_fkey(nome),
           demanda_tags(
             tags(
               id,
@@ -53,6 +52,29 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
     return statusMap[status as keyof typeof statusMap] || statusMap.aberta;
   };
 
+  // Buscar os nomes dos responsáveis separadamente
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ['responsaveis-demandas', demandas],
+    queryFn: async () => {
+      if (!demandas || demandas.length === 0) return [];
+      
+      const responsaveisIds = [...new Set(demandas.map(d => d.responsavel_id).filter(Boolean))];
+      if (responsaveisIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .in('id', responsaveisIds);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: demandas && demandas.length > 0
+  });
+
+  // Mapear responsáveis por ID para facilitar o acesso
+  const responsaveisMap = new Map(responsaveis.map(r => [r.id, r.nome]));
+
   const getPrioridadeBadge = (prioridade: string) => {
     const prioridadeMap = {
       'baixa': { label: 'Baixa', color: '#10B981' },
@@ -77,7 +99,7 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
 
         <div className="space-y-4 overflow-y-auto">
           {/* Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
@@ -126,6 +148,20 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                     <p className="text-sm font-medium">Resolvidas</p>
                     <p className="text-xl font-bold text-green-600">
                       {demandas.filter(d => d.status === 'resolvida').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <div>
+                    <p className="text-sm font-medium">Canceladas</p>
+                    <p className="text-xl font-bold text-red-600">
+                      {demandas.filter(d => d.status === 'cancelada').length}
                     </p>
                   </div>
                 </div>
@@ -215,7 +251,7 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              {demanda.profiles?.nome || 'Não definido'}
+                              {responsaveisMap.get(demanda.responsavel_id) || 'Não definido'}
                             </div>
                           </TableCell>
                           <TableCell>
