@@ -42,10 +42,12 @@ serve(async (req) => {
     console.log(`Instance ID: ${instanceConfig.instance_id}`);
     console.log(`Token (first 10 chars): ${instanceConfig.instance_token.substring(0, 10)}...`);
 
-    // Headers para Evolution API (usando Authorization Bearer em vez de apikey)
+    // Headers para Evolution API - testando diferentes formatos
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${instanceConfig.instance_token}`,
+      'apikey': instanceConfig.instance_token,
+      'Authorization': `ApiKey ${instanceConfig.instance_token}`,
+      'X-API-Key': instanceConfig.instance_token,
     };
 
     let result;
