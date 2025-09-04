@@ -119,6 +119,7 @@ export type Database = {
           id: string
           link_propositura: string | null
           propositura: string | null
+          status_propositura: string | null
           tipo_atividade: string
           titulo: string
           updated_at: string
@@ -132,6 +133,7 @@ export type Database = {
           id?: string
           link_propositura?: string | null
           propositura?: string | null
+          status_propositura?: string | null
           tipo_atividade?: string
           titulo: string
           updated_at?: string
@@ -145,6 +147,7 @@ export type Database = {
           id?: string
           link_propositura?: string | null
           propositura?: string | null
+          status_propositura?: string | null
           tipo_atividade?: string
           titulo?: string
           updated_at?: string

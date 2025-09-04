@@ -38,6 +38,7 @@ const formSchema = z.object({
   data_atividade: z.string().min(1, "Data da atividade é obrigatória"),
   propositura: z.string().optional(),
   link_propositura: z.string().optional(),
+  status_propositura: z.string().optional(),
 });
 
 interface DemandaAtividadesTabProps {
@@ -63,6 +64,18 @@ const proposituras = [
   { value: "projeto_resolucao", label: "Projeto de Resolução" },
 ];
 
+const statusPropositura = [
+  { value: "rejeitado", label: "Rejeitado" },
+  { value: "aprovado", label: "Aprovado" },
+  { value: "aguardando_resposta", label: "Aguardando Resposta" },
+  { value: "atendido", label: "Atendido" },
+  { value: "dilacao_prazo", label: "Dilação de Prazo" },
+  { value: "tramitando", label: "Tramitando" },
+  { value: "realizado", label: "Realizado" },
+  { value: "retirado", label: "Retirado" },
+  { value: "respondido", label: "Respondido" },
+];
+
 export function DemandaAtividadesTab({ 
   demandaId, 
   highlightedActivityId,
@@ -82,6 +95,7 @@ export function DemandaAtividadesTab({
       data_atividade: new Date().toISOString().slice(0, 16),
       propositura: "",
       link_propositura: "",
+      status_propositura: "",
     },
   });
 
@@ -274,6 +288,7 @@ export function DemandaAtividadesTab({
       data_atividade: new Date(atividade.data_atividade).toISOString().slice(0, 16),
       propositura: atividade.propositura || "",
       link_propositura: atividade.link_propositura || "",
+      status_propositura: atividade.status_propositura || "",
     });
     setShowForm(true);
   };
@@ -290,6 +305,10 @@ export function DemandaAtividadesTab({
 
   const getPropositura = (propositura: string) => {
     return proposituras.find(p => p.value === propositura);
+  };
+
+  const getStatusPropositura = (status: string) => {
+    return statusPropositura.find(s => s.value === status);
   };
 
   if (isLoading) {
@@ -404,30 +423,57 @@ export function DemandaAtividadesTab({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="propositura"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Propositura (Opcional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma propositura" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {proposituras.map((propositura) => (
-                            <SelectItem key={propositura.value} value={propositura.value}>
-                              {propositura.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="propositura"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Propositura (Opcional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma propositura" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {proposituras.map((propositura) => (
+                              <SelectItem key={propositura.value} value={propositura.value}>
+                                {propositura.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="status_propositura"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status da Propositura (Opcional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {statusPropositura.map((status) => (
+                              <SelectItem key={status.value} value={status.value}>
+                                {status.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
@@ -560,11 +606,36 @@ export function DemandaAtividadesTab({
                           </div>
                         )}
                         
-                        {atividade.propositura && (
-                          <div className="mb-3">
-                            <Badge variant="secondary" className="text-xs">
-                              {getPropositura(atividade.propositura)?.label || atividade.propositura}
-                            </Badge>
+                        {(atividade.propositura || atividade.status_propositura || atividade.link_propositura) && (
+                          <div className="mb-3 space-y-2">
+                            {atividade.propositura && (
+                              <div>
+                                <Badge variant="secondary" className="text-xs">
+                                  {getPropositura(atividade.propositura)?.label || atividade.propositura}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            {atividade.status_propositura && (
+                              <div>
+                                <Badge variant="outline" className="text-xs">
+                                  Status: {getStatusPropositura(atividade.status_propositura)?.label || atividade.status_propositura}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            {atividade.link_propositura && (
+                              <div>
+                                <a 
+                                  href={atividade.link_propositura} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  🔗 Link da propositura
+                                </a>
+                              </div>
+                            )}
                           </div>
                         )}
                         
