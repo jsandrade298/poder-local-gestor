@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3, Clock, Play, Pause, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3, Clock, Play, Pause, CheckCircle, XCircle, Grid3x3, List } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 
 export default function Areas() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
@@ -416,278 +417,310 @@ export default function Areas() {
         </Card>
       </div>
 
-      {/* Filtro de Busca */}
+      {/* Filtro de Busca e Controles de Visualização */}
       <Card className="shadow-sm border-0 bg-card">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar áreas por nome ou descrição..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Grid de Áreas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredAreas.map((area) => (
-          <Card key={area.id} className="shadow-sm border-0 bg-card hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: area.cor }}
-                  />
-                  <CardTitle className="text-base font-semibold">{area.nome}</CardTitle>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
-                      Ver Demandas
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEditArea(area)}>
-                      Editar
-                    </DropdownMenuItem>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <span className="text-destructive">Excluir</span>
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteArea(area.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {area.descricao}
-                </p>
-                <div className="grid grid-cols-5 gap-2">
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-foreground">{area.total_demandas}</div>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
-                    <p className="text-xs text-muted-foreground">Abertas</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
-                    <p className="text-xs text-muted-foreground">Andamento</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
-                    <p className="text-xs text-muted-foreground">Aguardando</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-success">{area.demandas_resolvidas}</div>
-                    <p className="text-xs text-muted-foreground">Resolvidas</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Taxa de Resolução</span>
-                    <span className="text-muted-foreground">
-                      {area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div 
-                      className="bg-success h-2 rounded-full transition-all" 
-                      style={{ 
-                        width: `${area.total_demandas > 0 ? (area.demandas_resolvidas / area.total_demandas) * 100 : 0}%` 
-                      }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-xs mt-2">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded bg-warning"></div>
-                      <span className="text-muted-foreground">Ativas: {area.demandas_ativas}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded bg-success"></div>
-                      <span className="text-muted-foreground">Resolvidas: {area.demandas_resolvidas}</span>
-                    </div>
-                    {area.demandas_canceladas > 0 && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded bg-destructive"></div>
-                        <span className="text-muted-foreground">Canceladas: {area.demandas_canceladas}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => handleViewDemandas(area.id, area.nome)}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar áreas por nome ou descrição..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* Toggle de Visualização */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Visualização:</span>
+              <div className="flex border rounded-lg">
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className="rounded-r-none"
                 >
-                  Ver Demandas
+                  <Grid3x3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="rounded-l-none"
+                >
+                  <List className="h-4 w-4" />
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Tabela Detalhada */}
-      <Card className="shadow-sm border-0 bg-card">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            Todas as Áreas ({filteredAreas.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Área</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-center">Abertas</TableHead>
-                  <TableHead className="text-center">Em Andamento</TableHead>
-                  <TableHead className="text-center">Aguardando</TableHead>
-                  <TableHead className="text-center">Resolvidas</TableHead>
-                  <TableHead className="text-center">Canceladas</TableHead>
-                  <TableHead className="text-center">Taxa de Resolução</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAreas.map((area) => {
-                  const taxaResolucao = area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0;
-                  
-                  return (
-                    <TableRow key={area.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: area.cor }}
-                          />
-                          <span className="font-medium text-foreground">{area.nome}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">{area.descricao}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">
-                          {area.total_demandas}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                          {area.demandas_abertas}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="warning">
-                          {area.demandas_em_andamento}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                          {area.demandas_aguardando}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          {area.demandas_resolvidas}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="destructive" className="bg-red-100 text-red-800">
-                          {area.demandas_canceladas}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-sm font-medium text-foreground">{taxaResolucao}%</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
-                              Ver Demandas
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditArea(area)}>
-                              Editar
-                            </DropdownMenuItem>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <span className="text-destructive">Excluir</span>
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteArea(area.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {filteredAreas.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Nenhuma área encontrada</p>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Display Areas - Grid or List View */}
+      {viewMode === "grid" ? (
+        /* Grid de Áreas */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAreas.map((area) => (
+            <Card key={area.id} className="shadow-sm border-0 bg-card hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base font-semibold">{area.nome}</CardTitle>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
+                        Ver Demandas
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditArea(area)}>
+                        Editar
+                      </DropdownMenuItem>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <span className="text-destructive">Excluir</span>
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteArea(area.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {area.descricao || "Sem descrição"}
+                  </p>
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-foreground">{area.total_demandas}</div>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
+                      <p className="text-xs text-muted-foreground">Abertas</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
+                      <p className="text-xs text-muted-foreground">Andamento</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
+                      <p className="text-xs text-muted-foreground">Aguardando</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-success">{area.demandas_resolvidas}</div>
+                      <p className="text-xs text-muted-foreground">Resolvidas</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Taxa de Resolução</span>
+                      <span className="text-muted-foreground">
+                        {area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div 
+                        className="bg-success h-2 rounded-full transition-all" 
+                        style={{ 
+                          width: `${area.total_demandas > 0 ? (area.demandas_resolvidas / area.total_demandas) * 100 : 0}%` 
+                        }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-xs mt-2">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded bg-warning"></div>
+                        <span className="text-muted-foreground">Ativas: {area.demandas_ativas}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded bg-success"></div>
+                        <span className="text-muted-foreground">Resolvidas: {area.demandas_resolvidas}</span>
+                      </div>
+                      {area.demandas_canceladas > 0 && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded bg-destructive"></div>
+                          <span className="text-muted-foreground">Canceladas: {area.demandas_canceladas}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => handleViewDemandas(area.id, area.nome)}
+                  >
+                    Ver Demandas
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          
+          {filteredAreas.length === 0 && (
+            <div className="col-span-full">
+              <Card className="shadow-sm border-0 bg-card">
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">Nenhuma área encontrada</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Lista de Áreas */
+        <Card className="shadow-sm border-0 bg-card">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">
+              Todas as Áreas ({filteredAreas.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Área</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead className="text-center">Total</TableHead>
+                    <TableHead className="text-center">Abertas</TableHead>
+                    <TableHead className="text-center">Em Andamento</TableHead>
+                    <TableHead className="text-center">Aguardando</TableHead>
+                    <TableHead className="text-center">Resolvidas</TableHead>
+                    <TableHead className="text-center">Canceladas</TableHead>
+                    <TableHead className="text-center">Taxa de Resolução</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAreas.map((area) => {
+                    const taxaResolucao = area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0;
+                    
+                    return (
+                      <TableRow key={area.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="h-5 w-5 text-primary" />
+                            <span className="font-medium text-foreground">{area.nome}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{area.descricao || "Sem descrição"}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">
+                            {area.total_demandas}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            {area.demandas_abertas}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            {area.demandas_em_andamento}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                            {area.demandas_aguardando}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            {area.demandas_resolvidas}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-red-100 text-red-800">
+                            {area.demandas_canceladas}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-sm font-medium text-foreground">{taxaResolucao}%</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewDemandas(area.id, area.nome)}>
+                                Ver Demandas
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditArea(area)}>
+                                Editar
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <span className="text-destructive">Excluir</span>
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteArea(area.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {filteredAreas.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Nenhuma área encontrada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
