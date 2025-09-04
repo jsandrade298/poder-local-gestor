@@ -273,6 +273,7 @@ export function DemandaAtividadesTab({
       descricao: atividade.descricao || "",
       data_atividade: new Date(atividade.data_atividade).toISOString().slice(0, 16),
       propositura: atividade.propositura || "",
+      link_propositura: atividade.link_propositura || "",
     });
     setShowForm(true);
   };
@@ -423,6 +424,24 @@ export function DemandaAtividadesTab({
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="link_propositura"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Link da Propositura (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="https://..."
+                          type="url"
+                          {...field} 
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

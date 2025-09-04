@@ -117,6 +117,7 @@ export type Database = {
           demanda_id: string
           descricao: string | null
           id: string
+          link_propositura: string | null
           propositura: string | null
           tipo_atividade: string
           titulo: string
@@ -129,6 +130,7 @@ export type Database = {
           demanda_id: string
           descricao?: string | null
           id?: string
+          link_propositura?: string | null
           propositura?: string | null
           tipo_atividade?: string
           titulo: string
@@ -141,6 +143,7 @@ export type Database = {
           demanda_id?: string
           descricao?: string | null
           id?: string
+          link_propositura?: string | null
           propositura?: string | null
           tipo_atividade?: string
           titulo?: string
