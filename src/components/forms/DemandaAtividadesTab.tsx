@@ -296,7 +296,15 @@ export function DemandaAtividadesTab({
   const handleCancel = () => {
     setShowForm(false);
     setEditingActivity(null);
-    form.reset();
+    form.reset({
+      tipo_atividade: "comentario",
+      titulo: "",
+      descricao: "",
+      data_atividade: new Date().toISOString().slice(0, 16),
+      propositura: "",
+      link_propositura: "",
+      status_propositura: "",
+    });
   };
 
   const getTipoAtividade = (tipo: string) => {
@@ -630,9 +638,9 @@ export function DemandaAtividadesTab({
                                   href={atividade.link_propositura.startsWith('http') ? atividade.link_propositura : `https://${atividade.link_propositura}`}
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                                  className="text-xs text-primary hover:underline break-all"
                                 >
-                                  🔗 Link da propositura
+                                  {atividade.link_propositura}
                                 </a>
                               </div>
                             )}
