@@ -15,9 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from '@/lib/dateUtils';
 
 export default function Usuarios() {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -249,7 +251,7 @@ export default function Usuarios() {
       console.log('✅ RESET - Sucesso:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       toast({
         title: "Senha alterada",
@@ -258,6 +260,15 @@ export default function Usuarios() {
       setIsResetPasswordDialogOpen(false);
       setNewPassword("");
       setResetPasswordUser(null);
+      
+      // Se o reset foi para o usuário atual, mostrar aviso
+      if (data.user?.email === user?.email) {
+        toast({
+          title: "Atenção",
+          description: "Sua própria senha foi alterada. Faça login novamente.",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error) => {
       toast({

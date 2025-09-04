@@ -64,7 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Se houver erro no logout (sessão inválida), limpar estado local mesmo assim
+      console.log('Erro no logout, limpando estado local:', error);
+      setSession(null);
+      setUser(null);
+    }
   };
 
   const value = {
