@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
 import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
 import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
+import { MunicipeDemandasDialog } from "@/components/forms/MunicipeDemandasDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,8 @@ export default function Municipes() {
   const [showDetails, setShowDetails] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [municipeToEdit, setMunicipeToEdit] = useState<any>(null);
+  const [showDemandasDialog, setShowDemandasDialog] = useState(false);
+  const [municipeParaDemandas, setMunicipeParaDemandas] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
   const { toast } = useToast();
@@ -716,7 +719,16 @@ export default function Municipes() {
                               console.log('Ver detalhes clicado para:', municipe.nome);
                               handleViewDetails(municipe);
                             }}>
+                              <Eye className="h-4 w-4 mr-2" />
                               Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.preventDefault();
+                              setMunicipeParaDemandas(municipe);
+                              setShowDemandasDialog(true);
+                            }}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Ver demandas
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => {
                               e.preventDefault();
@@ -724,6 +736,7 @@ export default function Municipes() {
                               setMunicipeToEdit(municipe);
                               setShowEditDialog(true);
                             }}>
+                              <Edit className="h-4 w-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => {
@@ -733,6 +746,7 @@ export default function Municipes() {
                                 deleteMunicipe.mutate(municipe.id);
                               }
                             }}>
+                              <Trash2 className="h-4 w-4 mr-2" />
                               <span className="text-destructive">Excluir</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -758,6 +772,13 @@ export default function Municipes() {
           municipe={municipeToEdit}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
+        />
+
+        {/* Dialog de Demandas do Munícipe */}
+        <MunicipeDemandasDialog
+          municipe={municipeParaDemandas}
+          open={showDemandasDialog}
+          onOpenChange={setShowDemandasDialog}
         />
       </div>
     </div>
