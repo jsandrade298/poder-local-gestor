@@ -687,6 +687,9 @@ export default function Demandas() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9 gap-4">
               <div className="relative xl:col-span-2">
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Buscar
+                </label>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Buscar por título, protocolo ou munícipe..."
@@ -696,108 +699,145 @@ export default function Demandas() {
                 />
               </div>
               
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="aberta">Aberta</SelectItem>
-                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                  <SelectItem value="aguardando">Aguardando</SelectItem>
-                  <SelectItem value="resolvida">Resolvida</SelectItem>
-                  <SelectItem value="cancelada">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Status
+                </label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="aberta">Aberta</SelectItem>
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
+                    <SelectItem value="resolvida">Resolvida</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={areaFilter} onValueChange={setAreaFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Área" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as áreas</SelectItem>
-                  {areas.map((area) => (
-                    <SelectItem key={area.id} value={area.id}>
-                      {area.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Área
+                </label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as áreas</SelectItem>
+                    {areas.map((area) => (
+                      <SelectItem key={area.id} value={area.id}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Munícipe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os munícipes</SelectItem>
-                  {demandas.map((demanda) => demanda.municipes).filter((municipe, index, self) => 
-                    municipe && self.findIndex(m => m?.nome === municipe.nome) === index
-                  ).map((municipe) => (
-                    <SelectItem key={municipe?.nome} value={demandas.find(d => d.municipes?.nome === municipe?.nome)?.municipe_id || ""}>
-                      {municipe?.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Munícipe
+                </label>
+                <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Munícipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os munícipes</SelectItem>
+                    {demandas.map((demanda) => demanda.municipes).filter((municipe, index, self) => 
+                      municipe && self.findIndex(m => m?.nome === municipe.nome) === index
+                    ).map((municipe) => (
+                      <SelectItem key={municipe?.nome} value={demandas.find(d => d.municipes?.nome === municipe?.nome)?.municipe_id || ""}>
+                        {municipe?.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os responsáveis</SelectItem>
-                  {responsaveis.map((responsavel) => (
-                    <SelectItem key={responsavel.id} value={responsavel.id}>
-                      {responsavel.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Responsável
+                </label>
+                <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os responsáveis</SelectItem>
+                    {responsaveis.map((responsavel) => (
+                      <SelectItem key={responsavel.id} value={responsavel.id}>
+                        {responsavel.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Cidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as cidades</SelectItem>
-                  {cidades.map((cidade) => (
-                    <SelectItem key={cidade} value={cidade}>
-                      {cidade}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Cidade
+                </label>
+                <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as cidades</SelectItem>
+                    {cidades.map((cidade) => (
+                      <SelectItem key={cidade} value={cidade}>
+                        {cidade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={bairroFilter} onValueChange={setBairroFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Bairro" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os bairros</SelectItem>
-                  {bairros.map((bairro) => (
-                    <SelectItem key={bairro} value={bairro}>
-                      {bairro}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Bairro
+                </label>
+                <Select value={bairroFilter} onValueChange={setBairroFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Bairro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os bairros</SelectItem>
+                    {bairros.map((bairro) => (
+                      <SelectItem key={bairro} value={bairro}>
+                        {bairro}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={atrasoFilter} onValueChange={setAtrasoFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Atraso" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Sem filtro de atraso</SelectItem>
-                  <SelectItem value="overdue">Em atraso</SelectItem>
-                  <SelectItem value="30">Mais de 30 dias</SelectItem>
-                  <SelectItem value="60">Mais de 60 dias</SelectItem>
-                  <SelectItem value="90">Mais de 90 dias</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Atraso
+                </label>
+                <Select value={atrasoFilter} onValueChange={setAtrasoFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Atraso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Sem filtro de atraso</SelectItem>
+                    <SelectItem value="overdue">Em atraso</SelectItem>
+                    <SelectItem value="30">Mais de 30 dias</SelectItem>
+                    <SelectItem value="60">Mais de 60 dias</SelectItem>
+                    <SelectItem value="90">Mais de 90 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar Filtros
-              </Button>
+              <div className="flex items-end">
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpar Filtros
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
