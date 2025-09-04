@@ -371,29 +371,36 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
               <div className="space-y-2">
                 <Label>Selecionar Munícipes</Label>
                 
-                {selectedMunicipes.length > 0 && (
-                  <div className="min-h-[100px] max-h-48 overflow-y-auto p-3 bg-muted rounded-lg border">
-                    <div className="flex flex-wrap gap-2">
-                      {selectedMunicipes.map(id => {
-                        const municipe = municipes?.find(m => m.id === id);
-                        return municipe ? (
-                          <Badge key={id} variant="secondary" className="gap-1 text-xs">
-                            {municipe.nome}
-                            <button
-                              onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ) : null;
-                      })}
+                {/* Área de selecionados - sempre visível */}
+                <div className="min-h-[80px] max-h-48 overflow-y-auto p-3 bg-muted rounded-lg border">
+                  {selectedMunicipes.length > 0 ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMunicipes.map(id => {
+                          const municipe = municipes?.find(m => m.id === id);
+                          return municipe ? (
+                            <Badge key={id} variant="secondary" className="gap-1 text-xs">
+                              {municipe.nome}
+                              <button
+                                onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {selectedMunicipes.length} munícipe(s) selecionado(s)
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      Nenhum munícipe selecionado. Use a busca abaixo para adicionar.
                     </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {selectedMunicipes.length} munícipe(s) selecionado(s)
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <Input
                   placeholder="Buscar munícipe por nome ou telefone..."
@@ -401,8 +408,9 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                   onChange={(e) => setSearchMunicipe(e.target.value)}
                 />
 
+                {/* Lista de resultados da busca */}
                 {searchMunicipe && (
-                  <div className="max-h-40 overflow-y-auto border rounded-lg">
+                  <div className="max-h-48 overflow-y-auto border rounded-lg">
                     {filteredMunicipes.length > 0 ? (
                       filteredMunicipes.map(municipe => {
                         const isSelected = selectedMunicipes.includes(municipe.id);
@@ -411,17 +419,17 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                             key={municipe.id}
                             onClick={() => {
                               if (isSelected) {
-                                // Remove da seleção se já estiver selecionado
                                 setSelectedMunicipes(prev => prev.filter(id => id !== municipe.id));
                               } else {
-                                // Adiciona à seleção se não estiver selecionado
                                 setSelectedMunicipes(prev => [...prev, municipe.id]);
                               }
+                              // Limpar busca após seleção para melhor UX
+                              setSearchMunicipe("");
                             }}
-                            className={`w-full text-left px-3 py-2 transition-colors ${
+                            className={`w-full text-left px-3 py-2 transition-colors border-b last:border-b-0 ${
                               isSelected 
-                                ? 'bg-primary/10 text-primary' 
-                                : 'hover:bg-muted'
+                                ? 'bg-primary/10 text-primary border-primary/20' 
+                                : 'hover:bg-muted border-border'
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -429,8 +437,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                                 <div className="font-medium">{municipe.nome}</div>
                                 <div className="text-sm text-muted-foreground">{municipe.telefone}</div>
                               </div>
-                              {isSelected && (
-                                <Badge variant="secondary" className="text-xs">Selecionado</Badge>
+                              {isSelected ? (
+                                <Badge variant="destructive" className="text-xs">Remover</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">Adicionar</Badge>
                               )}
                             </div>
                           </button>
