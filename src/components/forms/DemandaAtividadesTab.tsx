@@ -92,7 +92,10 @@ export function DemandaAtividadesTab({
       tipo_atividade: "comentario",
       titulo: "",
       descricao: "",
-      data_atividade: new Date().toISOString().slice(0, 16),
+      data_atividade: (() => {
+        const now = new Date();
+        return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+      })(),
       propositura: "",
       link_propositura: "",
       status_propositura: "",
@@ -296,11 +299,13 @@ export function DemandaAtividadesTab({
   const handleCancel = () => {
     setShowForm(false);
     setEditingActivity(null);
+    const now = new Date();
+    const localDateTime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
     form.reset({
       tipo_atividade: "comentario",
       titulo: "",
       descricao: "",
-      data_atividade: new Date().toISOString().slice(0, 16),
+      data_atividade: localDateTime,
       propositura: "",
       link_propositura: "",
       status_propositura: "",
@@ -336,11 +341,13 @@ export function DemandaAtividadesTab({
         <Button 
           onClick={() => {
             setShowForm(true);
+            const now = new Date();
+            const localDateTime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
             form.reset({
               tipo_atividade: "comentario",
               titulo: "",
               descricao: "",
-              data_atividade: new Date().toISOString().slice(0, 16),
+              data_atividade: localDateTime,
               propositura: "",
               link_propositura: "",
               status_propositura: "",
