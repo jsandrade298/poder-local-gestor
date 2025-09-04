@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity } from "lucide-react";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
+import { DemandaAtividadesTab } from "@/components/forms/DemandaAtividadesTab";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
@@ -895,163 +897,179 @@ export default function Demandas() {
 
         {/* Dialog de Visualização */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle>Detalhes da Demanda</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Demanda #{selectedDemanda?.protocolo}
+              </DialogTitle>
               <DialogDescription>
-                Visualize todas as informações detalhadas da demanda selecionada.
+                {selectedDemanda?.titulo}
               </DialogDescription>
             </DialogHeader>
+
             {selectedDemanda && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Protocolo</label>
-                    <p className="text-sm text-muted-foreground">#{selectedDemanda.protocolo}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Status</label>
-                    <p className="text-sm">
-                      <Badge 
-                        variant={getStatusVariant(selectedDemanda.status)}
-                        style={{ backgroundColor: getStatusColor(selectedDemanda.status), color: 'white' }}
-                      >
-                        {getStatusLabel(selectedDemanda.status)}
-                      </Badge>
-                    </p>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Título</label>
-                  <p className="text-sm text-muted-foreground">{selectedDemanda.titulo}</p>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Descrição</label>
-                  <p className="text-sm text-muted-foreground">{selectedDemanda.descricao}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Munícipe</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.municipes?.nome || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Área</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.areas?.nome || 'Sem área'}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Responsável</label>
-                    <p className="text-sm text-muted-foreground">Sem responsável</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Prioridade</label>
-                    <p className="text-sm">
-                      <Badge 
-                        variant="secondary"
-                        style={{ backgroundColor: getPrioridadeColor(selectedDemanda.prioridade), color: 'white' }}
-                      >
-                        {getPrioridadeLabel(selectedDemanda.prioridade)}
-                      </Badge>
-                    </p>
-                  </div>
-                </div>
-                
-                {selectedDemanda.data_prazo && (
-                  <div>
-                    <label className="text-sm font-medium">Prazo</label>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDateOnly(selectedDemanda.data_prazo)}
-                    </p>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Cidade</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.cidade || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Bairro</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.bairro || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">CEP</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.cep || 'N/A'}</p>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Endereço</label>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedDemanda.logradouro && selectedDemanda.numero 
-                      ? `${selectedDemanda.logradouro}, ${selectedDemanda.numero}${selectedDemanda.complemento ? `, ${selectedDemanda.complemento}` : ''}`
-                      : 'N/A'
-                    }
-                  </p>
-                </div>
-                
-                {selectedDemanda.observacoes && (
-                  <div>
-                    <label className="text-sm font-medium">Observações</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.observacoes}</p>
-                  </div>
-                )}
-                
-                {selectedDemanda.resolucao && (
-                  <div>
-                    <label className="text-sm font-medium">Resolução</label>
-                    <p className="text-sm text-muted-foreground">{selectedDemanda.resolucao}</p>
-                  </div>
-                )}
-                
-                
-                {/* Seção de Anexos */}
-                {anexosSelecionados.length > 0 && (
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium">Anexos ({anexosSelecionados.length})</label>
-                    <div className="grid gap-2">
-                      {anexosSelecionados.map((anexo) => (
-                        <div key={anexo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{anexo.nome_arquivo}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
-                            </span>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => downloadAnexo(anexo)}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar
-                          </Button>
+              <Tabs defaultValue="detalhes" className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="detalhes" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Detalhes
+                  </TabsTrigger>
+                  <TabsTrigger value="atividades" className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Atividades
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="detalhes" className="flex-1 overflow-y-auto">
+                  <div className="space-y-4 p-1">
+                    <div>
+                      <label className="text-sm font-medium">Descrição</label>
+                      <p className="text-sm text-muted-foreground">{selectedDemanda.descricao}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Munícipe</label>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedDemanda.municipes?.nome || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Status</label>
+                        <p className="text-sm">
+                          <Badge variant={getStatusVariant(selectedDemanda.status)}>
+                            {getStatusLabel(selectedDemanda.status)}
+                          </Badge>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Área</label>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedDemanda.areas?.nome || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Responsável</label>
+                        <p className="text-sm text-muted-foreground">
+                          Sem responsável
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Prioridade</label>
+                      <p className="text-sm">
+                        <Badge 
+                          variant="secondary"
+                          style={{ backgroundColor: getPrioridadeColor(selectedDemanda.prioridade), color: 'white' }}
+                        >
+                          {getPrioridadeLabel(selectedDemanda.prioridade)}
+                        </Badge>
+                      </p>
+                    </div>
+                    
+                    {selectedDemanda.data_prazo && (
+                      <div>
+                        <label className="text-sm font-medium">Prazo</label>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDateOnly(selectedDemanda.data_prazo)}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Cidade</label>
+                        <p className="text-sm text-muted-foreground">{selectedDemanda.cidade || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Bairro</label>
+                        <p className="text-sm text-muted-foreground">{selectedDemanda.bairro || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">CEP</label>
+                        <p className="text-sm text-muted-foreground">{selectedDemanda.cep || 'N/A'}</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium">Endereço</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedDemanda.logradouro && selectedDemanda.numero 
+                          ? `${selectedDemanda.logradouro}, ${selectedDemanda.numero}${selectedDemanda.complemento ? `, ${selectedDemanda.complemento}` : ''}`
+                          : 'N/A'
+                        }
+                      </p>
+                    </div>
+                    
+                    {selectedDemanda.observacoes && (
+                      <div>
+                        <label className="text-sm font-medium">Observações</label>
+                        <p className="text-sm text-muted-foreground">{selectedDemanda.observacoes}</p>
+                      </div>
+                    )}
+                    
+                    {selectedDemanda.resolucao && (
+                      <div>
+                        <label className="text-sm font-medium">Resolução</label>
+                        <p className="text-sm text-muted-foreground">{selectedDemanda.resolucao}</p>
+                      </div>
+                    )}
+                    
+                    
+                    {/* Seção de Anexos */}
+                    {anexosSelecionados.length > 0 && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">Anexos ({anexosSelecionados.length})</label>
+                        <div className="grid gap-2">
+                          {anexosSelecionados.map((anexo) => (
+                            <div key={anexo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{anexo.nome_arquivo}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
+                                </span>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadAnexo(anexo)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Baixar
+                              </Button>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                      <div>
+                        <label className="text-sm font-medium">Criado em</label>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDateTime(selectedDemanda.created_at)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Atualizado em</label>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDateTime(selectedDemanda.updated_at)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                  <div>
-                    <label className="text-sm font-medium">Criado em</label>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDateTime(selectedDemanda.created_at)}
-                    </p>
+                </TabsContent>
+
+                <TabsContent value="atividades" className="flex-1 overflow-y-auto">
+                  <div className="p-1">
+                    <DemandaAtividadesTab demandaId={selectedDemanda.id} />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Atualizado em</label>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDateTime(selectedDemanda.updated_at)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                </TabsContent>
+              </Tabs>
             )}
           </DialogContent>
         </Dialog>

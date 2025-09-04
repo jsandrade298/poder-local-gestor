@@ -109,6 +109,50 @@ export type Database = {
         }
         Relationships: []
       }
+      demanda_atividades: {
+        Row: {
+          created_at: string
+          created_by: string
+          data_atividade: string
+          demanda_id: string
+          descricao: string | null
+          id: string
+          tipo_atividade: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          data_atividade?: string
+          demanda_id: string
+          descricao?: string | null
+          id?: string
+          tipo_atividade?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          data_atividade?: string
+          demanda_id?: string
+          descricao?: string | null
+          id?: string
+          tipo_atividade?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_atividades_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demanda_tags: {
         Row: {
           created_at: string | null
