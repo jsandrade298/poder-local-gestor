@@ -224,15 +224,42 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       }
 
       let type: MediaFile['type'];
-      if (file.type.startsWith('image/')) type = 'image';
-      else if (file.type.startsWith('video/')) type = 'video';
-      else if (file.type.startsWith('audio/')) type = 'audio';
-      else type = 'document';
+      
+      // Detecção melhorada de tipo, especialmente para áudio
+      if (file.type.startsWith('image/')) {
+        type = 'image';
+      } else if (file.type.startsWith('video/')) {
+        type = 'video';
+      } else if (
+        file.type.startsWith('audio/') || 
+        file.name.endsWith('.m4a') || 
+        file.name.endsWith('.mp3') || 
+        file.name.endsWith('.wav') ||
+        file.name.endsWith('.ogg') ||
+        file.name.endsWith('.aac')
+      ) {
+        type = 'audio';
+        console.log(`Áudio detectado: ${file.name} (${file.type})`);
+      } else if (
+        file.type === 'application/pdf' ||
+        file.name.endsWith('.pdf') ||
+        file.name.endsWith('.doc') ||
+        file.name.endsWith('.docx') ||
+        file.name.endsWith('.xls') ||
+        file.name.endsWith('.xlsx')
+      ) {
+        type = 'document';
+      } else {
+        type = 'document'; // Fallback para documento
+      }
 
       const url = URL.createObjectURL(file);
       setMediaFiles(prev => [...prev, { file, type, url }]);
+      
+      console.log(`Arquivo adicionado: ${file.name} - Tipo: ${type} - MIME: ${file.type}`);
     });
 
+    // Reset input
     event.target.value = '';
   };
 

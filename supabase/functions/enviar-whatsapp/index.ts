@@ -111,6 +111,22 @@ serve(async (req) => {
       'apikey': instance.instance_token,
     };
 
+    // Função auxiliar para converter formatos de áudio
+    const convertAudioFormat = (mimeType: string): string => {
+      const audioMap: Record<string, string> = {
+        'audio/x-m4a': 'audio/mp4',
+        'audio/m4a': 'audio/mp4',
+        'audio/mp4a-latm': 'audio/mp4',
+        'audio/aac': 'audio/aac',
+        'audio/mpeg': 'audio/mpeg',
+        'audio/ogg': 'audio/ogg',
+        'audio/wav': 'audio/wav',
+        'audio/webm': 'audio/webm'
+      };
+      
+      return audioMap[mimeType] || mimeType;
+    };
+
     // Função para normalizar número brasileiro
     const normalizePhone = (phone) => {
       let digits = String(phone).replace(/\D/g, "");
@@ -138,65 +154,194 @@ serve(async (req) => {
       const rawPhone = phoneList[i];
       const normalizedPhone = normalizePhone(rawPhone);
       
-      console.log(`[${i + 1}/${phoneList.length}] Enviando para: ${normalizedPhone}`);
+      console.log(`\n📱 [${i + 1}/${phoneList.length}] Processando: ${normalizedPhone}`);
       
-      // Delay entre mensagens
+      // IMPORTANTE: Aplicar delay ANTES de processar (exceto no primeiro)
       if (i > 0) {
-        const delay = Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo;
-        await new Promise(r => setTimeout(r, delay * 1000));
+        // Calcular delay aleatório entre min e max
+        const delaySeconds = Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo;
+        const delayMs = Math.round(delaySeconds * 1000);
+        
+        console.log(`⏳ Aguardando ${delayMs}ms (${delaySeconds.toFixed(1)}s) antes do próximo envio...`);
+        
+        // Aguardar o delay configurado
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        
+        console.log('✅ Delay concluído, enviando próxima mensagem...');
       }
       
       try {
         let messageSent = false;
+        let mediaIndex = 0;
         
         // Enviar mídias se houver
         for (const media of mediaFiles) {
-          const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
-          
-          const mediaPayload = {
-            number: normalizedPhone,
-            mediatype: media.type,
-            media: media.url,
-            caption: !messageSent && mensagem ? mensagem : undefined
-          };
-          
-          // Para áudio, usar endpoint específico
-          if (media.type === 'audio') {
-            const audioUrl = `${instance.api_url}/message/sendWhatsAppAudio/${instance.instance_id}`;
-            const audioResponse = await fetch(audioUrl, {
-              method: 'POST',
-              headers: apiHeaders,
-              body: JSON.stringify({
-                number: normalizedPhone,
-                audio: media.url
-              })
-            });
-            
-            if (audioResponse.ok) {
-              messageSent = true;
-            }
-          } else {
-            const mediaResponse = await fetch(mediaUrl, {
-              method: 'POST',
-              headers: apiHeaders,
-              body: JSON.stringify(mediaPayload)
-            });
-            
-            if (mediaResponse.ok && mensagem) {
-              messageSent = true;
-            }
+          // Delay entre mídias (exceto na primeira)
+          if (mediaIndex > 0) {
+            const mediaDelay = 1000; // 1 segundo entre mídias
+            console.log(`⏱️ Aguardando ${mediaDelay}ms entre mídias...`);
+            await new Promise(r => setTimeout(r, mediaDelay));
           }
+          
+          console.log(`📎 Enviando mídia ${media.type} (${mediaIndex + 1}/${mediaFiles.length})`);
+          
+          try {
+            if (media.type === 'audio') {
+              // Tratamento especial para áudio
+              const audioUrl = `${instance.api_url}/message/sendWhatsAppAudio/${instance.instance_id}`;
+              
+              // Detectar formato correto do áudio
+              if (media.filename && (media.filename.endsWith('.m4a') || media.filename.includes('m4a'))) {
+                console.log('🎵 Detectado arquivo M4A, tratando como audio/mp4');
+              }
+              
+              const audioPayload = {
+                number: normalizedPhone,
+                audio: media.url,
+                encoding: true, // Importante para Evolution API processar corretamente
+                delay: 1200
+              };
+              
+              const audioResponse = await fetch(audioUrl, {
+                method: 'POST',
+                headers: apiHeaders,
+                body: JSON.stringify(audioPayload)
+              });
+              
+              const audioResult = await audioResponse.text();
+              console.log('Resposta do envio de áudio:', audioResult);
+              
+              if (audioResponse.ok) {
+                console.log('✅ Áudio enviado com sucesso');
+                successCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: 'audio',
+                  status: 'sucesso',
+                  mensagem: 'Áudio enviado'
+                });
+              } else {
+                console.error('❌ Erro ao enviar áudio:', audioResult);
+                errorCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: 'audio',
+                  status: 'erro',
+                  erro: `Erro no áudio: ${audioResponse.status}`
+                });
+              }
+            } else if (media.type === 'document') {
+              // Documentos (PDF, DOC, etc)
+              const docUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
+              const docPayload = {
+                number: normalizedPhone,
+                mediatype: 'document',
+                media: media.url,
+                fileName: media.filename || 'documento.pdf',
+                delay: 1200
+              };
+              
+              if (!messageSent && mensagem) {
+                docPayload.caption = mensagem;
+                messageSent = true;
+              }
+              
+              const docResponse = await fetch(docUrl, {
+                method: 'POST',
+                headers: apiHeaders,
+                body: JSON.stringify(docPayload)
+              });
+              
+              if (docResponse.ok) {
+                console.log('✅ Documento enviado com sucesso');
+                successCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: 'document',
+                  status: 'sucesso',
+                  mensagem: 'Documento enviado'
+                });
+              } else {
+                errorCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: 'document',
+                  status: 'erro',
+                  erro: `Erro no documento: ${docResponse.status}`
+                });
+              }
+            } else {
+              // Imagens e vídeos
+              const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
+              const mediaPayload = {
+                number: normalizedPhone,
+                mediatype: media.type,
+                media: media.url,
+                delay: 1200
+              };
+              
+              // Adicionar caption na primeira mídia visual
+              if (!messageSent && mensagem && (media.type === 'image' || media.type === 'video')) {
+                mediaPayload.caption = mensagem;
+                messageSent = true;
+              }
+              
+              const mediaResponse = await fetch(mediaUrl, {
+                method: 'POST',
+                headers: apiHeaders,
+                body: JSON.stringify(mediaPayload)
+              });
+              
+              if (mediaResponse.ok) {
+                console.log(`✅ ${media.type} enviado com sucesso`);
+                successCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: media.type,
+                  status: 'sucesso',
+                  mensagem: `${media.type} enviado`
+                });
+              } else {
+                errorCount++;
+                results.push({
+                  telefone: rawPhone,
+                  tipo: media.type,
+                  status: 'erro',
+                  erro: `Erro na ${media.type}: ${mediaResponse.status}`
+                });
+              }
+            }
+          } catch (mediaError) {
+            console.error(`❌ Erro ao processar mídia ${media.type}:`, mediaError);
+            errorCount++;
+            results.push({
+              telefone: rawPhone,
+              tipo: media.type,
+              status: 'erro',
+              erro: mediaError.message
+            });
+          }
+          
+          mediaIndex++;
         }
         
-        // Enviar texto se ainda não foi enviado como caption
+        // Enviar texto se houver e ainda não foi enviado como caption
         if (mensagem && !messageSent) {
+          // Pequeno delay se já enviou mídia
+          if (mediaFiles.length > 0) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+          
+          console.log('💬 Enviando mensagem de texto');
           const textUrl = `${instance.api_url}/message/sendText/${instance.instance_id}`;
           const textResponse = await fetch(textUrl, {
             method: 'POST',
             headers: apiHeaders,
             body: JSON.stringify({
               number: normalizedPhone,
-              text: mensagem
+              text: mensagem,
+              linkPreview: false,
+              delay: 1200
             })
           });
           
@@ -204,29 +349,33 @@ serve(async (req) => {
             successCount++;
             results.push({
               telefone: rawPhone,
+              tipo: 'texto',
               status: 'sucesso',
-              mensagem: 'Enviado com sucesso'
+              mensagem: 'Texto enviado'
             });
           } else {
             errorCount++;
-            const error = await textResponse.text();
             results.push({
               telefone: rawPhone,
+              tipo: 'texto',
               status: 'erro',
-              erro: `Erro ao enviar: ${textResponse.status}`
+              erro: `Erro no texto: ${textResponse.status}`
             });
           }
-        } else if (messageSent || mediaFiles.length > 0) {
-          successCount++;
+        }
+        
+        // Se não teve mensagem nem mídia mas chegou aqui, registrar como processado
+        if (!mensagem && mediaFiles.length === 0) {
           results.push({
             telefone: rawPhone,
-            status: 'sucesso',
-            mensagem: 'Mídia enviada com sucesso'
+            status: 'erro',
+            erro: 'Nenhum conteúdo para enviar'
           });
+          errorCount++;
         }
         
       } catch (error) {
-        console.error(`Erro ao enviar para ${rawPhone}:`, error);
+        console.error(`❌ Erro geral ao enviar para ${rawPhone}:`, error);
         errorCount++;
         results.push({
           telefone: rawPhone,
