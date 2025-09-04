@@ -373,21 +373,26 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 <Label>Selecionar Munícipes</Label>
                 
                 {selectedMunicipes.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
-                    {selectedMunicipes.map(id => {
-                      const municipe = municipes?.find(m => m.id === id);
-                      return municipe ? (
-                        <Badge key={id} variant="secondary" className="gap-1">
-                          {municipe.nome}
-                          <button
-                            onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ) : null;
-                    })}
+                  <div className="max-h-32 overflow-y-auto p-3 bg-muted rounded-lg border">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedMunicipes.map(id => {
+                        const municipe = municipes?.find(m => m.id === id);
+                        return municipe ? (
+                          <Badge key={id} variant="secondary" className="gap-1 text-xs">
+                            {municipe.nome}
+                            <button
+                              onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {selectedMunicipes.length} munícipe(s) selecionado(s)
+                    </div>
                   </div>
                 )}
 
