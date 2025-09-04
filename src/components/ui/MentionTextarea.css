@@ -60,6 +60,9 @@
   border-bottom: 1px solid hsl(var(--border)) !important;
   cursor: pointer !important;
   color: hsl(var(--foreground)) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .mention-input__suggestions__item:last-child {

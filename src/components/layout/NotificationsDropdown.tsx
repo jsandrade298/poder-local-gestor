@@ -206,7 +206,7 @@ export function NotificationsDropdown() {
                           {getTipoIcon(notificacao.tipo)}
                         </div>
                         
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 max-w-full">
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-sm font-medium truncate">
                               {notificacao.titulo}
@@ -216,9 +216,9 @@ export function NotificationsDropdown() {
                             )}
                           </div>
                           
-                          <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                            {notificacao.mensagem}
-                          </p>
+                           <p className="text-xs text-muted-foreground mb-2 break-words">
+                             {notificacao.mensagem}
+                           </p>
                           
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>
