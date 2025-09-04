@@ -46,6 +46,7 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
     const statusMap = {
       'aberta': { label: 'Aberta', variant: 'default' as const, color: '#3B82F6' },
       'em_andamento': { label: 'Em Andamento', variant: 'secondary' as const, color: '#F59E0B' },
+      'aguardando': { label: 'Aguardando', variant: 'secondary' as const, color: '#F97316' },
       'resolvida': { label: 'Resolvida', variant: 'secondary' as const, color: '#10B981' },
       'cancelada': { label: 'Cancelada', variant: 'destructive' as const, color: '#EF4444' }
     };
@@ -102,7 +103,7 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
 
         <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
@@ -137,6 +138,20 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                     <p className="text-sm font-medium">Em Andamento</p>
                     <p className="text-xl font-bold text-yellow-600">
                       {demandas.filter(d => d.status === 'em_andamento').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <p className="text-sm font-medium">Aguardando</p>
+                    <p className="text-xl font-bold text-orange-600">
+                      {demandas.filter(d => d.status === 'aguardando').length}
                     </p>
                   </div>
                 </div>
