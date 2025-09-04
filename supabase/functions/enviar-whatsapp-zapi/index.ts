@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { telefones, mensagem, incluirTodos, instanceName } = await req.json();
+    const { telefones, mensagem, incluirTodos, instanceName, tempoMinimo = 1, tempoMaximo = 3, mediaFiles = [] } = await req.json();
     
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -84,6 +84,11 @@ serve(async (req) => {
 
     for (const telefone of telefonesList) {
       try {
+        // Delay aleatório entre tempoMinimo e tempoMaximo
+        const delayMs = (Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo) * 1000;
+        console.log(`Aguardando ${delayMs}ms antes de enviar para ${telefone}`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+
         // Limpar e formatar telefone (remover caracteres especiais)
         let telefoneFormatado = telefone.replace(/\D/g, '');
         
@@ -118,47 +123,121 @@ serve(async (req) => {
         
         console.log(`Enviando para: ${telefone} -> ${numeroCompleto}`);
 
-        // URL da Evolution API para envio de mensagem
-        const evolutionUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`;
-        
-        console.log(`URL completa: ${evolutionUrl}`);
-        console.log(`Número formatado: ${numeroCompleto}`);
-        console.log(`Mensagem: ${mensagem}`);
+        // Enviar mídia primeiro, se houver
+        for (const media of mediaFiles) {
+          try {
+            let evolutionUrl;
+            let payload;
 
-        const response = await fetch(evolutionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': evolutionApiKey,
-          },
-          body: JSON.stringify({
-            number: `${numeroCompleto}@s.whatsapp.net`,
-            text: mensagem
-          }),
-        });
+            switch (media.type) {
+              case 'image':
+                evolutionUrl = `${evolutionApiUrl}/message/sendMedia/${instanceName}`;
+                payload = {
+                  number: `${numeroCompleto}@s.whatsapp.net`,
+                  mediatype: 'image',
+                  media: media.url,
+                  caption: mensagem || ''
+                };
+                break;
+              case 'video':
+                evolutionUrl = `${evolutionApiUrl}/message/sendMedia/${instanceName}`;
+                payload = {
+                  number: `${numeroCompleto}@s.whatsapp.net`,
+                  mediatype: 'video',
+                  media: media.url,
+                  caption: mensagem || ''
+                };
+                break;
+              case 'audio':
+                evolutionUrl = `${evolutionApiUrl}/message/sendWhatsAppAudio/${instanceName}`;
+                payload = {
+                  number: `${numeroCompleto}@s.whatsapp.net`,
+                  audio: media.url
+                };
+                break;
+              case 'document':
+                evolutionUrl = `${evolutionApiUrl}/message/sendMedia/${instanceName}`;
+                payload = {
+                  number: `${numeroCompleto}@s.whatsapp.net`,
+                  mediatype: 'document',
+                  media: media.url,
+                  fileName: media.filename
+                };
+                break;
+            }
 
-        console.log(`Response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`Response result:`, JSON.stringify(result));
-        
-        if (response.ok && result.key) {
-          console.log(`Mensagem enviada para ${telefone}:`, result);
+            console.log(`Enviando mídia ${media.type} para ${numeroCompleto}:`, payload);
+
+            const mediaResponse = await fetch(evolutionUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey,
+              },
+              body: JSON.stringify(payload),
+            });
+
+            const mediaResult = await mediaResponse.json();
+            console.log(`Resposta da mídia:`, mediaResult);
+
+            if (!mediaResponse.ok) {
+              console.error(`Erro ao enviar mídia para ${telefone}:`, mediaResult);
+            }
+
+            // Pequeno delay entre envios de mídia
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (mediaError) {
+            console.error(`Erro ao enviar mídia para ${telefone}:`, mediaError);
+          }
+        }
+
+        // Enviar mensagem de texto apenas se houver texto e não houver mídia com caption
+        if (mensagem && (mediaFiles.length === 0 || mediaFiles.some(m => m.type === 'audio'))) {
+          const evolutionUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`;
+          
+          console.log(`URL completa: ${evolutionUrl}`);
+          console.log(`Número formatado: ${numeroCompleto}`);
+          console.log(`Mensagem: ${mensagem}`);
+
+          const response = await fetch(evolutionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey,
+            },
+            body: JSON.stringify({
+              number: `${numeroCompleto}@s.whatsapp.net`,
+              text: mensagem
+            }),
+          });
+
+          console.log(`Response status: ${response.status}`);
+          const result = await response.json();
+          console.log(`Response result:`, JSON.stringify(result));
+          
+          if (response.ok && result.key) {
+            console.log(`Mensagem enviada para ${telefone}:`, result);
+            resultados.push({ 
+              telefone, 
+              status: 'sucesso',
+              messageId: result.key.id
+            });
+          } else {
+            console.error(`Erro ao enviar para ${telefone}:`, result);
+            resultados.push({ 
+              telefone, 
+              status: 'erro',
+              erro: result.message || result.error || 'Erro desconhecido'
+            });
+          }
+        } else {
+          // Se só enviamos mídia, considerar sucesso
           resultados.push({ 
             telefone, 
             status: 'sucesso',
-            messageId: result.key.id
-          });
-        } else {
-          console.error(`Erro ao enviar para ${telefone}:`, result);
-          resultados.push({ 
-            telefone, 
-            status: 'erro',
-            erro: result.message || result.error || 'Erro desconhecido'
+            messageId: 'media-only'
           });
         }
-
-        // Aguardar um pouco entre envios para evitar rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
         console.error(`Erro ao enviar para ${telefone}:`, error);

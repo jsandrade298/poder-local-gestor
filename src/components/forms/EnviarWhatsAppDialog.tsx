@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MessageSquare, Send, Loader2, Smartphone } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MessageSquare, Send, Loader2, Smartphone, Upload, X, Image, Video, FileAudio, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -28,12 +29,21 @@ interface EnviarWhatsAppDialogProps {
   municipesSelecionados?: string[];
 }
 
+interface MediaFile {
+  file: File;
+  type: 'image' | 'video' | 'audio' | 'document';
+  url: string;
+}
+
 export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhatsAppDialogProps) {
   const [open, setOpen] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [incluirTodos, setIncluirTodos] = useState(false);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>(municipesSelecionados);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
+  const [tempoMinimo, setTempoMinimo] = useState(1);
+  const [tempoMaximo, setTempoMaximo] = useState(3);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const { toast } = useToast();
 
   // Buscar munícipes com telefone
@@ -97,14 +107,49 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   });
 
   const enviarWhatsApp = useMutation({
-    mutationFn: async ({ telefones, mensagem, incluirTodos, instanceName }: {
+    mutationFn: async ({ telefones, mensagem, incluirTodos, instanceName, tempoMinimo, tempoMaximo, mediaFiles }: {
       telefones: string[];
       mensagem: string;
       incluirTodos: boolean;
       instanceName: string;
+      tempoMinimo: number;
+      tempoMaximo: number;
+      mediaFiles: MediaFile[];
     }) => {
+      // Upload de arquivos de mídia para o Supabase Storage
+      const uploadedMedia = [];
+      for (const media of mediaFiles) {
+        const fileName = `${Date.now()}-${media.file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('demanda-anexos')
+          .upload(fileName, media.file);
+
+        if (uploadError) {
+          console.error('Erro ao fazer upload:', uploadError);
+          throw new Error(`Erro ao fazer upload do arquivo ${media.file.name}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('demanda-anexos')
+          .getPublicUrl(fileName);
+
+        uploadedMedia.push({
+          type: media.type,
+          url: publicUrl,
+          filename: media.file.name
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke("enviar-whatsapp-zapi", {
-        body: { telefones, mensagem, incluirTodos, instanceName },
+        body: { 
+          telefones, 
+          mensagem, 
+          incluirTodos, 
+          instanceName, 
+          tempoMinimo, 
+          tempoMaximo,
+          mediaFiles: uploadedMedia
+        },
       });
 
       if (error) throw error;
@@ -120,6 +165,9 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       setSelectedMunicipes([]);
       setIncluirTodos(false);
       setSelectedInstance("");
+      setTempoMinimo(1);
+      setTempoMaximo(3);
+      setMediaFiles([]);
     },
     onError: (error) => {
       toast({
@@ -131,10 +179,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   });
 
   const handleEnviar = () => {
-    if (!mensagem.trim()) {
+    if (!mensagem.trim() && mediaFiles.length === 0) {
       toast({
         title: "Erro",
-        description: "Digite uma mensagem para enviar",
+        description: "Digite uma mensagem ou adicione um arquivo de mídia",
         variant: "destructive",
       });
       return;
@@ -144,6 +192,15 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       toast({
         title: "Erro",
         description: "Selecione uma instância WhatsApp conectada",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (tempoMinimo < 1 || tempoMaximo < tempoMinimo) {
+      toast({
+        title: "Erro",
+        description: "Configure tempos válidos (mínimo >= 1s e máximo >= mínimo)",
         variant: "destructive",
       });
       return;
@@ -164,14 +221,60 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           .map(id => municipes?.find(m => m.id === id)?.telefone)
           .filter(Boolean) as string[];
 
-    const selectedInstanceData = instances?.find(i => i.instance_name === selectedInstance);
-    
     enviarWhatsApp.mutate({ 
       telefones, 
       mensagem, 
       incluirTodos, 
-      instanceName: selectedInstance
+      instanceName: selectedInstance,
+      tempoMinimo,
+      tempoMaximo,
+      mediaFiles
     });
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const maxSize = 100 * 1024 * 1024; // 100MB
+      if (file.size > maxSize) {
+        toast({
+          title: "Arquivo muito grande",
+          description: `${file.name} excede o limite de 100MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let type: MediaFile['type'];
+      if (file.type.startsWith('image/')) type = 'image';
+      else if (file.type.startsWith('video/')) type = 'video';
+      else if (file.type.startsWith('audio/')) type = 'audio';
+      else type = 'document';
+
+      const url = URL.createObjectURL(file);
+      setMediaFiles(prev => [...prev, { file, type, url }]);
+    });
+
+    // Reset input
+    event.target.value = '';
+  };
+
+  const removeMediaFile = (index: number) => {
+    setMediaFiles(prev => {
+      URL.revokeObjectURL(prev[index].url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const getMediaIcon = (type: MediaFile['type']) => {
+    switch (type) {
+      case 'image': return <Image className="h-4 w-4" />;
+      case 'video': return <Video className="h-4 w-4" />;
+      case 'audio': return <FileAudio className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
+    }
   };
 
   const toggleMunicipe = (municipeId: string) => {
@@ -240,11 +343,85 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
             )}
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="tempo-minimo">Tempo mínimo entre envios (segundos)</Label>
+              <Input
+                id="tempo-minimo"
+                type="number"
+                min="1"
+                value={tempoMinimo}
+                onChange={(e) => setTempoMinimo(parseInt(e.target.value) || 1)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="tempo-maximo">Tempo máximo entre envios (segundos)</Label>
+              <Input
+                id="tempo-maximo"
+                type="number"
+                min="1"
+                value={tempoMaximo}
+                onChange={(e) => setTempoMaximo(parseInt(e.target.value) || 3)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Arquivos de Mídia</Label>
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="media-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById('media-upload')?.click()}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Adicionar Arquivos
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Imagens, vídeos, áudios, documentos (máx 100MB)
+                </span>
+              </div>
+
+              {mediaFiles.length > 0 && (
+                <div className="space-y-2">
+                  {mediaFiles.map((media, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 border rounded">
+                      {getMediaIcon(media.type)}
+                      <span className="flex-1 text-sm truncate">{media.file.name}</span>
+                      <Badge variant="secondary">{media.type}</Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeMediaFile(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="mensagem">Mensagem</Label>
             <Textarea
               id="mensagem"
-              placeholder="Digite sua mensagem aqui..."
+              placeholder="Digite sua mensagem aqui (opcional se enviando arquivos)..."
               value={mensagem}
               onChange={(e) => setMensagem(e.target.value)}
               rows={4}
