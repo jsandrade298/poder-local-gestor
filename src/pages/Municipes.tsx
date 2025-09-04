@@ -224,6 +224,20 @@ export default function Municipes() {
           if (error) {
             results.push({ success: false, nome: municipe.nome, error: error.message });
           } else {
+            // Se tem tag, tentar associar
+            if (municipe.tagId) {
+              const { error: tagError } = await supabase
+                .from('municipe_tags')
+                .insert({
+                  municipe_id: data.id,
+                  tag_id: municipe.tagId
+                });
+              
+              if (tagError) {
+                console.warn(`Erro ao associar tag para ${municipe.nome}:`, tagError);
+              }
+            }
+            
             results.push({ success: true, nome: municipe.nome, id: data.id });
           }
         } catch (err) {
@@ -269,7 +283,7 @@ export default function Municipes() {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const csv = e.target?.result as string;
         const lines = csv.split('\n').filter(line => line.trim());
@@ -299,8 +313,16 @@ export default function Municipes() {
           cep: ['cep', 'zip', 'zipcode'],
           complemento: ['complemento', 'complement'],
           data_nascimento: ['data_nascimento', 'data de nascimento', 'nascimento', 'birth_date'],
-          observacoes: ['observacoes', 'observações', 'notes', 'obs']
+          observacoes: ['observacoes', 'observações', 'notes', 'obs'],
+          tag: ['tag', 'tags', 'etiqueta']
         };
+
+        // Buscar todas as tags existentes para fazer o mapeamento
+        const { data: existingTags } = await supabase
+          .from('tags')
+          .select('id, nome');
+        
+        const tagMap = new Map(existingTags?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
 
         // Processar dados
         const municipes = lines.slice(1).map(line => {
@@ -322,16 +344,25 @@ export default function Municipes() {
                       municipe[key] = date.toISOString().split('T')[0];
                     }
                   } catch {
-                    // Ignorar datas inválidas
-                  }
-                }
-              } else {
-                municipe[key] = values[headerIndex];
-              }
-            }
-          });
+                     // Ignorar datas inválidas
+                   }
+                 }
+               } else if (key === 'tag') {
+                 // Processar tag - buscar o ID da tag pelo nome
+                 const tagName = values[headerIndex];
+                 if (tagName && tagName.trim() !== '') {
+                   const tagId = tagMap.get(tagName.toLowerCase().trim());
+                   if (tagId) {
+                     municipe.tagId = tagId;
+                   }
+                 }
+               } else {
+                 municipe[key] = values[headerIndex];
+               }
+             }
+           });
 
-          return municipe;
+           return municipe;
         }).filter(m => m.nome && m.nome.trim() !== ''); // Só importar se tiver nome
 
         if (municipes.length === 0) {
@@ -355,6 +386,7 @@ export default function Municipes() {
       }
     };
     
+    // Forçar codificação UTF-8 para resolver problemas de caracteres especiais
     reader.readAsText(file, 'UTF-8');
     
     // Limpar input para permitir re-upload do mesmo arquivo

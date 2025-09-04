@@ -35,7 +35,8 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
       'cep',
       'complemento',
       'data_nascimento',
-      'observacoes'
+      'observacoes',
+      'tag'
     ];
 
     const exampleData = [
@@ -50,7 +51,8 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
         '01234-567',
         'Apt 45',
         '1985-05-15',
-        'Munícipe cadastrada em 2024'
+        'Munícipe cadastrada em 2024',
+        'Família'
       ],
       [
         'José Santos Oliveira',
@@ -63,7 +65,8 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
         '05678-901',
         '',
         '1978-12-03',
-        'Comerciante local'
+        'Comerciante local',
+        'Empresário'
       ]
     ];
 
@@ -373,6 +376,10 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span>observacoes</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>tag (nome da tag existente)</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -385,6 +392,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                   <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
                   <p>• Datas devem estar no formato AAAA-MM-DD (ex: 1985-05-15)</p>
                   <p>• Se um campo estiver vazio, deixe a célula em branco</p>
+                  <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
                   <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
                   <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
