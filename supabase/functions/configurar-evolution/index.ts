@@ -46,6 +46,16 @@ serve(async (req) => {
           .eq('active', true);
 
         // Buscar status de todas as instâncias de uma vez
+        if (dbInstances.length === 0) {
+          return new Response(
+            JSON.stringify({ instances: [] }),
+            { 
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
+
         const fetchUrl = `${dbInstances[0].api_url}/instance/fetchInstances`;
         const response = await fetch(fetchUrl, {
           method: 'GET',
