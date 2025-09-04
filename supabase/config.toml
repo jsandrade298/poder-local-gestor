@@ -2,3 +2,6 @@ project_id = "nsoedzefrqjmbgahukub"
 
 [functions.backup-automatico]
 verify_jwt = false
+
+[functions.reset-password]
+verify_jwt = false

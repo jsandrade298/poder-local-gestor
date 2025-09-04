@@ -227,14 +227,27 @@ export default function Usuarios() {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
-      // Simular reset de senha direto - em produção, usaria admin API do Supabase
-      if (!newPassword || newPassword.length < 6) {
-        throw new Error("A senha deve ter pelo menos 6 caracteres");
-      }
+      console.log('🔄 RESET - Iniciando reset para userId:', userId);
       
-      // Para demonstração, apenas simulamos o sucesso
-      // Em produção real, seria necessário usar o Supabase Admin API
-      return { success: true };
+      const { data, error } = await supabase.functions.invoke('reset-password', {
+        body: { 
+          userId, 
+          newPassword 
+        }
+      });
+
+      if (error) {
+        console.error('❌ RESET - Erro na função:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('❌ RESET - Falha na resposta:', data);
+        throw new Error(data.error || 'Erro ao resetar senha');
+      }
+
+      console.log('✅ RESET - Sucesso:', data);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
