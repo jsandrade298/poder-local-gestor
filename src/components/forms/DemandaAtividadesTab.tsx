@@ -655,8 +655,12 @@ export function DemandaAtividadesTab({
                                 <a 
                                   href={atividade.link_propositura}
                                   target="_blank" 
-                                  rel="noopener noreferrer"
+                                  rel="noopener noreferrer nofollow"
                                   className="text-xs text-primary hover:underline break-all"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    window.open(atividade.link_propositura, '_blank', 'noopener,noreferrer');
+                                  }}
                                 >
                                   {atividade.link_propositura}
                                 </a>
