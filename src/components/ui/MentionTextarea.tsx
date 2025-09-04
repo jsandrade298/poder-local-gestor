@@ -130,11 +130,11 @@ export function MentionTextarea({
             </div>
           )}
           style={{
-            backgroundColor: 'hsl(var(--primary))',
-            color: 'hsl(var(--primary-foreground))',
-            fontWeight: 'bold',
-            borderRadius: '4px',
-            padding: '2px 4px',
+            backgroundColor: 'transparent',
+            color: 'transparent',
+            fontWeight: 'normal',
+            borderRadius: '0',
+            padding: '0',
           }}
         />
       </MentionsInput>
