@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,15 +89,18 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+      <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Demandas de {municipe.nome}
           </DialogTitle>
+          <DialogDescription>
+            Visualize todas as demandas registradas para este munícipe, com estatísticas detalhadas e opções de navegação.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 overflow-y-auto">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
@@ -174,7 +177,7 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
             <CardHeader>
               <CardTitle>Lista de Demandas</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -204,7 +207,14 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                       const prioridadeBadge = getPrioridadeBadge(demanda.prioridade);
                       
                       return (
-                        <TableRow key={demanda.id} className="hover:bg-muted/50">
+                        <TableRow 
+                          key={demanda.id} 
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => {
+                            // Abrir demanda em modal ou navegar para página de detalhes
+                            window.open(`/demandas?protocolo=${demanda.protocolo}`, '_blank');
+                          }}
+                        >
                           <TableCell>
                             <span className="font-mono text-sm">{demanda.protocolo}</span>
                           </TableCell>

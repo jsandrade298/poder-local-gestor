@@ -165,9 +165,24 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
   const updateDemanda = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Filtrar campos vazios e converter para null quando necessário
+      const cleanData = {
+        ...data,
+        area_id: data.area_id || null,
+        responsavel_id: data.responsavel_id || null,
+        data_prazo: data.data_prazo || null,
+        logradouro: data.logradouro || null,
+        numero: data.numero || null,
+        bairro: data.bairro || null,
+        cep: data.cep || null,
+        complemento: data.complemento || null,
+        observacoes: data.observacoes || null,
+        resolucao: data.resolucao || null
+      };
+
       const { error } = await supabase
         .from('demandas')
-        .update(data)
+        .update(cleanData)
         .eq('id', demanda.id);
 
       if (error) throw error;
