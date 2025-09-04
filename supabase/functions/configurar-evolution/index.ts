@@ -15,11 +15,20 @@ serve(async (req) => {
   try {
     const { action, instanceName } = await req.json();
     
+    console.log('=== DEBUGGING ENVIRONMENT VARIABLES ===');
+    console.log('All env keys:', Object.keys(Deno.env.toObject()));
+    
     const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
     const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+    
+    console.log(`EVOLUTION_API_URL: "${evolutionApiUrl}"`);
+    console.log(`EVOLUTION_API_KEY: "${evolutionApiKey}"`);
+    console.log(`URL is truthy: ${!!evolutionApiUrl}`);
+    console.log(`KEY is truthy: ${!!evolutionApiKey}`);
+    console.log('=== END DEBUGGING ===');
 
     if (!evolutionApiUrl || !evolutionApiKey) {
-      throw new Error('Evolution API não configurado. Verifique as variáveis de ambiente.');
+      throw new Error(`Evolution API não configurado. URL: ${evolutionApiUrl}, KEY: ${evolutionApiKey ? 'SET' : 'NOT_SET'}`);
     }
 
     console.log(`Evolution API URL: ${evolutionApiUrl}`);
