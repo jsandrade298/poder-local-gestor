@@ -635,7 +635,7 @@ export function DemandaAtividadesTab({
                             {atividade.link_propositura && (
                               <div>
                                 <a 
-                                  href={atividade.link_propositura.startsWith('http') ? atividade.link_propositura : `https://${atividade.link_propositura}`}
+                                  href={atividade.link_propositura}
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="text-xs text-primary hover:underline break-all"
