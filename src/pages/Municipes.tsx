@@ -155,11 +155,6 @@ export default function Municipes() {
     }
   };
 
-  // Limpar seleção quando filtros mudam
-  React.useEffect(() => {
-    setSelectedMunicipes([]);
-    setSelectAll(false);
-  }, [searchTerm, tagFilter, bairroFilter, cidadeFilter]);
 
   // Função para exportar CSV
   const exportToCSV = () => {
