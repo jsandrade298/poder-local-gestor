@@ -334,7 +334,18 @@ export function DemandaAtividadesTab({
           </p>
         </div>
         <Button 
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setShowForm(true);
+            form.reset({
+              tipo_atividade: "comentario",
+              titulo: "",
+              descricao: "",
+              data_atividade: new Date().toISOString().slice(0, 16),
+              propositura: "",
+              link_propositura: "",
+              status_propositura: "",
+            });
+          }}
           size="sm"
           className="flex items-center gap-2"
         >
