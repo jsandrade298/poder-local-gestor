@@ -40,10 +40,12 @@ serve(async (req) => {
 
     console.log(`Using API URL: ${instanceConfig.api_url}`);
     console.log(`Instance ID: ${instanceConfig.instance_id}`);
+    console.log(`Token (first 10 chars): ${instanceConfig.instance_token.substring(0, 10)}...`);
 
+    // Headers para Evolution API (usando Authorization Bearer em vez de apikey)
     const headers = {
       'Content-Type': 'application/json',
-      'apikey': instanceConfig.instance_token,
+      'Authorization': `Bearer ${instanceConfig.instance_token}`,
     };
 
     let result;
@@ -71,13 +73,37 @@ serve(async (req) => {
           headers,
         });
 
+        console.log(`Response status: ${connectResponse.status}`);
+        console.log(`Response headers:`, JSON.stringify(Object.fromEntries(connectResponse.headers.entries()), null, 2));
+
         if (!connectResponse.ok) {
           const errorText = await connectResponse.text();
           console.error('Erro ao conectar instância:', errorText);
-          throw new Error(`Erro ao conectar instância: ${connectResponse.status} - ${errorText}`);
+          
+          // Tentar com apikey em vez de Authorization
+          const alternativeHeaders = {
+            'Content-Type': 'application/json',
+            'apikey': instanceConfig.instance_token,
+          };
+          
+          console.log('Tentando com headers alternativos:', JSON.stringify(alternativeHeaders, null, 2));
+          
+          const retryResponse = await fetch(`${instanceConfig.api_url}/instance/connect/${instanceName}`, {
+            method: 'GET',
+            headers: alternativeHeaders,
+          });
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            console.error('Erro na segunda tentativa:', retryErrorText);
+            throw new Error(`Erro ao conectar instância: ${retryResponse.status} - ${retryErrorText}`);
+          }
+          
+          result = await retryResponse.json();
+        } else {
+          result = await connectResponse.json();
         }
-
-        result = await connectResponse.json();
+        
         console.log('Resposta da conexão:', result);
         break;
 
@@ -96,12 +122,14 @@ serve(async (req) => {
         const instancesWithStatus = [];
         for (const instance of allInstances || []) {
           try {
+            const statusHeaders = {
+              'Content-Type': 'application/json',
+              'apikey': instance.instance_token,
+            };
+            
             const statusResponse = await fetch(`${instance.api_url}/instance/connectionState/${instance.instance_name}`, {
               method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': instance.instance_token,
-              },
+              headers: statusHeaders,
             });
 
             let connectionStatus = 'disconnected';
@@ -144,9 +172,14 @@ serve(async (req) => {
           throw new Error('Nome da instância é obrigatório');
         }
 
+        const statusHeaders = {
+          'Content-Type': 'application/json',
+          'apikey': instanceConfig.instance_token,
+        };
+
         const statusResponse = await fetch(`${instanceConfig.api_url}/instance/connectionState/${instanceName}`, {
           method: 'GET',
-          headers,
+          headers: statusHeaders,
         });
 
         if (!statusResponse.ok) {
