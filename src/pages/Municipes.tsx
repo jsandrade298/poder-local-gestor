@@ -1,11 +1,13 @@
 import { useState, useRef } from "react";
+import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
@@ -29,6 +31,8 @@ export default function Municipes() {
   const [municipeToEdit, setMunicipeToEdit] = useState<any>(null);
   const [showDemandasDialog, setShowDemandasDialog] = useState(false);
   const [municipeParaDemandas, setMunicipeParaDemandas] = useState<any>(null);
+  const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
   const { toast } = useToast();
@@ -131,6 +135,31 @@ export default function Municipes() {
     setBairroFilter("all");
     setCidadeFilter("all");
   };
+
+  // Gerenciar seleção de munícipes
+  const handleSelectMunicipe = (municipeId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedMunicipes(prev => [...prev, municipeId]);
+    } else {
+      setSelectedMunicipes(prev => prev.filter(id => id !== municipeId));
+      setSelectAll(false);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked) {
+      setSelectedMunicipes(filteredMunicipes.map(m => m.id));
+    } else {
+      setSelectedMunicipes([]);
+    }
+  };
+
+  // Limpar seleção quando filtros mudam
+  React.useEffect(() => {
+    setSelectedMunicipes([]);
+    setSelectAll(false);
+  }, [searchTerm, tagFilter, bairroFilter, cidadeFilter]);
 
   // Função para exportar CSV
   const exportToCSV = () => {
@@ -406,7 +435,77 @@ export default function Municipes() {
     }
   };
 
-  // Função para excluir munícipe
+  // Função para excluir munícipes em massa
+  const deleteMunicipesInBatch = useMutation({
+    mutationFn: async (municipeIds: string[]) => {
+      const results = [];
+      
+      for (const municipeId of municipeIds) {
+        try {
+          console.log('Iniciando exclusão do munícipe:', municipeId);
+          
+          // Primeiro, remover todas as tags associadas ao munícipe
+          const { error: tagDeleteError } = await supabase
+            .from('municipe_tags')
+            .delete()
+            .eq('municipe_id', municipeId);
+          
+          if (tagDeleteError) {
+            console.error('Erro ao remover tags:', tagDeleteError);
+          }
+          
+          // Depois, excluir o munícipe
+          const { error, data } = await supabase
+            .from('municipes')
+            .delete()
+            .eq('id', municipeId)
+            .select();
+          
+          if (error) {
+            results.push({ id: municipeId, success: false, error: error.message });
+          } else {
+            results.push({ id: municipeId, success: true });
+          }
+        } catch (err) {
+          results.push({ id: municipeId, success: false, error: 'Erro inesperado' });
+        }
+      }
+      
+      return results;
+    },
+    onSuccess: (results) => {
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+      
+      if (successCount > 0) {
+        toast({
+          title: `${successCount} munícipe(s) excluído(s) com sucesso!`,
+          description: errorCount > 0 ? `${errorCount} erro(s) encontrado(s).` : "Operação concluída."
+        });
+      }
+      
+      if (errorCount > 0) {
+        toast({
+          title: `Erro ao excluir ${errorCount} munícipe(s)`,
+          description: "Verifique se não há demandas vinculadas aos munícipes.",
+          variant: "destructive"
+        });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      setSelectedMunicipes([]);
+      setSelectAll(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro na exclusão em massa",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Função para excluir munícipe individual
   const deleteMunicipe = useMutation({
     mutationFn: async (municipeId: string) => {
       console.log('Iniciando exclusão do munícipe:', municipeId);
@@ -471,7 +570,36 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
-            <ImportCSVDialog 
+            {selectedMunicipes.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir {selectedMunicipes.length} selecionado(s)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Tem certeza que deseja excluir {selectedMunicipes.length} munícipe(s) selecionado(s)? 
+                      Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => deleteMunicipesInBatch.mutate(selectedMunicipes)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            
+            <ImportCSVDialog
               onFileSelect={handleFileImport}
               isImporting={importMunicipes.isPending}
               fileInputRef={fileInputRef}
@@ -626,6 +754,13 @@ export default function Municipes() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                    />
+                  </TableHead>
                   <TableHead>Munícipe</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Endereço</TableHead>
@@ -635,8 +770,8 @@ export default function Municipes() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                         Carregando munícipes...
@@ -645,13 +780,20 @@ export default function Municipes() {
                   </TableRow>
                 ) : filteredMunicipes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Nenhum munícipe encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredMunicipes.map((municipe) => (
                     <TableRow key={municipe.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedMunicipes.includes(municipe.id)}
+                          onCheckedChange={(checked) => handleSelectMunicipe(municipe.id, !!checked)}
+                          aria-label={`Selecionar ${municipe.nome}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium text-foreground">{municipe.nome}</p>
