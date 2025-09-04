@@ -42,14 +42,30 @@ export function WhatsAppManager() {
 
   const callEdgeFunction = async (action: string, instanceName?: string, additionalData?: any) => {
     try {
+      console.log('Calling edge function:', { action, instanceName, additionalData });
+      
       const { data, error } = await supabase.functions.invoke('configurar-evolution', {
         body: { action, instanceName, ...additionalData }
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Erro na Edge Function');
+      }
+
+      if (!data) {
+        throw new Error('Resposta vazia da Edge Function');
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       return data;
     } catch (error) {
-      console.error('Erro na Edge Function:', error);
+      console.error('Error calling edge function:', error);
       throw error;
     }
   };
@@ -255,6 +271,66 @@ export function WhatsAppManager() {
           Verificar Todas
         </Button>
       </div>
+
+      {/* Botão de Teste */}
+      <Button
+        onClick={async () => {
+          try {
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/configurar-evolution`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                  action: 'connect_instance',
+                  instanceName: 'gabinete-whats-01'
+                })
+              }
+            );
+            
+            const text = await response.text();
+            console.log('Raw response:', text);
+            
+            try {
+              const data = JSON.parse(text);
+              console.log('Parsed data:', data);
+              
+              if (data.qrcode) {
+                toast({
+                  title: 'QR Code recebido!',
+                  description: 'Check console for details'
+                });
+              } else {
+                toast({
+                  title: 'Resposta recebida',
+                  description: 'Mas sem QR Code - check console'
+                });
+              }
+            } catch (e) {
+              console.error('Failed to parse response:', e);
+              toast({
+                title: 'Erro ao processar',
+                description: 'Check console for raw response',
+                variant: 'destructive'
+              });
+            }
+          } catch (error: any) {
+            console.error('Test error:', error);
+            toast({
+              title: 'Erro no teste',
+              description: error.message,
+              variant: 'destructive'
+            });
+          }
+        }}
+        variant="outline"
+        className="mb-4"
+      >
+        🧪 Testar Edge Function Diretamente
+      </Button>
 
       {/* Grid de Instâncias */}
       <div className="grid gap-4 md:grid-cols-3">
