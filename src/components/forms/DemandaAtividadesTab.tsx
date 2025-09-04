@@ -417,7 +417,6 @@ export function DemandaAtividadesTab({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Nenhuma</SelectItem>
                           {proposituras.map((propositura) => (
                             <SelectItem key={propositura.value} value={propositura.value}>
                               {propositura.label}
