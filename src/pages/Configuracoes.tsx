@@ -366,7 +366,12 @@ export default function Configuracoes() {
             <p className="text-sm text-muted-foreground">
               Configure suas instâncias do WhatsApp para envio de mensagens automáticas
             </p>
-            <ConfigurarEvolutionDialog />
+            <ConfigurarEvolutionDialog>
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar WhatsApp
+              </Button>
+            </ConfigurarEvolutionDialog>
           </div>
         </CardContent>
       </Card>
