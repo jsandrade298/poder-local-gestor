@@ -72,7 +72,13 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demanda_atividades')
-        .select('*')
+        .select(`
+          *,
+          profiles:created_by (
+            nome,
+            email
+          )
+        `)
         .eq('demanda_id', demandaId)
         .order('data_atividade', { ascending: false });
       
@@ -433,11 +439,11 @@ export function DemandaAtividadesTab({ demandaId }: DemandaAtividadesTabProps) {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-xs">
-                              U
+                              {atividade.profiles?.nome?.charAt(0) || "?"}
                             </AvatarFallback>
                           </Avatar>
                           <span>
-                            Criado em {formatDateTime(atividade.created_at)}
+                            Por {atividade.profiles?.nome || "Usuário"} em {formatDateTime(atividade.created_at)}
                           </span>
                         </div>
                       </div>
