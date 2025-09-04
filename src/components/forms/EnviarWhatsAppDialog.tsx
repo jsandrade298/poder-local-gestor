@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +51,11 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const [sendingStatus, setSendingStatus] = useState<any>(null);
   const { toast } = useToast();
+
+  // Sincronizar munícipes selecionados quando a prop mudar
+  useEffect(() => {
+    setSelectedMunicipes(municipesSelecionados);
+  }, [municipesSelecionados]);
 
   // Buscar munícipes
   const { data: municipes } = useQuery({
