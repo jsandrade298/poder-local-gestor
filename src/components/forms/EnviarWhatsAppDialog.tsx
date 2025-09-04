@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Smartphone, Upload, X, Image, Video, FileAudio, FileText } from "lucide-react";
+import { MessageSquare, Send, Loader2, Smartphone, Upload, X, Image, Video, FileAudio, FileText, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -46,6 +46,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Buscar munícipes com telefone
   const { data: municipes } = useQuery({
@@ -316,7 +317,19 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="instancia">Instância WhatsApp</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="instancia">Instância WhatsApp</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["whatsapp-instances-connected"] })}
+                disabled={loadingInstances}
+                className="gap-1 h-8"
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingInstances ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </div>
             {loadingInstances ? (
               <div className="flex items-center gap-2 mt-1">
                 <Loader2 className="h-4 w-4 animate-spin" />
