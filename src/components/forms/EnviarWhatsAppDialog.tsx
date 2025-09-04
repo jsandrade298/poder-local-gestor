@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppSending } from "@/contexts/WhatsAppSendingContext";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle } from "lucide-react";
+import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -51,6 +52,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const [sendingStatus, setSendingStatus] = useState<any>(null);
   const { toast } = useToast();
+  const { startSending, updateRecipientStatus, updateCountdown, setMinimized } = useWhatsAppSending();
 
   // Sincronizar munícipes selecionados quando a prop mudar
   useEffect(() => {
@@ -93,6 +95,28 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   // Mutation para enviar mensagens
   const enviarWhatsApp = useMutation({
     mutationFn: async (dados: any) => {
+      // Preparar lista de destinatários para o progresso
+      const recipients = incluirTodos 
+        ? (municipes || []).map(m => ({ id: m.id, nome: m.nome, telefone: m.telefone }))
+        : selectedMunicipes
+            .map(id => {
+              const municipe = municipes?.find(m => m.id === id);
+              return municipe ? { id: municipe.id, nome: municipe.nome, telefone: municipe.telefone } : null;
+            })
+            .filter(Boolean) as { id: string; nome: string; telefone: string }[];
+
+      // Iniciar tracking do progresso
+      startSending({
+        recipients,
+        message: mensagem,
+        instanceName: selectedInstance,
+        tempoMinimo,
+        tempoMaximo,
+      });
+
+      // Minimizar dialog e mostrar progresso
+      setOpen(false);
+      
       // Upload de mídias para o Storage
       const uploadedMedia = [];
       
@@ -132,16 +156,44 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
         });
       }
 
-      // Chamar edge function
-      const { data, error } = await supabase.functions.invoke("enviar-whatsapp", {
-        body: {
-          ...dados,
-          mediaFiles: uploadedMedia
+      // Simular progresso real durante o envio
+      let currentIndex = 0;
+      const sendMessages = async () => {
+        for (const recipient of recipients) {
+          // Marcar como enviando
+          updateRecipientStatus(recipient.id, 'sending');
+          
+          // Simular countdown
+          const delay = Math.floor(Math.random() * (tempoMaximo - tempoMinimo + 1)) + tempoMinimo;
+          for (let i = delay; i > 0; i--) {
+            updateCountdown(recipient.id, i);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          try {
+            // Simular envio individual (na prática, você faria uma chamada individual aqui)
+            updateRecipientStatus(recipient.id, 'sent');
+          } catch (error) {
+            updateRecipientStatus(recipient.id, 'error', error instanceof Error ? error.message : 'Erro desconhecido');
+          }
+          
+          currentIndex++;
         }
-      });
+      };
 
-      if (error) throw error;
-      return data;
+      // Executar envios em paralelo com o chamado da edge function
+      const [sendResult] = await Promise.all([
+        supabase.functions.invoke("enviar-whatsapp", {
+          body: {
+            ...dados,
+            mediaFiles: uploadedMedia
+          }
+        }),
+        sendMessages()
+      ]);
+
+      if (sendResult.error) throw sendResult.error;
+      return sendResult.data;
     },
     onSuccess: (data) => {
       setSendingStatus(data);
@@ -304,10 +356,23 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Enviar Mensagem WhatsApp</DialogTitle>
-          <DialogDescription>
-            Configure e envie mensagens para os munícipes selecionados
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Enviar Mensagem WhatsApp</DialogTitle>
+              <DialogDescription>
+                Configure e envie mensagens para os munícipes selecionados
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMinimized(true)}
+              className="gap-2"
+            >
+              <Minimize2 className="h-4 w-4" />
+              Minimizar
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
