@@ -44,6 +44,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [tempoMinimo, setTempoMinimo] = useState(1);
   const [tempoMaximo, setTempoMaximo] = useState(3);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [searchMunicipe, setSearchMunicipe] = useState("");
   const { toast } = useToast();
 
   // Buscar munícipes com telefone
@@ -168,6 +169,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       setTempoMinimo(1);
       setTempoMaximo(3);
       setMediaFiles([]);
+      setSearchMunicipe("");
     },
     onError: (error) => {
       toast({
@@ -277,6 +279,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     }
   };
 
+  const totalSelecionados = incluirTodos 
+    ? municipes?.length || 0
+    : selectedMunicipes.length;
+
   const toggleMunicipe = (municipeId: string) => {
     setSelectedMunicipes(prev => 
       prev.includes(municipeId)
@@ -285,9 +291,12 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     );
   };
 
-  const totalSelecionados = incluirTodos 
-    ? municipes?.length || 0
-    : selectedMunicipes.length;
+  // Filtrar munícipes baseado na busca
+  const filteredMunicipes = municipes?.filter(m => 
+    !selectedMunicipes.includes(m.id) && 
+    (m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
+     m.telefone.includes(searchMunicipe))
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -466,18 +475,34 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                   })}
                 </div>
 
-                <Select onValueChange={toggleMunicipe}>
+                <div>
+                  <Input
+                    placeholder="Buscar munícipe por nome ou telefone..."
+                    value={searchMunicipe}
+                    onChange={(e) => setSearchMunicipe(e.target.value)}
+                    className="mb-2"
+                  />
+                </div>
+
+                <Select onValueChange={(value) => {
+                  toggleMunicipe(value);
+                  setSearchMunicipe(""); // Limpar busca após selecionar
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um munícipe para adicionar" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {municipes
-                      ?.filter(m => !selectedMunicipes.includes(m.id))
-                      .map((municipe) => (
-                      <SelectItem key={municipe.id} value={municipe.id}>
-                        {municipe.nome} - {municipe.telefone}
+                  <SelectContent className="bg-background border z-50">
+                    {filteredMunicipes && filteredMunicipes.length > 0 ? (
+                      filteredMunicipes.map((municipe) => (
+                        <SelectItem key={municipe.id} value={municipe.id}>
+                          {municipe.nome} - {municipe.telefone}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-results" disabled>
+                        {searchMunicipe ? "Nenhum munícipe encontrado" : "Todos os munícipes já foram selecionados"}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
