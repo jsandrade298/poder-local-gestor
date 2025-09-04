@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash, Settings, Filter } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Users, Tag as TagIcon, Edit, Trash, Settings, Filter, Grid3x3, List } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -33,6 +33,7 @@ const colorOptions = [
 
 export default function Tags() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isManageMunicipesDialogOpen, setIsManageMunicipesDialogOpen] = useState(false);
@@ -511,201 +512,239 @@ export default function Tags() {
         </DialogContent>
       </Dialog>
 
-      {/* Filtro de Busca */}
+      {/* Filtro de Busca e Controles de Visualização */}
       <Card className="shadow-sm border-0 bg-card">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar tags por nome ou descrição..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar tags por nome ou descrição..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* Toggle de Visualização */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Visualização:</span>
+              <div className="flex border rounded-lg">
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className="rounded-r-none"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="rounded-l-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Grid de Tags */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTags.map((tag) => (
-          <Card key={tag.id} className="shadow-sm border-0 bg-card hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: tag.cor }}
-                  />
-                  <CardTitle className="text-base font-semibold">{tag.nome}</CardTitle>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                   <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                     <DropdownMenuItem onClick={() => {
-                       setSelectedTag(tag);
-                       setIsManageMunicipesDialogOpen(true);
-                     }}>
-                       <Settings className="h-4 w-4 mr-2" />
-                       Gerenciar Munícipes
-                     </DropdownMenuItem>
-                     <DropdownMenuItem onClick={() => handleEditTag(tag)}>
-                       <Edit className="h-4 w-4 mr-2" />
-                       Editar
-                     </DropdownMenuItem>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <Trash className="h-4 w-4 mr-2" />
-                          <span className="text-destructive">Excluir</span>
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja excluir a tag "{tag.nome}"? 
-                            Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteTag(tag.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {tag.descricao || "Sem descrição"}
-                </p>
+      {/* Display Tags - Grid or List View */}
+      {viewMode === "grid" ? (
+        /* Grid de Tags */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTags.map((tag) => (
+            <Card key={tag.id} className="shadow-sm border-0 bg-card hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">{tag.total_municipes} munícipes</span>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: tag.cor }}
+                    />
+                    <CardTitle className="text-base font-semibold">{tag.nome}</CardTitle>
                   </div>
-                  <Badge variant="secondary">
-                    {tag.total_municipes}
-                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                     <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                       <DropdownMenuItem onClick={() => {
+                         setSelectedTag(tag);
+                         setIsManageMunicipesDialogOpen(true);
+                       }}>
+                         <Settings className="h-4 w-4 mr-2" />
+                         Gerenciar Munícipes
+                       </DropdownMenuItem>
+                       <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                         <Edit className="h-4 w-4 mr-2" />
+                         Editar
+                       </DropdownMenuItem>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <Trash className="h-4 w-4 mr-2" />
+                            <span className="text-destructive">Excluir</span>
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir a tag "{tag.nome}"? 
+                              Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteTag(tag.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Tabela Alternativa (para telas maiores) */}
-      <Card className="shadow-sm border-0 bg-card hidden lg:block">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            Todas as Tags ({filteredTags.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tag</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Munícipes</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTags.map((tag) => (
-                  <TableRow key={tag.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: tag.cor }}
-                        />
-                        <span className="font-medium text-foreground">{tag.nome}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{tag.descricao || "Sem descrição"}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {tag.total_municipes}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                         <DropdownMenuContent align="end" className="bg-background border border-border z-50">
-                           <DropdownMenuItem onClick={() => {
-                             setSelectedTag(tag);
-                             setIsManageMunicipesDialogOpen(true);
-                           }}>
-                             <Settings className="h-4 w-4 mr-2" />
-                             Gerenciar Munícipes
-                           </DropdownMenuItem>
-                           <DropdownMenuItem onClick={() => handleEditTag(tag)}>
-                             <Edit className="h-4 w-4 mr-2" />
-                             Editar
-                           </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                <Trash className="h-4 w-4 mr-2" />
-                                <span className="text-destructive">Excluir</span>
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja excluir a tag "{tag.nome}"? 
-                                  Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteTag(tag.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {tag.descricao || "Sem descrição"}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-foreground">{tag.total_municipes} munícipes</span>
+                    </div>
+                    <Badge variant="secondary">
+                      {tag.total_municipes}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
           
           {filteredTags.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Nenhuma tag encontrada</p>
+            <div className="col-span-full">
+              <Card className="shadow-sm border-0 bg-card">
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">Nenhuma tag encontrada</p>
+                </CardContent>
+              </Card>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      ) : (
+        /* Lista de Tags */
+        <Card className="shadow-sm border-0 bg-card">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">
+              Todas as Tags ({filteredTags.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tag</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Munícipes</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTags.map((tag) => (
+                    <TableRow key={tag.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: tag.cor }}
+                          />
+                          <span className="font-medium text-foreground">{tag.nome}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">{tag.descricao || "Sem descrição"}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {tag.total_municipes}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                           <DropdownMenuContent align="end" className="bg-background border border-border z-50">
+                             <DropdownMenuItem onClick={() => {
+                               setSelectedTag(tag);
+                               setIsManageMunicipesDialogOpen(true);
+                             }}>
+                               <Settings className="h-4 w-4 mr-2" />
+                               Gerenciar Munícipes
+                             </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleEditTag(tag)}>
+                               <Edit className="h-4 w-4 mr-2" />
+                               Editar
+                             </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  <span className="text-destructive">Excluir</span>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir a tag "{tag.nome}"? 
+                                    Esta ação removerá a tag de todos os munícipes e não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteTag(tag.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {filteredTags.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Nenhuma tag encontrada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dialog de Gestão de Munícipes */}
       <Dialog open={isManageMunicipesDialogOpen} onOpenChange={setIsManageMunicipesDialogOpen}>
