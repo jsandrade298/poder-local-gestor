@@ -91,7 +91,7 @@ export function WhatsAppManager() {
             if (updatedInst) {
               return {
                 ...prevInst,
-                status: updatedInst.status === 'connected' ? 'connected' : 'disconnected',
+                status: updatedInst.status,
                 profileName: updatedInst.profileName,
                 number: updatedInst.number
               };
@@ -101,9 +101,13 @@ export function WhatsAppManager() {
           });
         });
         
+        // Contar quantas estão conectadas
+        const connectedCount = result.instances.filter(i => i.status === 'connected').length;
+        const totalCount = result.instances.length;
+        
         toast({
           title: 'Status atualizado',
-          description: 'Status de todas as instâncias verificado',
+          description: `${connectedCount} de ${totalCount} instâncias conectadas`,
         });
       }
     } catch (error) {
@@ -127,11 +131,7 @@ export function WhatsAppManager() {
       const result = await callEdgeFunction('instance_status', instanceName);
       console.log(`Status result for ${instanceName}:`, result);
       
-      // Verificar se está conectado baseado em múltiplos campos possíveis
-      const isConnected = 
-        result?.status === 'connected' || 
-        result?.state === 'open' ||
-        result?.connected === true;
+      const isConnected = result?.status === 'connected';
       
       setInstances(prev => prev.map(inst => 
         inst.name === instanceName 
@@ -139,7 +139,7 @@ export function WhatsAppManager() {
               ...inst, 
               status: isConnected ? 'connected' : 'disconnected',
               profileName: result?.profileName,
-              number: result?.phoneNumber || result?.number
+              number: result?.phoneNumber
             }
           : inst
       ));
@@ -147,7 +147,7 @@ export function WhatsAppManager() {
       if (showToast) {
         toast({
           title: 'Status verificado',
-          description: `${instanceName}: ${isConnected ? 'Conectado' : 'Desconectado'}`,
+          description: `${instanceName}: ${isConnected ? '✅ Conectado' : '❌ Desconectado'}`,
           variant: isConnected ? 'default' : 'destructive'
         });
       }
@@ -423,102 +423,6 @@ export function WhatsAppManager() {
         </Button>
       </div>
 
-      {/* Botão de Debug Detalhado - TEMPORÁRIO */}
-      <div className="mb-4 p-4 border rounded-lg bg-yellow-50">
-        <h3 className="font-semibold mb-2">🔍 Debug Detalhado Evolution API</h3>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              console.log('=== Teste Manual Evolution API ===');
-              
-              // Dados da instância gabinete-whats-02
-              const apiUrl = 'https://api.evoapicloud.com';
-              const instanceId = '06331c62-88b5-4d67-844c-aba9c41ef417';
-              const token = 'AAC55AAC988A-4E56-90E3-694CBE9CD17A';
-              
-              const endpoints = [
-                `/instance/connectionState/${instanceId}`,
-                `/instance/fetchInstances`,
-                `/instance/status/${instanceId}`,
-                `/instance/info/${instanceId}`,
-              ];
-              
-              for (const endpoint of endpoints) {
-                try {
-                  console.log(`Testing: ${endpoint}`);
-                  const response = await fetch(`${apiUrl}${endpoint}`, {
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'apikey': token,
-                    },
-                  });
-                  
-                  const text = await response.text();
-                  console.log(`Response from ${endpoint}:`, text);
-                  
-                  try {
-                    const data = JSON.parse(text);
-                    console.log(`Parsed data from ${endpoint}:`, data);
-                    
-                    // Se for fetchInstances, procurar nossa instância
-                    if (endpoint.includes('fetchInstances')) {
-                      const instances = Array.isArray(data) ? data : data.instances;
-                      const ourInstance = instances?.find(i => 
-                        i.instanceId === instanceId || 
-                        i.instance_id === instanceId ||
-                        i.instanceName === 'gabinete-whats-02'
-                      );
-                      if (ourInstance) {
-                        console.log('Nossa instância:', ourInstance);
-                        alert(`Instância encontrada!\nStatus: ${ourInstance.state || ourInstance.status}\nDados: ${JSON.stringify(ourInstance, null, 2)}`);
-                      }
-                    }
-                  } catch (e) {
-                    console.log('Parse error:', e);
-                  }
-                } catch (error) {
-                  console.error(`Error testing ${endpoint}:`, error);
-                }
-              }
-            }}
-          >
-            Testar Todos Endpoints
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              // Forçar status como conectado para teste
-              setInstances(prev => prev.map(inst => 
-                inst.name === 'gabinete-whats-02' 
-                  ? { ...inst, status: 'connected' }
-                  : inst
-              ));
-              toast({
-                title: 'Forçado para Conectado',
-                description: 'Status alterado manualmente para teste',
-              });
-            }}
-          >
-            Forçar Conectado (Teste)
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              // Ver estado atual das instâncias
-              console.log('Estado atual das instâncias:', instances);
-              alert(`Estado atual:\n${JSON.stringify(instances, null, 2)}`);
-            }}
-          >
-            Ver Estado Local
-          </Button>
-        </div>
-      </div>
 
       {/* Grid de Instâncias */}
       <div className="grid gap-4 md:grid-cols-3">
