@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Smartphone, Upload, X, Image, Video, FileAudio, FileText, RefreshCw } from "lucide-react";
+import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -24,6 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 
 interface EnviarWhatsAppDialogProps {
   municipesSelecionados?: string[];
@@ -45,10 +49,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [tempoMaximo, setTempoMaximo] = useState(3);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
+  const [sendingStatus, setSendingStatus] = useState<any>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Buscar munícipes com telefone
+  // Buscar munícipes
   const { data: municipes } = useQuery({
     queryKey: ["municipes-whatsapp"],
     queryFn: async () => {
@@ -59,140 +63,101 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
         .order("nome");
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
+    enabled: open,
   });
 
-  // Buscar instâncias WhatsApp conectadas
-  const { data: instances, isLoading: loadingInstances } = useQuery({
-    queryKey: ["whatsapp-instances-connected"],
+  // Buscar instâncias conectadas usando a edge function
+  const { data: instances, isLoading: loadingInstances, refetch: refetchInstances } = useQuery({
+    queryKey: ["whatsapp-instances-status"],
     queryFn: async () => {
-      // Primeiro buscar as instâncias do banco
-      const { data: dbInstances, error } = await supabase
-        .from("whatsapp_instances")
-        .select("*")
-        .eq("active", true);
+      const { data, error } = await supabase.functions.invoke("configurar-evolution", {
+        body: { action: "list_instances" }
+      });
 
       if (error) throw error;
-
-      // Verificar status de cada instância via edge function
-      const instancesWithStatus = await Promise.all(
-        dbInstances.map(async (instance) => {
-          try {
-            const { data: statusData } = await supabase.functions.invoke("configurar-evolution", {
-              body: {
-                action: "instance_status",
-                instanceName: instance.instance_name
-              }
-            });
-
-            return {
-              ...instance,
-              connected: statusData?.status === "connected",
-              profileName: statusData?.profileName,
-              phoneNumber: statusData?.phoneNumber
-            };
-          } catch (error) {
-            console.error(`Erro ao verificar status da instância ${instance.instance_name}:`, error);
-            return {
-              ...instance,
-              connected: false
-            };
-          }
-        })
-      );
-
-      // Retornar apenas instâncias conectadas
-      return instancesWithStatus.filter(instance => instance.connected);
+      
+      // Filtrar apenas instâncias conectadas
+      return (data?.instances || []).filter(inst => inst.status === 'connected');
     },
-    enabled: open, // Só executa quando o dialog está aberto
+    enabled: open,
+    refetchInterval: 10000, // Atualiza a cada 10 segundos
   });
 
+  // Mutation para enviar mensagens
   const enviarWhatsApp = useMutation({
-    mutationFn: async ({ telefones, mensagem, incluirTodos, instanceName, tempoMinimo, tempoMaximo, mediaFiles }: {
-      telefones: string[];
-      mensagem: string;
-      incluirTodos: boolean;
-      instanceName: string;
-      tempoMinimo: number;
-      tempoMaximo: number;
-      mediaFiles: MediaFile[];
-    }) => {
-      // Função para sanitizar nome do arquivo
-      const sanitizeKey = (original: string) => {
-        return `${Date.now()}-${original}`
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-          .replace(/[^\w.-]+/g, '_');                       // troca espaços, () etc por _
-      };
-
-      // Upload de arquivos de mídia para o Supabase Storage com URL assinada
+    mutationFn: async (dados: any) => {
+      // Upload de mídias para o Storage
       const uploadedMedia = [];
+      
       for (const media of mediaFiles) {
-        const sanitizedFileName = sanitizeKey(media.file.name);
+        const fileName = `whatsapp/${Date.now()}-${media.file.name}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from('demanda-anexos')
-          .upload(sanitizedFileName, media.file, { 
-            upsert: true, 
-            contentType: media.file.type 
-          });
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('whatsapp-media')
+          .upload(fileName, media.file);
 
         if (uploadError) {
-          console.error('Erro ao fazer upload:', uploadError);
-          throw new Error(`Erro ao fazer upload do arquivo ${media.file.name}: ${uploadError.message}`);
+          // Se o bucket não existir, criar e tentar novamente
+          if (uploadError.message.includes('not found')) {
+            // Criar bucket
+            await supabase.storage.createBucket('whatsapp-media', { public: true });
+            
+            // Tentar upload novamente
+            const { data: retryData, error: retryError } = await supabase.storage
+              .from('whatsapp-media')
+              .upload(fileName, media.file);
+              
+            if (retryError) throw retryError;
+          } else {
+            throw uploadError;
+          }
         }
 
-        // Criar URL assinada (válida por 1 hora)
-        const { data: signedData, error: signError } = await supabase.storage
-          .from('demanda-anexos')
-          .createSignedUrl(sanitizedFileName, 60 * 60);
-
-        if (signError) {
-          console.error('Erro ao criar URL assinada:', signError);
-          throw new Error(`Erro ao criar URL do arquivo ${media.file.name}: ${signError.message}`);
-        }
+        // Obter URL pública
+        const { data: urlData } = supabase.storage
+          .from('whatsapp-media')
+          .getPublicUrl(fileName);
 
         uploadedMedia.push({
           type: media.type,
-          url: signedData.signedUrl,
-          filename: sanitizedFileName,
-          fileName: media.file.name // nome original para exibição
+          url: urlData.publicUrl,
+          filename: media.file.name
         });
       }
 
-      const { data, error } = await supabase.functions.invoke("enviar-whatsapp-zapi", {
-        body: { 
-          telefones, 
-          mensagem, 
-          incluirTodos, 
-          instanceName, 
-          tempoMinimo, 
-          tempoMaximo,
+      // Chamar edge function
+      const { data, error } = await supabase.functions.invoke("enviar-whatsapp", {
+        body: {
+          ...dados,
           mediaFiles: uploadedMedia
-        },
+        }
       });
 
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
+      setSendingStatus(data);
+      
       toast({
-        title: "Mensagens enviadas!",
-        description: `${data.resumo.sucessos} mensagens enviadas com sucesso. ${data.resumo.erros} erros.`,
+        title: "✅ Envio concluído!",
+        description: `${data.resumo.sucessos} enviadas com sucesso, ${data.resumo.erros} erros.`,
       });
-      setOpen(false);
-      setMensagem("");
-      setSelectedMunicipes([]);
-      setIncluirTodos(false);
-      setSelectedInstance("");
-      setTempoMinimo(1);
-      setTempoMaximo(3);
-      setMediaFiles([]);
-      setSearchMunicipe("");
+      
+      // Limpar formulário após sucesso
+      setTimeout(() => {
+        setMensagem("");
+        setSelectedMunicipes([]);
+        setIncluirTodos(false);
+        setMediaFiles([]);
+        setSendingStatus(null);
+      }, 3000);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
-        title: "Erro ao enviar mensagens",
+        title: "Erro ao enviar",
         description: error.message,
         variant: "destructive",
       });
@@ -202,8 +167,8 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const handleEnviar = () => {
     if (!mensagem.trim() && mediaFiles.length === 0) {
       toast({
-        title: "Erro",
-        description: "Digite uma mensagem ou adicione um arquivo de mídia",
+        title: "Atenção",
+        description: "Digite uma mensagem ou adicione um arquivo",
         variant: "destructive",
       });
       return;
@@ -211,17 +176,8 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
 
     if (!selectedInstance) {
       toast({
-        title: "Erro",
-        description: "Selecione uma instância WhatsApp conectada",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (tempoMinimo < 1 || tempoMaximo < tempoMinimo) {
-      toast({
-        title: "Erro",
-        description: "Configure tempos válidos (mínimo >= 1s e máximo >= mínimo)",
+        title: "Atenção",
+        description: "Selecione uma instância WhatsApp",
         variant: "destructive",
       });
       return;
@@ -229,27 +185,26 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
 
     if (!incluirTodos && selectedMunicipes.length === 0) {
       toast({
-        title: "Erro",
-        description: "Selecione ao menos um munícipe ou marque 'Enviar para todos'",
+        title: "Atenção",
+        description: "Selecione destinatários ou marque 'Enviar para todos'",
         variant: "destructive",
       });
       return;
     }
 
     const telefones = incluirTodos 
-      ? [] 
+      ? []
       : selectedMunicipes
           .map(id => municipes?.find(m => m.id === id)?.telefone)
-          .filter(Boolean) as string[];
+          .filter(Boolean);
 
-    enviarWhatsApp.mutate({ 
-      telefones, 
-      mensagem, 
-      incluirTodos, 
+    enviarWhatsApp.mutate({
+      telefones,
+      mensagem,
+      incluirTodos,
       instanceName: selectedInstance,
       tempoMinimo,
       tempoMaximo,
-      mediaFiles
     });
   };
 
@@ -258,11 +213,11 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     if (!files) return;
 
     Array.from(files).forEach(file => {
-      const maxSize = 100 * 1024 * 1024; // 100MB
-      if (file.size > maxSize) {
+      // Validar tamanho (máximo 100MB)
+      if (file.size > 100 * 1024 * 1024) {
         toast({
           title: "Arquivo muito grande",
-          description: `${file.name} excede o limite de 100MB`,
+          description: `${file.name} excede 100MB`,
           variant: "destructive",
         });
         return;
@@ -278,7 +233,6 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       setMediaFiles(prev => [...prev, { file, type, url }]);
     });
 
-    // Reset input
     event.target.value = '';
   };
 
@@ -298,24 +252,16 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     }
   };
 
-  const totalSelecionados = incluirTodos 
-    ? municipes?.length || 0
-    : selectedMunicipes.length;
-
-  const toggleMunicipe = (municipeId: string) => {
-    setSelectedMunicipes(prev => 
-      prev.includes(municipeId)
-        ? prev.filter(id => id !== municipeId)
-        : [...prev, municipeId]
-    );
-  };
-
-  // Filtrar munícipes baseado na busca
+  // Filtrar munícipes para busca
   const filteredMunicipes = municipes?.filter(m => 
     !selectedMunicipes.includes(m.id) && 
     (m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
-     m.telefone.includes(searchMunicipe))
-  );
+     m.telefone?.includes(searchMunicipe))
+  ) || [];
+
+  const totalDestinatarios = incluirTodos 
+    ? (municipes?.length || 0)
+    : selectedMunicipes.length;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -325,48 +271,36 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           Enviar WhatsApp
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Enviar Mensagem WhatsApp</DialogTitle>
           <DialogDescription>
-            Envie mensagens WhatsApp para munícipes selecionados ou todos os cadastrados
+            Configure e envie mensagens para os munícipes selecionados
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Seleção de Instância */}
           <div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="instancia">Instância WhatsApp</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => queryClient.invalidateQueries({ queryKey: ["whatsapp-instances-connected"] })}
-                disabled={loadingInstances}
-                className="gap-1 h-8"
-              >
-                <RefreshCw className={`h-3 w-3 ${loadingInstances ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
-            </div>
+            <Label>Instância WhatsApp *</Label>
             {loadingInstances ? (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 py-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">Verificando instâncias conectadas...</span>
+                <span className="text-sm text-muted-foreground">Verificando instâncias...</span>
               </div>
             ) : instances && instances.length > 0 ? (
               <Select value={selectedInstance} onValueChange={setSelectedInstance}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione uma instância WhatsApp conectada" />
+                  <SelectValue placeholder="Selecione a instância para envio" />
                 </SelectTrigger>
                 <SelectContent>
-                  {instances.map((instance) => (
-                    <SelectItem key={instance.id} value={instance.instance_name}>
+                  {instances.map((inst) => (
+                    <SelectItem key={inst.instanceName} value={inst.instanceName}>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <Smartphone className="h-4 w-4" />
-                        <span>{instance.display_name}</span>
-                        {instance.phoneNumber && (
-                          <span className="text-muted-foreground">({instance.phoneNumber})</span>
+                        <div className="w-2 h-2 bg-green-500 rounded-full" />
+                        <span>{inst.displayName}</span>
+                        {inst.number && (
+                          <span className="text-muted-foreground">({inst.number})</span>
                         )}
                       </div>
                     </SelectItem>
@@ -374,48 +308,104 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 </SelectContent>
               </Select>
             ) : (
-              <div className="mt-1 p-3 border border-destructive/50 rounded-md bg-destructive/10">
-                <p className="text-sm text-destructive">
-                  Nenhuma instância WhatsApp conectada encontrada. 
-                  Vá para Configurações → WhatsApp para conectar uma instância.
-                </p>
+              <Alert className="mt-1">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Nenhuma instância conectada. Configure em Configurações → WhatsApp.
+                </AlertDescription>
+              </Alert>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetchInstances()}
+              className="mt-1"
+            >
+              Atualizar instâncias
+            </Button>
+          </div>
+
+          {/* Seleção de Destinatários */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox
+                id="todos"
+                checked={incluirTodos}
+                onCheckedChange={(checked) => {
+                  setIncluirTodos(!!checked);
+                  if (checked) setSelectedMunicipes([]);
+                }}
+              />
+              <Label htmlFor="todos">
+                Enviar para todos os munícipes ({municipes?.length || 0})
+              </Label>
+            </div>
+
+            {!incluirTodos && (
+              <div className="space-y-2">
+                <Label>Selecionar Munícipes</Label>
+                
+                {selectedMunicipes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
+                    {selectedMunicipes.map(id => {
+                      const municipe = municipes?.find(m => m.id === id);
+                      return municipe ? (
+                        <Badge key={id} variant="secondary" className="gap-1">
+                          {municipe.nome}
+                          <button
+                            onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+
+                <Input
+                  placeholder="Buscar munícipe por nome ou telefone..."
+                  value={searchMunicipe}
+                  onChange={(e) => setSearchMunicipe(e.target.value)}
+                />
+
+                {searchMunicipe && (
+                  <div className="max-h-40 overflow-y-auto border rounded-lg">
+                    {filteredMunicipes.length > 0 ? (
+                      filteredMunicipes.map(municipe => (
+                        <button
+                          key={municipe.id}
+                          onClick={() => {
+                            setSelectedMunicipes(prev => [...prev, municipe.id]);
+                            setSearchMunicipe("");
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
+                        >
+                          <div className="font-medium">{municipe.nome}</div>
+                          <div className="text-sm text-muted-foreground">{municipe.telefone}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-muted-foreground">
+                        Nenhum munícipe encontrado
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="tempo-minimo">Tempo mínimo entre envios (segundos)</Label>
-              <Input
-                id="tempo-minimo"
-                type="number"
-                min="1"
-                value={tempoMinimo}
-                onChange={(e) => setTempoMinimo(parseInt(e.target.value) || 1)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="tempo-maximo">Tempo máximo entre envios (segundos)</Label>
-              <Input
-                id="tempo-maximo"
-                type="number"
-                min="1"
-                value={tempoMaximo}
-                onChange={(e) => setTempoMaximo(parseInt(e.target.value) || 3)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-
+          {/* Upload de Mídia */}
           <div>
-            <Label>Arquivos de Mídia</Label>
+            <Label>Arquivos de Mídia (opcional)</Label>
             <div className="mt-2 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="file"
                   multiple
-                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
                   onChange={handleFileUpload}
                   className="hidden"
                   id="media-upload"
@@ -423,33 +413,27 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => document.getElementById('media-upload')?.click()}
-                  className="gap-2"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-4 w-4 mr-2" />
                   Adicionar Arquivos
                 </Button>
-                <span className="text-sm text-muted-foreground">
-                  Imagens, vídeos, áudios, documentos (máx 100MB)
+                <span className="text-xs text-muted-foreground">
+                  Máx. 100MB por arquivo
                 </span>
               </div>
 
               {mediaFiles.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {mediaFiles.map((media, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 border rounded">
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
                       {getMediaIcon(media.type)}
                       <span className="flex-1 text-sm truncate">{media.file.name}</span>
-                      <Badge variant="secondary">{media.type}</Badge>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeMediaFile(index)}
-                        className="h-6 w-6 p-0"
-                      >
+                      <Badge variant="outline" className="text-xs">{media.type}</Badge>
+                      <button onClick={() => removeMediaFile(index)}>
                         <X className="h-3 w-3" />
-                      </Button>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -457,108 +441,87 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
             </div>
           </div>
 
+          {/* Mensagem */}
           <div>
-            <Label htmlFor="mensagem">Mensagem</Label>
+            <Label htmlFor="mensagem">Mensagem de Texto</Label>
             <Textarea
               id="mensagem"
-              placeholder="Digite sua mensagem aqui (opcional se enviando arquivos)..."
+              placeholder="Digite sua mensagem..."
               value={mensagem}
               onChange={(e) => setMensagem(e.target.value)}
               rows={4}
               className="mt-1"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {mensagem.length} caracteres
+            </p>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="incluir-todos"
-              checked={incluirTodos}
-              onCheckedChange={(checked) => {
-                setIncluirTodos(checked as boolean);
-                if (checked) {
-                  setSelectedMunicipes([]);
-                }
-              }}
-            />
-            <Label htmlFor="incluir-todos">
-              Enviar para todos os munícipes cadastrados ({municipes?.length || 0})
-            </Label>
-          </div>
-
-          {!incluirTodos && (
+          {/* Configuração de Delay */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Selecionar Munícipes</Label>
-              <div className="mt-2 space-y-2">
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {selectedMunicipes.map(id => {
-                    const municipe = municipes?.find(m => m.id === id);
-                    return municipe ? (
-                      <Badge key={id} variant="secondary" className="gap-1">
-                        {municipe.nome}
-                        <button
-                          onClick={() => toggleMunicipe(id)}
-                          className="ml-1 hover:bg-red-200 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-
-                <div>
-                  <Input
-                    placeholder="Buscar munícipe por nome ou telefone..."
-                    value={searchMunicipe}
-                    onChange={(e) => setSearchMunicipe(e.target.value)}
-                    className="mb-2"
-                  />
-                </div>
-
-                <Select onValueChange={(value) => {
-                  toggleMunicipe(value);
-                  setSearchMunicipe(""); // Limpar busca após selecionar
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um munícipe para adicionar" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border z-50">
-                    {filteredMunicipes && filteredMunicipes.length > 0 ? (
-                      filteredMunicipes.map((municipe) => (
-                        <SelectItem key={municipe.id} value={municipe.id}>
-                          {municipe.nome} - {municipe.telefone}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-results" disabled>
-                        {searchMunicipe ? "Nenhum munícipe encontrado" : "Todos os munícipes já foram selecionados"}
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Label htmlFor="tempo-min">Tempo mínimo (segundos)</Label>
+              <Input
+                id="tempo-min"
+                type="number"
+                min="1"
+                value={tempoMinimo}
+                onChange={(e) => setTempoMinimo(Number(e.target.value))}
+              />
             </div>
+            <div>
+              <Label htmlFor="tempo-max">Tempo máximo (segundos)</Label>
+              <Input
+                id="tempo-max"
+                type="number"
+                min="1"
+                value={tempoMaximo}
+                onChange={(e) => setTempoMaximo(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Status de Envio */}
+          {sendingStatus && (
+            <Alert>
+              <AlertDescription>
+                <div className="space-y-2">
+                  <div className="font-medium">Relatório de Envio:</div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>Total: {sendingStatus.resumo.total}</div>
+                    <div className="text-green-600">Sucesso: {sendingStatus.resumo.sucessos}</div>
+                    <div className="text-red-600">Erros: {sendingStatus.resumo.erros}</div>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
-          <div className="flex justify-between items-center pt-4">
+          {/* Resumo e Botões */}
+          <div className="flex items-center justify-between pt-4 border-t">
             <div className="text-sm text-muted-foreground">
-              {totalSelecionados} destinatário{totalSelecionados !== 1 ? 's' : ''} selecionado{totalSelecionados !== 1 ? 's' : ''}
+              {totalDestinatarios} destinatário(s) selecionado(s)
             </div>
+            
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
               <Button 
                 onClick={handleEnviar}
-                disabled={enviarWhatsApp.isPending || !selectedInstance || (instances && instances.length === 0)}
-                className="gap-2"
+                disabled={enviarWhatsApp.isPending || !selectedInstance}
               >
                 {enviarWhatsApp.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Enviando...
+                  </>
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar Mensagem
+                  </>
                 )}
-                Enviar Mensagem
               </Button>
             </div>
           </div>
