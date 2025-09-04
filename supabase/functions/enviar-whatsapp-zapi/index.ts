@@ -18,6 +18,11 @@ serve(async (req) => {
     const zapiToken = Deno.env.get('ZAPI_TOKEN');
     const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
     
+    console.log('ZAPI_TOKEN presente:', !!zapiToken);
+    console.log('ZAPI_INSTANCE_ID presente:', !!zapiInstanceId);
+    console.log('ZAPI_TOKEN length:', zapiToken?.length || 0);
+    console.log('ZAPI_INSTANCE_ID length:', zapiInstanceId?.length || 0);
+    
     if (!zapiToken || !zapiInstanceId) {
       console.error('Credenciais Z-API não configuradas');
       return new Response(
