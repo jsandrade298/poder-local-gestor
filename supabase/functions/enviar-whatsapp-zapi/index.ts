@@ -13,22 +13,28 @@ serve(async (req) => {
   }
 
   try {
-    const { telefones, mensagem, incluirTodos } = await req.json();
+    const { telefones, mensagem, incluirTodos, instanceName } = await req.json();
     
-    const zapiToken = Deno.env.get('ZAPI_TOKEN');
-    const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
-    
-    console.log('ZAPI_TOKEN presente:', !!zapiToken);
-    console.log('ZAPI_INSTANCE_ID presente:', !!zapiInstanceId);
-    console.log('ZAPI_TOKEN length:', zapiToken?.length || 0);
-    console.log('ZAPI_INSTANCE_ID length:', zapiInstanceId?.length || 0);
-    
-    if (!zapiToken || !zapiInstanceId) {
-      console.error('Credenciais Z-API não configuradas');
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    );
+
+    // Buscar configurações da instância selecionada
+    const { data: instanceData, error: instanceError } = await supabaseClient
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('instance_name', instanceName)
+      .eq('active', true)
+      .single();
+
+    if (instanceError || !instanceData) {
+      console.error('Instância não encontrada:', instanceError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Credenciais Z-API não configuradas' 
+          error: 'Instância WhatsApp não encontrada ou inativa' 
         }),
         { 
           status: 400,
@@ -37,11 +43,7 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
+    console.log('Usando instância:', instanceData.display_name);
 
     let telefonesList = telefones;
 
@@ -58,8 +60,27 @@ serve(async (req) => {
     console.log(`Enviando mensagem para ${telefonesList.length} números`);
 
     const resultados = [];
-    const baseUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}`;
-    console.log(`Base URL construída: ${baseUrl}`);
+
+    // Configuração para Evolution API
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+
+    if (!evolutionApiUrl || !evolutionApiKey) {
+      console.error('Credenciais Evolution API não configuradas');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Credenciais Evolution API não configuradas' 
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('Evolution API URL:', evolutionApiUrl);
+    console.log('Instance Name:', instanceName);
 
     for (const telefone of telefonesList) {
       try {
@@ -97,23 +118,22 @@ serve(async (req) => {
         
         console.log(`Enviando para: ${telefone} -> ${numeroCompleto}`);
 
-        console.log(`Tentando enviar para: ${numeroCompleto}`);
-        console.log(`URL: ${baseUrl}/send-text`);
+        // URL da Evolution API para envio de mensagem
+        const evolutionUrl = `${evolutionApiUrl}/message/sendText/${instanceName}`;
         
-        const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
-        
-        console.log(`URL completa: ${zapiUrl}`);
+        console.log(`URL completa: ${evolutionUrl}`);
         console.log(`Número formatado: ${numeroCompleto}`);
         console.log(`Mensagem: ${mensagem}`);
 
-        const response = await fetch(zapiUrl, {
+        const response = await fetch(evolutionUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': evolutionApiKey,
           },
           body: JSON.stringify({
-            phone: numeroCompleto,
-            message: mensagem
+            number: `${numeroCompleto}@s.whatsapp.net`,
+            text: mensagem
           }),
         });
 
@@ -121,19 +141,19 @@ serve(async (req) => {
         const result = await response.json();
         console.log(`Response result:`, JSON.stringify(result));
         
-        if (response.ok) {
+        if (response.ok && result.key) {
           console.log(`Mensagem enviada para ${telefone}:`, result);
           resultados.push({ 
             telefone, 
             status: 'sucesso',
-            messageId: result.messageId
+            messageId: result.key.id
           });
         } else {
           console.error(`Erro ao enviar para ${telefone}:`, result);
           resultados.push({ 
             telefone, 
             status: 'erro',
-            erro: result.error || 'Erro desconhecido'
+            erro: result.message || result.error || 'Erro desconhecido'
           });
         }
 
