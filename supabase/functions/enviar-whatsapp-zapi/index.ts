@@ -58,12 +58,38 @@ serve(async (req) => {
     for (const telefone of telefonesList) {
       try {
         // Limpar e formatar telefone (remover caracteres especiais)
-        const telefoneFormatado = telefone.replace(/\D/g, '');
+        let telefoneFormatado = telefone.replace(/\D/g, '');
         
-        // Verificar se tem código do país, se não adicionar 55 (Brasil)
-        const numeroCompleto = telefoneFormatado.startsWith('55') 
-          ? telefoneFormatado 
-          : `55${telefoneFormatado}`;
+        // Remover código do país se já tiver (+55 ou 55)
+        if (telefoneFormatado.startsWith('55')) {
+          telefoneFormatado = telefoneFormatado.substring(2);
+        }
+        
+        // Verificar se é número válido (10 ou 11 dígitos)
+        if (telefoneFormatado.length < 10 || telefoneFormatado.length > 11) {
+          console.error(`Número inválido: ${telefone} -> ${telefoneFormatado}`);
+          resultados.push({ 
+            telefone, 
+            status: 'erro',
+            erro: 'Número de telefone inválido'
+          });
+          continue;
+        }
+        
+        // Para celulares, garantir que tenha 11 dígitos (adicionar 9 se necessário)
+        if (telefoneFormatado.length === 10) {
+          // Se começar com 9, é celular antigo, adicionar 9
+          const ddd = telefoneFormatado.substring(0, 2);
+          const numero = telefoneFormatado.substring(2);
+          if (numero.startsWith('9') || numero.startsWith('8') || numero.startsWith('7')) {
+            telefoneFormatado = ddd + '9' + numero;
+          }
+        }
+        
+        // Adicionar código do país (55)
+        const numeroCompleto = `55${telefoneFormatado}`;
+        
+        console.log(`Enviando para: ${telefone} -> ${numeroCompleto}`);
 
         const response = await fetch(`${baseUrl}/send-text`, {
           method: 'POST',
