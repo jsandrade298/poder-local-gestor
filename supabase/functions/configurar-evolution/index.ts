@@ -51,10 +51,59 @@ serve(async (req) => {
 
       const instancesWithStatus = [];
       for (const instance of instances || []) {
+        let connectionStatus = 'disconnected';
+        let profileName = '';
+        let phoneNumber = '';
+        
+        try {
+          const statusHeaders = {
+            'Content-Type': 'application/json',
+            'apikey': instance.instance_token,
+          };
+          
+          const statusUrl = `${instance.api_url}/instance/connectionState/${instance.instance_id}`;
+          console.log(`Checking status for ${instance.instance_name} at:`, statusUrl);
+          
+          const statusResponse = await fetch(statusUrl, {
+            method: 'GET',
+            headers: statusHeaders,
+          });
+
+          if (statusResponse.ok) {
+            const responseText = await statusResponse.text();
+            console.log(`Status response for ${instance.instance_name}:`, responseText);
+            
+            if (responseText.trim() !== '') {
+              try {
+                const statusData = JSON.parse(responseText);
+                
+                const isConnected = 
+                  statusData?.state === 'open' || 
+                  statusData?.instance?.state === 'open' ||
+                  statusData?.status === 'open' ||
+                  statusData?.connectionState === 'open' ||
+                  statusData?.data?.state === 'open';
+                
+                if (isConnected) {
+                  connectionStatus = 'connected';
+                  profileName = statusData?.profileName || statusData?.instance?.profileName || '';
+                  phoneNumber = statusData?.phoneNumber || statusData?.instance?.phoneNumber || '';
+                }
+              } catch (parseError) {
+                console.log(`Could not parse status for ${instance.instance_name}`);
+              }
+            }
+          }
+        } catch (statusError) {
+          console.error(`Error checking status for ${instance.instance_name}:`, statusError);
+        }
+
         instancesWithStatus.push({
           instanceName: instance.instance_name,
           displayName: instance.display_name,
-          status: 'disconnected' // Simplificado por enquanto
+          status: connectionStatus,
+          profileName,
+          phoneNumber
         });
       }
 
@@ -265,24 +314,59 @@ serve(async (req) => {
       case 'instance_status':
         try {
           const statusUrl = `${instanceConfig.api_url}/instance/connectionState/${instanceConfig.instance_id}`;
+          console.log('Checking status at URL:', statusUrl);
+          
           const statusResponse = await fetch(statusUrl, {
             method: 'GET',
             headers: apiHeaders,
           });
 
+          console.log('Status response code:', statusResponse.status);
+          
           if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            const isConnected = 
-              statusData?.state === 'open' || 
-              statusData?.instance?.state === 'open';
+            const responseText = await statusResponse.text();
+            console.log('Status response text:', responseText);
             
-            result = {
-              status: isConnected ? 'connected' : 'disconnected',
-              details: statusData
-            };
+            if (responseText.trim() === '') {
+              console.log('Empty response, assuming disconnected');
+              result = {
+                status: 'disconnected',
+                details: 'Empty response from API'
+              };
+            } else {
+              try {
+                const statusData = JSON.parse(responseText);
+                console.log('Parsed status data:', statusData);
+                
+                // Verificar múltiplos formatos de resposta possíveis
+                const isConnected = 
+                  statusData?.state === 'open' || 
+                  statusData?.instance?.state === 'open' ||
+                  statusData?.status === 'open' ||
+                  statusData?.connectionState === 'open' ||
+                  statusData?.data?.state === 'open';
+                
+                result = {
+                  status: isConnected ? 'connected' : 'disconnected',
+                  details: statusData,
+                  profileName: statusData?.profileName || statusData?.instance?.profileName,
+                  phoneNumber: statusData?.phoneNumber || statusData?.instance?.phoneNumber
+                };
+              } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                // Se não conseguir parsear, mas teve resposta, pode estar conectado
+                result = {
+                  status: 'disconnected',
+                  error: 'Could not parse response',
+                  rawResponse: responseText.substring(0, 100)
+                };
+              }
+            }
           } else {
+            console.log('Status check failed with code:', statusResponse.status);
             result = {
-              status: 'disconnected'
+              status: 'disconnected',
+              error: `HTTP ${statusResponse.status}`
             };
           }
         } catch (error) {
