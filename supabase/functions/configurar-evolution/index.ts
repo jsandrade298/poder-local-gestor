@@ -63,6 +63,9 @@ serve(async (req) => {
           throw new Error('Nome da instância é obrigatório');
         }
 
+        console.log(`Attempting connection to: ${instanceConfig.api_url}/instance/connect/${instanceName}`);
+        console.log(`Using headers:`, JSON.stringify(headers, null, 2));
+        
         const connectResponse = await fetch(`${instanceConfig.api_url}/instance/connect/${instanceName}`, {
           method: 'GET',
           headers,
