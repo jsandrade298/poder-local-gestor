@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { QrCode, Smartphone, CheckCircle, XCircle, RefreshCw, Loader, Send } from 'lucide-react';
+import { QrCode, Smartphone, CheckCircle, XCircle, RefreshCw, Loader, Send, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface WhatsAppInstance {
   name: string;
   displayName: string;
   status: 'connected' | 'disconnected' | 'connecting';
+  profileName?: string;
+  number?: string;
 }
 
 export function WhatsAppManager() {
@@ -31,7 +34,8 @@ export function WhatsAppManager() {
   const [currentInstance, setCurrentInstance] = useState<string>('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [showQRModal, setShowQRModal] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   // Form para enviar mensagem
   const [messageForm, setMessageForm] = useState({
@@ -70,15 +74,37 @@ export function WhatsAppManager() {
     }
   };
 
+  // Verificar todas as instâncias (chamado manualmente)
   const checkAllInstances = async () => {
+    setLoading(prev => ({ ...prev, 'check-all': true }));
+    
     try {
       const result = await callEdgeFunction('list_instances');
+      
       if (result?.instances) {
-        setInstances(result.instances.map((inst: any) => ({
-          name: inst.instanceName,
-          displayName: inst.displayName,
-          status: inst.status === 'connected' ? 'connected' : 'disconnected'
-        })));
+        setInstances(prevInstances => {
+          return prevInstances.map(prevInst => {
+            const updatedInst = result.instances.find(
+              (inst: any) => inst.instanceName === prevInst.name
+            );
+            
+            if (updatedInst) {
+              return {
+                ...prevInst,
+                status: updatedInst.status === 'connected' ? 'connected' : 'disconnected',
+                profileName: updatedInst.profileName,
+                number: updatedInst.number
+              };
+            }
+            
+            return prevInst;
+          });
+        });
+        
+        toast({
+          title: 'Status atualizado',
+          description: 'Status de todas as instâncias verificado',
+        });
       }
     } catch (error) {
       toast({
@@ -86,19 +112,59 @@ export function WhatsAppManager() {
         description: 'Não foi possível verificar as instâncias',
         variant: 'destructive'
       });
+    } finally {
+      setLoading(prev => ({ ...prev, 'check-all': false }));
     }
   };
 
-  const checkInstanceStatus = async (instanceName: string) => {
+  // Verificar status de uma instância específica
+  const checkInstanceStatus = async (instanceName: string, showToast = true) => {
+    if (showToast) {
+      setLoading(prev => ({ ...prev, [`verify-${instanceName}`]: true }));
+    }
+    
     try {
       const result = await callEdgeFunction('instance_status', instanceName);
-      return result?.status === 'connected';
+      const isConnected = result?.status === 'connected';
+      
+      setInstances(prev => prev.map(inst => 
+        inst.name === instanceName 
+          ? { 
+              ...inst, 
+              status: isConnected ? 'connected' : 'disconnected',
+              profileName: result?.profileName,
+              number: result?.phoneNumber || result?.number
+            }
+          : inst
+      ));
+      
+      if (showToast) {
+        toast({
+          title: 'Status verificado',
+          description: `${instanceName}: ${isConnected ? 'Conectado' : 'Desconectado'}`,
+          variant: isConnected ? 'default' : 'destructive'
+        });
+      }
+      
+      return isConnected;
     } catch (error) {
       console.error('Erro ao verificar status:', error);
+      if (showToast) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível verificar o status',
+          variant: 'destructive'
+        });
+      }
       return false;
+    } finally {
+      if (showToast) {
+        setLoading(prev => ({ ...prev, [`verify-${instanceName}`]: false }));
+      }
     }
   };
 
+  // Conectar instância
   const connectInstance = async (instanceName: string) => {
     setLoading(prev => ({ ...prev, [`connect-${instanceName}`]: true }));
     
@@ -106,20 +172,34 @@ export function WhatsAppManager() {
       const result = await callEdgeFunction('connect_instance', instanceName);
       
       if (result?.status === 'connected') {
+        // Já está conectado
         setInstances(prev => prev.map(inst => 
           inst.name === instanceName 
-            ? { ...inst, status: 'connected' }
+            ? { 
+                ...inst, 
+                status: 'connected',
+                profileName: result.profileName,
+                number: result.phoneNumber || result.number
+              }
             : inst
         ));
         
         toast({
-          title: 'Conectado',
-          description: 'WhatsApp já está conectado!'
+          title: '✅ Já conectado',
+          description: 'Este WhatsApp já está conectado!',
         });
       } else if (result?.qrcode) {
+        // Mostrar QR Code
         setQrCodeData(result.qrcode);
         setCurrentInstance(instanceName);
         setShowQRModal(true);
+        
+        // Marcar como "conectando"
+        setInstances(prev => prev.map(inst => 
+          inst.name === instanceName 
+            ? { ...inst, status: 'connecting' }
+            : inst
+        ));
         
         // Iniciar polling
         startPolling(instanceName);
@@ -142,49 +222,82 @@ export function WhatsAppManager() {
     }
   };
 
+  // Polling para verificar quando conectar
   const startPolling = (instanceName: string) => {
     // Limpar polling anterior se existir
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
+    
+    setIsPolling(true);
+    let pollCount = 0;
+    const maxPolls = 40; // 40 * 3 segundos = 2 minutos
 
     const interval = setInterval(async () => {
-      const isConnected = await checkInstanceStatus(instanceName);
+      pollCount++;
+      
+      const isConnected = await checkInstanceStatus(instanceName, false);
       
       if (isConnected) {
+        // CONECTADO COM SUCESSO!
         setInstances(prev => prev.map(inst => 
           inst.name === instanceName 
             ? { ...inst, status: 'connected' }
             : inst
         ));
         
+        // Fechar modal e limpar QR
         setShowQRModal(false);
         setQrCodeData('');
         setCurrentInstance('');
+        setIsPolling(false);
         
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
+        // Parar polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
         }
         
+        // Notificar sucesso
         toast({
-          title: 'Sucesso!',
-          description: 'WhatsApp conectado com sucesso'
+          title: '🎉 Conectado com sucesso!',
+          description: `WhatsApp ${instanceName} foi conectado`,
+          duration: 5000,
+        });
+        
+        // Atualizar status de todas as instâncias após 1 segundo
+        setTimeout(() => {
+          checkAllInstances();
+        }, 1000);
+      } else if (pollCount >= maxPolls) {
+        // Timeout - parar polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        
+        setIsPolling(false);
+        
+        // Voltar status para desconectado
+        setInstances(prev => prev.map(inst => 
+          inst.name === instanceName 
+            ? { ...inst, status: 'disconnected' }
+            : inst
+        ));
+        
+        toast({
+          title: 'Tempo esgotado',
+          description: 'Tente conectar novamente',
+          variant: 'destructive'
         });
       }
-    }, 3000);
+    }, 3000); // Verificar a cada 3 segundos
 
-    setPollingInterval(interval);
-
-    // Parar após 2 minutos
-    setTimeout(() => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        setPollingInterval(null);
-      }
-    }, 120000);
+    pollingIntervalRef.current = interval;
   };
 
+  // Desconectar instância
   const disconnectInstance = async (instanceName: string) => {
     setLoading(prev => ({ ...prev, [`disconnect-${instanceName}`]: true }));
     
@@ -193,13 +306,13 @@ export function WhatsAppManager() {
       
       setInstances(prev => prev.map(inst => 
         inst.name === instanceName 
-          ? { ...inst, status: 'disconnected' }
+          ? { ...inst, status: 'disconnected', profileName: undefined, number: undefined }
           : inst
       ));
       
       toast({
         title: 'Desconectado',
-        description: 'WhatsApp desconectado com sucesso'
+        description: 'WhatsApp desconectado com sucesso',
       });
     } catch (error) {
       toast({
@@ -212,6 +325,7 @@ export function WhatsAppManager() {
     }
   };
 
+  // Enviar mensagem
   const sendMessage = async () => {
     if (!messageForm.instance || !messageForm.phone || !messageForm.message) {
       toast({
@@ -231,8 +345,8 @@ export function WhatsAppManager() {
       });
       
       toast({
-        title: 'Enviado!',
-        description: 'Mensagem enviada com sucesso'
+        title: '✅ Enviado!',
+        description: 'Mensagem enviada com sucesso',
       });
       
       setMessageForm({ instance: '', phone: '', message: '' });
@@ -247,16 +361,39 @@ export function WhatsAppManager() {
     }
   };
 
+  // Verificar status inicial ao carregar
   useEffect(() => {
     checkAllInstances();
     
-    // Limpar polling ao desmontar
+    // Limpar polling ao desmontar componente
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
       }
     };
   }, []);
+
+  // Fechar modal e parar polling
+  const closeQRModal = () => {
+    setShowQRModal(false);
+    setQrCodeData('');
+    setCurrentInstance('');
+    
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    setIsPolling(false);
+    
+    // Voltar status para desconectado se estava conectando
+    setInstances(prev => prev.map(inst => 
+      inst.status === 'connecting' 
+        ? { ...inst, status: 'disconnected' }
+        : inst
+    ));
+  };
 
   return (
     <div className="space-y-6">
@@ -266,83 +403,42 @@ export function WhatsAppManager() {
           <Smartphone className="h-6 w-6" />
           Gerenciar Instâncias WhatsApp
         </h2>
-        <Button onClick={checkAllInstances} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          onClick={checkAllInstances} 
+          variant="outline"
+          disabled={loading['check-all']}
+        >
+          {loading['check-all'] ? (
+            <Loader className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
           Verificar Todas
         </Button>
       </div>
 
-      {/* Botão de Teste */}
-      <Button
-        onClick={async () => {
-          try {
-            const response = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/configurar-evolution`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-                },
-                body: JSON.stringify({
-                  action: 'connect_instance',
-                  instanceName: 'gabinete-whats-01'
-                })
-              }
-            );
-            
-            const text = await response.text();
-            console.log('Raw response:', text);
-            
-            try {
-              const data = JSON.parse(text);
-              console.log('Parsed data:', data);
-              
-              if (data.qrcode) {
-                toast({
-                  title: 'QR Code recebido!',
-                  description: 'Check console for details'
-                });
-              } else {
-                toast({
-                  title: 'Resposta recebida',
-                  description: 'Mas sem QR Code - check console'
-                });
-              }
-            } catch (e) {
-              console.error('Failed to parse response:', e);
-              toast({
-                title: 'Erro ao processar',
-                description: 'Check console for raw response',
-                variant: 'destructive'
-              });
-            }
-          } catch (error: any) {
-            console.error('Test error:', error);
-            toast({
-              title: 'Erro no teste',
-              description: error.message,
-              variant: 'destructive'
-            });
-          }
-        }}
-        variant="outline"
-        className="mb-4"
-      >
-        🧪 Testar Edge Function Diretamente
-      </Button>
-
       {/* Grid de Instâncias */}
       <div className="grid gap-4 md:grid-cols-3">
         {instances.map((instance) => (
-          <Card key={instance.name}>
+          <Card key={instance.name} className={instance.status === 'connecting' ? 'border-blue-500' : ''}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="text-lg">{instance.displayName}</span>
                 {instance.status === 'connected' ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <Badge variant="default" className="bg-green-500">
+                    <Wifi className="h-3 w-3 mr-1" />
+                    Conectado
+                  </Badge>
+                ) : instance.status === 'connecting' ? (
+                  <Badge variant="secondary" className="bg-blue-500 text-white">
+                    <Loader className="h-3 w-3 mr-1 animate-spin" />
+                    Conectando
+                  </Badge>
                 ) : (
-                  <XCircle className="h-5 w-5 text-red-500" />
+                  <Badge variant="destructive">
+                    <WifiOff className="h-3 w-3 mr-1" />
+                    Desconectado
+                  </Badge>
                 )}
               </CardTitle>
             </CardHeader>
@@ -350,20 +446,31 @@ export function WhatsAppManager() {
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">{instance.name}</p>
                 
+                {instance.profileName && (
+                  <div className="text-sm bg-gray-50 p-2 rounded">
+                    <strong>Perfil:</strong> {instance.profileName}
+                  </div>
+                )}
+                
+                {instance.number && (
+                  <div className="text-sm bg-gray-50 p-2 rounded">
+                    <strong>Número:</strong> {instance.number}
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
                   <Button
-                    onClick={() => checkInstanceStatus(instance.name).then(connected => {
-                      setInstances(prev => prev.map(inst => 
-                        inst.name === instance.name 
-                          ? { ...inst, status: connected ? 'connected' : 'disconnected' }
-                          : inst
-                      ));
-                    })}
+                    onClick={() => checkInstanceStatus(instance.name, true)}
                     variant="outline"
                     size="sm"
                     className="flex-1"
+                    disabled={loading[`verify-${instance.name}`] || instance.status === 'connecting'}
                   >
-                    Verificar
+                    {loading[`verify-${instance.name}`] ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Verificar'
+                    )}
                   </Button>
                   
                   {instance.status === 'disconnected' ? (
@@ -378,6 +485,15 @@ export function WhatsAppManager() {
                       ) : (
                         'Conectar'
                       )}
+                    </Button>
+                  ) : instance.status === 'connecting' ? (
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      disabled
+                    >
+                      <Loader className="h-4 w-4 animate-spin mr-1" />
+                      Aguarde...
                     </Button>
                   ) : (
                     <Button
@@ -420,7 +536,7 @@ export function WhatsAppManager() {
               .filter(inst => inst.status === 'connected')
               .map(inst => (
                 <option key={inst.name} value={inst.name}>
-                  {inst.displayName}
+                  {inst.displayName} {inst.profileName ? `(${inst.profileName})` : ''}
                 </option>
               ))
             }
@@ -455,34 +571,53 @@ export function WhatsAppManager() {
       </Card>
 
       {/* Modal do QR Code */}
-      <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
+      <Dialog open={showQRModal} onOpenChange={(open) => !open && closeQRModal()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Escaneie o QR Code</DialogTitle>
           </DialogHeader>
           
           <div className="flex flex-col items-center space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Conectando: {instances.find(i => i.name === currentInstance)?.displayName}
+            <p className="text-sm text-muted-foreground text-center">
+              Conectando: <strong>{instances.find(i => i.name === currentInstance)?.displayName}</strong>
             </p>
             
-            <div className="bg-white p-4 rounded-lg border-2">
-              {qrCodeData ? (
-                <img 
-                  src={qrCodeData} 
-                  alt="QR Code" 
-                  className="w-64 h-64"
-                />
-              ) : (
-                <div className="w-64 h-64 flex items-center justify-center">
-                  <Loader className="h-8 w-8 animate-spin" />
+            <div className="relative">
+              <div className="bg-white p-4 rounded-lg border-2">
+                {qrCodeData ? (
+                  <img 
+                    src={qrCodeData} 
+                    alt="QR Code" 
+                    className="w-64 h-64"
+                  />
+                ) : (
+                  <div className="w-64 h-64 flex items-center justify-center">
+                    <Loader className="h-8 w-8 animate-spin" />
+                  </div>
+                )}
+              </div>
+              
+              {isPolling && (
+                <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                  <Badge variant="secondary" className="animate-pulse">
+                    <Loader className="h-3 w-3 mr-1 animate-spin" />
+                    Aguardando conexão...
+                  </Badge>
                 </div>
               )}
             </div>
             
             <p className="text-xs text-center text-muted-foreground">
-              Abra o WhatsApp no seu celular, vá em Dispositivos Conectados e escaneie o código
+              Abra o WhatsApp no seu celular, vá em <strong>Dispositivos Conectados</strong> → <strong>Conectar dispositivo</strong> e escaneie o código
             </p>
+            
+            <Button
+              onClick={closeQRModal}
+              variant="outline"
+              className="w-full"
+            >
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
