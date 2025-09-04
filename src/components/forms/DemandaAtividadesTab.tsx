@@ -116,7 +116,7 @@ export function DemandaAtividadesTab({
           )
         `)
         .eq('demanda_id', demandaId)
-        .order('created_at', { ascending: false });
+        .order('data_atividade', { ascending: false });
       
       if (error) throw error;
       return data || [];
@@ -652,7 +652,7 @@ export function DemandaAtividadesTab({
                             
                             {atividade.link_propositura && (
                               <div>
-                                <span className="text-xs text-muted-foreground break-all">
+                                <span className="text-xs text-foreground break-all">
                                   {atividade.link_propositura}
                                 </span>
                               </div>
