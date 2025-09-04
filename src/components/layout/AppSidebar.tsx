@@ -7,7 +7,8 @@ import {
   Building2,
   UserCheck,
   Settings,
-  Home
+  Home,
+  Calendar
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -25,6 +26,7 @@ import {
 
 const menuItems = [
   { title: "Visão Geral", url: "/", icon: Home },
+  { title: "Agenda", url: "/agenda", icon: Calendar },
   { title: "Demandas", url: "/demandas", icon: FileText },
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Tags", url: "/tags", icon: Tags },
