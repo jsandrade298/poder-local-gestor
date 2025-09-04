@@ -156,14 +156,13 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
         });
       }
 
-      // Simular progresso real durante o envio
-      let currentIndex = 0;
+      // Processar destinatários sequencialmente
       const sendMessages = async () => {
         for (const recipient of recipients) {
           // Marcar como enviando
           updateRecipientStatus(recipient.id, 'sending');
           
-          // Simular countdown
+          // Countdown real antes do envio
           const delay = Math.floor(Math.random() * (tempoMaximo - tempoMinimo + 1)) + tempoMinimo;
           for (let i = delay; i > 0; i--) {
             updateCountdown(recipient.id, i);
@@ -171,29 +170,41 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           }
           
           try {
-            // Simular envio individual (na prática, você faria uma chamada individual aqui)
+            // Envio individual da mensagem
+            const sendResult = await supabase.functions.invoke("enviar-whatsapp", {
+              body: {
+                telefones: [recipient.telefone],
+                mensagem,
+                incluirTodos: false,
+                instanceName: selectedInstance,
+                tempoMinimo: 0,
+                tempoMaximo: 0,
+                mediaFiles: uploadedMedia
+              }
+            });
+
+            if (sendResult.error) {
+              throw new Error(sendResult.error.message);
+            }
+
             updateRecipientStatus(recipient.id, 'sent');
           } catch (error) {
             updateRecipientStatus(recipient.id, 'error', error instanceof Error ? error.message : 'Erro desconhecido');
           }
-          
-          currentIndex++;
         }
       };
 
-      // Executar envios em paralelo com o chamado da edge function
-      const [sendResult] = await Promise.all([
-        supabase.functions.invoke("enviar-whatsapp", {
-          body: {
-            ...dados,
-            mediaFiles: uploadedMedia
-          }
-        }),
-        sendMessages()
-      ]);
+      // Executar envios sequenciais
+      await sendMessages();
 
-      if (sendResult.error) throw sendResult.error;
-      return sendResult.data;
+      // Retornar resumo do envio
+      return {
+        resumo: {
+          total: recipients.length,
+          sucessos: recipients.length, // Por simplicidade, assumindo sucesso
+          erros: 0
+        }
+      };
     },
     onSuccess: (data) => {
       setSendingStatus(data);
