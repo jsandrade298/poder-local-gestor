@@ -234,16 +234,76 @@ export function ConfigurarEvolutionDialog({ children }: { children: React.ReactN
         {/* Debug Section - TEMPORÁRIO */}
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
-            <CardTitle className="text-orange-800 text-sm">🔧 Debug - Teste de Status</CardTitle>
+            <CardTitle className="text-orange-800 text-sm">🔧 Debug - Teste Detalhado de Endpoints</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  console.log('=== Teste Manual Evolution API ===');
+                  
+                  // Dados da instância gabinete-whats-02
+                  const apiUrl = 'https://api.evoapicloud.com';
+                  const instanceId = '06331c62-88b5-4d67-844c-aba9c41ef417';
+                  const token = 'AAC55AAC988A-4E56-90E3-694CBE9CD17A';
+                  
+                  const endpoints = [
+                    `/instance/connectionState/${instanceId}`,
+                    `/instance/fetchInstances`,
+                    `/instance/status/${instanceId}`,
+                    `/instance/info/${instanceId}`,
+                  ];
+                  
+                  for (const endpoint of endpoints) {
+                    try {
+                      console.log(`Testing: ${endpoint}`);
+                      const response = await fetch(`${apiUrl}${endpoint}`, {
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'apikey': token,
+                        },
+                      });
+                      
+                      const text = await response.text();
+                      console.log(`Response from ${endpoint}:`, text);
+                      
+                      try {
+                        const data = JSON.parse(text);
+                        console.log(`Parsed data from ${endpoint}:`, data);
+                        
+                        // Se for fetchInstances, procurar nossa instância
+                        if (endpoint.includes('fetchInstances')) {
+                          const instances = Array.isArray(data) ? data : data.instances;
+                          const ourInstance = instances?.find(i => 
+                            i.instanceId === instanceId || 
+                            i.instance_id === instanceId ||
+                            i.instanceName === 'gabinete-whats-02'
+                          );
+                          if (ourInstance) {
+                            console.log('Nossa instância:', ourInstance);
+                            alert(`Instância encontrada!\nStatus: ${ourInstance.connectionStatus || ourInstance.state || ourInstance.status}\nDados: ${JSON.stringify(ourInstance, null, 2).substring(0, 500)}`);
+                          }
+                        }
+                      } catch (e) {
+                        console.log('Parse error:', e);
+                      }
+                    } catch (error) {
+                      console.error(`Error testing ${endpoint}:`, error);
+                    }
+                  }
+                }}
+              >
+                Testar Todos Endpoints
+              </Button>
+              
               <Button
                 variant="outline"
                 size="sm"
                 onClick={async () => {
                   try {
-                    console.log('=== DEBUG: Testando gabinete-whats-02 ===');
+                    console.log('=== DEBUG: Testando Edge Function ===');
                     const { data, error } = await supabase.functions.invoke('configurar-evolution', {
                       body: { 
                         action: 'instance_status',
