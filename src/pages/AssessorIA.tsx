@@ -310,14 +310,16 @@ const AssessorIA = () => {
                       {documentosContexto.map((doc) => (
                         <div
                           key={doc.id}
-                          className="relative flex-shrink-0 w-24 h-24 bg-muted rounded-lg border border-border hover:border-primary/50 transition-colors group"
+                          className="relative flex-shrink-0 w-28 h-20 bg-card rounded-lg border border-border hover:border-primary/50 transition-all duration-200 group shadow-sm hover:shadow-md"
                         >
-                          <div className="p-2 h-full flex flex-col items-center justify-between text-center">
-                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                            <span className="text-[10px] font-medium text-foreground leading-tight break-words">
-                              {doc.nome.length > 20 ? doc.nome.substring(0, 17) + '...' : doc.nome}
-                            </span>
-                            <Badge variant="outline" className="text-[9px] py-0 px-1 h-3 truncate max-w-full">
+                          <div className="p-3 h-full flex flex-col justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-xs font-medium text-foreground leading-tight truncate">
+                                {doc.nome}
+                              </span>
+                            </div>
+                            <Badge variant="secondary" className="text-[10px] py-0.5 px-2 h-auto self-start max-w-full truncate">
                               {doc.categoria}
                             </Badge>
                           </div>
@@ -325,7 +327,7 @@ const AssessorIA = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => removerDocumentoContexto(doc.id)}
-                            className="absolute -top-1 -right-1 h-5 w-5 p-0 rounded-full bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                           >
                             <X className="h-3 w-3" />
                           </Button>
