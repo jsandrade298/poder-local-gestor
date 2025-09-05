@@ -1,12 +1,10 @@
 /* Estilos para o componente MentionTextarea */
 .mention-container {
   width: 100%;
-  position: relative;
 }
 
 .mention-input {
   width: 100%;
-  position: relative;
 }
 
 .mention-input__control {
@@ -18,7 +16,6 @@
   color: hsl(var(--foreground)) !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
-  position: relative !important;
 }
 
 .mention-input__control:focus-within {
@@ -54,13 +51,8 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
   font-size: 14px !important;
   max-height: 200px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  z-index: 9999 !important;
-  position: absolute !important;
-  width: auto !important;
-  min-width: 200px !important;
-  margin-top: 2px !important;
+  overflow: auto !important;
+  z-index: 1000 !important;
 }
 
 .mention-input__suggestions__item {
@@ -71,7 +63,6 @@
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
-  white-space: nowrap !important;
 }
 
 .mention-input__suggestions__item:last-child {
@@ -92,25 +83,6 @@
   display: inline !important;
   z-index: 1 !important;
   position: relative !important;
-}
-
-/* Garantir que não haja scroll duplo */
-.mention-input__suggestions::-webkit-scrollbar {
-  width: 6px;
-}
-
-.mention-input__suggestions::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 3px;
-}
-
-.mention-input__suggestions::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 3px;
-}
-
-.mention-input__suggestions::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--border));
 }
 
 /* Modo escuro */

@@ -100,17 +100,12 @@ export function MentionTextarea({
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
               fontSize: '14px',
               maxHeight: '200px',
-              overflowY: 'auto',
-              position: 'absolute',
-              zIndex: 10000,
-              marginTop: '2px',
-              minWidth: '200px',
+              overflow: 'auto',
             },
             item: {
               padding: '8px 12px',
               borderBottom: '1px solid hsl(var(--border))',
               cursor: 'pointer',
-              color: 'hsl(var(--foreground))',
               '&focused': {
                 backgroundColor: 'hsl(var(--accent))',
               },
