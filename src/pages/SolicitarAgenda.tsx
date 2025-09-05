@@ -642,21 +642,31 @@ const SolicitarAgenda = () => {
   useEffect(() => {
     const agendaId = searchParams.get('agenda');
     
-    if (agendaId) {
+    console.log("=== DEBUG ABERTURA DE AGENDA ===");
+    console.log("Parâmetro agenda da URL:", agendaId);
+    console.log("Minhas agendas disponíveis:", minhasAgendas?.length);
+    console.log("Solicitações disponíveis:", solicitacoes?.length);
+    
+    if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Buscar nas minhas agendas primeiro
       let agenda = minhasAgendas?.find(a => a.id === agendaId);
+      console.log("Agenda encontrada em minhas agendas:", !!agenda);
       
       // Se não encontrou, buscar nas solicitações
       if (!agenda) {
         agenda = solicitacoes?.find(a => a.id === agendaId);
+        console.log("Agenda encontrada em solicitações:", !!agenda);
       }
       
       if (agenda) {
+        console.log("Abrindo agenda:", agenda.id);
         setSelectedAgenda(agenda);
         
         // Limpar o parâmetro da URL após abrir
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
+      } else {
+        console.log("Agenda não encontrada!");
       }
     }
   }, [searchParams, minhasAgendas, solicitacoes]);
