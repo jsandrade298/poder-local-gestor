@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Cake, Settings, Send, Clock, Users, Paperclip, X, CheckSquare, Square } from "lucide-react";
+import { MessageCircle, Cake, Settings, Send, Clock, Users, Paperclip, X, CheckSquare, Square, FileText, AlertCircle } from "lucide-react";
 
 interface WhatsAppInstance {
   id: string;
@@ -32,6 +33,9 @@ interface WhatsAppConfig {
   instancia_aniversario: string;
   mensagem_aniversario: string;
   aniversario_ativo: boolean;
+  instancia_demandas: string;
+  mensagem_demandas: string;
+  demandas_ativo: boolean;
 }
 
 interface MediaFile {
@@ -45,7 +49,10 @@ const WhatsApp = () => {
   const [config, setConfig] = useState<WhatsAppConfig>({
     instancia_aniversario: '',
     mensagem_aniversario: 'Olá {nome}, feliz aniversário! 🎉🎂 Desejamos um dia repleto de alegria e felicidade!',
-    aniversario_ativo: false
+    aniversario_ativo: false,
+    instancia_demandas: '',
+    mensagem_demandas: 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
+    demandas_ativo: false
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,11 +97,14 @@ const WhatsApp = () => {
         return acc;
       }, {} as Record<string, string>) || {};
 
-      setConfig({
-        instancia_aniversario: configMap.whatsapp_instancia_aniversario || '',
-        mensagem_aniversario: configMap.whatsapp_mensagem_aniversario || 'Olá {nome}, feliz aniversário! 🎉🎂 Desejamos um dia repleto de alegria e felicidade!',
-        aniversario_ativo: configMap.whatsapp_aniversario_ativo === 'true'
-      });
+    setConfig({
+      instancia_aniversario: configMap.whatsapp_instancia_aniversario || '',
+      mensagem_aniversario: configMap.whatsapp_mensagem_aniversario || 'Olá {nome}, feliz aniversário! 🎉🎂 Desejamos um dia repleto de alegria e felicidade!',
+      aniversario_ativo: configMap.whatsapp_aniversario_ativo === 'true',
+      instancia_demandas: configMap.whatsapp_instancia_demandas || '',
+      mensagem_demandas: configMap.whatsapp_mensagem_demandas || 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
+      demandas_ativo: configMap.whatsapp_demandas_ativo === 'true'
+    });
     } catch (error) {
       console.error('Erro ao buscar configurações:', error);
       toast.error('Erro ao carregar configurações');
@@ -140,7 +150,10 @@ const WhatsApp = () => {
       const configsToSave = [
         { chave: 'whatsapp_instancia_aniversario', valor: config.instancia_aniversario },
         { chave: 'whatsapp_mensagem_aniversario', valor: config.mensagem_aniversario },
-        { chave: 'whatsapp_aniversario_ativo', valor: config.aniversario_ativo.toString() }
+        { chave: 'whatsapp_aniversario_ativo', valor: config.aniversario_ativo.toString() },
+        { chave: 'whatsapp_instancia_demandas', valor: config.instancia_demandas },
+        { chave: 'whatsapp_mensagem_demandas', valor: config.mensagem_demandas },
+        { chave: 'whatsapp_demandas_ativo', valor: config.demandas_ativo.toString() }
       ];
 
       for (const configItem of configsToSave) {
@@ -343,18 +356,32 @@ const WhatsApp = () => {
         </CardContent>
       </Card>
 
-      {/* Card de Configuração de Aniversário */}
+      {/* Card de Configuração de Mensagens Automáticas */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Cake className="h-5 w-5" />
-            Mensagens de Aniversário
+            <Settings className="h-5 w-5" />
+            Mensagens Automáticas
           </CardTitle>
           <CardDescription>
-            Configure mensagens automáticas para aniversariantes
+            Configure mensagens automáticas para diferentes eventos
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
+          <Tabs defaultValue="aniversario" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="aniversario" className="flex items-center gap-2">
+                <Cake className="h-4 w-4" />
+                Aniversários
+              </TabsTrigger>
+              <TabsTrigger value="demandas" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Demandas
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Aba de Aniversários */}
+            <TabsContent value="aniversario" className="space-y-6">
           {/* Lista de Aniversariantes */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -538,9 +565,6 @@ const WhatsApp = () => {
 
           {/* Botões de Ação */}
           <div className="flex gap-2 pt-4">
-            <Button onClick={saveConfig} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar Configurações'}
-            </Button>
             <Button 
               variant="outline" 
               onClick={enviarMensagemTeste}
@@ -551,17 +575,134 @@ const WhatsApp = () => {
             </Button>
           </div>
 
-          {config.aniversario_ativo && (
-            <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
-                <Clock className="h-4 w-4" />
-                <span className="font-medium">Sistema Ativado</span>
+            {config.aniversario_ativo && (
+              <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-medium">Sistema Ativado</span>
+                </div>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                  As mensagens de aniversário serão enviadas automaticamente todos os dias às 9:00h
+                </p>
               </div>
-              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                As mensagens de aniversário serão enviadas automaticamente todos os dias às 9:00h
-              </p>
+            )}
+            </TabsContent>
+
+            {/* Aba de Demandas */}
+            <TabsContent value="demandas" className="space-y-6">
+              {/* Switch para Ativar/Desativar Demandas */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-base font-medium">Notificações de Demandas</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Enviar mensagens automaticamente quando o status de uma demanda for atualizado
+                  </p>
+                </div>
+                <Switch
+                  checked={config.demandas_ativo}
+                  onCheckedChange={(checked) =>
+                    setConfig(prev => ({ ...prev, demandas_ativo: checked }))
+                  }
+                />
+              </div>
+
+              <Separator />
+
+              {/* Seleção de Instância para Demandas */}
+              <div className="space-y-2">
+                <Label htmlFor="instancia-demandas">Instância do WhatsApp</Label>
+                <Select
+                  value={config.instancia_demandas}
+                  onValueChange={(value) =>
+                    setConfig(prev => ({ ...prev, instancia_demandas: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma instância" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instances
+                      .filter(instance => instance.status === 'connected')
+                      .map((instance) => (
+                        <SelectItem key={instance.id} value={instance.instance_name}>
+                          {instance.display_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {instances.filter(i => i.status === 'connected').length === 0 && (
+                  <p className="text-sm text-destructive">
+                    Nenhuma instância conectada disponível
+                  </p>
+                )}
+              </div>
+
+              {/* Mensagem de Atualização de Demanda */}
+              <div className="space-y-2">
+                <Label htmlFor="mensagem-demandas">Mensagem de Atualização</Label>
+                <Textarea
+                  id="mensagem-demandas"
+                  value={config.mensagem_demandas}
+                  onChange={(e) =>
+                    setConfig(prev => ({ ...prev, mensagem_demandas: e.target.value }))
+                  }
+                  placeholder="Digite a mensagem de atualização de demanda..."
+                  className="min-h-24"
+                />
+                <div className="text-sm text-muted-foreground">
+                  <p>Variáveis disponíveis:</p>
+                  <ul className="mt-1 space-y-1">
+                    <li>• <code className="bg-muted px-1 rounded">{'{nome}'}</code> - Nome do munícipe solicitante</li>
+                    <li>• <code className="bg-muted px-1 rounded">{'{status}'}</code> - Novo status da demanda</li>
+                  </ul>
+                  <p className="mt-2">
+                    <strong>Exemplo:</strong> {config.mensagem_demandas.replace('{nome}', 'João Silva').replace('{status}', 'Em Andamento')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Informações sobre o funcionamento */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2 text-blue-700 dark:text-blue-300">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <span className="font-medium">Como funciona</span>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      Sempre que o status de uma demanda for alterado no sistema, uma mensagem será enviada automaticamente 
+                      para o telefone do munícipe solicitante informando sobre a atualização.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {config.demandas_ativo && (
+                <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                    <Clock className="h-4 w-4" />
+                    <span className="font-medium">Sistema Ativado</span>
+                  </div>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                    As notificações de atualização de demandas estão ativas e serão enviadas automaticamente
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Botões de Ação Globais */}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={saveConfig} disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar Configurações'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={enviarMensagemTeste}
+                disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {enviandoTeste ? 'Enviando...' : `Teste Aniversário (${aniversariantesSelecionados.size})`}
+              </Button>
             </div>
-          )}
+          </Tabs>
         </CardContent>
       </Card>
     </div>
