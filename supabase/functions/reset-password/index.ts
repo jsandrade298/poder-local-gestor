@@ -44,7 +44,8 @@ Deno.serve(async (req: Request) => {
 
     // Usar Admin API para atualizar senha diretamente
     const { data, error } = await supabase.auth.admin.updateUserById(userId, {
-      password: newPassword
+      password: newPassword,
+      email_confirm: true // Garante que o email está confirmado
     });
 
     if (error) {

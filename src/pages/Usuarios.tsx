@@ -104,16 +104,32 @@ export default function Usuarios() {
         email: userData.email,
         password: userData.senha,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: userData.nome
           }
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        // Se o erro for de usuário já existente, mostrar mensagem específica
+        if (authError.message.includes('already registered')) {
+          throw new Error("Este email já está registrado no sistema");
+        }
+        throw authError;
+      }
 
       // Atualizar perfil com informações adicionais
       if (authData.user) {
+        // Confirmar o email automaticamente para usuários criados por admin
+        const { error: confirmError } = await supabase.functions.invoke('reset-password', {
+          body: { userId: authData.user.id, newPassword: userData.senha }
+        });
+        
+        if (confirmError) {
+          console.warn("Erro ao confirmar email automaticamente:", confirmError);
+        }
+
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -137,19 +153,19 @@ export default function Usuarios() {
     },
     onSuccess: () => {
       // Forçar recarregamento imediato dos dados
-      refetchUsuarios();
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       toast({
         title: "Usuário criado",
-        description: "O usuário foi criado com sucesso com acesso completo ao sistema.",
+        description: "O usuário foi criado com sucesso e já pode fazer login no sistema.",
       });
       setIsCreateDialogOpen(false);
       setNewUser({ nome: "", email: "", senha: "", telefone: "", cargo: "", ativo: true });
     },
     onError: (error) => {
+      console.error("Erro ao criar usuário:", error);
       toast({
-        title: "Erro",
-        description: error.message,
+        title: "Erro ao criar usuário",
+        description: error.message || "Verifique se o email não está em uso.",
         variant: "destructive",
       });
     }
@@ -254,26 +270,18 @@ export default function Usuarios() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       toast({
-        title: "Senha alterada",
-        description: "A senha do usuário foi alterada com sucesso.",
+        title: "Senha alterada com sucesso",
+        description: `A senha do usuário ${resetPasswordUser?.nome} foi alterada. O usuário já pode fazer login com a nova senha.`,
       });
       setIsResetPasswordDialogOpen(false);
       setNewPassword("");
       setResetPasswordUser(null);
-      
-      // Se o reset foi para o usuário atual, mostrar aviso
-      if (data.user?.email === user?.email) {
-        toast({
-          title: "Atenção",
-          description: "Sua própria senha foi alterada. Faça login novamente.",
-          variant: "destructive",
-        });
-      }
     },
     onError: (error) => {
+      console.error("Erro no reset de senha:", error);
       toast({
-        title: "Erro",
-        description: error.message,
+        title: "Erro ao alterar senha",
+        description: error.message || "Tente novamente em alguns minutos.",
         variant: "destructive",
       });
     }
