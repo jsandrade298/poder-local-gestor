@@ -211,7 +211,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       // Notificar se status mudou
       if (statusAnterior !== data.status && municipeData?.telefone) {
         try {
-          const { data: result } = await supabase.functions.invoke('whatsapp-notificar-demanda', {
+          console.log('🔔 Enviando notificação WhatsApp...');
+          const response = await supabase.functions.invoke('whatsapp-notificar-demanda', {
             body: {
               demanda_id: demanda.id,
               municipe_nome: municipeData.nome,
@@ -223,12 +224,16 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
             }
           });
           
-          if (result?.success) {
-            toast.success(`WhatsApp enviado para ${municipeData.nome}!`);
+          console.log('📱 Resposta da notificação:', response);
+          
+          if (response.data?.success) {
+            toast.success(`✅ WhatsApp enviado para ${municipeData.nome}!`);
+          } else if (response.error) {
+            toast.error("❌ Erro ao enviar notificação WhatsApp");
           }
         } catch (notifError) {
           console.error('Erro ao enviar notificação:', notifError);
-          toast.error("Erro ao enviar notificação WhatsApp");
+          toast.error("❌ Erro ao enviar notificação WhatsApp");
         }
       }
 
