@@ -744,6 +744,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      agendar_exclusao_agenda: {
+        Args: { agenda_id_param: string; data_hora_exclusao: string }
+        Returns: undefined
+      }
+      cancelar_exclusao_agenda: {
+        Args: { agenda_id_param: string }
+        Returns: undefined
+      }
       generate_protocolo: {
         Args: Record<PropertyKey, never>
         Returns: string
