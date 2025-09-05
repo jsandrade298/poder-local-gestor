@@ -1108,14 +1108,15 @@ const SolicitarAgenda = () => {
                                {getStatusBadge(agenda.status)}
                                <AlertDialog>
                                  <AlertDialogTrigger asChild>
-                                   <Button
-                                     variant="outline"
-                                     size="sm"
-                                     className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
-                                     disabled={excluirAgendaMutation.isPending}
-                                   >
-                                     <Trash2 className="h-4 w-4" />
-                                   </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                                      disabled={excluirAgendaMutation.isPending}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
                                  </AlertDialogTrigger>
                                  <AlertDialogContent>
                                    <AlertDialogHeader>

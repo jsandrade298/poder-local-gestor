@@ -908,7 +908,11 @@ export default function Demandas() {
                           </DropdownMenuItem>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                               <DropdownMenuItem 
+                                 onSelect={(e) => e.preventDefault()} 
+                                 onClick={(e) => e.stopPropagation()}
+                                 className="text-destructive focus:text-destructive"
+                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Excluir
                               </DropdownMenuItem>
