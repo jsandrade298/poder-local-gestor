@@ -61,6 +61,7 @@ const SolicitarAgenda = () => {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
+  const [urlProcessed, setUrlProcessed] = useState(false);
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -335,12 +336,20 @@ const SolicitarAgenda = () => {
     enabled: !!user?.id && activeTab === "solicitacoes",
   });
 
-  // Detectar redirecionamento de notificação - CORRIGIDO
+  // Resetar flag quando URL muda (nova navegação)
+  useEffect(() => {
+    const agendaId = searchParams.get('agenda');
+    if (!agendaId) {
+      setUrlProcessed(false);
+    }
+  }, [searchParams]);
+
+  // Detectar redirecionamento de notificação - CORRIGIDO para evitar loop
   useEffect(() => {
     const agendaId = searchParams.get('agenda');
     
-    // Só processar se há um agendaId na URL e não há modal já aberto
-    if (agendaId && !selectedAgenda && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
+    // Só processar se há um agendaId na URL, não foi processado ainda, e há dados carregados
+    if (agendaId && !urlProcessed && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Procurar a agenda tanto nas minhas quanto nas solicitações
       const todasAgendas = [...(minhasAgendas || []), ...(solicitacoes || [])];
       const agenda = todasAgendas.find(a => a.id === agendaId);
@@ -355,12 +364,13 @@ const SolicitarAgenda = () => {
           setActiveTab("solicitacoes");
         }
         
-        // Limpar os parâmetros da URL após o redirecionamento
+        // Marcar como processado e limpar URL
+        setUrlProcessed(true);
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       }
     }
-  }, [searchParams, minhasAgendas, solicitacoes, selectedAgenda]);
+  }, [searchParams, minhasAgendas, solicitacoes, urlProcessed]);
 
   // Buscar mensagens - CORRIGIDO
   const { data: mensagens } = useQuery({
