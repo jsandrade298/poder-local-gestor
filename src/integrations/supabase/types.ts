@@ -533,6 +533,39 @@ export type Database = {
         }
         Relationships: []
       }
+      logs_aniversario: {
+        Row: {
+          aniversariantes: Json | null
+          created_at: string | null
+          data_envio: string | null
+          error_message: string | null
+          id: string
+          quantidade: number | null
+          success: boolean | null
+          teste: boolean | null
+        }
+        Insert: {
+          aniversariantes?: Json | null
+          created_at?: string | null
+          data_envio?: string | null
+          error_message?: string | null
+          id?: string
+          quantidade?: number | null
+          success?: boolean | null
+          teste?: boolean | null
+        }
+        Update: {
+          aniversariantes?: Json | null
+          created_at?: string | null
+          data_envio?: string | null
+          error_message?: string | null
+          id?: string
+          quantidade?: number | null
+          success?: boolean | null
+          teste?: boolean | null
+        }
+        Relationships: []
+      }
       municipe_tags: {
         Row: {
           created_at: string

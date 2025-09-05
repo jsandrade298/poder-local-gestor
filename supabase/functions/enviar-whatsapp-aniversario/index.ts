@@ -19,8 +19,19 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let startTime = new Date();
+  let logData = {
+    data_envio: startTime,
+    quantidade: 0,
+    teste: false,
+    aniversariantes: [],
+    success: false,
+    error_message: null
+  };
+
   try {
-    console.log('Iniciando processo de envio de mensagens de aniversário');
+    console.log('=== INICIANDO PROCESSO DE ANIVERSÁRIOS ===');
+    console.log('Timestamp:', startTime.toISOString());
 
     // Inicializar cliente Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -67,6 +78,9 @@ const handler = async (req: Request): Promise<Response> => {
     // Verificar se é uma chamada de teste
     const body = await req.json().catch(() => ({}));
     const isTeste = body.teste === true;
+    logData.teste = isTeste;
+    
+    console.log('Modo de execução:', isTeste ? 'TESTE' : 'PRODUÇÃO');
 
     let aniversariantes: Municipe[] = [];
 
@@ -169,7 +183,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Resultado do envio:', resultadoEnvio);
 
-    return new Response(JSON.stringify({
+    // Atualizar dados do log com sucesso
+    logData.quantidade = telefones.length;
+    logData.success = true;
+    logData.aniversariantes = aniversariantes.map(a => ({
+      nome: a.nome,
+      telefone: a.telefone
+    }));
+
+    // Salvar log no banco
+    try {
+      await supabase.from('logs_aniversario').insert(logData);
+      console.log('Log salvo com sucesso');
+    } catch (logError) {
+      console.error('Erro ao salvar log:', logError);
+    }
+
+    const resposta = {
       message: isTeste 
         ? `Mensagens de teste enviadas para ${telefones.length} contatos`
         : `Mensagens de aniversário enviadas para ${telefones.length} aniversariantes`,
@@ -179,18 +209,41 @@ const handler = async (req: Request): Promise<Response> => {
       aniversariantes: aniversariantes.map(a => ({
         nome: a.nome,
         telefone: a.telefone
-      }))
-    }), {
+      })),
+      executedAt: startTime.toISOString()
+    };
+
+    console.log('=== PROCESSO CONCLUÍDO COM SUCESSO ===');
+    return new Response(JSON.stringify(resposta), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error('Erro no envio de mensagens de aniversário:', error);
+    console.error('=== ERRO NO PROCESSO DE ANIVERSÁRIOS ===');
+    console.error('Erro detalhado:', error);
+    
+    // Atualizar dados do log com erro
+    logData.success = false;
+    logData.error_message = error.message;
+
+    // Tentar salvar log de erro
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await supabase.from('logs_aniversario').insert(logData);
+      console.log('Log de erro salvo');
+    } catch (logError) {
+      console.error('Erro ao salvar log de erro:', logError);
+    }
+
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        success: false 
+        success: false,
+        executedAt: startTime.toISOString()
       }),
       {
         status: 500,

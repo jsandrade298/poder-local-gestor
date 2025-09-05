@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageCircle, Cake, Settings, Send, Clock, Users, Paperclip, X, CheckSquare, Square, FileText, AlertCircle } from "lucide-react";
+import { WhatsAppLogsViewer } from "@/components/WhatsAppLogsViewer";
 
 interface WhatsAppInstance {
   id: string;
@@ -325,6 +326,46 @@ const WhatsApp = () => {
     }
   };
 
+  // Nova função para testar o sistema automático de aniversários
+  const testarSistemaAutomatico = async () => {
+    if (!config.instancia_aniversario) {
+      toast.error('Configure uma instância primeiro');
+      return;
+    }
+
+    setEnviandoTeste(true);
+    try {
+      console.log('Testando sistema automático de aniversários...');
+      
+      const { data, error } = await supabase.functions.invoke('enviar-whatsapp-aniversario', {
+        body: { teste: true }
+      });
+
+      if (error) {
+        console.error('Erro na edge function:', error);
+        throw error;
+      }
+
+      console.log('Resposta do sistema automático:', data);
+      
+      if (data.success) {
+        toast.success(`✅ Sistema testado! ${data.message} (${data.count || 0} mensagens)`);
+        
+        if (data.aniversariantes && data.aniversariantes.length > 0) {
+          console.log('Aniversariantes processados:', data.aniversariantes);
+        }
+      } else {
+        toast.error(`❌ Erro no teste: ${data.error || 'Erro desconhecido'}`);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao testar sistema automático:', error);
+      toast.error('Erro ao testar sistema automático de aniversários');
+    } finally {
+      setEnviandoTeste(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -401,7 +442,7 @@ const WhatsApp = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="aniversario" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="aniversario" className="flex items-center gap-2">
                 <Cake className="h-4 w-4" />
                 Aniversários
@@ -409,6 +450,10 @@ const WhatsApp = () => {
               <TabsTrigger value="demandas" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Demandas
+              </TabsTrigger>
+              <TabsTrigger value="logs" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Histórico
               </TabsTrigger>
             </TabsList>
 
@@ -596,7 +641,7 @@ const WhatsApp = () => {
           </div>
 
           {/* Botões de Ação */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 pt-4 flex-wrap">
             <Button 
               variant="outline" 
               onClick={enviarMensagemTeste}
@@ -605,19 +650,59 @@ const WhatsApp = () => {
               <Send className="h-4 w-4 mr-2" />
               {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
             </Button>
+            
+            <Button 
+              variant="secondary" 
+              onClick={testarSistemaAutomatico}
+              disabled={!config.instancia_aniversario || enviandoTeste}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              {enviandoTeste ? 'Testando...' : 'Testar Sistema Automático'}
+            </Button>
           </div>
 
-            {config.aniversario_ativo && (
+          {/* Informações sobre o Sistema Automático */}
+          <div className="space-y-4">
+            {config.aniversario_ativo ? (
               <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
                 <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
                   <Clock className="h-4 w-4" />
-                  <span className="font-medium">Sistema Ativado</span>
+                  <span className="font-medium">Sistema Automático Ativado</span>
                 </div>
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                  As mensagens de aniversário serão enviadas automaticamente todos os dias às 9:00h
+                <div className="text-sm text-green-600 dark:text-green-400 mt-2 space-y-1">
+                  <p>✅ Mensagens enviadas automaticamente todos os dias às 9:00h (UTC)</p>
+                  <p>✅ Sistema independente - não afeta outros módulos</p>
+                  <p>✅ Instância: {config.instancia_aniversario || 'Não selecionada'}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="font-medium">Sistema Automático Desativado</span>
+                </div>
+                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                  Ative o sistema para enviar mensagens automaticamente todos os dias às 9:00h
                 </p>
               </div>
             )}
+            
+            {/* Informações técnicas */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2 text-blue-700 dark:text-blue-300">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div className="space-y-2">
+                  <span className="font-medium">Informações do Sistema</span>
+                  <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
+                    <p>• O sistema roda automaticamente via Cron Job às 9:00h UTC diariamente</p>
+                    <p>• Busca aniversariantes do dia atual baseado na data de nascimento</p>
+                    <p>• Personaliza mensagens substituindo {'{nome}'} pelo nome do munícipe</p>
+                    <p>• Use "Testar Sistema Automático" para validar com munícipes aleatórios</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
             </TabsContent>
 
             {/* Aba de Demandas */}
@@ -825,6 +910,11 @@ const WhatsApp = () => {
                   </p>
                 </div>
               )}
+            </TabsContent>
+
+            {/* Aba de Histórico/Logs */}
+            <TabsContent value="logs" className="space-y-6">
+              <WhatsAppLogsViewer />
             </TabsContent>
 
             {/* Botões de Ação Globais */}
