@@ -165,6 +165,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
       case 'em_andamento': return 'Em Andamento';
       case 'aguardando': return 'Aguardando';
       case 'resolvida': return 'Resolvida';
+      case 'cancelada': return 'Cancelada';
       default: return status;
     }
   };
@@ -175,6 +176,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
       case 'em_andamento': return 'secondary';
       case 'aguardando': return 'outline';
       case 'resolvida': return 'default';
+      case 'cancelada': return 'destructive';
       default: return 'secondary';
     }
   };
@@ -255,6 +257,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
                 <SelectItem value="em_andamento">Em Andamento</SelectItem>
                 <SelectItem value="aguardando">Aguardando</SelectItem>
                 <SelectItem value="resolvida">Resolvida</SelectItem>
+                <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
 
