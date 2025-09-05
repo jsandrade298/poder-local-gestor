@@ -419,6 +419,24 @@ const WhatsApp = () => {
 
             {/* Aba de Aniversários */}
             <TabsContent value="aniversario" className="space-y-6">
+          {/* Switch para Ativar/Desativar Sistema Automático */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">Sistema Automático</Label>
+              <p className="text-sm text-muted-foreground">
+                Ativar envio automático de mensagens de aniversário às 9:00h diariamente
+              </p>
+            </div>
+            <Switch
+              checked={config.aniversario_ativo}
+              onCheckedChange={(checked) =>
+                setConfig(prev => ({ ...prev, aniversario_ativo: checked }))
+              }
+            />
+          </div>
+
+          <Separator />
+
           {/* Lista de Aniversariantes */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -443,13 +461,13 @@ const WhatsApp = () => {
                     {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
                   </Button>
                   <Button 
-                    variant="default" 
+                    variant="outline" 
                     size="sm"
                     onClick={enviarMensagemTeste}
                     disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
                     className="gap-2"
                   >
-                    <Send className="h-4 w-4" />
+                    <Send className="h-4 w-4 text-blue-600" />
                     {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
                   </Button>
                 </div>
@@ -593,22 +611,6 @@ const WhatsApp = () => {
                 </ScrollArea>
               </div>
             )}
-          </div>
-
-          {/* Switch para Ativar/Desativar */}
-          <div className="flex items-center justify-between pt-4">
-            <div className="space-y-1">
-              <Label className="text-base font-medium">Sistema Automático</Label>
-              <p className="text-sm text-muted-foreground">
-                Ativar envio automático de mensagens de aniversário às 9:00h diariamente
-              </p>
-            </div>
-            <Switch
-              checked={config.aniversario_ativo}
-              onCheckedChange={(checked) =>
-                setConfig(prev => ({ ...prev, aniversario_ativo: checked }))
-              }
-            />
           </div>
 
           {/* Informações sobre o Sistema Automático */}
