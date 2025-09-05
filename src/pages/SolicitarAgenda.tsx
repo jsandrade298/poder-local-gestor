@@ -794,7 +794,12 @@ const SolicitarAgenda = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="container mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Sistema de Agendas</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Sistema de Agendas</h1>
+          <p className="text-muted-foreground mt-1">
+            Gerencie solicitações de agenda e valide compromissos do mandato
+          </p>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
