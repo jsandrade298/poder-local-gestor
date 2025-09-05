@@ -335,13 +335,20 @@ const SolicitarAgenda = () => {
   // Detectar redirecionamento de notificação
   useEffect(() => {
     const agendaId = searchParams.get('agenda');
+    console.log('=== DETECÇÃO AGENDA URL ===');
+    console.log('Parâmetro agenda:', agendaId);
+    console.log('Minhas agendas:', minhasAgendas?.length);
+    console.log('Solicitações:', solicitacoes?.length);
     
     if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Procurar a agenda tanto nas minhas quanto nas solicitações
       const todasAgendas = [...(minhasAgendas || []), ...(solicitacoes || [])];
       const agenda = todasAgendas.find(a => a.id === agendaId);
       
+      console.log('Agenda encontrada:', agenda?.id);
+      
       if (agenda) {
+        console.log('Abrindo modal para agenda:', agenda.id);
         setSelectedAgenda(agenda);
         
         // Definir a aba correta baseado no contexto
