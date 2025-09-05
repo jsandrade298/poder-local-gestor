@@ -282,21 +282,23 @@ const AssessorIA = () => {
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Documentos no Contexto:</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {documentosContexto.map((doc) => (
-                      <Badge key={doc.id} variant="secondary" className="gap-1">
-                        {doc.nome}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removerDocumentoContexto(doc.id)}
-                          className="h-4 w-4 p-0 hover:bg-transparent"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
+                  <ScrollArea className="max-h-20">
+                    <div className="flex flex-wrap gap-2 pr-3">
+                      {documentosContexto.map((doc) => (
+                        <Badge key={doc.id} variant="secondary" className="gap-1">
+                          {doc.nome}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removerDocumentoContexto(doc.id)}
+                            className="h-4 w-4 p-0 hover:bg-transparent"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
               )}
               
