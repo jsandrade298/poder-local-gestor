@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 export function DemandaNotificationProgress() {
   const { state, setMinimized, resetNotifications, cancelNotifications } = useDemandaNotification();
 
-  // Não renderiza se não há notificações ativas
+  // Não renderiza se não há notificação ativa
   if (!state.isActive) {
     return null;
   }
@@ -70,7 +70,7 @@ export function DemandaNotificationProgress() {
   return (
     <div 
       className={cn(
-        "fixed z-40 bg-background border border-border shadow-lg transition-all duration-300",
+        "fixed z-50 bg-background border border-border shadow-lg transition-all duration-300",
         state.isMinimized 
           ? "bottom-20 right-4 w-80 h-16 rounded-lg"
           : "bottom-20 right-4 w-96 h-[500px] rounded-lg"
@@ -86,7 +86,7 @@ export function DemandaNotificationProgress() {
               <CardTitle className="text-sm">
                 {state.isMinimized 
                   ? `Notificações Demandas (${state.processedNotifications}/${state.totalNotifications})`
-                  : 'Progresso Notificações de Demandas'
+                  : 'Progresso das Notificações'
                 }
               </CardTitle>
             </div>
@@ -109,7 +109,7 @@ export function DemandaNotificationProgress() {
                   size="sm"
                   onClick={cancelNotifications}
                   className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                  title="Cancelar envio"
+                  title="Cancelar notificações"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -140,21 +140,21 @@ export function DemandaNotificationProgress() {
               
               <div className="text-xs text-muted-foreground space-y-1">
                 <div>Instância: {state.instanceName}</div>
-                <div>Tipo: Notificações automáticas</div>
+                <div>Tipo: Notificações de Demandas</div>
               </div>
             </>
           )}
         </CardHeader>
 
         {!state.isMinimized && (
-          <CardContent className="pt-0 flex flex-col" style={{ height: 'calc(100% - 120px)' }}>
+          <CardContent className="pt-0 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 120px)' }}>
             <div className="flex-1 space-y-3 overflow-hidden min-h-0">
               {/* Lista de Notificações */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="font-medium text-xs mb-2">Notificações:</div>
                 <ScrollArea className="flex-1 border rounded">
                   <div className="p-2 space-y-2">
-                    {state.notifications.map((notification) => (
+                    {state.notifications.map((notification, index) => (
                       <div
                         key={notification.id}
                         className={cn(
@@ -166,10 +166,12 @@ export function DemandaNotificationProgress() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{notification.municipe_nome}</div>
-                          <div className="text-muted-foreground truncate text-xs">
-                            {notification.demanda_titulo} - {notification.novo_status}
+                          <div className="text-muted-foreground truncate">
+                            Demanda: {notification.demanda_id.slice(0, 8)}...
                           </div>
-                          <div className="text-muted-foreground truncate text-xs">{notification.telefone}</div>
+                          <div className="text-muted-foreground truncate">
+                            {notification.telefone}
+                          </div>
                           {notification.error && (
                             <div className="text-red-600 text-xs truncate" title={notification.error}>
                               {notification.error}
