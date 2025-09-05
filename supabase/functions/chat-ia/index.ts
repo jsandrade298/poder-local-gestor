@@ -43,6 +43,15 @@ serve(async (req) => {
 
     const { message, conversationHistory = [], documentosContexto = [], model = 'gpt-5-mini' } = await req.json();
     
+    // Log para diagnóstico (primeiro log)
+    console.log("BODY recebido:", { 
+      hasMessage: !!message, 
+      historyLen: conversationHistory.length, 
+      docs: documentosContexto.length, 
+      model,
+      messagePreview: message ? message.substring(0, 50) + '...' : 'VAZIO'
+    });
+    
     // Validar modelo (allowlist)
     const ALLOWED_MODELS = ['gpt-5', 'gpt-5-mini'] as const;
     type AllowedModel = typeof ALLOWED_MODELS[number];
@@ -190,8 +199,15 @@ ${contextosDocumentos}`;
 
   } catch (error) {
     console.error('Erro na função chat-ia:', error);
+    
+    // Tratamento de erro mais descritivo
+    let errorMessage = 'Erro interno do servidor';
+    if (error instanceof Error) {
+      errorMessage = `Erro interno: ${error.message}`;
+    }
+    
     return new Response(
-      JSON.stringify({ error: 'Erro interno do servidor' }), 
+      JSON.stringify({ error: errorMessage }), 
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
