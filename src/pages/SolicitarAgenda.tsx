@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -59,7 +58,6 @@ const SolicitarAgenda = () => {
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [searchParams] = useSearchParams();
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -138,18 +136,13 @@ const SolicitarAgenda = () => {
       }
 
       // Criar notificação para validador
-      const urlDestino = `/solicitar-agenda?agenda=${agenda[0].id}`;
-      console.log("=== CRIANDO NOTIFICAÇÃO ===");
-      console.log("URL destino:", urlDestino);
-      console.log("ID da agenda:", agenda[0].id);
-      
       await supabase.from("notificacoes").insert({
         destinatario_id: data.validador_id,
         remetente_id: user.id,
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
         mensagem: `Nova agenda: ${data.descricao_objetivo}`,
-        url_destino: urlDestino,
+        url_destino: "/solicitar-agenda",
       });
 
       // Notificar acompanhantes
@@ -160,7 +153,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_acompanhante",
           titulo: "Você foi adicionado em uma agenda",
           mensagem: `Agenda: ${data.descricao_objetivo}`,
-          url_destino: `/solicitar-agenda?agenda=${agenda[0].id}`,
+          url_destino: "/solicitar-agenda",
         }));
 
         await supabase.from("notificacoes").insert(notifAcompanhantes);
@@ -480,7 +473,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Sua agenda foi ${status}`,
-            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
+            url_destino: "/solicitar-agenda",
           });
         }
 
@@ -493,7 +486,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Agenda foi ${status}`,
-            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
+            url_destino: "/solicitar-agenda",
           }));
 
         if (notifs.length > 0) {
@@ -557,7 +550,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_mensagem",
           titulo: "Nova mensagem na agenda",
           mensagem: mensagem.substring(0, 100),
-          url_destino: `/solicitar-agenda?agenda=${selectedAgenda?.id}`,
+          url_destino: "/solicitar-agenda",
         }));
 
         if (notifs.length > 0) {
@@ -642,49 +635,6 @@ const SolicitarAgenda = () => {
       console.log("Solicitações:", solicitacoes);
     }
   }, [solicitacoes, user?.id]);
-
-  // Lógica para abrir agenda específica via parâmetros de URL (notificações)
-  useEffect(() => {
-    console.log("=== DEBUG ABERTURA DE AGENDA ===");
-    console.log("URL atual:", window.location.href);
-    console.log("SearchParams:", Object.fromEntries(searchParams.entries()));
-    
-    const agendaId = searchParams.get('agenda');
-    console.log("Parâmetro agenda da URL:", agendaId);
-    
-    if (minhasAgendas?.length > 0) {
-      console.log("Minhas agendas:", minhasAgendas.map(a => ({ id: a.id, descricao: a.descricao_objetivo })));
-    }
-    
-    if (solicitacoes?.length > 0) {
-      console.log("Solicitações:", solicitacoes.map(a => ({ id: a.id, descricao: a.descricao_objetivo })));
-    }
-    
-    if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
-      // Buscar nas minhas agendas primeiro
-      let agenda = minhasAgendas?.find(a => a.id === agendaId);
-      console.log("Agenda encontrada em minhas agendas:", !!agenda);
-      
-      // Se não encontrou, buscar nas solicitações
-      if (!agenda) {
-        agenda = solicitacoes?.find(a => a.id === agendaId);
-        console.log("Agenda encontrada em solicitações:", !!agenda);
-      }
-      
-      if (agenda) {
-        console.log("Abrindo agenda:", agenda.id, agenda.descricao_objetivo);
-        setSelectedAgenda(agenda);
-        
-        // Limpar o parâmetro da URL após abrir
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      } else {
-        console.log("Agenda não encontrada para ID:", agendaId);
-      }
-    } else if (agendaId) {
-      console.log("Parâmetro presente mas dados ainda não carregados");
-    }
-  }, [searchParams, minhasAgendas, solicitacoes]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {

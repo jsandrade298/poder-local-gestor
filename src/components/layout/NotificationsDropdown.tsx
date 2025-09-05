@@ -107,10 +107,6 @@ export function NotificationsDropdown() {
   });
 
   const handleNotificationClick = (notificacao: any) => {
-    console.log("=== CLIQUE EM NOTIFICAÇÃO ===");
-    console.log("Notificação:", notificacao);
-    console.log("URL destino:", notificacao.url_destino);
-    
     // Marcar como lida
     if (!notificacao.lida) {
       marcarComoLida.mutate(notificacao.id);
