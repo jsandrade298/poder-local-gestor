@@ -8,7 +8,8 @@ import {
   UserCheck,
   Settings,
   Home,
-  Columns
+  Columns,
+  Calendar
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -29,6 +30,7 @@ const menuItems = [
   { title: "Demandas", url: "/demandas", icon: FileText },
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Kanban", url: "/kanban", icon: Columns },
+  { title: "Solicitar Agenda", url: "/solicitar-agenda", icon: Calendar },
   { title: "Tags", url: "/tags", icon: Tags },
   { title: "Áreas", url: "/areas", icon: Building2 },
   { title: "Usuários", url: "/usuarios", icon: UserCheck },
