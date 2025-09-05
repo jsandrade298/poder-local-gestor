@@ -953,20 +953,81 @@ const SolicitarAgenda = () => {
 
               <Separator />
 
-              {/* Informações completas */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium">Participantes</p>
-                  <p className="text-sm">{selectedAgenda.participantes}</p>
+              {/* Informações completas da solicitação */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-lg">Detalhes da Solicitação</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Data de Solicitação</p>
+                    <p className="text-sm">{formatDateTime(selectedAgenda.data_pedido)}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Duração Prevista</p>
+                    <p className="text-sm">{selectedAgenda.duracao_prevista}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Solicitante</p>
+                    <p className="text-sm">{selectedAgenda.solicitante?.nome}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Validador</p>
+                    <p className="text-sm">{selectedAgenda.validador?.nome}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Local/Link</p>
-                  <p className="text-sm">{selectedAgenda.local_endereco}</p>
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Participantes</p>
+                    <p className="text-sm">{selectedAgenda.participantes}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Local/Endereço</p>
+                    <p className="text-sm">{selectedAgenda.local_endereco}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Objetivo/Descrição</p>
+                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.descricao_objetivo}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Pauta Sugerida</p>
+                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.pauta_sugerida}</p>
+                  </div>
+                  
+                  {selectedAgenda.material_apoio && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Material de Apoio</p>
+                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
+                    </div>
+                  )}
+                  
+                  {selectedAgenda.observacoes && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Observações</p>
+                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Pauta</p>
-                  <p className="text-sm">{selectedAgenda.pauta_sugerida}</p>
-                </div>
+
+                {/* Acompanhantes se houver */}
+                {selectedAgenda.agenda_acompanhantes && selectedAgenda.agenda_acompanhantes.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Acompanhantes</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedAgenda.agenda_acompanhantes.map((acomp: any, index: number) => (
+                        <Badge key={index} variant="secondary">
+                          Usuário {acomp.usuario_id.substring(0, 8)}...
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
