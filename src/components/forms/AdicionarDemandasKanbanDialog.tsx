@@ -223,7 +223,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Adicionar Demandas ao Kanban</DialogTitle>
           <DialogDescription>
@@ -232,7 +232,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
           {/* Filtros */}
           <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="flex-1 min-w-[200px]">
@@ -372,7 +372,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           </div>
 
           {/* Lista de demandas */}
-          <div className="border rounded-lg max-h-[400px] overflow-y-auto">
+          <div className="border rounded-lg flex-1 min-h-0 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
