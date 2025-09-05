@@ -144,7 +144,7 @@ ${contextosDocumentos}`;
       body: JSON.stringify({
         model: modelMap[validatedModel],
         messages: messages,
-        max_completion_tokens: 2000,
+        max_tokens: 2000,
       }),
     });
 
