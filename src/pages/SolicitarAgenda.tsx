@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -169,109 +169,190 @@ const SolicitarAgenda = () => {
     }
   };
 
-  // Buscar minhas agendas
+  // Buscar minhas agendas - CORRIGIDO
   const { data: minhasAgendas, isLoading: loadingMinhas } = useQuery({
     queryKey: ["minhas-agendas", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from("agendas")
-        .select(`
-          *,
-          solicitante:profiles!agendas_solicitante_id_fkey(id, nome),
-          validador:profiles!agendas_validador_id_fkey(id, nome),
-          agenda_acompanhantes(
-            usuario_id,
-            usuario:profiles!agenda_acompanhantes_usuario_id_fkey(id, nome)
-          )
-        `)
-        .or(`solicitante_id.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      try {
+        // Buscar agendas onde sou solicitante ou validador
+        const { data: agendas, error } = await supabase
+          .from("agendas")
+          .select(`
+            *,
+            agenda_acompanhantes(
+              usuario_id
+            )
+          `)
+          .or(`solicitante_id.eq.${user.id},validador_id.eq.${user.id}`)
+          .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Erro ao buscar minhas agendas:", error);
+        if (error) {
+          console.error("Erro ao buscar agendas diretas:", error);
+        }
+
+        // Buscar agendas onde sou acompanhante
+        const { data: acompanhamentos, error: errorAcomp } = await supabase
+          .from("agenda_acompanhantes")
+          .select(`
+            agenda_id,
+            agendas(*)
+          `)
+          .eq("usuario_id", user.id);
+
+        if (errorAcomp) {
+          console.error("Erro ao buscar acompanhamentos:", errorAcomp);
+        }
+
+        // Combinar resultados
+        const todasAgendas = [...(agendas || [])];
+        
+        if (acompanhamentos) {
+          acompanhamentos.forEach((item: any) => {
+            if (item.agendas && !todasAgendas.find(a => a.id === item.agendas.id)) {
+              todasAgendas.push({
+                ...item.agendas,
+                agenda_acompanhantes: []
+              });
+            }
+          });
+        }
+
+        // Buscar nomes dos usuários separadamente
+        const userIds = new Set<string>();
+        todasAgendas.forEach(agenda => {
+          userIds.add(agenda.solicitante_id);
+          userIds.add(agenda.validador_id);
+          agenda.agenda_acompanhantes?.forEach((a: any) => userIds.add(a.usuario_id));
+        });
+
+        const { data: usuarios } = await supabase
+          .from("profiles")
+          .select("id, nome")
+          .in("id", Array.from(userIds));
+
+        const userMap = new Map(usuarios?.map(u => [u.id, u.nome]) || []);
+
+        // Adicionar nomes aos resultados
+        return todasAgendas.map(agenda => ({
+          ...agenda,
+          solicitante: { 
+            id: agenda.solicitante_id, 
+            nome: userMap.get(agenda.solicitante_id) || "Usuário"
+          },
+          validador: { 
+            id: agenda.validador_id, 
+            nome: userMap.get(agenda.validador_id) || "Usuário"
+          }
+        }));
+      } catch (error) {
+        console.error("Erro geral ao buscar agendas:", error);
         return [];
       }
-      
-      // Também buscar agendas onde sou acompanhante
-      const { data: agendasAcompanhante } = await supabase
-        .from("agenda_acompanhantes")
-        .select(`
-          agenda:agendas(
-            *,
-            solicitante:profiles!agendas_solicitante_id_fkey(id, nome),
-            validador:profiles!agendas_validador_id_fkey(id, nome)
-          )
-        `)
-        .eq("usuario_id", user.id);
-
-      const todasAgendas = [...(data || [])];
-      
-      if (agendasAcompanhante) {
-        agendasAcompanhante.forEach((item: any) => {
-          if (item.agenda && !todasAgendas.find(a => a.id === item.agenda.id)) {
-            todasAgendas.push(item.agenda);
-          }
-        });
-      }
-
-      return todasAgendas;
     },
     enabled: !!user?.id && activeTab === "minhas",
   });
 
-  // Buscar solicitações para validar
+  // Buscar solicitações para validar - CORRIGIDO
   const { data: solicitacoes, isLoading: loadingSolicitacoes } = useQuery({
     queryKey: ["solicitacoes-agenda", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from("agendas")
-        .select(`
-          *,
-          solicitante:profiles!agendas_solicitante_id_fkey(id, nome),
-          validador:profiles!agendas_validador_id_fkey(id, nome),
-          agenda_acompanhantes(
-            usuario_id,
-            usuario:profiles!agenda_acompanhantes_usuario_id_fkey(id, nome)
-          )
-        `)
-        .eq("validador_id", user.id)
-        .order("created_at", { ascending: false });
+      try {
+        // Buscar agendas onde sou validador
+        const { data: agendas, error } = await supabase
+          .from("agendas")
+          .select(`
+            *,
+            agenda_acompanhantes(
+              usuario_id
+            )
+          `)
+          .eq("validador_id", user.id)
+          .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Erro ao buscar solicitações:", error);
+        if (error) {
+          console.error("Erro ao buscar solicitações:", error);
+          return [];
+        }
+
+        // Buscar nomes dos usuários
+        const userIds = new Set<string>();
+        (agendas || []).forEach(agenda => {
+          userIds.add(agenda.solicitante_id);
+          userIds.add(agenda.validador_id);
+          agenda.agenda_acompanhantes?.forEach((a: any) => userIds.add(a.usuario_id));
+        });
+
+        const { data: usuarios } = await supabase
+          .from("profiles")
+          .select("id, nome")
+          .in("id", Array.from(userIds));
+
+        const userMap = new Map(usuarios?.map(u => [u.id, u.nome]) || []);
+
+        // Adicionar nomes aos resultados
+        return (agendas || []).map(agenda => ({
+          ...agenda,
+          solicitante: { 
+            id: agenda.solicitante_id, 
+            nome: userMap.get(agenda.solicitante_id) || "Usuário"
+          },
+          validador: { 
+            id: agenda.validador_id, 
+            nome: userMap.get(agenda.validador_id) || "Usuário"
+          }
+        }));
+      } catch (error) {
+        console.error("Erro geral ao buscar solicitações:", error);
         return [];
       }
-      
-      return data || [];
     },
     enabled: !!user?.id && activeTab === "solicitacoes",
   });
 
-  // Buscar mensagens
+  // Buscar mensagens - CORRIGIDO
   const { data: mensagens } = useQuery({
     queryKey: ["agenda-mensagens", selectedAgenda?.id],
     queryFn: async () => {
       if (!selectedAgenda?.id) return [];
 
-      const { data, error } = await supabase
-        .from("agenda_mensagens")
-        .select(`
-          *,
-          remetente:profiles!agenda_mensagens_remetente_id_fkey(id, nome)
-        `)
-        .eq("agenda_id", selectedAgenda.id)
-        .order("created_at", { ascending: true });
+      try {
+        const { data: msgs, error } = await supabase
+          .from("agenda_mensagens")
+          .select("*")
+          .eq("agenda_id", selectedAgenda.id)
+          .order("created_at", { ascending: true });
 
-      if (error) {
+        if (error) {
+          console.error("Erro ao buscar mensagens:", error);
+          return [];
+        }
+
+        // Buscar nomes dos remetentes
+        const userIds = [...new Set(msgs?.map(m => m.remetente_id) || [])];
+        
+        const { data: usuarios } = await supabase
+          .from("profiles")
+          .select("id, nome")
+          .in("id", userIds);
+
+        const userMap = new Map(usuarios?.map(u => [u.id, u.nome]) || []);
+
+        // Adicionar nomes às mensagens
+        return (msgs || []).map(msg => ({
+          ...msg,
+          remetente: {
+            id: msg.remetente_id,
+            nome: userMap.get(msg.remetente_id) || "Usuário"
+          }
+        }));
+      } catch (error) {
         console.error("Erro ao buscar mensagens:", error);
         return [];
       }
-      
-      return data || [];
     },
     enabled: !!selectedAgenda?.id,
   });
@@ -402,6 +483,25 @@ const SolicitarAgenda = () => {
       });
     },
   });
+
+  // Logs de debug temporários
+  useEffect(() => {
+    if (minhasAgendas) {
+      console.log("=== MINHAS AGENDAS ===");
+      console.log("User ID atual:", user?.id);
+      console.log("Total de agendas encontradas:", minhasAgendas.length);
+      console.log("Agendas:", minhasAgendas);
+    }
+  }, [minhasAgendas, user?.id]);
+
+  useEffect(() => {
+    if (solicitacoes) {
+      console.log("=== SOLICITAÇÕES ===");
+      console.log("User ID atual:", user?.id);
+      console.log("Total de solicitações:", solicitacoes.length);
+      console.log("Solicitações:", solicitacoes);
+    }
+  }, [solicitacoes, user?.id]);
 
   const getStatusBadge = (status: string) => {
     const config = {
