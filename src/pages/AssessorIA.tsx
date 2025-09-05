@@ -72,13 +72,13 @@ const AssessorIA = () => {
     const promptData = location.state?.promptData;
     if (promptData) {
       // Construir prompt estruturado baseado nos dados da demanda
-      let prompt = `Com base na demanda a seguir, elabore um **[TIPO DE PROPOSITURA]**:\n\n`;
+      let prompt = `Com base na demanda a seguir, elabore um [TIPO DE PROPOSITURA]:\n\n`;
       
-      prompt += `**DADOS DA DEMANDA:**\n`;
-      prompt += `• **Descrição**: ${promptData.descricao}\n`;
+      prompt += `DADOS DA DEMANDA:\n`;
+      prompt += `• DESCRIÇÃO: ${promptData.descricao}\n`;
       
       if (promptData.endereco) {
-        prompt += `• **Endereço**: ${promptData.endereco}\n`;
+        prompt += `• ENDEREÇO: ${promptData.endereco}\n`;
       }
       
       if (promptData.area) {
@@ -86,10 +86,10 @@ const AssessorIA = () => {
       }
       
       if (promptData.observacoes) {
-        prompt += `• **Observações**: ${promptData.observacoes}\n`;
+        prompt += `• OBSERVAÇÕES: ${promptData.observacoes}\n`;
       }
       
-      prompt += `\nPor favor, redija um **[TIPO DE PROPOSITURA]** oficial baseado nestes dados, seguindo os modelos de documentos enviados no contexto.`;
+      prompt += `\nPor favor, redija um [TIPO DE PROPOSITURA] oficial baseado nestes dados, seguindo os modelos de documentos enviados no contexto.`;
       
       // Pré-preencher o campo de input
       setInputMessage(prompt);
