@@ -480,7 +480,7 @@ const WhatsApp = () => {
                 <p className="text-muted-foreground">Nenhum aniversariante hoje</p>
               </div>
             ) : (
-              <ScrollArea className="h-80 border rounded-lg">
+              <ScrollArea className="h-48 border rounded-lg">
                 <div className="p-3 space-y-2">
                   {aniversariantes.map((aniversariante) => (
                     <div
