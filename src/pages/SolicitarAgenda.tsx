@@ -657,15 +657,39 @@ const SolicitarAgenda = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Sistema de Agendas</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            Sistema de Agendas
+          </h1>
+          <p className="text-muted-foreground">Gerencie suas solicitações e agendamentos</p>
+        </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="solicitar">Solicitar</TabsTrigger>
-          <TabsTrigger value="minhas">Minhas Agendas</TabsTrigger>
-          <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
-        </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 bg-muted/50 border shadow-sm">
+            <TabsTrigger 
+              value="solicitar" 
+              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Solicitar
+            </TabsTrigger>
+            <TabsTrigger 
+              value="minhas"
+              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Minhas Agendas
+            </TabsTrigger>
+            <TabsTrigger 
+              value="solicitacoes"
+              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Clock4 className="h-4 w-4 mr-2" />
+              Solicitações
+            </TabsTrigger>
+          </TabsList>
 
         {/* Tab Solicitar */}
         <TabsContent value="solicitar">
@@ -898,37 +922,62 @@ const SolicitarAgenda = () => {
 
         {/* Tab Minhas Agendas */}
         <TabsContent value="minhas">
-          <Card>
-            <CardHeader>
-              <CardTitle>Minhas Agendas</CardTitle>
+          <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Minhas Agendas
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingMinhas ? (
-                <div>Carregando...</div>
-              ) : (
-                <div className="space-y-4">
-                  {minhasAgendas?.map(agenda => (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2 text-muted-foreground">Carregando agendas...</span>
+                </div>
+              ) : minhasAgendas && minhasAgendas.length > 0 ? (
+                <div className="space-y-3">
+                  {minhasAgendas.map(agenda => (
                     <Card 
                       key={agenda.id} 
-                      className="cursor-pointer hover:shadow-md"
+                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 border-l-primary/30 hover:border-l-primary bg-card/60 backdrop-blur"
                       onClick={() => setSelectedAgenda(agenda)}
                     >
                       <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold">{agenda.descricao_objetivo}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDateTime(agenda.data_hora_proposta)}
-                            </p>
-                            <p className="text-sm">
-                              Validador: {agenda.validador?.nome}
-                            </p>
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1 space-y-2">
+                            <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {formatDateTime(agenda.data_hora_proposta)}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <User className="h-4 w-4" />
+                                Validador: {agenda.validador?.nome}
+                              </div>
+                            </div>
                           </div>
-                          {getStatusBadge(agenda.status)}
+                          <div className="flex flex-col items-end gap-2">
+                            {getStatusBadge(agenda.status)}
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(agenda.created_at)}
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">Nenhuma agenda encontrada</h3>
+                  <p className="text-sm text-center">
+                    Você ainda não possui agendas cadastradas.
+                    <br />
+                    Clique em "Solicitar" para criar uma nova agenda.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -937,37 +986,60 @@ const SolicitarAgenda = () => {
 
         {/* Tab Solicitações */}
         <TabsContent value="solicitacoes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Solicitações para Validar</CardTitle>
+          <Card className="shadow-lg border-0 bg-card/50 backdrop-blur">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Clock4 className="h-5 w-5" />
+                Solicitações para Validar
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingSolicitacoes ? (
-                <div>Carregando...</div>
-              ) : (
-                <div className="space-y-4">
-                  {solicitacoes?.map(agenda => (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2 text-muted-foreground">Carregando solicitações...</span>
+                </div>
+              ) : solicitacoes && solicitacoes.length > 0 ? (
+                <div className="space-y-3">
+                  {solicitacoes.map(agenda => (
                     <Card 
                       key={agenda.id}
-                      className="cursor-pointer hover:shadow-md"
+                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 border-l-orange-400/30 hover:border-l-orange-400 bg-card/60 backdrop-blur"
                       onClick={() => setSelectedAgenda(agenda)}
                     >
                       <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold">{agenda.descricao_objetivo}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDateTime(agenda.data_hora_proposta)}
-                            </p>
-                            <p className="text-sm">
-                              Solicitante: {agenda.solicitante?.nome}
-                            </p>
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1 space-y-2">
+                            <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {formatDateTime(agenda.data_hora_proposta)}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <User className="h-4 w-4" />
+                                Solicitante: {agenda.solicitante?.nome}
+                              </div>
+                            </div>
                           </div>
-                          {getStatusBadge(agenda.status)}
+                          <div className="flex flex-col items-end gap-2">
+                            {getStatusBadge(agenda.status)}
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(agenda.created_at)}
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Clock4 className="h-12 w-12 mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">Nenhuma solicitação pendente</h3>
+                  <p className="text-sm text-center">
+                    Não há agendas aguardando sua validação no momento.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -975,192 +1047,221 @@ const SolicitarAgenda = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de Detalhes */}
-      {selectedAgenda && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{selectedAgenda.descricao_objetivo}</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setSelectedAgenda(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            
-            <CardContent className="overflow-y-auto max-h-[70vh] space-y-4">
-              {/* Informações principais */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Data/Hora</p>
-                  <p className="text-sm">{formatDateTime(selectedAgenda.data_hora_proposta)}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Status</p>
-                  <StatusBox
-                    currentStatus={selectedAgenda.status}
-                    canUpdate={user?.id === selectedAgenda.validador_id}
-                    onUpdateStatus={(status) => updateStatusMutation.mutate({
-                      agendaId: selectedAgenda.id,
-                      status
-                    })}
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Detalhes da solicitação */}
-              <div className="space-y-4">
-                <h4 className="font-semibold">Detalhes da Solicitação</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Duração Prevista</p>
-                    <p className="text-sm">{selectedAgenda.duracao_prevista}</p>
+        {/* Modal de Detalhes Melhorado */}
+        {selectedAgenda && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in-0 duration-200">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl border-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-background/95 backdrop-blur border-b z-10">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg line-clamp-2">{selectedAgenda.descricao_objetivo}</CardTitle>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {formatDateTime(selectedAgenda.data_hora_proposta)}
                   </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Data de Solicitação</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setSelectedAgenda(null)}
+                  className="h-8 w-8 hover:bg-muted/50"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              
+              <CardContent className="overflow-y-auto max-h-[75vh] space-y-6 p-6">
+                {/* Status e Informações Principais */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</p>
+                    <StatusBox
+                      currentStatus={selectedAgenda.status}
+                      canUpdate={user?.id === selectedAgenda.validador_id}
+                      onUpdateStatus={(status) => updateStatusMutation.mutate({
+                        agendaId: selectedAgenda.id,
+                        status
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duração</p>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {selectedAgenda.duracao_prevista}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solicitado em</p>
                     <p className="text-sm">{formatDateTime(selectedAgenda.data_pedido)}</p>
                   </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Solicitante</p>
-                    <p className="text-sm">{selectedAgenda.solicitante?.nome}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Validador</p>
-                    <p className="text-sm">{selectedAgenda.validador?.nome}</p>
-                  </div>
                 </div>
 
+                {/* Participantes */}
                 <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Participantes</p>
-                    <p className="text-sm">{selectedAgenda.participantes}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Local/Endereço</p>
-                    <p className="text-sm">{selectedAgenda.local_endereco}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Objetivo/Descrição</p>
-                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.descricao_objetivo}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pauta Sugerida</p>
-                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.pauta_sugerida}</p>
-                  </div>
-                  
-                  {selectedAgenda.material_apoio && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Material de Apoio</p>
-                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Participantes
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solicitante</p>
+                      <p className="text-sm font-medium">{selectedAgenda.solicitante?.nome}</p>
                     </div>
-                  )}
-                  
-                  {selectedAgenda.observacoes && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Observações</p>
-                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acompanhantes com nomes */}
-                {agendaDetalhada?.acompanhantes_nomes && agendaDetalhada.acompanhantes_nomes.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Acompanhantes</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {agendaDetalhada.acompanhantes_nomes.map((acomp: any, index: number) => (
-                        <Badge key={index} variant="secondary">
-                          {acomp.nome}
-                        </Badge>
-                      ))}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Validador</p>
+                      <p className="text-sm font-medium">{selectedAgenda.validador?.nome}</p>
                     </div>
                   </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Chat */}
-              <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <MessageCircle className="h-4 w-4" />
-                  Mensagens
-                </h4>
-                
-                <ScrollArea className="h-48 border rounded-lg p-3">
-                  {mensagens && mensagens.length > 0 ? (
-                    mensagens.map(msg => (
-                      <div
-                        key={msg.id}
-                        className={cn(
-                          "mb-3 p-2 rounded-lg max-w-[80%]",
-                          msg.remetente_id === user?.id
-                            ? "ml-auto bg-primary text-primary-foreground"
-                            : "bg-muted"
-                        )}
-                      >
-                        <p className="text-xs font-semibold">
-                          {msg.remetente?.nome}
-                        </p>
-                        <p className="text-sm">{msg.mensagem}</p>
-                        <p className="text-xs opacity-70">
-                          {formatDateTime(msg.created_at)}
-                        </p>
+                  
+                  {agendaDetalhada?.acompanhantes_nomes && agendaDetalhada.acompanhantes_nomes.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Acompanhantes do Mandato</p>
+                      <div className="flex flex-wrap gap-2">
+                        {agendaDetalhada.acompanhantes_nomes.map((acomp: any, index: number) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {acomp.nome}
+                          </Badge>
+                        ))}
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground py-8">
-                      <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Nenhuma mensagem ainda</p>
                     </div>
                   )}
-                </ScrollArea>
-
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Digite sua mensagem..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && newMessage.trim()) {
-                        enviarMensagemMutation.mutate({
-                          agendaId: selectedAgenda.id,
-                          mensagem: newMessage.trim()
-                        });
-                      }
-                    }}
-                  />
-                  <Button
-                    size="icon"
-                    onClick={() => {
-                      if (newMessage.trim()) {
-                        enviarMensagemMutation.mutate({
-                          agendaId: selectedAgenda.id,
-                          mensagem: newMessage.trim()
-                        });
-                      }
-                    }}
-                    disabled={!newMessage.trim()}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
+                  
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Todos os Participantes</p>
+                    <p className="text-sm bg-muted/50 p-3 rounded-md">{selectedAgenda.participantes}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
+                <Separator />
+
+                {/* Local e Detalhes */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Local e Detalhes
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Local/Endereço/Link</p>
+                      <p className="text-sm bg-muted/50 p-3 rounded-md">{selectedAgenda.local_endereco}</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Objetivo/Descrição</p>
+                      <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.descricao_objetivo}</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pauta Sugerida</p>
+                      <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.pauta_sugerida}</p>
+                    </div>
+                    
+                    {selectedAgenda.material_apoio && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Material de Apoio</p>
+                        <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
+                      </div>
+                    )}
+                    
+                    {selectedAgenda.observacoes && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Observações</p>
+                        <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Chat */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Mensagens
+                  </h4>
+                  
+                  <div className="border rounded-lg bg-muted/20 overflow-hidden">
+                    <ScrollArea className="h-64 p-4">
+                      {mensagens && mensagens.length > 0 ? (
+                        <div className="space-y-3">
+                          {mensagens.map(msg => (
+                            <div
+                              key={msg.id}
+                              className={cn(
+                                "flex flex-col space-y-1 max-w-[85%]",
+                                msg.remetente_id === user?.id ? "ml-auto items-end" : "items-start"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "rounded-lg p-3 shadow-sm",
+                                  msg.remetente_id === user?.id
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background border"
+                                )}
+                              >
+                                <p className="text-xs font-medium opacity-80 mb-1">
+                                  {msg.remetente?.nome}
+                                </p>
+                                <p className="text-sm">{msg.mensagem}</p>
+                                <p className="text-xs opacity-60 mt-1">
+                                  {formatDateTime(msg.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                          <MessageCircle className="h-8 w-8 mb-2 opacity-50" />
+                          <p className="text-sm">Nenhuma mensagem ainda</p>
+                          <p className="text-xs">Inicie uma conversa sobre esta agenda</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                    
+                    <div className="border-t bg-background p-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Digite sua mensagem..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && newMessage.trim()) {
+                              enviarMensagemMutation.mutate({
+                                agendaId: selectedAgenda.id,
+                                mensagem: newMessage.trim()
+                              });
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          size="icon"
+                          onClick={() => {
+                            if (newMessage.trim()) {
+                              enviarMensagemMutation.mutate({
+                                agendaId: selectedAgenda.id,
+                                mensagem: newMessage.trim()
+                              });
+                            }
+                          }}
+                          disabled={!newMessage.trim() || enviarMensagemMutation.isPending}
+                          className="shrink-0"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
