@@ -55,16 +55,19 @@ const WhatsApp = () => {
     demandas_ativo: false
   });
   const [loading, setLoading] = useState(true);
+  const [demandaSelecionada, setDemandaSelecionada] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
   const [aniversariantesSelecionados, setAniversariantesSelecionados] = useState<Set<string>>(new Set());
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [enviandoTeste, setEnviandoTeste] = useState(false);
+  const [demandas, setDemandas] = useState<any[]>([]);
 
   useEffect(() => {
     fetchInstances();
     fetchConfig();
     fetchAniversariantes();
+    fetchDemandas();
   }, []);
 
   const fetchInstances = async () => {
@@ -117,6 +120,27 @@ const WhatsApp = () => {
       toast.error('Erro ao carregar configurações');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDemandas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select(`
+          id,
+          titulo,
+          protocolo,
+          municipes (nome, telefone)
+        `)
+        .not('municipes.telefone', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setDemandas(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar demandas:', error);
     }
   };
 
@@ -682,56 +706,96 @@ const WhatsApp = () => {
                 </div>
               </div>
 
-              {/* Botão de Teste de Demanda */}
-              <div className="pt-4">
-                <Button 
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      // Buscar uma demanda de teste
-                      const { data: demanda } = await supabase
-                        .from('demandas')
-                        .select(`
-                          *,
-                          municipes (nome, telefone)
-                        `)
-                        .not('municipes.telefone', 'is', null)
-                        .limit(1)
-                        .single();
+              {/* Seção de Teste */}
+              <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px bg-border flex-1" />
+                  <span className="text-sm text-muted-foreground font-medium">Teste de Notificação</span>
+                  <div className="h-px bg-border flex-1" />
+                </div>
 
-                      if (!demanda) {
-                        toast.error('Nenhuma demanda com telefone encontrada');
-                        return;
-                      }
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Seletor de Demanda */}
+                  <div className="space-y-2">
+                    <Label htmlFor="demanda-teste">Demanda para Teste</Label>
+                    <Select
+                      value={demandaSelecionada}
+                      onValueChange={setDemandaSelecionada}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma demanda" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {demandas.map((demanda) => {
+                          const municipeData = demanda.municipes as any;
+                          return (
+                            <SelectItem key={demanda.id} value={demanda.id}>
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">#{demanda.protocolo} - {demanda.titulo}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {municipeData?.nome} • {municipeData?.telefone}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {demandas.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Nenhuma demanda com telefone encontrada
+                      </p>
+                    )}
+                  </div>
 
-                      const municipeData = demanda.municipes as any;
+                  {/* Botão de Teste */}
+                  <div className="space-y-2">
+                    <Label>Ação</Label>
+                    <Button 
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          if (!demandaSelecionada) {
+                            toast.error('Selecione uma demanda para teste');
+                            return;
+                          }
 
-                      await supabase.functions.invoke('whatsapp-notificar-demanda', {
-                        body: {
-                          demanda_id: demanda.id,
-                          municipe_nome: municipeData.nome,
-                          municipe_telefone: municipeData.telefone,
-                          status: 'Em Andamento (TESTE)',
-                          titulo_demanda: demanda.titulo,
-                          protocolo: demanda.protocolo
+                          const demandaEscolhida = demandas.find(d => d.id === demandaSelecionada);
+                          if (!demandaEscolhida) {
+                            toast.error('Demanda não encontrada');
+                            return;
+                          }
+
+                          const municipeData = demandaEscolhida.municipes as any;
+
+                          await supabase.functions.invoke('whatsapp-notificar-demanda', {
+                            body: {
+                              demanda_id: demandaEscolhida.id,
+                              municipe_nome: municipeData.nome,
+                              municipe_telefone: municipeData.telefone,
+                              status: 'Em Andamento (TESTE)',
+                              titulo_demanda: demandaEscolhida.titulo,
+                              protocolo: demandaEscolhida.protocolo
+                            }
+                          });
+
+                          toast.success(`Notificação de teste enviada para ${municipeData.nome}!`);
+                        } catch (error) {
+                          console.error('Erro:', error);
+                          toast.error('Erro ao enviar teste');
                         }
-                      });
-
-                      toast.success('Notificação de teste enviada!');
-                    } catch (error) {
-                      console.error('Erro:', error);
-                      toast.error('Erro ao enviar teste');
-                    }
-                  }}
-                  disabled={!config.instancia_demandas || !config.demandas_ativo}
-                  className="gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Testar Notificação
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Envia uma mensagem de teste para uma demanda existente
-                </p>
+                      }}
+                      disabled={!config.instancia_demandas || !config.demandas_ativo || !demandaSelecionada}
+                      className="gap-2 w-full"
+                    >
+                      <Send className="h-4 w-4" />
+                      Testar Notificação
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Envia mensagem de teste para a demanda selecionada
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {config.demandas_ativo && (
