@@ -10,7 +10,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
-import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
+import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 
 interface Demanda {
   id: string;
@@ -34,7 +34,7 @@ const statusColumns = [
 
 export default function Kanban() {
   const [selectedDemanda, setSelectedDemanda] = useState<Demanda | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -250,7 +250,7 @@ export default function Kanban() {
                                 }`}
                                 onClick={() => {
                                   setSelectedDemanda(demanda);
-                                  setIsEditDialogOpen(true);
+                                  setIsViewDialogOpen(true);
                                 }}
                               >
                                 <Button
@@ -344,10 +344,10 @@ export default function Kanban() {
         </DragDropContext>
 
         {selectedDemanda && (
-          <EditDemandaDialog
+          <ViewDemandaDialog
             demanda={selectedDemanda}
-            open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
+            open={isViewDialogOpen}
+            onOpenChange={setIsViewDialogOpen}
           />
         )}
 
