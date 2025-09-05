@@ -28,7 +28,6 @@ import { toast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   solicitante_id: z.string().min(1, "Selecione um solicitante"),
-  data_pedido: z.string().min(1, "Data do pedido é obrigatória"),
   data_hora_proposta: z.string().min(1, "Data e hora da reunião são obrigatórias"),
   duracao_prevista: z.string().min(1, "Informe a duração prevista"),
   participantes: z.string().min(1, "Informe os participantes"),
@@ -44,14 +43,13 @@ type FormData = z.infer<typeof formSchema>;
 
 const SolicitarAgenda = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Data do pedido atual (não editável)
+  const dataPedido = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      data_pedido: (() => {
-        const now = new Date();
-        return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-      })(),
       material_apoio: "",
       observacoes: "",
     },
@@ -84,10 +82,6 @@ const SolicitarAgenda = () => {
       });
 
       form.reset({
-        data_pedido: (() => {
-          const now = new Date();
-          return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-        })(),
         material_apoio: "",
         observacoes: "",
       });
@@ -152,20 +146,13 @@ const SolicitarAgenda = () => {
                   )}
                 />
 
-                {/* Data do Pedido */}
-                <FormField
-                  control={form.control}
-                  name="data_pedido"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data do Pedido *</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Data do Pedido - Não editável */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none">Data do Pedido</label>
+                  <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {dataPedido}
+                  </div>
+                </div>
 
                 {/* Data/Hora Proposta */}
                 <FormField
@@ -346,10 +333,7 @@ const SolicitarAgenda = () => {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const now = new Date();
-                    const localDateTime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
                     form.reset({
-                      data_pedido: localDateTime,
                       material_apoio: "",
                       observacoes: "",
                     });
