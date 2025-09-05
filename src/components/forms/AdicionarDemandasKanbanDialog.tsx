@@ -21,6 +21,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
+  const [municipeFilter, setMunicipeFilter] = useState("all");
+  const [cidadeFilter, setCidadeFilter] = useState("all");
+  const [bairroFilter, setBairroFilter] = useState("all");
+  const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
@@ -72,6 +76,53 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     enabled: open
   });
 
+  // Buscar munícipes únicos das demandas
+  const { data: municipes = [] } = useQuery({
+    queryKey: ['municipes-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('id, nome')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open
+  });
+
+  // Buscar cidades únicas das demandas
+  const { data: cidades = [] } = useQuery({
+    queryKey: ['cidades-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('cidade')
+        .not('cidade', 'is', null)
+        .order('cidade');
+      
+      if (error) throw error;
+      return [...new Set(data.map(item => item.cidade))];
+    },
+    enabled: open
+  });
+
+  // Buscar bairros únicos das demandas
+  const { data: bairros = [] } = useQuery({
+    queryKey: ['bairros-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('bairro')
+        .not('bairro', 'is', null)
+        .order('bairro');
+      
+      if (error) throw error;
+      return [...new Set(data.map(item => item.bairro))];
+    },
+    enabled: open
+  });
+
   const adicionarKanbanMutation = useMutation({
     mutationFn: async (demandaIds: string[]) => {
       const { error } = await supabase
@@ -101,8 +152,12 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     
     const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
     const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
+    const matchesMunicipe = municipeFilter === "all" || demanda.municipe_id === municipeFilter;
+    const matchesCidade = cidadeFilter === "all" || demanda.cidade === cidadeFilter;
+    const matchesBairro = bairroFilter === "all" || demanda.bairro === bairroFilter;
+    const matchesResponsavel = responsavelFilter === "all" || demanda.responsavel_id === responsavelFilter;
 
-    return matchesSearch && matchesStatus && matchesArea;
+    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesCidade && matchesBairro && matchesResponsavel;
   });
 
   const getStatusLabel = (status: string) => {
@@ -218,6 +273,62 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
               </SelectContent>
             </Select>
 
+            <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Munícipe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Munícipes</SelectItem>
+                {municipes.map((municipe) => (
+                  <SelectItem key={municipe.id} value={municipe.id}>
+                    {municipe.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Cidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Cidades</SelectItem>
+                {cidades.map((cidade) => (
+                  <SelectItem key={cidade} value={cidade}>
+                    {cidade}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={bairroFilter} onValueChange={setBairroFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Bairro" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Bairros</SelectItem>
+                {bairros.map((bairro) => (
+                  <SelectItem key={bairro} value={bairro}>
+                    {bairro}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Responsáveis</SelectItem>
+                {responsaveis.map((responsavel) => (
+                  <SelectItem key={responsavel.id} value={responsavel.id}>
+                    {responsavel.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               variant="outline"
               size="sm"
@@ -225,6 +336,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
                 setSearchTerm("");
                 setStatusFilter("all");
                 setAreaFilter("all");
+                setMunicipeFilter("all");
+                setCidadeFilter("all");
+                setBairroFilter("all");
+                setResponsavelFilter("all");
               }}
             >
               <Filter className="h-4 w-4 mr-2" />
