@@ -120,6 +120,7 @@ const AssessorIA = () => {
 
     setMessages(prev => [...prev, userMessage]);
     setInputMessage("");
+    setDocumentosContexto([]); // Limpar documentos após envio
     setIsLoading(true);
 
     try {
