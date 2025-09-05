@@ -33,7 +33,6 @@
   font-family: inherit !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
-  overflow: hidden !important;
 }
 
 .mention-input__input {
@@ -46,7 +45,6 @@
   resize: vertical !important;
   background: transparent !important;
   color: hsl(var(--foreground)) !important;
-  overflow: hidden !important;
 }
 
 .mention-input__suggestions {
