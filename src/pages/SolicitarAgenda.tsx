@@ -1092,7 +1092,7 @@ const SolicitarAgenda = () => {
                 <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="detalhes" className="space-y-4">
+              <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
