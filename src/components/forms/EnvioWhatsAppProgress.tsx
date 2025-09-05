@@ -131,8 +131,8 @@ export function EnvioWhatsAppProgress() {
         </CardHeader>
 
         {!state.isMinimized && (
-          <CardContent className="pt-0 flex flex-col h-full overflow-hidden">
-            <div className="flex-1 space-y-3 overflow-hidden">
+          <CardContent className="pt-0 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 120px)' }}>
+            <div className="flex-1 space-y-3 overflow-hidden min-h-0">
               {/* Mensagem */}
               <div className="text-xs">
                 <div className="font-medium mb-1">Mensagem:</div>
