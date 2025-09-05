@@ -413,6 +413,48 @@ export type Database = {
           },
         ]
       }
+      documentos_modelo: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          conteudo_extraido: string | null
+          created_at: string
+          id: string
+          nome: string
+          tamanho_arquivo: number | null
+          tipo_arquivo: string
+          updated_at: string
+          uploaded_by: string
+          url_arquivo: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          conteudo_extraido?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          tamanho_arquivo?: number | null
+          tipo_arquivo: string
+          updated_at?: string
+          uploaded_by: string
+          url_arquivo: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          conteudo_extraido?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          tamanho_arquivo?: number | null
+          tipo_arquivo?: string
+          updated_at?: string
+          uploaded_by?: string
+          url_arquivo?: string
+        }
+        Relationships: []
+      }
       municipe_tags: {
         Row: {
           created_at: string

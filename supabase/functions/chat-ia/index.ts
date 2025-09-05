@@ -26,7 +26,7 @@ serve(async (req) => {
       );
     }
 
-    const { message, conversationHistory = [] } = await req.json();
+    const { message, conversationHistory = [], documentosContexto = [] } = await req.json();
     
     if (!message) {
       return new Response(
@@ -40,12 +40,22 @@ serve(async (req) => {
 
     console.log('Processando mensagem para IA:', message);
     console.log('Histórico de conversa:', conversationHistory.length, 'mensagens');
+    console.log('Documentos no contexto:', documentosContexto.length);
+
+    // Construir contexto dos documentos
+    let contextosDocumentos = '';
+    if (documentosContexto.length > 0) {
+      contextosDocumentos = '\n\n=== DOCUMENTOS DE REFERÊNCIA ===\n';
+      documentosContexto.forEach((doc: any, index: number) => {
+        contextosDocumentos += `\n[DOCUMENTO ${index + 1}: ${doc.nome} - Categoria: ${doc.categoria}]\n`;
+        contextosDocumentos += `${doc.conteudo}\n`;
+        contextosDocumentos += '---\n';
+      });
+      contextosDocumentos += '\n=== FIM DOS DOCUMENTOS DE REFERÊNCIA ===\n\n';
+    }
 
     // Preparar mensagens para a OpenAI
-    const messages = [
-      {
-        role: 'system',
-        content: `Você é um assistente virtual especializado em gestão pública municipal. Você trabalha para ajudar funcionários de gabinete e gestores públicos com:
+    const systemPrompt = `Você é um assistente virtual especializado em gestão pública municipal. Você trabalha para ajudar funcionários de gabinete e gestores públicos com:
 
 - Orientações sobre legislação municipal
 - Processos administrativos
@@ -55,7 +65,18 @@ serve(async (req) => {
 - Protocolos de atendimento
 - Organização de agendas e reuniões
 
-Seja sempre profissional, claro e objetivo. Forneça informações precisas e práticas que ajudem no dia a dia da administração pública. Se não souber algo específico sobre a legislação local, oriente a consultar os órgãos competentes.`
+Seja sempre profissional, claro e objetivo. Forneça informações precisas e práticas que ajudem no dia a dia da administração pública. Se não souber algo específico sobre a legislação local, oriente a consultar os órgãos competentes.
+
+${documentosContexto.length > 0 ? 
+  'IMPORTANTE: Você tem acesso a documentos modelo de referência fornecidos pelo usuário. Use-os como base para criar documentos similares quando solicitado. Mantenha o formato, estrutura e linguagem formal adequada para documentos públicos oficiais.' : 
+  ''}
+
+${contextosDocumentos}`;
+
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
       },
       ...conversationHistory,
       {

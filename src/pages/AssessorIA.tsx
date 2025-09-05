@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Send, Bot, User, Loader2, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Send, Bot, User, Loader2, Trash2, FileText, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
 
 interface Message {
   id: string;
@@ -17,10 +19,22 @@ interface Message {
   timestamp: Date;
 }
 
+interface DocumentoModelo {
+  id: string;
+  nome: string;
+  categoria: string;
+  tipo_arquivo: string;
+  tamanho_arquivo: number;
+  url_arquivo: string;
+  conteudo_extraido: string;
+  created_at: string;
+}
+
 const AssessorIA = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -72,7 +86,12 @@ const AssessorIA = () => {
       const { data, error } = await supabase.functions.invoke('chat-ia', {
         body: {
           message: userMessage.content,
-          conversationHistory
+          conversationHistory,
+          documentosContexto: documentosContexto.map(doc => ({
+            nome: doc.nome,
+            categoria: doc.categoria,
+            conteudo: doc.conteudo_extraido
+          }))
         }
       });
 
@@ -143,6 +162,14 @@ const AssessorIA = () => {
       hour: '2-digit', 
       minute: '2-digit' 
     });
+  };
+
+  const handleDocumentosSelect = (documentos: DocumentoModelo[]) => {
+    setDocumentosContexto(documentos);
+  };
+
+  const removerDocumentoContexto = (documentoId: string) => {
+    setDocumentosContexto(prev => prev.filter(doc => doc.id !== documentoId));
   };
 
   return (
@@ -244,8 +271,35 @@ const AssessorIA = () => {
             
             <Separator />
             
-            <div className="p-4">
+            <div className="p-4 space-y-3">
+              {/* Documentos no Contexto */}
+              {documentosContexto.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Documentos no Contexto:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {documentosContexto.map((doc) => (
+                      <Badge key={doc.id} variant="secondary" className="gap-1">
+                        {doc.nome}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removerDocumentoContexto(doc.id)}
+                          className="h-4 w-4 p-0 hover:bg-transparent"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Barra de Input */}
               <div className="flex gap-2">
+                <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
@@ -267,7 +321,7 @@ const AssessorIA = () => {
                 </Button>
               </div>
               
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground">
                 Pressione Enter para enviar ou Shift+Enter para quebrar linha
               </p>
             </div>
