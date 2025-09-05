@@ -12,6 +12,7 @@ import { Upload, FileText, Trash2, Eye, Library } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { CategoriaDialog } from './CategoriaDialog';
 
 interface DocumentoModelo {
   id: string;
@@ -45,6 +46,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
   const [documentosSelecionados, setDocumentosSelecionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(false);
+  const [categoriaDialogOpen, setCategoriaDialogOpen] = useState(false);
+  const [arquivosPendentes, setArquivosPendentes] = useState<FileList | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -106,12 +109,17 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
     const files = event.target.files;
     if (!files || !user) return;
 
-    const categoriaSelecionada = prompt('Categoria do documento:', CATEGORIAS_DOCUMENTO[0]);
-    if (!categoriaSelecionada) return;
+    // Armazenar arquivos e abrir modal de categoria
+    setArquivosPendentes(files);
+    setCategoriaDialogOpen(true);
+  };
+
+  const processarUpload = async (categoria: string) => {
+    if (!arquivosPendentes || !user) return;
 
     setUploadProgress(true);
 
-    for (const file of Array.from(files)) {
+    for (const file of Array.from(arquivosPendentes)) {
       try {
         // Validar tipo de arquivo
         const tiposPermitidos = ['application/pdf', 'application/msword', 
@@ -153,7 +161,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           .from('documentos_modelo')
           .insert({
             nome: file.name,
-            categoria: categoriaSelecionada,
+            categoria: categoria,
             tipo_arquivo: file.type,
             tamanho_arquivo: file.size,
             url_arquivo: urlData.publicUrl,
@@ -179,6 +187,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
     }
 
     setUploadProgress(false);
+    setArquivosPendentes(null);
     carregarDocumentos();
     
     // Limpar input
@@ -396,6 +405,13 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal de Categoria */}
+      <CategoriaDialog
+        open={categoriaDialogOpen}
+        onOpenChange={setCategoriaDialogOpen}
+        onConfirm={processarUpload}
+      />
     </Dialog>
   );
 };

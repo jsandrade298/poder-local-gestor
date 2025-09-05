@@ -195,12 +195,15 @@ const AssessorIA = () => {
           </Button>
         </div>
 
-        <Card className="h-[calc(100vh-240px)] flex flex-col">
+        <Card className="h-[calc(100vh-280px)] flex flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-primary" />
-              Conversa com o Assessor IA
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" />
+                Conversa com o Assessor IA
+              </CardTitle>
+              <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
+            </div>
           </CardHeader>
           
           <Separator />
@@ -299,7 +302,6 @@ const AssessorIA = () => {
               
               {/* Barra de Input */}
               <div className="flex gap-2">
-                <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
