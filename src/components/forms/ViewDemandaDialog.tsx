@@ -300,8 +300,10 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
             </Card>
           </TabsContent>
 
-          <TabsContent value="atividades" className="overflow-y-auto max-h-[calc(90vh-200px)]">
-            <DemandaAtividadesTab demandaId={demanda.id} />
+          <TabsContent value="atividades" className="flex-1 overflow-hidden">
+            <div className="h-full overflow-y-auto">
+              <DemandaAtividadesTab demandaId={demanda.id} />
+            </div>
           </TabsContent>
 
           <TabsContent value="anexos" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
