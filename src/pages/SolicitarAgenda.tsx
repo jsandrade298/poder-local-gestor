@@ -975,315 +975,186 @@ const SolicitarAgenda = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de Detalhes - Melhorado */}
+      {/* Modal de Detalhes */}
       {selectedAgenda && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden animate-scale-in shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border-b-2 border-primary/20">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/20 rounded-xl shadow-sm">
-                  <Calendar className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-foreground">
-                    {selectedAgenda.descricao_objetivo}
-                  </CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground font-medium">
-                      {formatDateTime(selectedAgenda.data_hora_proposta)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{selectedAgenda.descricao_objetivo}</CardTitle>
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setSelectedAgenda(null)}
-                className="hover:bg-destructive/10 hover:text-destructive transition-colors rounded-full"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </CardHeader>
             
-            <CardContent className="overflow-y-auto max-h-[75vh] p-8">
-              <div className="space-y-8">
-                {/* Status e Info Principal */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 p-6 bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl border">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Clock4 className="h-4 w-4 text-primary" />
-                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            Data Proposta
-                          </p>
-                        </div>
-                        <p className="text-lg font-bold">
-                          {formatDateTime(selectedAgenda.data_hora_proposta)}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            Duração
-                          </p>
-                        </div>
-                        <p className="text-lg font-bold">{selectedAgenda.duracao_prevista}</p>
-                      </div>
-                    </div>
+            <CardContent className="overflow-y-auto max-h-[70vh] space-y-4">
+              {/* Informações principais */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Data/Hora</p>
+                  <p className="text-sm">{formatDateTime(selectedAgenda.data_hora_proposta)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  <StatusBox
+                    currentStatus={selectedAgenda.status}
+                    canUpdate={user?.id === selectedAgenda.validador_id}
+                    onUpdateStatus={(status) => updateStatusMutation.mutate({
+                      agendaId: selectedAgenda.id,
+                      status
+                    })}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Detalhes da solicitação */}
+              <div className="space-y-4">
+                <h4 className="font-semibold">Detalhes da Solicitação</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Duração Prevista</p>
+                    <p className="text-sm">{selectedAgenda.duracao_prevista}</p>
                   </div>
                   
-                  <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
-                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                          Status Atual
-                        </p>
-                      </div>
-                      <StatusBox
-                        currentStatus={selectedAgenda.status}
-                        canUpdate={user?.id === selectedAgenda.validador_id}
-                        onUpdateStatus={(status) => updateStatusMutation.mutate({
-                          agendaId: selectedAgenda.id,
-                          status
-                        })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Responsáveis */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Solicitante</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xl font-semibold">{selectedAgenda.solicitante?.nome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Solicitado em {formatDateTime(selectedAgenda.data_pedido)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Validador</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xl font-semibold">{selectedAgenda.validador?.nome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Responsável pela aprovação
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Local e Participantes */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                        <MapPin className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Local da Reunião</h4>
-                    </div>
-                    <p className="text-base leading-relaxed bg-muted/50 p-3 rounded-lg">
-                      {selectedAgenda.local_endereco}
-                    </p>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Data de Solicitação</p>
+                    <p className="text-sm">{formatDateTime(selectedAgenda.data_pedido)}</p>
                   </div>
                   
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                        <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Participantes</h4>
-                    </div>
-                    <p className="text-base leading-relaxed bg-muted/50 p-3 rounded-lg">
-                      {selectedAgenda.participantes}
-                    </p>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Solicitante</p>
+                    <p className="text-sm">{selectedAgenda.solicitante?.nome}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Validador</p>
+                    <p className="text-sm">{selectedAgenda.validador?.nome}</p>
                   </div>
                 </div>
 
-                {/* Acompanhantes */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Participantes</p>
+                    <p className="text-sm">{selectedAgenda.participantes}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Local/Endereço</p>
+                    <p className="text-sm">{selectedAgenda.local_endereco}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Objetivo/Descrição</p>
+                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.descricao_objetivo}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Pauta Sugerida</p>
+                    <p className="text-sm whitespace-pre-wrap">{selectedAgenda.pauta_sugerida}</p>
+                  </div>
+                  
+                  {selectedAgenda.material_apoio && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Material de Apoio</p>
+                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
+                    </div>
+                  )}
+                  
+                  {selectedAgenda.observacoes && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Observações</p>
+                      <p className="text-sm whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Acompanhantes com nomes */}
                 {agendaDetalhada?.acompanhantes_nomes && agendaDetalhada.acompanhantes_nomes.length > 0 && (
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                        <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Acompanhantes da Reunião</h4>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Acompanhantes</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
                       {agendaDetalhada.acompanhantes_nomes.map((acomp: any, index: number) => (
-                        <Badge 
-                          key={index} 
-                          variant="secondary" 
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
-                        >
-                          <User className="h-4 w-4" />
+                        <Badge key={index} variant="secondary">
                           {acomp.nome}
                         </Badge>
                       ))}
                     </div>
                   </div>
                 )}
+              </div>
 
-                {/* Descrição e Pauta */}
-                <div className="space-y-6">
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
-                        <FileText className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Objetivo da Reunião</h4>
-                    </div>
-                    <div className="prose prose-sm max-w-none">
-                      <p className="text-base leading-relaxed whitespace-pre-wrap bg-muted/50 p-4 rounded-lg border-l-4 border-cyan-500">
-                        {selectedAgenda.descricao_objetivo}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="p-6 border rounded-xl bg-card shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                        <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <h4 className="font-bold text-lg">Pauta Sugerida</h4>
-                    </div>
-                    <div className="prose prose-sm max-w-none">
-                      <p className="text-base leading-relaxed whitespace-pre-wrap bg-muted/50 p-4 rounded-lg border-l-4 border-emerald-500">
-                        {selectedAgenda.pauta_sugerida}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <Separator />
 
-                {/* Material de Apoio e Observações */}
-                {(selectedAgenda.material_apoio || selectedAgenda.observacoes) && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {selectedAgenda.material_apoio && (
-                      <div className="p-6 border rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                            <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                          </div>
-                          <h4 className="font-bold text-lg text-amber-800 dark:text-amber-200">
-                            Material de Apoio
-                          </h4>
-                        </div>
-                        <p className="text-base leading-relaxed whitespace-pre-wrap">
-                          {selectedAgenda.material_apoio}
+              {/* Chat */}
+              <div className="space-y-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Mensagens
+                </h4>
+                
+                <ScrollArea className="h-48 border rounded-lg p-3">
+                  {mensagens && mensagens.length > 0 ? (
+                    mensagens.map(msg => (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          "mb-3 p-2 rounded-lg max-w-[80%]",
+                          msg.remetente_id === user?.id
+                            ? "ml-auto bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        )}
+                      >
+                        <p className="text-xs font-semibold">
+                          {msg.remetente?.nome}
+                        </p>
+                        <p className="text-sm">{msg.mensagem}</p>
+                        <p className="text-xs opacity-70">
+                          {formatDateTime(msg.created_at)}
                         </p>
                       </div>
-                    )}
-                    
-                    {selectedAgenda.observacoes && (
-                      <div className="p-6 border rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="p-2 bg-slate-100 dark:bg-slate-900/30 rounded-lg">
-                            <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                          </div>
-                          <h4 className="font-bold text-lg text-slate-800 dark:text-slate-200">
-                            Observações
-                          </h4>
-                        </div>
-                        <p className="text-base leading-relaxed whitespace-pre-wrap">
-                          {selectedAgenda.observacoes}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <Separator className="my-8" />
-
-                {/* Chat */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/20 rounded-lg">
-                      <MessageCircle className="h-6 w-6 text-primary" />
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Nenhuma mensagem ainda</p>
                     </div>
-                    <h4 className="font-bold text-xl">Comunicação Interna</h4>
-                  </div>
-                  
-                  <ScrollArea className="h-64 border-2 rounded-xl p-6 bg-muted/20 shadow-inner">
-                    {mensagens && mensagens.length > 0 ? (
-                      <div className="space-y-4">
-                        {mensagens.map(msg => (
-                          <div
-                            key={msg.id}
-                            className={cn(
-                              "p-4 rounded-xl max-w-[85%] shadow-sm transition-all duration-200 hover:shadow-md",
-                              msg.remetente_id === user?.id
-                                ? "ml-auto bg-primary text-primary-foreground"
-                                : "bg-background border-2"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <User className="h-3 w-3 opacity-70" />
-                              <p className="text-xs font-bold opacity-90">
-                                {msg.remetente?.nome}
-                              </p>
-                            </div>
-                            <p className="text-sm leading-relaxed mb-2">{msg.mensagem}</p>
-                            <p className="text-xs opacity-70 text-right">
-                              {formatDateTime(msg.created_at)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center text-muted-foreground py-12">
-                        <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium">Nenhuma mensagem ainda</p>
-                        <p className="text-sm">Inicie a conversa enviando uma mensagem</p>
-                      </div>
-                    )}
-                  </ScrollArea>
+                  )}
+                </ScrollArea>
 
-                  <div className="flex gap-3">
-                    <Input
-                      placeholder="Digite sua mensagem..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && newMessage.trim()) {
-                          enviarMensagemMutation.mutate({
-                            agendaId: selectedAgenda.id,
-                            mensagem: newMessage.trim()
-                          });
-                        }
-                      }}
-                      className="flex-1 h-12 text-base"
-                    />
-                    <Button
-                      size="lg"
-                      onClick={() => {
-                        if (newMessage.trim()) {
-                          enviarMensagemMutation.mutate({
-                            agendaId: selectedAgenda.id,
-                            mensagem: newMessage.trim()
-                          });
-                        }
-                      }}
-                      disabled={!newMessage.trim()}
-                      className="px-6 h-12"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                  </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Digite sua mensagem..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && newMessage.trim()) {
+                        enviarMensagemMutation.mutate({
+                          agendaId: selectedAgenda.id,
+                          mensagem: newMessage.trim()
+                        });
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={() => {
+                      if (newMessage.trim()) {
+                        enviarMensagemMutation.mutate({
+                          agendaId: selectedAgenda.id,
+                          mensagem: newMessage.trim()
+                        });
+                      }
+                    }}
+                    disabled={!newMessage.trim()}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </CardContent>
