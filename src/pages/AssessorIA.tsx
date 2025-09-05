@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Send, Bot, User, Loader2, Trash2, FileText, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -300,42 +301,48 @@ const AssessorIA = () => {
             <div className="p-4 space-y-3 flex-shrink-0">
               {/* Documentos no Contexto */}
               {documentosContexto.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Documentos no Contexto ({documentosContexto.length}):</span>
-                  </div>
-                  <div className="w-full overflow-x-auto">
-                    <div className="flex gap-3 pb-2">
-                      {documentosContexto.map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="relative flex-shrink-0 w-28 h-20 bg-card rounded-lg border border-border hover:border-primary/50 transition-all duration-200 group shadow-sm hover:shadow-md"
-                        >
-                          <div className="p-3 h-full flex flex-col justify-between">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="text-xs font-medium text-foreground leading-tight truncate">
-                                {doc.nome}
-                              </span>
-                            </div>
-                            <Badge variant="secondary" className="text-[10px] py-0.5 px-2 h-auto self-start max-w-full truncate">
-                              {doc.categoria}
-                            </Badge>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removerDocumentoContexto(doc.id)}
-                            className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
+                <TooltipProvider>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Documentos no Contexto ({documentosContexto.length}):</span>
+                    </div>
+                    <div className="w-full overflow-x-auto">
+                      <div className="flex gap-3 pb-2">
+                        {documentosContexto.map((doc) => (
+                          <Tooltip key={doc.id}>
+                            <TooltipTrigger asChild>
+                              <div className="relative flex-shrink-0 w-28 h-20 bg-card rounded-lg border border-border hover:border-primary/50 transition-all duration-200 group shadow-sm hover:shadow-md">
+                                <div className="p-3 h-full flex flex-col justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span className="text-xs font-medium text-foreground leading-tight truncate">
+                                      {doc.nome}
+                                    </span>
+                                  </div>
+                                  <Badge variant="secondary" className="text-[10px] py-0.5 px-2 h-auto self-start max-w-full truncate">
+                                    {doc.categoria}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removerDocumentoContexto(doc.id)}
+                                  className="absolute -top-1 -right-1 h-6 w-6 p-0 rounded-full bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{doc.nome}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </TooltipProvider>
               )}
               
               {/* Barra de Input */}
