@@ -37,6 +37,7 @@ import { formatDateTime } from "@/lib/dateUtils";
 import { useSearchParams } from "react-router-dom";
 
 const formSchema = z.object({
+  titulo: z.string().min(1, "Título é obrigatório"),
   validador_id: z.string().min(1, "Selecione um validador"),
   data_hora_proposta: z.string().min(1, "Data e hora são obrigatórias"),
   duracao_prevista: z.string().min(1, "Informe a duração prevista"),
@@ -70,6 +71,7 @@ const SolicitarAgenda = () => {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      titulo: "",
       acompanha_mandato_ids: [],
       material_apoio: "",
       observacoes: "",
@@ -107,6 +109,7 @@ const SolicitarAgenda = () => {
       const { data: agenda, error: agendaError } = await supabase
         .from("agendas")
         .insert({
+          titulo: data.titulo,
           solicitante_id: user.id,
           validador_id: data.validador_id,
           data_hora_proposta: new Date(data.data_hora_proposta).toISOString(),
@@ -143,7 +146,7 @@ const SolicitarAgenda = () => {
         remetente_id: user.id,
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
-        mensagem: `Nova agenda: ${data.descricao_objetivo}`,
+        mensagem: `Nova agenda: ${data.titulo}`,
         url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
       });
 
@@ -154,7 +157,7 @@ const SolicitarAgenda = () => {
           remetente_id: user.id,
           tipo: "agenda_acompanhante",
           titulo: "Você foi adicionado em uma agenda",
-          mensagem: `Agenda: ${data.descricao_objetivo}`,
+          mensagem: `Agenda: ${data.titulo}`,
           url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
         }));
 
@@ -812,6 +815,23 @@ const SolicitarAgenda = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
+                      name="titulo"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Título da Agenda *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Digite o título da agenda..." 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="validador_id"
                       render={({ field }) => (
                         <FormItem>
@@ -1058,7 +1078,7 @@ const SolicitarAgenda = () => {
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start gap-4">
                           <div className="flex-1 space-y-2">
-                            <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
+                            <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.titulo || agenda.descricao_objetivo}</h3>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-4 w-4" />
@@ -1127,7 +1147,7 @@ const SolicitarAgenda = () => {
                              className="flex-1 space-y-2 cursor-pointer"
                              onClick={() => setSelectedAgenda(agenda)}
                            >
-                             <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
+                             <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.titulo || agenda.descricao_objetivo}</h3>
                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                <div className="flex items-center gap-1">
                                  <Calendar className="h-4 w-4" />
@@ -1158,7 +1178,7 @@ const SolicitarAgenda = () => {
                                    <AlertDialogHeader>
                                      <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                                      <AlertDialogDescription>
-                                       Tem certeza que deseja excluir a solicitação "{agenda.descricao_objetivo}"? Esta ação não pode ser desfeita e todos os dados relacionados (mensagens, acompanhantes) serão perdidos.
+                                       Tem certeza que deseja excluir a solicitação "{agenda.titulo || agenda.descricao_objetivo}"? Esta ação não pode ser desfeita e todos os dados relacionados (mensagens, acompanhantes) serão perdidos.
                                      </AlertDialogDescription>
                                    </AlertDialogHeader>
                                    <AlertDialogFooter>
@@ -1205,7 +1225,7 @@ const SolicitarAgenda = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Agenda - {selectedAgenda?.descricao_objetivo}
+                {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo}
               </DialogTitle>
             </DialogHeader>
 

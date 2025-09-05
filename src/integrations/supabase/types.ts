@@ -93,6 +93,7 @@ export type Database = {
           pauta_sugerida: string
           solicitante_id: string
           status: Database["public"]["Enums"]["status_agenda"]
+          titulo: string | null
           updated_at: string
           validador_id: string
         }
@@ -110,6 +111,7 @@ export type Database = {
           pauta_sugerida: string
           solicitante_id: string
           status?: Database["public"]["Enums"]["status_agenda"]
+          titulo?: string | null
           updated_at?: string
           validador_id: string
         }
@@ -127,6 +129,7 @@ export type Database = {
           pauta_sugerida?: string
           solicitante_id?: string
           status?: Database["public"]["Enums"]["status_agenda"]
+          titulo?: string | null
           updated_at?: string
           validador_id?: string
         }
