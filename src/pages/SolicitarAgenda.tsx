@@ -138,13 +138,18 @@ const SolicitarAgenda = () => {
       }
 
       // Criar notificação para validador
+      const urlDestino = `/solicitar-agenda?agenda=${agenda[0].id}`;
+      console.log("=== CRIANDO NOTIFICAÇÃO ===");
+      console.log("URL destino:", urlDestino);
+      console.log("ID da agenda:", agenda[0].id);
+      
       await supabase.from("notificacoes").insert({
         destinatario_id: data.validador_id,
         remetente_id: user.id,
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
         mensagem: `Nova agenda: ${data.descricao_objetivo}`,
-        url_destino: `/solicitar-agenda?agenda=${agenda[0].id}`,
+        url_destino: urlDestino,
       });
 
       // Notificar acompanhantes
