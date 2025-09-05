@@ -827,7 +827,11 @@ export default function Demandas() {
             </Card>
           ) : (
             filteredDemandas.map((demanda) => (
-              <Card key={demanda.id} className="backdrop-blur-sm bg-card/95 border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <Card 
+                key={demanda.id} 
+                className="backdrop-blur-sm bg-card/95 border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+                onClick={() => handleViewDemanda(demanda)}
+              >
                 <CardContent className="p-6">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1 space-y-3">
@@ -885,7 +889,11 @@ export default function Demandas() {
                       
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
