@@ -380,6 +380,13 @@ const SolicitarAgenda = () => {
     }
   }, [mensagens]);
 
+  // Auto-scroll quando abre o modal de uma agenda
+  useEffect(() => {
+    if (selectedAgenda && mensagens) {
+      setTimeout(scrollToBottom, 200);
+    }
+  }, [selectedAgenda]);
+
   // Buscar detalhes completos da agenda selecionada incluindo acompanhantes
   const { data: agendaDetalhada } = useQuery({
     queryKey: ["agenda-detalhada", selectedAgenda?.id],
@@ -1085,7 +1092,7 @@ const SolicitarAgenda = () => {
                 <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <TabsContent value="detalhes" className="space-y-4">
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -1165,7 +1172,7 @@ const SolicitarAgenda = () => {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="participantes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <TabsContent value="participantes" className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1213,7 +1220,7 @@ const SolicitarAgenda = () => {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="mensagens" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <TabsContent value="mensagens" className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
