@@ -245,7 +245,7 @@ export default function Kanban() {
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group ${
                                   snapshot.isDragging ? 'shadow-lg rotate-3' : ''
                                 }`}
                                 onClick={() => {
@@ -253,27 +253,25 @@ export default function Kanban() {
                                   setIsEditDialogOpen(true);
                                 }}
                               >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removerDemandaKanbanMutation.mutate(demanda.id);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
                                 <CardHeader className="pb-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <CardTitle className="text-sm font-medium line-clamp-2">
                                       {demanda.titulo}
                                     </CardTitle>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          removerDemandaKanbanMutation.mutate(demanda.id);
-                                        }}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                      <Badge variant="outline" className="text-xs shrink-0">
-                                        #{demanda.protocolo}
-                                      </Badge>
-                                    </div>
+                                    <Badge variant="outline" className="text-xs shrink-0">
+                                      #{demanda.protocolo}
+                                    </Badge>
                                   </div>
                                 </CardHeader>
                                 
