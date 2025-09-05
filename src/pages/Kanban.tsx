@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
@@ -131,89 +131,6 @@ export default function Kanban() {
     }
   };
 
-  // Mutation para atualizar status
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ demandaId, newStatus }: { demandaId: string; newStatus: string }) => {
-      // Primeiro buscar dados da demanda para notificação
-      const { data: demanda, error: fetchError } = await supabase
-        .from('demandas')
-        .select(`
-          *,
-          municipes (nome, telefone)
-        `)
-        .eq('id', demandaId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      const oldStatus = demanda.status;
-      let whatsappEnviado = false;
-
-      // Atualizar status
-      const { error } = await supabase
-        .from('demandas')
-        .update({ status: newStatus })
-        .eq('id', demandaId);
-      
-      if (error) throw error;
-
-      // Enviar notificação se tiver telefone
-      if (demanda.municipes?.telefone && oldStatus !== newStatus) {
-        try {
-          console.log('🔔 Enviando notificação WhatsApp...');
-          const response = await supabase.functions.invoke('whatsapp-notificar-demanda', {
-            body: {
-              demanda_id: demandaId,
-              municipe_nome: demanda.municipes.nome,
-              municipe_telefone: demanda.municipes.telefone,
-              status: getStatusLabel(newStatus),
-              status_anterior: getStatusLabel(oldStatus),
-              titulo_demanda: demanda.titulo,
-              protocolo: demanda.protocolo
-            }
-          });
-          
-          console.log('📱 Resposta da notificação:', response);
-          
-          if (response.data?.success) {
-            whatsappEnviado = true;
-          }
-        } catch (notifError) {
-          console.error('Erro ao enviar notificação:', notifError);
-        }
-      }
-
-      return { whatsappEnviado, municipeNome: demanda.municipes?.nome };
-    },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
-      
-      if (result?.whatsappEnviado) {
-        toast.success(`✅ Status atualizado e WhatsApp enviado para ${result.municipeNome}!`);
-      } else {
-        toast.success("Status atualizado!");
-      }
-    },
-    onError: (error) => {
-      console.error('Erro ao atualizar status:', error);
-      toast.error("Erro ao atualizar status");
-    }
-  });
-
-  const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
-
-    const demandaId = result.draggableId;
-    const sourceStatus = result.source.droppableId;
-    const destinationStatus = result.destination.droppableId;
-
-    if (sourceStatus === destinationStatus) return;
-
-    updateStatusMutation.mutate({ 
-      demandaId, 
-      newStatus: destinationStatus 
-    });
-  };
 
   const getPrioridadeColor = (prioridade: string) => {
     switch (prioridade) {
@@ -318,8 +235,7 @@ export default function Kanban() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {statusColumns.map((column) => {
               const columnDemandas = getDemandsByStatus(column.id);
               
@@ -337,133 +253,107 @@ export default function Kanban() {
                     </h2>
                   </div>
 
-                  <Droppable droppableId={column.id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
-                          snapshot.isDraggingOver 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-muted-foreground/20'
-                        }`}
+                  <div className="min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                    {columnDemandas.map((demanda) => (
+                      <Card
+                        key={demanda.id}
+                        className="cursor-pointer transition-all duration-200 hover:shadow-md relative group"
+                        onClick={() => {
+                          setSelectedDemanda(demanda);
+                          setIsViewDialogOpen(true);
+                        }}
                       >
-                        {columnDemandas.map((demanda, index) => (
-                          <Draggable
-                            key={demanda.id}
-                            draggableId={demanda.id}
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group ${
-                                  snapshot.isDragging ? 'shadow-lg rotate-2 scale-105' : ''
-                                }`}
-                                onClick={() => {
-                                  setSelectedDemanda(demanda);
-                                  setIsViewDialogOpen(true);
-                                }}
-                              >
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removerDemandaMutation.mutate(demanda.id);
-                                  }}
-                                  disabled={removerDemandaMutation.isPending}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                                
-                                <CardHeader className="pb-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <CardTitle className="text-sm font-medium line-clamp-2">
-                                      {demanda.titulo}
-                                    </CardTitle>
-                                    <Badge variant="outline" className="text-xs shrink-0">
-                                      #{demanda.protocolo}
-                                    </Badge>
-                                  </div>
-                                </CardHeader>
-                                
-                                <CardContent className="pt-0 space-y-2">
-                                  <p className="text-xs text-muted-foreground line-clamp-2">
-                                    {demanda.descricao}
-                                  </p>
-                                  
-                                  <div className="flex items-center justify-between">
-                                    <Badge 
-                                      variant="outline" 
-                                      className="text-xs"
-                                      style={{ 
-                                        borderColor: getPrioridadeColor(demanda.prioridade),
-                                        color: getPrioridadeColor(demanda.prioridade)
-                                      }}
-                                    >
-                                      {getPrioridadeLabel(demanda.prioridade)}
-                                    </Badge>
-                                    
-                                    {isOverdue(demanda.data_prazo) && (
-                                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    {demanda.areas?.nome && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <MapPin className="h-3 w-3" />
-                                        <span className="truncate">{demanda.areas.nome}</span>
-                                      </div>
-                                    )}
-                                    
-                                    {demanda.municipes?.nome && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span className="truncate">{demanda.municipes.nome}</span>
-                                      </div>
-                                    )}
-
-                                    {demanda.responsavel_id && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span className="truncate">
-                                          Resp: {getResponsavelNome(demanda.responsavel_id)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    
-                                    {demanda.data_prazo && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="h-3 w-3" />
-                                        <span>Prazo: {formatDateTime(demanda.data_prazo).split(' ')[0]}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removerDemandaMutation.mutate(demanda.id);
+                          }}
+                          disabled={removerDemandaMutation.isPending}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         
-                        {columnDemandas.length === 0 && (
-                          <div className="flex items-center justify-center h-32 text-muted-foreground">
-                            <p className="text-sm">Nenhuma demanda nesta coluna</p>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-sm font-medium line-clamp-2">
+                              {demanda.titulo}
+                            </CardTitle>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              #{demanda.protocolo}
+                            </Badge>
                           </div>
-                        )}
+                        </CardHeader>
+                        
+                        <CardContent className="pt-0 space-y-2">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {demanda.descricao}
+                          </p>
+                          
+                          <div className="flex items-center justify-between">
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs"
+                              style={{ 
+                                borderColor: getPrioridadeColor(demanda.prioridade),
+                                color: getPrioridadeColor(demanda.prioridade)
+                              }}
+                            >
+                              {getPrioridadeLabel(demanda.prioridade)}
+                            </Badge>
+                            
+                            {isOverdue(demanda.data_prazo) && (
+                              <AlertTriangle className="h-4 w-4 text-destructive" />
+                            )}
+                          </div>
+
+                          <div className="space-y-1">
+                            {demanda.areas?.nome && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">{demanda.areas.nome}</span>
+                              </div>
+                            )}
+                            
+                            {demanda.municipes?.nome && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span className="truncate">{demanda.municipes.nome}</span>
+                              </div>
+                            )}
+
+                            {demanda.responsavel_id && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span className="truncate">
+                                  Resp: {getResponsavelNome(demanda.responsavel_id)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {demanda.data_prazo && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                <span>Prazo: {formatDateTime(demanda.data_prazo).split(' ')[0]}</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    
+                    {columnDemandas.length === 0 && (
+                      <div className="flex items-center justify-center h-32 text-muted-foreground">
+                        <p className="text-sm">Nenhuma demanda nesta coluna</p>
                       </div>
                     )}
-                  </Droppable>
+                  </div>
                 </div>
               );
             })}
-          </div>
-        </DragDropContext>
+        </div>
 
         {/* Dialogs */}
         {selectedDemanda && (
