@@ -390,7 +390,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                 <h3 className="text-lg font-semibold">Dicas Importantes</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
-                  <p>• Datas devem estar no formato AAAA-MM-DD (ex: 1985-05-15)</p>
+                  <p>• Datas devem estar no formato DD/MM/AAAA (ex: 15/05/1985) ou DD/MM/AA (ex: 15/05/85)</p>
                   <p>• Se um campo estiver vazio, deixe a célula em branco</p>
                   <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
