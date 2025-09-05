@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Message {
   id: string;
@@ -35,6 +36,7 @@ const AssessorIA = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
+  const [selectedModel, setSelectedModel] = useState<'gpt-5' | 'gpt-5-mini'>('gpt-5-mini');
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,7 @@ const AssessorIA = () => {
         {
           id: 'welcome',
           role: 'assistant',
-          content: 'Olá! Sou seu Assessor IA especializado em gestão pública municipal. Como posso ajudá-lo hoje? Posso orientar sobre legislação, processos administrativos, atendimento ao cidadão e muito mais.',
+          content: 'Olá! Sou seu **Assessor Legislativo IA** especializado em redação de documentos oficiais municipais.\n\n📝 **Posso redigir:**\n• Requerimentos de informação\n• Indicações legislativas\n• Projetos de Lei (PLs)\n• Moções\n• Ofícios oficiais\n• Outros documentos legislativos\n\n💡 **Para melhores resultados:** Use a Biblioteca de Documentos para selecionar modelos como referência. Assim posso manter o formato e linguagem adequados aos padrões do seu município.\n\nComo posso ajudá-lo hoje?',
           timestamp: new Date()
         }
       ]);
@@ -83,14 +85,21 @@ const AssessorIA = () => {
           content: msg.content
         }));
 
+      // Função para truncar conteúdo (salvaguarda no cliente)
+      const truncarConteudo = (texto: string, maxChars: number = 10000): string => {
+        if (texto.length <= maxChars) return texto;
+        return texto.substring(0, maxChars) + '\n[... texto truncado no cliente ...]';
+      };
+
       const { data, error } = await supabase.functions.invoke('chat-ia', {
         body: {
           message: userMessage.content,
           conversationHistory,
+          model: selectedModel,
           documentosContexto: documentosContexto.map(doc => ({
             nome: doc.nome,
             categoria: doc.categoria,
-            conteudo: doc.conteudo_extraido
+            conteudo: truncarConteudo(doc.conteudo_extraido, 10000)
           }))
         }
       });
@@ -140,7 +149,7 @@ const AssessorIA = () => {
       {
         id: 'welcome',
         role: 'assistant',
-        content: 'Olá! Sou seu Assessor IA especializado em gestão pública municipal. Como posso ajudá-lo hoje? Posso orientar sobre legislação, processos administrativos, atendimento ao cidadão e muito mais.',
+        content: 'Olá! Sou seu **Assessor Legislativo IA** especializado em redação de documentos oficiais municipais.\n\n📝 **Posso redigir:**\n• Requerimentos de informação\n• Indicações legislativas\n• Projetos de Lei (PLs)\n• Moções\n• Ofícios oficiais\n• Outros documentos legislativos\n\n💡 **Para melhores resultados:** Use a Biblioteca de Documentos para selecionar modelos como referência. Assim posso manter o formato e linguagem adequados aos padrões do seu município.\n\nComo posso ajudá-lo hoje?',
         timestamp: new Date()
       }
     ]);
@@ -179,9 +188,9 @@ const AssessorIA = () => {
       <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full min-h-0">
         <div className="flex justify-between items-center mb-6 flex-shrink-0">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Assessor IA</h1>
+            <h1 className="text-3xl font-bold text-foreground">Assessor Legislativo IA</h1>
             <p className="text-muted-foreground mt-1">
-              Seu assistente inteligente para gestão pública municipal
+              Redator especializado em documentos oficiais municipais
             </p>
           </div>
           
@@ -200,9 +209,23 @@ const AssessorIA = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
-                Conversa com o Assessor IA
+                Assessor Legislativo IA
               </CardTitle>
-              <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Modelo:</span>
+                  <Select value={selectedModel} onValueChange={(value: 'gpt-5' | 'gpt-5-mini') => setSelectedModel(value)}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
+                      <SelectItem value="gpt-5">GPT-5</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
+              </div>
             </div>
           </CardHeader>
           
@@ -308,7 +331,7 @@ const AssessorIA = () => {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Digite sua pergunta sobre gestão pública..."
+                  placeholder="Ex: Gerar requerimento de informação sobre obras públicas..."
                   disabled={isLoading}
                   className="flex-1"
                 />

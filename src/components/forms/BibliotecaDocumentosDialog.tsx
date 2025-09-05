@@ -80,20 +80,20 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
   };
 
   const extrairTextoArquivo = async (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        // Para arquivos TXT, retorna o conteúdo diretamente
-        if (file.type === 'text/plain') {
-          resolve(text);
-        } else {
-          // Para outros tipos, extrai texto básico (implementação simples)
-          resolve(text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').trim());
-        }
-      };
-      reader.readAsText(file);
-    });
+    // Para arquivos de texto simples, extrai diretamente
+    if (file.type === 'text/plain') {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target?.result as string || '');
+        };
+        reader.readAsText(file);
+      });
+    }
+    
+    // Para PDF/DOCX, não tenta extrair (evita lixo binário)
+    // Retorna apenas metadados para identificação
+    return `[${file.name}]\nTipo: ${file.type}\nTamanho: ${(file.size / 1024).toFixed(2)} KB\n\n⚠️ Para extrair texto de PDF/DOCX, será necessário implementar extração específica.`;
   };
 
   const sanitizarNomeArquivo = (nome: string): string => {
