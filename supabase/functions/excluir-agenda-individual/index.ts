@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     // Buscar a agenda para verificar se existe e está confirmada ou recusada
     const { data: agenda, error: selectError } = await supabase
       .from('agendas')
-      .select('id, status, data_hora_proposta, descricao_objetivo, created_at')
+      .select('id, status, data_hora_proposta, descricao_objetivo, created_at, updated_at')
       .eq('id', agenda_id)
       .in('status', ['confirmado', 'recusado'])
       .maybeSingle();
@@ -63,8 +63,8 @@ Deno.serve(async (req) => {
       dataLimite = new Date(agenda.data_hora_proposta);
       dataLimite.setMinutes(dataLimite.getMinutes() + 5);
     } else if (agenda.status === 'recusado') {
-      // Para recusado: 5 minutos após a criação
-      dataLimite = new Date(agenda.created_at);
+      // Para recusado: 5 minutos após a atualização (quando foi recusado)
+      dataLimite = new Date(agenda.updated_at);
       dataLimite.setMinutes(dataLimite.getMinutes() + 5);
     }
 
