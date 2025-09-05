@@ -87,7 +87,7 @@ const AssessorIA = () => {
 
       // Função para truncar conteúdo (salvaguarda no cliente)
       const truncarConteudo = (texto: string, maxChars: number = 10000): string => {
-        if (texto.length <= maxChars) return texto;
+        if (!texto || texto.length <= maxChars) return texto;
         return texto.substring(0, maxChars) + '\n[... texto truncado no cliente ...]';
       };
 
@@ -99,7 +99,7 @@ const AssessorIA = () => {
           documentosContexto: documentosContexto.map(doc => ({
             nome: doc.nome,
             categoria: doc.categoria,
-            conteudo: truncarConteudo(doc.conteudo_extraido, 10000)
+            conteudo: truncarConteudo(doc.conteudo_extraido || '', 10000)
           }))
         }
       });

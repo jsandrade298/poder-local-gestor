@@ -13,6 +13,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 200 });
   }
 
+  // Handle healthcheck
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    if (url.searchParams.get('healthz') === '1') {
+      return new Response(
+        JSON.stringify({ ok: true }), 
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+  }
+
   try {
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     
@@ -32,8 +46,8 @@ serve(async (req) => {
     // Validar modelo
     const validModels = ['gpt-5', 'gpt-5-mini'];
     const modelMap = {
-      'gpt-5': 'gpt-5-2025-08-07',
-      'gpt-5-mini': 'gpt-5-mini-2025-08-07'
+      'gpt-5': 'gpt-4o',
+      'gpt-5-mini': 'gpt-4o-mini'
     };
     
     if (!validModels.includes(model)) {
@@ -62,8 +76,8 @@ serve(async (req) => {
     console.log('Documentos no contexto:', documentosContexto.length);
 
     // Função para truncar texto preservando estrutura
-    const truncarTexto = (texto: string, maxChars: number = 4000): string => {
-      if (texto.length <= maxChars) return texto;
+    const truncarTexto = (texto: string, maxChars: number = 10000): string => {
+      if (!texto || texto.length <= maxChars) return texto;
       return texto.substring(0, maxChars) + '\n[... texto truncado ...]';
     };
 
@@ -72,8 +86,8 @@ serve(async (req) => {
     if (documentosContexto.length > 0) {
       contextosDocumentos = '\n\n=== DOCUMENTOS DE REFERÊNCIA ===\n';
       documentosContexto.forEach((doc: any, index: number) => {
-        const conteudoTruncado = truncarTexto(doc.conteudo, 4000);
-        contextosDocumentos += `\n[DOCUMENTO ${doc.nome} (${doc.categoria})]\n`;
+        const conteudoTruncado = truncarTexto(doc.conteudo, 10000);
+        contextosDocumentos += `\n[DOCUMENTO ${index + 1}: ${doc.nome} - Categoria: ${doc.categoria}]\n`;
         contextosDocumentos += `${conteudoTruncado}\n`;
         contextosDocumentos += '---\n';
       });
