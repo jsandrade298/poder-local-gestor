@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MapPin, User, AlertTriangle } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
@@ -65,6 +66,44 @@ export default function Kanban() {
       
       if (error) throw error;
       return data;
+    }
+  });
+
+  const limparKanbanMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('demandas')
+        .update({ status: 'aguardando' })
+        .in('status', ['aberta', 'em_andamento', 'resolvida']);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      toast.success("Kanban limpo com sucesso!");
+    },
+    onError: (error) => {
+      console.error('Erro ao limpar kanban:', error);
+      toast.error("Erro ao limpar kanban");
+    }
+  });
+
+  const removerDemandaKanbanMutation = useMutation({
+    mutationFn: async (demandaId: string) => {
+      const { error } = await supabase
+        .from('demandas')
+        .update({ status: 'aguardando' })
+        .eq('id', demandaId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      toast.success("Demanda removida do kanban!");
+    },
+    onError: (error) => {
+      console.error('Erro ao remover demanda do kanban:', error);
+      toast.error("Erro ao remover demanda do kanban");
     }
   });
 
@@ -131,10 +170,38 @@ export default function Kanban() {
               Gerencie o fluxo das demandas na produção legislativa
             </p>
           </div>
-          <Button onClick={() => setIsAdicionarDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
+          <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Limpar Kanban
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso removerá todas as demandas do kanban, alterando seu status para "Aguardando". 
+                    Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => limparKanbanMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Limpar Kanban
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button onClick={() => setIsAdicionarDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar
+            </Button>
+          </div>
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -191,9 +258,22 @@ export default function Kanban() {
                                     <CardTitle className="text-sm font-medium line-clamp-2">
                                       {demanda.titulo}
                                     </CardTitle>
-                                    <Badge variant="outline" className="text-xs shrink-0">
-                                      #{demanda.protocolo}
-                                    </Badge>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removerDemandaKanbanMutation.mutate(demanda.id);
+                                        }}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                      <Badge variant="outline" className="text-xs shrink-0">
+                                        #{demanda.protocolo}
+                                      </Badge>
+                                    </div>
                                   </div>
                                 </CardHeader>
                                 
