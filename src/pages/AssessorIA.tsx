@@ -173,11 +173,11 @@ const AssessorIA = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       <AppHeader />
       
-      <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-        <div className="flex justify-between items-center mb-6">
+      <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full min-h-0">
+        <div className="flex justify-between items-center mb-6 flex-shrink-0">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Assessor IA</h1>
             <p className="text-muted-foreground mt-1">
@@ -195,8 +195,8 @@ const AssessorIA = () => {
           </Button>
         </div>
 
-        <Card className="h-[calc(100vh-280px)] flex flex-col">
-          <CardHeader className="pb-3">
+        <Card className="flex-1 flex flex-col min-h-0">
+          <CardHeader className="pb-3 flex-shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
@@ -206,9 +206,9 @@ const AssessorIA = () => {
             </div>
           </CardHeader>
           
-          <Separator />
+          <Separator className="flex-shrink-0" />
           
-          <CardContent className="flex-1 flex flex-col p-0">
+          <CardContent className="flex-1 flex flex-col p-0 min-h-0">
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {messages.map((message) => (
@@ -272,9 +272,9 @@ const AssessorIA = () => {
               </div>
             </ScrollArea>
             
-            <Separator />
+            <Separator className="flex-shrink-0" />
             
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 flex-shrink-0">
               {/* Documentos no Contexto */}
               {documentosContexto.length > 0 && (
                 <div className="space-y-2">
