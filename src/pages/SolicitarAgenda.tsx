@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { X, Send, Clock, CheckCircle, XCircle, RotateCcw, MessageCircle } from "lucide-react";
+import { X, Send, Clock, CheckCircle, XCircle, RotateCcw, MessageCircle, Edit } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -504,20 +504,96 @@ const SolicitarAgenda = () => {
   }, [solicitacoes, user?.id]);
 
   const getStatusBadge = (status: string) => {
-    const config = {
-      pendente: { color: "bg-gray-100 text-gray-800", icon: Clock },
-      confirmado: { color: "bg-green-100 text-green-800", icon: CheckCircle },
-      recusado: { color: "bg-red-100 text-red-800", icon: XCircle },
-      remarcar: { color: "bg-yellow-100 text-yellow-800", icon: RotateCcw },
-    };
-    
-    const { color, icon: Icon } = config[status as keyof typeof config] || config.pendente;
-    
+    const variants = {
+      pendente: "secondary",
+      confirmado: "default",
+      recusado: "destructive",
+      remarcar: "outline",
+    } as const;
+
     return (
-      <Badge className={cn("gap-1", color)}>
-        <Icon className="h-3 w-3" />
+      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
+    );
+  };
+
+  // Component for status updater
+  const StatusBox = ({ 
+    currentStatus, 
+    canUpdate, 
+    onUpdateStatus 
+  }: { 
+    currentStatus: string; 
+    canUpdate: boolean; 
+    onUpdateStatus: (status: string) => void; 
+  }) => {
+    const [isEditing, setIsEditing] = useState(false);
+
+    if (!canUpdate) {
+      return getStatusBadge(currentStatus);
+    }
+
+    if (isEditing) {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                onUpdateStatus('confirmado');
+                setIsEditing(false);
+              }}
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Confirmar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                onUpdateStatus('recusado');
+                setIsEditing(false);
+              }}
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Recusar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                onUpdateStatus('remarcar');
+                setIsEditing(false);
+              }}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Remarcar
+            </Button>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsEditing(false)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded"
+        onClick={() => setIsEditing(true)}
+      >
+        {getStatusBadge(currentStatus)}
+        <Button size="sm" variant="outline">
+          <Edit className="h-3 w-3 mr-1" />
+          Atualizar
+        </Button>
+      </div>
     );
   };
 
@@ -864,48 +940,16 @@ const SolicitarAgenda = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium">Status</p>
-                  {getStatusBadge(selectedAgenda.status)}
+                  <StatusBox
+                    currentStatus={selectedAgenda.status}
+                    canUpdate={user?.id === selectedAgenda.validador_id}
+                    onUpdateStatus={(status) => updateStatusMutation.mutate({
+                      agendaId: selectedAgenda.id,
+                      status
+                    })}
+                  />
                 </div>
               </div>
-
-              {/* Botões de ação para validador */}
-              {user?.id === selectedAgenda.validador_id && (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => updateStatusMutation.mutate({
-                      agendaId: selectedAgenda.id,
-                      status: 'confirmado'
-                    })}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Confirmar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => updateStatusMutation.mutate({
-                      agendaId: selectedAgenda.id,
-                      status: 'recusado'
-                    })}
-                  >
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Recusar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => updateStatusMutation.mutate({
-                      agendaId: selectedAgenda.id,
-                      status: 'remarcar'
-                    })}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Remarcar
-                  </Button>
-                </div>
-              )}
 
               <Separator />
 
