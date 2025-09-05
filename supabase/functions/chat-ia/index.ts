@@ -46,8 +46,8 @@ serve(async (req) => {
     // Validar modelo
     const validModels = ['gpt-5', 'gpt-5-mini'];
     const modelMap = {
-      'gpt-5': 'gpt-4.1-2025-04-14',
-      'gpt-5-mini': 'gpt-4.1-mini-2025-04-14'
+      'gpt-5': 'gpt-5-2025-08-07',
+      'gpt-5-mini': 'gpt-5-mini-2025-08-07'
     };
     
     if (!validModels.includes(model)) {
