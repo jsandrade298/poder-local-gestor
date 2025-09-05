@@ -367,7 +367,6 @@ serve(async (req) => {
         }
         
         // Se não teve mensagem nem mídia mas chegou aqui, registrar como processado
-        const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
         if (!mensagemParaEnviar && mediaFiles.length === 0) {
           results.push({
             telefone: rawPhone,
