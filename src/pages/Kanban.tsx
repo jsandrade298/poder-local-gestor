@@ -68,32 +68,9 @@ export default function Kanban() {
     }
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ demandaId, newStatus }: { demandaId: string; newStatus: string }) => {
-      const { error } = await supabase
-        .from('demandas')
-        .update({ status: newStatus })
-        .eq('id', demandaId);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
-      toast.success("Status da demanda atualizado!");
-    },
-    onError: (error) => {
-      console.error('Erro ao atualizar status:', error);
-      toast.error("Erro ao atualizar status da demanda");
-    }
-  });
-
   const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
-
-    const demandaId = result.draggableId;
-    const newStatus = result.destination.droppableId;
-
-    updateStatusMutation.mutate({ demandaId, newStatus });
+    // Não alteramos o status da demanda, apenas permitimos o movimento visual
+    return;
   };
 
   const getPrioridadeColor = (prioridade: string) => {
