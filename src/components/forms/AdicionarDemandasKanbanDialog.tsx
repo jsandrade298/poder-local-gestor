@@ -28,7 +28,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
-  // Buscar todas as demandas
+  // Buscar todas as demandas (incluindo canceladas)
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-todas'],
     queryFn: async () => {
@@ -39,7 +39,6 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           areas(nome),
           municipes(nome)
         `)
-        .neq('status', 'cancelada')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
