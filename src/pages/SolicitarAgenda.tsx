@@ -56,12 +56,16 @@ const SolicitarAgenda = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState("solicitar");
+  const [searchParams] = useSearchParams();
+  
+  // Definir aba inicial baseado na presença de parâmetro agenda na URL
+  const agendaId = searchParams.get('agenda');
+  const [activeTab, setActiveTab] = useState(agendaId ? "minhas" : "solicitar");
+  
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [searchParams] = useSearchParams();
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -185,7 +189,7 @@ const SolicitarAgenda = () => {
   };
 
   // Buscar minhas agendas - CORRIGIDO
-  const { data: minhasAgendas, isLoading: loadingMinhas } = useQuery({
+  const { data: minhasAgendas, isLoading: loadingMinhas } = useQuery<any[]>({
     queryKey: ["minhas-agendas", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -270,11 +274,11 @@ const SolicitarAgenda = () => {
         return [];
       }
     },
-    enabled: !!user?.id && activeTab === "minhas",
+    enabled: !!user?.id && (activeTab === "minhas" || !!agendaId),
   });
 
   // Buscar solicitações para validar - CORRIGIDO
-  const { data: solicitacoes, isLoading: loadingSolicitacoes } = useQuery({
+  const { data: solicitacoes, isLoading: loadingSolicitacoes } = useQuery<any[]>({
     queryKey: ["solicitacoes-agenda", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -333,7 +337,7 @@ const SolicitarAgenda = () => {
         return [];
       }
     },
-    enabled: !!user?.id && activeTab === "solicitacoes",
+    enabled: !!user?.id && (activeTab === "solicitacoes" || !!agendaId),
   });
 
   // Detectar redirecionamento de notificação - REFATORADO como demandas
