@@ -76,7 +76,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     mutationFn: async (demandaIds: string[]) => {
       const { error } = await supabase
         .from('demandas')
-        .update({ status: 'a_fazer' })
+        .update({ status: 'aberta' })
         .in('id', demandaIds);
       
       if (error) throw error;

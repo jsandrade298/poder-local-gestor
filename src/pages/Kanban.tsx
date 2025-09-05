@@ -26,9 +26,9 @@ interface Demanda {
 }
 
 const statusColumns = [
-  { id: 'a_fazer', title: 'A Fazer', color: 'hsl(var(--chart-1))' },
-  { id: 'em_progresso', title: 'Em Progresso', color: 'hsl(var(--chart-2))' },
-  { id: 'feito', title: 'Feito', color: 'hsl(var(--chart-4))' },
+  { id: 'aberta', title: 'A Fazer', color: 'hsl(var(--chart-1))' },
+  { id: 'em_andamento', title: 'Em Progresso', color: 'hsl(var(--chart-2))' },
+  { id: 'resolvida', title: 'Feito', color: 'hsl(var(--chart-4))' },
 ];
 
 export default function Kanban() {
@@ -47,7 +47,7 @@ export default function Kanban() {
           areas(nome),
           municipes(nome)
         `)
-        .in('status', ['a_fazer', 'em_progresso', 'feito'])
+        .in('status', ['aberta', 'em_andamento', 'resolvida'])
         .order('created_at', { ascending: false });
       
       if (error) throw error;
