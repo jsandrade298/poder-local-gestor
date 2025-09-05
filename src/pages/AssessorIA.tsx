@@ -86,8 +86,6 @@ const AssessorIA = () => {
         prompt += `• Área: ${promptData.area}\n`;
       }
       
-      prompt += `• VEREADOR: Clóvis Girardi\n`;
-      
       if (promptData.observacoes) {
         prompt += `• OBSERVAÇÕES: ${promptData.observacoes}\n`;
       }
@@ -122,7 +120,6 @@ const AssessorIA = () => {
 
     setMessages(prev => [...prev, userMessage]);
     setInputMessage("");
-    setDocumentosContexto([]); // Limpar documentos após envio
     setIsLoading(true);
 
     try {
@@ -231,33 +228,29 @@ const AssessorIA = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       <AppHeader />
       
-      <div className="container mx-auto px-4 py-6 space-y-8">
-        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
-              Assessor Legislativo IA
-            </h1>
-            <p className="text-base text-muted-foreground lg:text-lg">
+      <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full min-h-0">
+        <div className="flex justify-between items-center mb-6 flex-shrink-0">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Assessor Legislativo IA</h1>
+            <p className="text-muted-foreground mt-1">
               Redator especializado em documentos oficiais municipais
             </p>
           </div>
           
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button
-              variant="outline"
-              onClick={clearConversation}
-              className="flex items-center gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Limpar Chat
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            onClick={clearConversation}
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar Chat
+          </Button>
         </div>
 
-        <Card className="min-h-[600px] flex flex-col">
+        <Card className="flex-1 flex flex-col min-h-0">
           <CardHeader className="pb-3 flex-shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">

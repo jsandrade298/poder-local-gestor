@@ -230,33 +230,6 @@ export type Database = {
         }
         Relationships: []
       }
-      conversations: {
-        Row: {
-          created_at: string
-          id: string
-          model_default: string
-          title: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          model_default?: string
-          title?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          model_default?: string
-          title?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       demanda_atividades: {
         Row: {
           created_at: string
@@ -819,10 +792,6 @@ export type Database = {
       }
       cancelar_exclusao_agenda: {
         Args: { agenda_id_param: string }
-        Returns: undefined
-      }
-      enviar_mensagens_aniversario: {
-        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       generate_protocolo: {

@@ -45,7 +45,7 @@ const formSchema = z.object({
   local_endereco: z.string().min(1, "Informe o local ou link"),
   descricao_objetivo: z.string().min(1, "Descreva o objetivo"),
   pauta_sugerida: z.string().min(1, "Informe a pauta"),
-  acompanha_mandato_ids: z.array(z.string()).optional(),
+  acompanha_mandato_ids: z.array(z.string()).min(1, "Selecione pelo menos um acompanhante"),
   material_apoio: z.string().optional(),
   observacoes: z.string().optional(),
 });

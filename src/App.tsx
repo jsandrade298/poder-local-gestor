@@ -12,7 +12,6 @@ import Demandas from "./pages/Demandas";
 import Municipes from "./pages/Municipes";
 import Kanban from "./pages/Kanban";
 import SolicitarAgenda from "./pages/SolicitarAgenda";
-import WhatsApp from "./pages/WhatsApp";
 import AssessorIA from "./pages/AssessorIA";
 import Tags from "./pages/Tags";
 import Areas from "./pages/Areas";
@@ -39,7 +38,6 @@ const App = () => (
               <Route path="/municipes" element={<Municipes />} />
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/solicitar-agenda" element={<SolicitarAgenda />} />
-              <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/assessor-ia" element={<AssessorIA />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/areas" element={<Areas />} />

@@ -27,13 +27,13 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Excluindo agenda: ${agenda_id}`);
 
-    // Buscar a agenda para verificar se existe e está confirmada ou recusada
+    // Buscar a agenda para verificar se existe e está confirmada
     const { data: agenda, error: selectError } = await supabase
       .from('agendas')
-      .select('id, status, data_hora_proposta, descricao_objetivo, created_at, updated_at')
+      .select('id, status, data_hora_proposta, descricao_objetivo')
       .eq('id', agenda_id)
-      .in('status', ['confirmado', 'recusado'])
-      .maybeSingle();
+      .eq('status', 'confirmado')
+      .single();
 
     if (selectError) {
       console.error('❌ Erro ao buscar agenda:', selectError);
@@ -41,11 +41,11 @@ Deno.serve(async (req) => {
     }
 
     if (!agenda) {
-      console.log('⚠️ Agenda não encontrada ou não está confirmada/recusada');
+      console.log('⚠️ Agenda não encontrada ou não está confirmada');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Agenda não encontrada ou não está confirmada/recusada',
+          message: 'Agenda não encontrada ou não está confirmada',
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -54,29 +54,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verificar se já passou o tempo limite para exclusão
+    // Verificar se já passou 5 minutos da data/hora proposta
     const agora = new Date();
-    let dataLimite: Date;
-    
-    if (agenda.status === 'confirmado') {
-      // Para confirmado: 5 minutos após a data/hora proposta
-      dataLimite = new Date(agenda.data_hora_proposta);
-      dataLimite.setMinutes(dataLimite.getMinutes() + 5);
-    } else if (agenda.status === 'recusado') {
-      // Para recusado: 5 minutos após a atualização (quando foi recusado)
-      dataLimite = new Date(agenda.updated_at);
-      dataLimite.setMinutes(dataLimite.getMinutes() + 5);
-    }
+    const dataLimite = new Date(agenda.data_hora_proposta);
+    dataLimite.setMinutes(dataLimite.getMinutes() + 5);
 
-    console.log(`🕐 Agenda ${agenda.status}: agora=${agora.toISOString()}, limite=${dataLimite!.toISOString()}`);
-    console.log(`🔍 Comparação: agora(${agora.getTime()}) < limite(${dataLimite!.getTime()}) = ${agora < dataLimite!}`);
-
-    if (agora < dataLimite!) {
-      console.log(`⏰ Ainda não é hora de excluir esta agenda ${agenda.status}`);
+    if (agora < dataLimite) {
+      console.log('⏰ Ainda não é hora de excluir esta agenda');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: `Ainda não é hora de excluir esta agenda ${agenda.status}`,
+          message: 'Ainda não é hora de excluir esta agenda',
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -133,12 +121,12 @@ Deno.serve(async (req) => {
       console.error('❌ Erro ao cancelar job de exclusão:', cancelError);
     }
 
-    console.log(`✅ Agenda ${agenda_id} (${agenda.status}) excluída com sucesso após expiração`);
+    console.log(`✅ Agenda ${agenda_id} excluída com sucesso após expiração`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Agenda ${agenda.status} excluída com sucesso após expiração`,
+        message: 'Agenda excluída com sucesso após expiração',
         deletedAgenda: {
           id: agenda.id,
           descricao: agenda.descricao_objetivo,
