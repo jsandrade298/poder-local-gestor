@@ -42,7 +42,7 @@ export default function Usuarios() {
 
   // Fetch users with their roles and demandas count
   const { data: usuarios = [], isLoading: isLoadingUsuarios, refetch: refetchUsuarios } = useQuery({
-    queryKey: ['usuarios', Date.now()], // Forçar refresh para ver logs
+    queryKey: ['usuarios'],
     queryFn: async () => {
       // Fetch profiles
       const { data: profilesData, error: profilesError } = await supabase
@@ -68,8 +68,6 @@ export default function Usuarios() {
         throw demandasError;
       }
 
-      console.log('📊 Demandas encontradas:', demandasData?.length || 0);
-
       // Create roles map
       const rolesMap = rolesData.reduce((acc, roleItem) => {
         acc[roleItem.user_id] = roleItem.role;
@@ -87,22 +85,13 @@ export default function Usuarios() {
         return acc;
       }, {}) || {};
 
-      console.log('📈 Contagem de demandas por usuário:', demandasCount);
-
       // Combine profiles with roles and demandas count
-      const usuariosCompletos = profilesData.map(profile => ({
+      return profilesData.map(profile => ({
         ...profile,
         total_demandas: demandasCount[profile.id] || 0,
         role: rolesMap[profile.id] || 'usuario',
         ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
       }));
-
-      console.log('👥 Usuários com contagem:', usuariosCompletos.map(u => ({
-        nome: u.nome,
-        total_demandas: u.total_demandas
-      })));
-
-      return usuariosCompletos;
     }
   });
 
