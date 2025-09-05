@@ -14,6 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
+      agenda_acompanhantes: {
+        Row: {
+          agenda_id: string
+          created_at: string
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          agenda_id: string
+          created_at?: string
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          agenda_id?: string
+          created_at?: string
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
+      agenda_mensagens: {
+        Row: {
+          agenda_id: string
+          created_at: string
+          id: string
+          mensagem: string
+          remetente_id: string
+          updated_at: string
+        }
+        Insert: {
+          agenda_id: string
+          created_at?: string
+          id?: string
+          mensagem: string
+          remetente_id: string
+          updated_at?: string
+        }
+        Update: {
+          agenda_id?: string
+          created_at?: string
+          id?: string
+          mensagem?: string
+          remetente_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agendas: {
+        Row: {
+          created_at: string
+          data_hora_proposta: string
+          data_pedido: string
+          descricao_objetivo: string
+          duracao_prevista: string
+          id: string
+          local_endereco: string
+          material_apoio: string | null
+          observacoes: string | null
+          participantes: string
+          pauta_sugerida: string
+          solicitante_id: string
+          status: Database["public"]["Enums"]["status_agenda"]
+          updated_at: string
+          validador_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_hora_proposta: string
+          data_pedido?: string
+          descricao_objetivo: string
+          duracao_prevista: string
+          id?: string
+          local_endereco: string
+          material_apoio?: string | null
+          observacoes?: string | null
+          participantes: string
+          pauta_sugerida: string
+          solicitante_id: string
+          status?: Database["public"]["Enums"]["status_agenda"]
+          updated_at?: string
+          validador_id: string
+        }
+        Update: {
+          created_at?: string
+          data_hora_proposta?: string
+          data_pedido?: string
+          descricao_objetivo?: string
+          duracao_prevista?: string
+          id?: string
+          local_endereco?: string
+          material_apoio?: string | null
+          observacoes?: string | null
+          participantes?: string
+          pauta_sugerida?: string
+          solicitante_id?: string
+          status?: Database["public"]["Enums"]["status_agenda"]
+          updated_at?: string
+          validador_id?: string
+        }
+        Relationships: []
+      }
       anexos: {
         Row: {
           created_at: string | null
@@ -638,6 +740,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "gestor" | "atendente" | "usuario"
       prioridade_demanda: "baixa" | "media" | "alta" | "urgente"
+      status_agenda: "pendente" | "confirmado" | "recusado" | "remarcar"
       status_demanda:
         | "aberta"
         | "em_andamento"
@@ -773,6 +876,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "gestor", "atendente", "usuario"],
       prioridade_demanda: ["baixa", "media", "alta", "urgente"],
+      status_agenda: ["pendente", "confirmado", "recusado", "remarcar"],
       status_demanda: [
         "aberta",
         "em_andamento",
