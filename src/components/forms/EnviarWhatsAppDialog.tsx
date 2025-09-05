@@ -79,7 +79,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const { data: instances, isLoading: loadingInstances, refetch: refetchInstances } = useQuery({
     queryKey: ["whatsapp-instances-status"],
     queryFn: async () => {
-      const specificInstances = ["gabinete-whats-1", "gabinete-whats-2", "gabinete-whats-3"];
+      const specificInstances = ["gabinete-whats-01", "gabinete-whats-02", "gabinete-whats-03"];
       const connectedInstances = [];
 
       for (const instanceName of specificInstances) {
@@ -104,7 +104,8 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       return connectedInstances;
     },
     enabled: open,
-    refetchInterval: 10000, // Atualiza a cada 10 segundos
+    staleTime: 0, // Sempre buscar dados frescos
+    refetchInterval: false, // Não fazer polling automático
   });
 
   // Mutation para enviar mensagens
