@@ -200,7 +200,7 @@ const SolicitarAgenda = () => {
             profiles(nome)
           )
         `)
-        .or(`solicitante_id.eq.${user.id},agenda_acompanhantes.usuario_id.eq.${user.id}`)
+        .or(`solicitante_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
