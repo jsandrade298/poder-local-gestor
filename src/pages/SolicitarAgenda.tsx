@@ -1229,7 +1229,8 @@ const SolicitarAgenda = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo}
+                {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo || "Agenda"}
+                {/* Debug: {JSON.stringify({titulo: selectedAgenda?.titulo, desc: selectedAgenda?.descricao_objetivo})} */}
               </DialogTitle>
             </DialogHeader>
 
@@ -1249,10 +1250,17 @@ const SolicitarAgenda = () => {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
+                      <CardTitle className="text-lg">{selectedAgenda?.titulo || "Agenda"}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {selectedAgenda?.titulo && (
+                      <div>
+                        <h4 className="font-medium mb-2">Título</h4>
+                        <p className="text-muted-foreground font-semibold">{selectedAgenda.titulo}</p>
+                      </div>
+                    )}
+
                     <div>
                       <h4 className="font-medium mb-2">Local/Endereço</h4>
                       <p className="text-muted-foreground">{selectedAgenda?.local_endereco}</p>
