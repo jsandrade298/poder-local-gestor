@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -659,36 +660,13 @@ const SolicitarAgenda = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="container mx-auto p-6 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Sistema de Agendas
-          </h1>
-          <p className="text-muted-foreground">Gerencie suas solicitações e agendamentos</p>
-        </div>
+        <h1 className="text-3xl font-bold">Sistema de Agendas</h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 bg-muted/50 border shadow-sm">
-            <TabsTrigger 
-              value="solicitar" 
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Solicitar
-            </TabsTrigger>
-            <TabsTrigger 
-              value="minhas"
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Minhas Agendas
-            </TabsTrigger>
-            <TabsTrigger 
-              value="solicitacoes"
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Clock4 className="h-4 w-4 mr-2" />
-              Solicitações
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="solicitar">Solicitar</TabsTrigger>
+            <TabsTrigger value="minhas">Minhas Agendas</TabsTrigger>
+            <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
           </TabsList>
 
         {/* Tab Solicitar */}
@@ -1047,220 +1025,218 @@ const SolicitarAgenda = () => {
         </TabsContent>
       </Tabs>
 
-        {/* Modal de Detalhes Melhorado */}
-        {selectedAgenda && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in-0 duration-200">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl border-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-background/95 backdrop-blur border-b z-10">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg line-clamp-2">{selectedAgenda.descricao_objetivo}</CardTitle>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    {formatDateTime(selectedAgenda.data_hora_proposta)}
-                  </div>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setSelectedAgenda(null)}
-                  className="h-8 w-8 hover:bg-muted/50"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              
-              <CardContent className="overflow-y-auto max-h-[75vh] space-y-6 p-6">
-                {/* Status e Informações Principais */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</p>
-                    <StatusBox
-                      currentStatus={selectedAgenda.status}
-                      canUpdate={user?.id === selectedAgenda.validador_id}
-                      onUpdateStatus={(status) => updateStatusMutation.mutate({
-                        agendaId: selectedAgenda.id,
-                        status
-                      })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duração</p>
-                    <p className="text-sm font-medium flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {selectedAgenda.duracao_prevista}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solicitado em</p>
-                    <p className="text-sm">{formatDateTime(selectedAgenda.data_pedido)}</p>
-                  </div>
-                </div>
+        {/* Modal de Agenda com Tabs */}
+        <Dialog open={!!selectedAgenda} onOpenChange={() => setSelectedAgenda(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Agenda - {selectedAgenda?.descricao_objetivo}
+              </DialogTitle>
+            </DialogHeader>
 
-                {/* Participantes */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Participantes
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solicitante</p>
-                      <p className="text-sm font-medium">{selectedAgenda.solicitante?.nome}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Validador</p>
-                      <p className="text-sm font-medium">{selectedAgenda.validador?.nome}</p>
-                    </div>
-                  </div>
-                  
-                  {agendaDetalhada?.acompanhantes_nomes && agendaDetalhada.acompanhantes_nomes.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Acompanhantes do Mandato</p>
-                      <div className="flex flex-wrap gap-2">
-                        {agendaDetalhada.acompanhantes_nomes.map((acomp: any, index: number) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {acomp.nome}
+            <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+                <TabsTrigger value="participantes">Participantes</TabsTrigger>
+                <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge variant="outline">
+                            {formatDateTime(selectedAgenda?.data_hora_proposta)}
                           </Badge>
-                        ))}
+                          <Badge variant="outline">
+                            {selectedAgenda?.duracao_prevista}
+                          </Badge>
+                          <StatusBox
+                            currentStatus={selectedAgenda?.status || ""}
+                            canUpdate={user?.id === selectedAgenda?.validador_id}
+                            onUpdateStatus={(status) => updateStatusMutation.mutate({
+                              agendaId: selectedAgenda?.id,
+                              status
+                            })}
+                          />
+                        </div>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Todos os Participantes</p>
-                    <p className="text-sm bg-muted/50 p-3 rounded-md">{selectedAgenda.participantes}</p>
-                  </div>
-                </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Local/Endereço</h4>
+                      <p className="text-muted-foreground">{selectedAgenda?.local_endereco}</p>
+                    </div>
 
-                <Separator />
+                    <div>
+                      <h4 className="font-medium mb-2">Objetivo/Descrição</h4>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{selectedAgenda?.descricao_objetivo}</p>
+                    </div>
 
-                {/* Local e Detalhes */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Local e Detalhes
-                  </h4>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Local/Endereço/Link</p>
-                      <p className="text-sm bg-muted/50 p-3 rounded-md">{selectedAgenda.local_endereco}</p>
+                    <div>
+                      <h4 className="font-medium mb-2">Pauta Sugerida</h4>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{selectedAgenda?.pauta_sugerida}</p>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Objetivo/Descrição</p>
-                      <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.descricao_objetivo}</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pauta Sugerida</p>
-                      <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.pauta_sugerida}</p>
-                    </div>
-                    
-                    {selectedAgenda.material_apoio && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Material de Apoio</p>
-                        <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
+
+                    {selectedAgenda?.material_apoio && (
+                      <div>
+                        <h4 className="font-medium mb-2">Material de Apoio</h4>
+                        <p className="text-muted-foreground whitespace-pre-wrap">{selectedAgenda.material_apoio}</p>
                       </div>
                     )}
-                    
-                    {selectedAgenda.observacoes && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Observações</p>
-                        <p className="text-sm bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
+
+                    {selectedAgenda?.observacoes && (
+                      <div>
+                        <h4 className="font-medium mb-2">Observações</h4>
+                        <p className="text-muted-foreground whitespace-pre-wrap">{selectedAgenda.observacoes}</p>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                <Separator />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          <strong>Solicitado em:</strong> {formatDateTime(selectedAgenda?.data_pedido)}
+                        </span>
+                      </div>
 
-                {/* Chat */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Mensagens
-                  </h4>
-                  
-                  <div className="border rounded-lg bg-muted/20 overflow-hidden">
-                    <ScrollArea className="h-64 p-4">
-                      {mensagens && mensagens.length > 0 ? (
-                        <div className="space-y-3">
-                          {mensagens.map(msg => (
-                            <div
-                              key={msg.id}
-                              className={cn(
-                                "flex flex-col space-y-1 max-w-[85%]",
-                                msg.remetente_id === user?.id ? "ml-auto items-end" : "items-start"
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  "rounded-lg p-3 shadow-sm",
-                                  msg.remetente_id === user?.id
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-background border"
-                                )}
-                              >
-                                <p className="text-xs font-medium opacity-80 mb-1">
-                                  {msg.remetente?.nome}
-                                </p>
-                                <p className="text-sm">{msg.mensagem}</p>
-                                <p className="text-xs opacity-60 mt-1">
-                                  {formatDateTime(msg.created_at)}
-                                </p>
-                              </div>
-                            </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          <strong>Duração:</strong> {selectedAgenda?.duracao_prevista}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="participantes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Participantes da Agenda
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">
+                            <strong>Solicitante:</strong> {selectedAgenda?.solicitante?.nome}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">
+                            <strong>Validador:</strong> {selectedAgenda?.validador?.nome}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {agendaDetalhada?.acompanhantes_nomes && agendaDetalhada.acompanhantes_nomes.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2">Acompanhantes do Mandato</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {agendaDetalhada.acompanhantes_nomes.map((acomp: any, index: number) => (
+                            <Badge key={index} variant="secondary">
+                              {acomp.nome}
+                            </Badge>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <h4 className="font-medium mb-2">Todos os Participantes</h4>
+                      <p className="text-muted-foreground">{selectedAgenda?.participantes}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="mensagens" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      Mensagens da Agenda
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-64 border rounded-lg p-3 mb-4">
+                      {mensagens && mensagens.length > 0 ? (
+                        mensagens.map(msg => (
+                          <div
+                            key={msg.id}
+                            className={cn(
+                              "mb-3 p-3 rounded-lg max-w-[80%]",
+                              msg.remetente_id === user?.id
+                                ? "ml-auto bg-primary text-primary-foreground"
+                                : "bg-muted"
+                            )}
+                          >
+                            <p className="text-xs font-semibold mb-1">
+                              {msg.remetente?.nome}
+                            </p>
+                            <p className="text-sm">{msg.mensagem}</p>
+                            <p className="text-xs opacity-70 mt-1">
+                              {formatDateTime(msg.created_at)}
+                            </p>
+                          </div>
+                        ))
                       ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                          <MessageCircle className="h-8 w-8 mb-2 opacity-50" />
+                        <div className="text-center text-muted-foreground py-8">
+                          <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">Nenhuma mensagem ainda</p>
-                          <p className="text-xs">Inicie uma conversa sobre esta agenda</p>
                         </div>
                       )}
                     </ScrollArea>
-                    
-                    <div className="border-t bg-background p-3">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Digite sua mensagem..."
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && newMessage.trim()) {
-                              enviarMensagemMutation.mutate({
-                                agendaId: selectedAgenda.id,
-                                mensagem: newMessage.trim()
-                              });
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        <Button
-                          size="icon"
-                          onClick={() => {
-                            if (newMessage.trim()) {
-                              enviarMensagemMutation.mutate({
-                                agendaId: selectedAgenda.id,
-                                mensagem: newMessage.trim()
-                              });
-                            }
-                          }}
-                          disabled={!newMessage.trim() || enviarMensagemMutation.isPending}
-                          className="shrink-0"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Digite sua mensagem..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newMessage.trim()) {
+                            enviarMensagemMutation.mutate({
+                              agendaId: selectedAgenda?.id,
+                              mensagem: newMessage.trim()
+                            });
+                          }
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        onClick={() => {
+                          if (newMessage.trim()) {
+                            enviarMensagemMutation.mutate({
+                              agendaId: selectedAgenda?.id,
+                              mensagem: newMessage.trim()
+                            });
+                          }
+                        }}
+                        disabled={!newMessage.trim() || enviarMensagemMutation.isPending}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
