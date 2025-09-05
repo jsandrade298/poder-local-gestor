@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MarkdownText } from "@/components/ui/markdown-text";
 
 interface Message {
   id: string;
@@ -257,7 +258,7 @@ const AssessorIA = () => {
                           : 'bg-muted'
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <MarkdownText className="text-sm">{message.content}</MarkdownText>
                       <p className={`text-xs mt-1 opacity-70 ${
                         message.role === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
                       }`}>
