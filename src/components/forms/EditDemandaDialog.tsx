@@ -185,6 +185,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
       const statusAnterior = demandaAnterior?.status;
       const municipeData = demandaAnterior?.municipes as any;
+      let whatsappEnviado = false;
 
       // Atualizar demanda
       const cleanData = {
@@ -227,22 +228,26 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
           console.log('📱 Resposta da notificação:', response);
           
           if (response.data?.success) {
-            toast.success(`✅ WhatsApp enviado para ${municipeData.nome}!`);
-          } else if (response.error) {
-            toast.error("❌ Erro ao enviar notificação WhatsApp");
+            whatsappEnviado = true;
           }
         } catch (notifError) {
           console.error('Erro ao enviar notificação:', notifError);
-          toast.error("❌ Erro ao enviar notificação WhatsApp");
         }
       }
 
       if (files.length > 0) {
         await uploadFiles(demanda.id);
       }
+
+      return { whatsappEnviado, municipeNome: municipeData?.nome };
     },
-    onSuccess: () => {
-      toast.success("Demanda atualizada com sucesso!");
+    onSuccess: (result) => {
+      if (result?.whatsappEnviado) {
+        toast.success(`✅ Demanda atualizada e WhatsApp enviado para ${result.municipeNome}!`);
+      } else {
+        toast.success("Demanda atualizada com sucesso!");
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       queryClient.invalidateQueries({ queryKey: ['anexos', demanda.id] });
       onOpenChange(false);

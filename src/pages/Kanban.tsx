@@ -147,6 +147,7 @@ export default function Kanban() {
       if (fetchError) throw fetchError;
 
       const oldStatus = demanda.status;
+      let whatsappEnviado = false;
 
       // Atualizar status
       const { error } = await supabase
@@ -175,19 +176,23 @@ export default function Kanban() {
           console.log('📱 Resposta da notificação:', response);
           
           if (response.data?.success) {
-            toast.success(`✅ WhatsApp enviado para ${demanda.municipes.nome}!`);
-          } else if (response.error) {
-            toast.error("❌ Erro ao enviar notificação WhatsApp");
+            whatsappEnviado = true;
           }
         } catch (notifError) {
           console.error('Erro ao enviar notificação:', notifError);
-          toast.error("❌ Erro ao enviar notificação WhatsApp");
         }
       }
+
+      return { whatsappEnviado, municipeNome: demanda.municipes?.nome };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
-      toast.success("Status atualizado!");
+      
+      if (result?.whatsappEnviado) {
+        toast.success(`✅ Status atualizado e WhatsApp enviado para ${result.municipeNome}!`);
+      } else {
+        toast.success("Status atualizado!");
+      }
     },
     onError: (error) => {
       console.error('Erro ao atualizar status:', error);
