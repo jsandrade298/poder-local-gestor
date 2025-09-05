@@ -86,6 +86,8 @@ const AssessorIA = () => {
         prompt += `• Área: ${promptData.area}\n`;
       }
       
+      prompt += `• VEREADOR: Clóvis Girardi\n`;
+      
       if (promptData.observacoes) {
         prompt += `• OBSERVAÇÕES: ${promptData.observacoes}\n`;
       }
