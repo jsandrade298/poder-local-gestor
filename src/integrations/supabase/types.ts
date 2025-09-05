@@ -317,6 +317,54 @@ export type Database = {
           },
         ]
       }
+      demanda_notifications: {
+        Row: {
+          countdown: number | null
+          created_at: string | null
+          demanda_id: string
+          demanda_titulo: string | null
+          error_message: string | null
+          id: string
+          instance_name: string
+          municipe_nome: string
+          novo_status: string
+          sent_at: string | null
+          status: string | null
+          telefone: string
+          updated_at: string | null
+        }
+        Insert: {
+          countdown?: number | null
+          created_at?: string | null
+          demanda_id: string
+          demanda_titulo?: string | null
+          error_message?: string | null
+          id?: string
+          instance_name: string
+          municipe_nome: string
+          novo_status: string
+          sent_at?: string | null
+          status?: string | null
+          telefone: string
+          updated_at?: string | null
+        }
+        Update: {
+          countdown?: number | null
+          created_at?: string | null
+          demanda_id?: string
+          demanda_titulo?: string | null
+          error_message?: string | null
+          id?: string
+          instance_name?: string
+          municipe_nome?: string
+          novo_status?: string
+          sent_at?: string | null
+          status?: string | null
+          telefone?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       demanda_tags: {
         Row: {
           created_at: string | null
