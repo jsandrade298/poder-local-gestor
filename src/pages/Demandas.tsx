@@ -71,11 +71,14 @@ export default function Demandas() {
     
     // Processar redirecionamento de notificação ou de outros locais
     const protocolo = searchParams.get('protocolo');
+    const demandaId = searchParams.get('id');
     const atividadeId = searchParams.get('atividade');
     
-    if (protocolo && demandas.length > 0) {
+    if ((protocolo || demandaId) && demandas.length > 0) {
       // Encontrar e abrir a demanda específica
-      const demanda = demandas?.find(d => d.protocolo === protocolo);
+      const demanda = demandas?.find(d => 
+        protocolo ? d.protocolo === protocolo : d.id === demandaId
+      );
       if (demanda) {
         setSelectedDemanda(demanda);
         setIsViewDialogOpen(true);
