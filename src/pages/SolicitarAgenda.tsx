@@ -1049,12 +1049,6 @@ const SolicitarAgenda = () => {
                       <div className="flex-1">
                         <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline">
-                            {formatDateTime(selectedAgenda?.data_hora_proposta)}
-                          </Badge>
-                          <Badge variant="outline">
-                            {selectedAgenda?.duracao_prevista}
-                          </Badge>
                           <StatusBox
                             currentStatus={selectedAgenda?.status || ""}
                             canUpdate={user?.id === selectedAgenda?.validador_id}
@@ -1097,21 +1091,28 @@ const SolicitarAgenda = () => {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          <strong>Solicitado em:</strong> {formatDateTime(selectedAgenda?.data_pedido)}
-                        </span>
-                      </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="flex items-center gap-2">
+                         <Calendar className="h-4 w-4 text-muted-foreground" />
+                         <span className="text-sm">
+                           <strong>Data/Hora Sugerida:</strong> {formatDateTime(selectedAgenda?.data_hora_proposta)}
+                         </span>
+                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          <strong>Duração:</strong> {selectedAgenda?.duracao_prevista}
-                        </span>
-                      </div>
-                    </div>
+                       <div className="flex items-center gap-2">
+                         <Clock className="h-4 w-4 text-muted-foreground" />
+                         <span className="text-sm">
+                           <strong>Duração Prevista:</strong> {selectedAgenda?.duracao_prevista}
+                         </span>
+                       </div>
+
+                       <div className="flex items-center gap-2">
+                         <Calendar className="h-4 w-4 text-muted-foreground" />
+                         <span className="text-sm">
+                           <strong>Solicitado em:</strong> {formatDateTime(selectedAgenda?.data_pedido)}
+                         </span>
+                       </div>
+                     </div>
                   </CardContent>
                 </Card>
               </TabsContent>
