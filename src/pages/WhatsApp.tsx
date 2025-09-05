@@ -331,8 +331,14 @@ const WhatsApp = () => {
       console.log('Resposta da edge function:', JSON.stringify({ data, error }, null, 2));
 
       if (error) throw error;
-      if (data && !data.success) throw new Error(data.error || 'Erro na função');
       
+      console.log('Verificando data.success:', data?.success);
+      if (data && !data.success) {
+        console.log('Erro retornado pela função:', data.error);
+        throw new Error(data.error || 'Erro na função');
+      }
+      
+      console.log('Tudo certo, exibindo toast de sucesso...');
       toast.success(`Mensagem de teste enviada para ${aniversariantesSelecionados.size} aniversariantes!`);
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
