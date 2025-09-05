@@ -600,7 +600,7 @@ const SolicitarAgenda = () => {
           <div className="flex gap-2 flex-wrap">
             <Button
               size="sm"
-              variant="default"
+              variant="outline"
               onClick={() => {
                 onUpdateStatus('confirmado');
                 setIsEditing(false);
@@ -611,7 +611,7 @@ const SolicitarAgenda = () => {
             </Button>
             <Button
               size="sm"
-              variant="destructive"
+              variant="outline"
               onClick={() => {
                 onUpdateStatus('recusado');
                 setIsEditing(false);
