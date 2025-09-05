@@ -1,217 +1,201 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// /functions/chat-ia/index.ts
+// Deno + Supabase Edge Function
+
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+  "Content-Type": "application/json",
+} as const;
+
+type ChatRole = "system" | "user" | "assistant";
+
+type HistoryItem = {
+  role: ChatRole;
+  content: string;
 };
 
+type DocumentoCtx = {
+  nome: string;
+  categoria?: string;
+  conteudo?: string;
+};
+
+const ALLOWED_MODELS = ["gpt-5", "gpt-5-mini"] as const;
+type AllowedModel = typeof ALLOWED_MODELS[number];
+
+const MAX_DOC_CHARS = 10_000; // truncamento por documento
+const MAX_DOCS = 12;          // segurança para contexto
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders } });
+}
+const ok = (b: unknown) => json(200, b);
+const bad = (e: string | Record<string, unknown>) =>
+  json(400, typeof e === "string" ? { error: e } : e);
+const err = (e: unknown) => json(500, { error: String(e) });
+
+function isHistoryArray(x: unknown): x is HistoryItem[] {
+  return Array.isArray(x) && x.every(
+    i => i && typeof i === "object" && ["system","user","assistant"].includes((i as any).role) && typeof (i as any).content === "string"
+  );
+}
+
+function sanitizeHistory(arr: HistoryItem[] | undefined): HistoryItem[] {
+  if (!arr) return [];
+  // remove vazios e força tipos válidos
+  return arr
+    .map(i => ({
+      role: (["system","user","assistant"].includes(i.role) ? i.role : "user") as ChatRole,
+      content: String(i.content ?? "").trim()
+    }))
+    .filter(i => i.content.length > 0);
+}
+
+function truncate(s: string, max = MAX_DOC_CHARS) {
+  if (!s) return "";
+  if (s.length <= max) return s;
+  return s.slice(0, max) + "\n\n...[TRUNCADO]";
+}
+
+function buildContext(docs: DocumentoCtx[]) {
+  if (!docs?.length) return "";
+  const limited = docs.slice(0, MAX_DOCS);
+  const blocks = limited.map((d, idx) => {
+    const head = `[DOCUMENTO ${idx + 1}: ${d.nome}${d.categoria ? " – " + d.categoria : ""}]`;
+    const body = truncate((d.conteudo ?? "").toString());
+    return `${head}\n${body}`;
+  });
+  return `\n\n=== DOCUMENTOS DE REFERÊNCIA (SELECIONADOS) ===\n${blocks.join(
+    "\n\n---\n\n",
+  )}\n=== FIM DOS DOCUMENTOS ===\n`;
+}
+
+const SYSTEM_PROMPT = `
+Você é um Assessor Legislativo Municipal (Brasil). Redija requerimentos, indicações, projetos de lei, moções e ofícios.
+• Use linguagem formal, objetiva e impessoal.
+• Siga a hierarquia Art., §, incisos (I, II...), alíneas (a), (b)).
+• Fundamente-se apenas no que estiver no contexto do usuário e nos DOCUMENTOS DE REFERÊNCIA (SELECIONADOS).
+• Se faltar base, responda assim mesmo de forma genérica, mas sem inventar citações específicas.
+`.trim();
+
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 200 });
-  }
-
-  // Handle healthcheck
-  if (req.method === 'GET') {
-    const url = new URL(req.url);
-    if (url.searchParams.get('healthz') === '1') {
-      return new Response(
-        JSON.stringify({ ok: true }), 
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-  }
-
   try {
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    
-    if (!openAIApiKey) {
-      console.error('OPENAI_API_KEY não configurado');
-      return new Response(
-        JSON.stringify({ error: 'Chave da API OpenAI não configurada' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    // CORS preflight
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers: { ...corsHeaders } });
     }
 
-    const { message, conversationHistory = [], documentosContexto = [], model = 'gpt-5-mini' } = await req.json();
-    
-    // Log para diagnóstico (primeiro log)
-    console.log("BODY recebido:", { 
-      hasMessage: !!message, 
-      historyLen: conversationHistory.length, 
-      docs: documentosContexto.length, 
-      model,
-      messagePreview: message ? message.substring(0, 50) + '...' : 'VAZIO'
-    });
-    
-    // Validar modelo (allowlist)
-    const ALLOWED_MODELS = ['gpt-5', 'gpt-5-mini'] as const;
-    type AllowedModel = typeof ALLOWED_MODELS[number];
-    
-    let validatedModel: AllowedModel = model;
-    if (!ALLOWED_MODELS.includes(model)) {
-      return new Response(
-        JSON.stringify({ error: `Modelo inválido. Use um de: ${ALLOWED_MODELS.join(', ')}` }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
-    // Mapear para modelos OpenAI reais
-    const modelMap = {
-      'gpt-5': 'gpt-5-2025-08-07',
-      'gpt-5-mini': 'gpt-5-mini-2025-08-07'
-    } as const;
-    
-    if (!message) {
-      return new Response(
-        JSON.stringify({ error: 'Mensagem é obrigatória' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    console.log('Processando mensagem para IA:', message);
-    console.log('Modelo selecionado:', validatedModel);
-    console.log('Modelo OpenAI usado:', modelMap[validatedModel]);
-    console.log('Histórico de conversa:', conversationHistory.length, 'mensagens');
-    console.log('Documentos no contexto:', documentosContexto.length);
-
-    // Função para truncar texto preservando estrutura
-    const truncarTexto = (texto: string, maxChars: number = 10000): string => {
-      if (!texto || texto.length <= maxChars) return texto;
-      return texto.substring(0, maxChars) + '\n[... texto truncado ...]';
-    };
-
-    // Construir contexto dos documentos
-    let contextosDocumentos = '';
-    if (documentosContexto.length > 0) {
-      contextosDocumentos = '\n\n=== DOCUMENTOS DE REFERÊNCIA ===\n';
-      documentosContexto.forEach((doc: any, index: number) => {
-        const conteudoTruncado = truncarTexto(doc.conteudo, 10000);
-        contextosDocumentos += `\n[DOCUMENTO ${index + 1}: ${doc.nome} - Categoria: ${doc.categoria}]\n`;
-        contextosDocumentos += `${conteudoTruncado}\n`;
-        contextosDocumentos += '---\n';
-      });
-      contextosDocumentos += '\n=== FIM DOS DOCUMENTOS DE REFERÊNCIA ===\n\n';
-    }
-
-    // Preparar mensagens para a OpenAI
-    const systemPrompt = `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Sua função é redigir:
-
-- Requerimentos de informação
-- Indicações legislativas  
-- Projetos de Lei (PLs)
-- Moções
-- Ofícios oficiais
-- Requerimentos diversos
-- Outros documentos legislativos municipais
-
-INSTRUÇÕES IMPORTANTES:
-1. Use EXCLUSIVAMENTE os documentos de referência fornecidos como base para a estrutura, formato e linguagem
-2. NÃO invente informações, base legal ou dados que não estejam nos documentos fornecidos
-3. Mantenha a linguagem formal e técnica adequada para documentos oficiais
-4. Preserve a estrutura e formatação típica dos documentos legislativos
-5. Se não houver documentos de referência suficientes, informe que precisa de modelos adequados
-
-${documentosContexto.length > 0 ? 
-  'DOCUMENTOS DISPONÍVEIS: Use os documentos abaixo como referência OBRIGATÓRIA para estrutura, formato e linguagem. Não cite informações externas aos documentos fornecidos.' : 
-  'ATENÇÃO: Sem documentos de referência, posso apenas orientar sobre estruturas gerais. Para redação específica, forneça documentos-modelo.'}
-
-${contextosDocumentos}`;
-
-    const messages = [
-      {
-        role: 'system',
-        content: systemPrompt
-      },
-      ...conversationHistory,
-      {
-        role: 'user',
-        content: message
+    // Healthcheck
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      if (url.searchParams.get("healthz") === "1") {
+        return ok({ ok: true });
       }
-    ];
+      return bad("Use POST para conversar com a IA (ou ?healthz=1 para healthcheck).");
+    }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    if (req.method !== "POST") {
+      return json(405, { error: "Method not allowed" });
+    }
+
+    // Leitura e validação do body
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return bad("JSON inválido no corpo da requisição.");
+    }
+
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) return bad("Chave da API OpenAI não configurada.");
+
+    const message = String(body?.message ?? "").trim();
+    const rawHistory = body?.conversationHistory;
+    const documentosContexto = (body?.documentosContexto ?? []) as DocumentoCtx[];
+    let model: AllowedModel = (body?.model ?? "gpt-5-mini") as AllowedModel;
+
+    if (!message) return bad("Mensagem é obrigatória.");
+    if (!ALLOWED_MODELS.includes(model)) {
+      return bad(`Modelo inválido. Use um de: ${ALLOWED_MODELS.join(", ")}`);
+    }
+
+    const history = isHistoryArray(rawHistory)
+      ? sanitizeHistory(rawHistory)
+      : [];
+
+    // Monta contexto dos documentos (apenas selecionados + truncados)
+    const ctxBlock = buildContext(documentosContexto);
+
+    // Monta mensagens (spread correto!)
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT + ctxBlock },
+      ...history,
+      { role: "user", content: message },
+    ] as { role: ChatRole; content: string }[];
+
+    // Parâmetros (ajuste conforme sua UI)
+    const temperature = typeof body?.temperature === "number" ? body.temperature : 0.2;
+    const maxTokens = typeof body?.maxTokens === "number" ? body.maxTokens : 1024;
+
+    // Log útil para diagnóstico
+    console.log("chat-ia request >", {
+      model,
+      hasMessage: !!message,
+      historyLen: history.length,
+      docs: documentosContexto.length,
+      temperature,
+      maxTokens,
+    });
+
+    // Chamada OpenAI (Chat Completions) — usa max_tokens (correto)
+    const openaiRes = await fetch(OPENAI_URL, {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: modelMap[validatedModel],
-        messages: messages,
-        max_tokens: 2000,
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Erro da API OpenAI:', response.status, errorData);
-      
-      try {
-        const errorJson = JSON.parse(errorData);
-        return new Response(
-          JSON.stringify({ error: errorJson.error?.message || 'Erro na API OpenAI' }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      } catch {
-        return new Response(
-          JSON.stringify({ error: `Erro OpenAI: ${errorData}` }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
+    const rawText = await openaiRes.text();
+
+    if (!openaiRes.ok) {
+      console.error("OpenAI error", openaiRes.status, rawText);
+      return bad({
+        error: "Erro da OpenAI",
+        status: openaiRes.status,
+        details: rawText,
+      });
     }
 
-    const data = await response.json();
-    console.log('Resposta da OpenAI recebida');
-
-    const assistantMessage = data.choices[0].message.content;
-
-    return new Response(
-      JSON.stringify({ 
-        message: assistantMessage,
-        modelUsed: validatedModel,
-        conversationId: Date.now().toString() // ID simples para a conversa
-      }), 
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-
-  } catch (error) {
-    console.error('Erro na função chat-ia:', error);
-    
-    // Tratamento de erro mais descritivo
-    let errorMessage = 'Erro interno do servidor';
-    if (error instanceof Error) {
-      errorMessage = `Erro interno: ${error.message}`;
+    let data: any;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.error("OpenAI JSON parse error", rawText);
+      return bad({ error: "Resposta inválida da OpenAI", details: rawText });
     }
-    
-    return new Response(
-      JSON.stringify({ error: errorMessage }), 
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+
+    const content =
+      data?.choices?.[0]?.message?.content?.toString()?.trim() ?? "";
+
+    return ok({
+      message: content,
+      modelUsed: model,
+      conversationId: body?.conversationId ?? null,
+    });
+  } catch (e) {
+    console.error("chat-ia fatal error", e);
+    return err(e);
   }
 });
