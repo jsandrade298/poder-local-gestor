@@ -46,14 +46,20 @@ export function useDashboardData() {
     ? Math.round((demandasResolvidas / totalDemandas) * 100)
     : 0;
 
-  // Dados para gráfico de status
-  const statusData = [
-    { name: "Aberta", value: demandas.filter(d => d.status === 'aberta').length, color: "#3b82f6" },
-    { name: "Em Andamento", value: demandas.filter(d => d.status === 'em_andamento').length, color: "#f59e0b" },
-    { name: "Aguardando", value: demandas.filter(d => d.status === 'aguardando').length, color: "#8b5cf6" },
-    { name: "Resolvida", value: demandas.filter(d => d.status === 'resolvida').length, color: "#10b981" },
-    { name: "Cancelada", value: demandas.filter(d => d.status === 'cancelada').length, color: "#ef4444" },
+  // Dados para gráfico de status (convertidos para percentuais)
+  const statusCounts = [
+    { name: "Aberta", count: demandas.filter(d => d.status === 'aberta').length, color: "#3b82f6" },
+    { name: "Em Andamento", count: demandas.filter(d => d.status === 'em_andamento').length, color: "#f59e0b" },
+    { name: "Aguardando", count: demandas.filter(d => d.status === 'aguardando').length, color: "#8b5cf6" },
+    { name: "Resolvida", count: demandas.filter(d => d.status === 'resolvida').length, color: "#10b981" },
+    { name: "Cancelada", count: demandas.filter(d => d.status === 'cancelada').length, color: "#ef4444" },
   ];
+  
+  const statusData = statusCounts.map(item => ({
+    name: item.name,
+    value: totalDemandas > 0 ? Math.round((item.count / totalDemandas) * 100) : 0,
+    color: item.color
+  }));
 
   // Dados para gráfico de áreas com divisão por status
   const areaStatusData = demandas.reduce((acc, demanda) => {
