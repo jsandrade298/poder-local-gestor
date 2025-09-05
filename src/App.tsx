@@ -13,7 +13,6 @@ import Municipes from "./pages/Municipes";
 import Kanban from "./pages/Kanban";
 import SolicitarAgenda from "./pages/SolicitarAgenda";
 import WhatsApp from "./pages/WhatsApp";
-import ConfiguracoesWhatsApp from "./pages/ConfiguracoesWhatsApp";
 import AssessorIA from "./pages/AssessorIA";
 import Tags from "./pages/Tags";
 import Areas from "./pages/Areas";
@@ -41,7 +40,6 @@ const App = () => (
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/solicitar-agenda" element={<SolicitarAgenda />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
-              <Route path="/configuracoes-whatsapp" element={<ConfiguracoesWhatsApp />} />
               <Route path="/assessor-ia" element={<AssessorIA />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/areas" element={<Areas />} />
