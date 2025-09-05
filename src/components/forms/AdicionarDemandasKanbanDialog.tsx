@@ -24,9 +24,9 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
-  // Buscar todas as demandas que não estão no kanban
+  // Buscar todas as demandas
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-nao-kanban'],
+    queryKey: ['demandas-todas'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demandas')
@@ -36,7 +36,6 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           municipes(nome)
         `)
         .neq('status', 'cancelada')
-        .not('status', 'in', '("a_fazer","em_progresso","feito")')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -256,7 +255,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           </div>
 
           {/* Lista de demandas */}
-          <div className="border rounded-lg">
+          <div className="border rounded-lg max-h-[400px] overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
