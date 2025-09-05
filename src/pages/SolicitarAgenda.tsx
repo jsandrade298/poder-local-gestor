@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { X, Send, Clock, CheckCircle, XCircle, RotateCcw, MessageCircle, Edit, Calendar, MapPin, Users, FileText, User, Clock4 } from "lucide-react";
+import { X, Send, Clock, CheckCircle, XCircle, RotateCcw, MessageCircle, Edit, Calendar, MapPin, Users, FileText, User, Clock4, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -570,6 +570,51 @@ const SolicitarAgenda = () => {
     },
   });
 
+  // Excluir agenda
+  const excluirAgendaMutation = useMutation({
+    mutationFn: async (agendaId: string) => {
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      // Primeiro, excluir mensagens relacionadas
+      const { error: mensagensError } = await supabase
+        .from("agenda_mensagens")
+        .delete()
+        .eq("agenda_id", agendaId);
+
+      if (mensagensError) throw mensagensError;
+
+      // Excluir acompanhantes
+      const { error: acompanhantesError } = await supabase
+        .from("agenda_acompanhantes")
+        .delete()
+        .eq("agenda_id", agendaId);
+
+      if (acompanhantesError) throw acompanhantesError;
+
+      // Finalmente, excluir a agenda
+      const { error } = await supabase
+        .from("agendas")
+        .delete()
+        .eq("id", agendaId)
+        .eq("validador_id", user.id); // Só pode excluir se for o validador
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
+      toast({ title: "Solicitação excluída com sucesso!" });
+      setSelectedAgenda(null); // Fechar modal se estiver aberto
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        title: "Erro ao excluir solicitação",
+        description: "Verifique se você tem permissão para excluir esta agenda.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Logs de debug temporários
   useEffect(() => {
     if (minhasAgendas) {
@@ -1032,36 +1077,54 @@ const SolicitarAgenda = () => {
               ) : solicitacoes && solicitacoes.length > 0 ? (
                 <div className="space-y-3">
                   {solicitacoes.map(agenda => (
-                    <Card 
-                      key={agenda.id}
-                      className={cn(
-                        "cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 bg-card/60 backdrop-blur",
-                        getStatusBorderClass(agenda.status)
-                      )}
-                      onClick={() => setSelectedAgenda(agenda)}
-                    >
+                     <Card 
+                       key={agenda.id}
+                       className={cn(
+                         "hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 bg-card/60 backdrop-blur",
+                         getStatusBorderClass(agenda.status)
+                       )}
+                     >
                       <CardContent className="p-4">
-                        <div className="flex justify-between items-start gap-4">
-                          <div className="flex-1 space-y-2">
-                            <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4" />
-                                {formatDateTime(agenda.data_hora_proposta)}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <User className="h-4 w-4" />
-                                Solicitante: {agenda.solicitante?.nome}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            {getStatusBadge(agenda.status)}
-                            <div className="text-xs text-muted-foreground">
-                              {formatDateTime(agenda.created_at)}
-                            </div>
-                          </div>
-                        </div>
+                         <div className="flex justify-between items-start gap-4">
+                           <div 
+                             className="flex-1 space-y-2 cursor-pointer"
+                             onClick={() => setSelectedAgenda(agenda)}
+                           >
+                             <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.descricao_objetivo}</h3>
+                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                               <div className="flex items-center gap-1">
+                                 <Calendar className="h-4 w-4" />
+                                 {formatDateTime(agenda.data_hora_proposta)}
+                               </div>
+                               <div className="flex items-center gap-1">
+                                 <User className="h-4 w-4" />
+                                 Solicitante: {agenda.solicitante?.nome}
+                               </div>
+                             </div>
+                           </div>
+                           <div className="flex flex-col items-end gap-2">
+                             <div className="flex items-center gap-2">
+                               {getStatusBadge(agenda.status)}
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   if (confirm(`Tem certeza que deseja excluir a solicitação "${agenda.descricao_objetivo}"?`)) {
+                                     excluirAgendaMutation.mutate(agenda.id);
+                                   }
+                                 }}
+                                 disabled={excluirAgendaMutation.isPending}
+                               >
+                                 <Trash2 className="h-4 w-4" />
+                               </Button>
+                             </div>
+                             <div className="text-xs text-muted-foreground">
+                               {formatDateTime(agenda.created_at)}
+                             </div>
+                           </div>
+                         </div>
                       </CardContent>
                     </Card>
                   ))}
