@@ -494,15 +494,7 @@ const SolicitarAgenda = () => {
         }
       }
     },
-    onSuccess: (_, { status }) => {
-      // Atualizar o selectedAgenda imediatamente para refletir no modal
-      if (selectedAgenda) {
-        setSelectedAgenda({ 
-          ...selectedAgenda, 
-          status: status as any 
-        });
-      }
-      
+    onSuccess: () => {
       toast({ title: "Status atualizado!" });
       queryClient.invalidateQueries({ queryKey: ["minhas-agendas"] });
       queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
@@ -1264,10 +1256,19 @@ const SolicitarAgenda = () => {
                         <StatusBox
                           currentStatus={selectedAgenda?.status || ""}
                           canUpdate={user?.id === selectedAgenda?.validador_id}
-                          onUpdateStatus={(status) => updateStatusMutation.mutate({
-                            agendaId: selectedAgenda?.id,
-                            status
-                          })}
+                          onUpdateStatus={(status) => {
+                            // Atualizar o estado local imediatamente para refletir no modal
+                            if (selectedAgenda) {
+                              setSelectedAgenda({ 
+                                ...selectedAgenda, 
+                                status: status as any 
+                              });
+                            }
+                            updateStatusMutation.mutate({
+                              agendaId: selectedAgenda?.id,
+                              status
+                            });
+                          }}
                         />
                       </div>
                   </CardContent>
