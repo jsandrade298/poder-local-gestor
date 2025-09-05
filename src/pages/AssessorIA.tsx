@@ -282,10 +282,10 @@ const AssessorIA = () => {
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Documentos no Contexto:</span>
                   </div>
-                  <ScrollArea className="max-h-20">
-                    <div className="flex flex-wrap gap-2 pr-3">
+                  <div className="w-full overflow-x-auto">
+                    <div className="flex gap-2 pb-2">
                       {documentosContexto.map((doc) => (
-                        <Badge key={doc.id} variant="secondary" className="gap-1">
+                        <Badge key={doc.id} variant="secondary" className="gap-1 whitespace-nowrap flex-shrink-0">
                           {doc.nome}
                           <Button
                             variant="ghost"
@@ -298,7 +298,7 @@ const AssessorIA = () => {
                         </Badge>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               )}
               
