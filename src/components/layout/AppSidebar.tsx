@@ -7,7 +7,8 @@ import {
   Building2,
   UserCheck,
   Settings,
-  Home
+  Home,
+  Columns
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -27,6 +28,7 @@ const menuItems = [
   { title: "Visão Geral", url: "/", icon: Home },
   { title: "Demandas", url: "/demandas", icon: FileText },
   { title: "Munícipes", url: "/municipes", icon: Users },
+  { title: "Kanban", url: "/kanban", icon: Columns },
   { title: "Tags", url: "/tags", icon: Tags },
   { title: "Áreas", url: "/areas", icon: Building2 },
   { title: "Usuários", url: "/usuarios", icon: UserCheck },
