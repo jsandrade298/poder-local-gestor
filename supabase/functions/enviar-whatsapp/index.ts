@@ -31,6 +31,7 @@ serve(async (req) => {
       tempoMinimo = 1,
       tempoMaximo = 3,
       mediaFiles = [],
+      customMessages = {},
     } = requestData;
 
     console.log("=== INICIANDO ENVIO WHATSAPP ===");
@@ -47,7 +48,7 @@ serve(async (req) => {
       );
     }
 
-    if (!mensagem && mediaFiles.length === 0) {
+    if (!mensagem && mediaFiles.length === 0 && Object.keys(customMessages).length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: "Envie uma mensagem ou arquivo de mídia" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -326,7 +327,8 @@ serve(async (req) => {
         }
         
         // Enviar texto se houver e ainda não foi enviado como caption
-        if (mensagem && !messageSent) {
+        const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
+        if (mensagemParaEnviar && !messageSent) {
           // Pequeno delay se já enviou mídia
           if (mediaFiles.length > 0) {
             await new Promise(r => setTimeout(r, 1000));
@@ -339,7 +341,7 @@ serve(async (req) => {
             headers: apiHeaders,
             body: JSON.stringify({
               number: normalizedPhone,
-              text: mensagem,
+              text: mensagemParaEnviar,
               linkPreview: false,
               delay: 1200
             })
@@ -365,7 +367,8 @@ serve(async (req) => {
         }
         
         // Se não teve mensagem nem mídia mas chegou aqui, registrar como processado
-        if (!mensagem && mediaFiles.length === 0) {
+        const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
+        if (!mensagemParaEnviar && mediaFiles.length === 0) {
           results.push({
             telefone: rawPhone,
             status: 'erro',

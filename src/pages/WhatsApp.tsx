@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Birthday, Settings, Send, Clock, Users } from "lucide-react";
+import { MessageCircle, Cake, Settings, Send, Clock, Users } from "lucide-react";
 
 interface WhatsAppInstance {
   id: string;
@@ -221,7 +221,7 @@ const WhatsApp = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Birthday className="h-5 w-5" />
+            <Cake className="h-5 w-5" />
             Mensagens de Aniversário
           </CardTitle>
           <CardDescription>
