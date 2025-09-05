@@ -13,8 +13,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity } from "lucide-react";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
+import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
-import { DemandaAtividadesTab } from "@/components/forms/DemandaAtividadesTab";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
@@ -101,21 +101,6 @@ export default function Demandas() {
     }
   }, [searchParams, demandas]);
 
-  // Buscar anexos para a demanda selecionada
-  const { data: anexosSelecionados = [] } = useQuery({
-    queryKey: ['anexos', selectedDemanda?.id],
-    queryFn: async () => {
-      if (!selectedDemanda?.id) return [];
-      const { data, error } = await supabase
-        .from('anexos')
-        .select('*')
-        .eq('demanda_id', selectedDemanda.id);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedDemanda?.id && isViewDialogOpen
-  });
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
@@ -264,28 +249,6 @@ export default function Demandas() {
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
   });
 
-  // Função para download de anexo
-  const downloadAnexo = async (anexo: any) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('demanda-anexos')
-        .download(anexo.url_arquivo);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = anexo.nome_arquivo;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
-      toast.error("Erro ao baixar arquivo");
-    }
-  };
 
   // Mutação para excluir demanda
   const deleteMutation = useMutation({
@@ -964,187 +927,13 @@ export default function Demandas() {
         </div>
 
         {/* Dialog de Visualização */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                Demanda #{selectedDemanda?.protocolo}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedDemanda?.titulo}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedDemanda && (
-              <Tabs defaultValue="detalhes" className="flex-1 flex flex-col overflow-hidden">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="detalhes" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Detalhes
-                  </TabsTrigger>
-                  <TabsTrigger value="atividades" className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Atividades
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="detalhes" className="flex-1 overflow-y-auto">
-                  <div className="space-y-4 p-1">
-                    <div>
-                      <label className="text-sm font-medium">Descrição</label>
-                      <p className="text-sm text-muted-foreground">{selectedDemanda.descricao}</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium">Munícipe</label>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedDemanda.municipes?.nome || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Status</label>
-                        <p className="text-sm">
-                          <Badge variant={getStatusVariant(selectedDemanda.status)}>
-                            {getStatusLabel(selectedDemanda.status)}
-                          </Badge>
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium">Área</label>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedDemanda.areas?.nome || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Responsável</label>
-                        <p className="text-sm text-muted-foreground">
-                          Sem responsável
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Prioridade</label>
-                      <p className="text-sm">
-                        <Badge 
-                          variant="secondary"
-                          style={{ backgroundColor: getPrioridadeColor(selectedDemanda.prioridade), color: 'white' }}
-                        >
-                          {getPrioridadeLabel(selectedDemanda.prioridade)}
-                        </Badge>
-                      </p>
-                    </div>
-                    
-                    {selectedDemanda.data_prazo && (
-                      <div>
-                        <label className="text-sm font-medium">Prazo</label>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateOnly(selectedDemanda.data_prazo)}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-sm font-medium">Cidade</label>
-                        <p className="text-sm text-muted-foreground">{selectedDemanda.cidade || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Bairro</label>
-                        <p className="text-sm text-muted-foreground">{selectedDemanda.bairro || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">CEP</label>
-                        <p className="text-sm text-muted-foreground">{selectedDemanda.cep || 'N/A'}</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-medium">Endereço</label>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedDemanda.logradouro && selectedDemanda.numero 
-                          ? `${selectedDemanda.logradouro}, ${selectedDemanda.numero}${selectedDemanda.complemento ? `, ${selectedDemanda.complemento}` : ''}`
-                          : 'N/A'
-                        }
-                      </p>
-                    </div>
-                    
-                    {selectedDemanda.observacoes && (
-                      <div>
-                        <label className="text-sm font-medium">Observações</label>
-                        <p className="text-sm text-muted-foreground">{selectedDemanda.observacoes}</p>
-                      </div>
-                    )}
-                    
-                    {selectedDemanda.resolucao && (
-                      <div>
-                        <label className="text-sm font-medium">Resolução</label>
-                        <p className="text-sm text-muted-foreground">{selectedDemanda.resolucao}</p>
-                      </div>
-                    )}
-                    
-                    
-                    {/* Seção de Anexos */}
-                    {anexosSelecionados.length > 0 && (
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium">Anexos ({anexosSelecionados.length})</label>
-                        <div className="grid gap-2">
-                          {anexosSelecionados.map((anexo) => (
-                            <div key={anexo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{anexo.nome_arquivo}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
-                                </span>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => downloadAnexo(anexo)}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Baixar
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                      <div>
-                        <label className="text-sm font-medium">Criado em</label>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateTime(selectedDemanda.created_at)}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Atualizado em</label>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDateTime(selectedDemanda.updated_at)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="atividades" className="flex-1 overflow-y-auto">
-                  <div className="p-1">
-                    <DemandaAtividadesTab 
-                      demandaId={selectedDemanda.id} 
-                      highlightedActivityId={highlightedActivityId}
-                      onActivityHighlighted={() => setHighlightedActivityId(null)}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
-          </DialogContent>
-        </Dialog>
+        {selectedDemanda && (
+          <ViewDemandaDialog
+            demanda={selectedDemanda}
+            open={isViewDialogOpen}
+            onOpenChange={setIsViewDialogOpen}
+          />
+        )}
         
         {/* Dialog de Edição */}
         <EditDemandaDialog 
