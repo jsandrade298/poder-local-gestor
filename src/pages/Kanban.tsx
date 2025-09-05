@@ -159,7 +159,6 @@ export default function Kanban() {
       // Enviar notificação se tiver telefone
       if (demanda.municipes?.telefone && oldStatus !== newStatus) {
         try {
-          // Enviar notificação diretamente
           await supabase.functions.invoke('whatsapp-notificar-demanda', {
             body: {
               demanda_id: demandaId,
