@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -56,6 +56,13 @@ const SolicitarAgenda = () => {
   const [activeTab, setActiveTab] = useState("solicitar");
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Função para fazer scroll para o final das mensagens
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -365,6 +372,13 @@ const SolicitarAgenda = () => {
     },
     enabled: !!selectedAgenda?.id,
   });
+
+  // Auto-scroll quando mensagens mudam ou quando uma nova mensagem é enviada
+  useEffect(() => {
+    if (mensagens && mensagens.length > 0) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [mensagens]);
 
   // Buscar detalhes completos da agenda selecionada incluindo acompanhantes
   const { data: agendaDetalhada } = useQuery({
@@ -1208,34 +1222,37 @@ const SolicitarAgenda = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ScrollArea className="h-64 border rounded-lg p-3 mb-4">
-                      {mensagens && mensagens.length > 0 ? (
-                        mensagens.map(msg => (
-                          <div
-                            key={msg.id}
-                            className={cn(
-                              "mb-3 p-3 rounded-lg max-w-[80%]",
-                              msg.remetente_id === user?.id
-                                ? "ml-auto bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            )}
-                          >
-                            <p className="text-xs font-semibold mb-1">
-                              {msg.remetente?.nome}
-                            </p>
-                            <p className="text-sm">{msg.mensagem}</p>
-                            <p className="text-xs opacity-70 mt-1">
-                              {formatDateTime(msg.created_at)}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-muted-foreground py-8">
-                          <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Nenhuma mensagem ainda</p>
-                        </div>
-                      )}
-                    </ScrollArea>
+                     <ScrollArea className="h-64 border rounded-lg p-3 mb-4">
+                       {mensagens && mensagens.length > 0 ? (
+                         <div>
+                           {mensagens.map(msg => (
+                             <div
+                               key={msg.id}
+                               className={cn(
+                                 "mb-3 p-3 rounded-lg max-w-[80%]",
+                                 msg.remetente_id === user?.id
+                                   ? "ml-auto bg-primary text-primary-foreground"
+                                   : "bg-muted"
+                               )}
+                             >
+                               <p className="text-xs font-semibold mb-1">
+                                 {msg.remetente?.nome}
+                               </p>
+                               <p className="text-sm">{msg.mensagem}</p>
+                               <p className="text-xs opacity-70 mt-1">
+                                 {formatDateTime(msg.created_at)}
+                               </p>
+                             </div>
+                           ))}
+                           <div ref={messagesEndRef} />
+                         </div>
+                       ) : (
+                         <div className="text-center text-muted-foreground py-8">
+                           <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                           <p className="text-sm">Nenhuma mensagem ainda</p>
+                         </div>
+                       )}
+                     </ScrollArea>
 
                     <div className="flex gap-2">
                       <Input
