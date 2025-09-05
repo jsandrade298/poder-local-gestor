@@ -84,24 +84,15 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        // Apenas arquivos TXT por enquanto - PDFs precisam de extração especializada
+        // Para arquivos TXT, retorna o conteúdo diretamente
         if (file.type === 'text/plain') {
           resolve(text);
         } else {
-          // Para outros tipos, vamos extrair metadados básicos
-          resolve(`[Documento: ${file.name} - Tipo: ${file.type} - Tamanho: ${file.size} bytes]`);
+          // Para outros tipos, extrai texto básico (implementação simples)
+          resolve(text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').trim());
         }
       };
-      reader.onerror = () => {
-        resolve(`[Erro ao ler arquivo: ${file.name}]`);
-      };
-      
-      if (file.type === 'text/plain') {
-        reader.readAsText(file);
-      } else {
-        // Para não-texto, apenas retornar metadados
-        resolve(`[Documento: ${file.name} - Tipo: ${file.type} - Tamanho: ${file.size} bytes]`);
-      }
+      reader.readAsText(file);
     });
   };
 
@@ -130,11 +121,9 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
 
     for (const file of Array.from(arquivosPendentes)) {
       try {
-        // Validar tipo de arquivo - temporariamente apenas TXT para extração completa
+        // Validar tipo de arquivo
         const tiposPermitidos = ['application/pdf', 'application/msword', 
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-        
-        const tiposComExtracao = ['text/plain']; // Apenas TXT tem extração completa por enquanto
         
         if (!tiposPermitidos.includes(file.type)) {
           toast({
@@ -143,14 +132,6 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
             variant: "destructive",
           });
           continue;
-        }
-
-        // Avisar sobre limitação de extração para PDFs/DOCs
-        if (!tiposComExtracao.includes(file.type)) {
-          toast({
-            title: "Arquivo adicionado",
-            description: `${file.name} foi adicionado, mas apenas metadados serão extraídos. Para extração completa, use arquivos TXT.`,
-          });
         }
 
         // Upload do arquivo com nome sanitizado
@@ -322,7 +303,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                   {uploadProgress ? 'Enviando...' : 'Selecionar Arquivos'}
                 </Button>
                 <span className="text-sm text-muted-foreground self-center">
-                  PDF, DOC, DOCX, TXT (apenas TXT com extração completa)
+                  PDF, DOC, DOCX, TXT
                 </span>
               </div>
               <input
@@ -410,19 +391,18 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
             </CardContent>
           </Card>
 
-        </div>
-
-        {/* Botões de Ação */}
-        <div className="flex justify-between pt-4 border-t">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleConfirmarSelecao}
-            disabled={documentosSelecionados.length === 0}
-          >
-            Usar {documentosSelecionados.length} Documento(s) no Contexto
-          </Button>
+          {/* Botões de Ação */}
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleConfirmarSelecao}
+              disabled={documentosSelecionados.length === 0}
+            >
+              Usar {documentosSelecionados.length} Documento(s) no Contexto
+            </Button>
+          </div>
         </div>
       </DialogContent>
 

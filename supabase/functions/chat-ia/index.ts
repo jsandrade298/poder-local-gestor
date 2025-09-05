@@ -113,18 +113,6 @@ ${contextosDocumentos}`;
     const data = await response.json();
     console.log('Resposta da OpenAI recebida');
 
-    // Verificar se a resposta tem a estrutura esperada
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      console.error('Estrutura de resposta inválida da OpenAI:', JSON.stringify(data, null, 2));
-      return new Response(
-        JSON.stringify({ error: 'Resposta inválida da IA' }), 
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
     const assistantMessage = data.choices[0].message.content;
 
     return new Response(
