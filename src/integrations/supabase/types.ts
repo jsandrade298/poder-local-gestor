@@ -413,6 +413,7 @@ export type Database = {
           data_prazo: string | null
           descricao: string
           id: string
+          kanban_position: string | null
           logradouro: string | null
           municipe_id: string
           numero: string | null
@@ -436,6 +437,7 @@ export type Database = {
           data_prazo?: string | null
           descricao: string
           id?: string
+          kanban_position?: string | null
           logradouro?: string | null
           municipe_id: string
           numero?: string | null
@@ -459,6 +461,7 @@ export type Database = {
           data_prazo?: string | null
           descricao?: string
           id?: string
+          kanban_position?: string | null
           logradouro?: string | null
           municipe_id?: string
           numero?: string | null
