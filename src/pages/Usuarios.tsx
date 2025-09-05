@@ -42,7 +42,7 @@ export default function Usuarios() {
 
   // Fetch users with their roles and demandas count
   const { data: usuarios = [], isLoading: isLoadingUsuarios, refetch: refetchUsuarios } = useQuery({
-    queryKey: ['usuarios'],
+    queryKey: ['usuarios', Date.now()], // Forçar refresh para ver logs
     queryFn: async () => {
       // Fetch profiles
       const { data: profilesData, error: profilesError } = await supabase
@@ -63,7 +63,12 @@ export default function Usuarios() {
         .from('demandas')
         .select('criado_por, responsavel_id');
 
-      if (demandasError) throw demandasError;
+      if (demandasError) {
+        console.error('Erro ao buscar demandas:', demandasError);
+        throw demandasError;
+      }
+
+      console.log('📊 Demandas encontradas:', demandasData?.length || 0);
 
       // Create roles map
       const rolesMap = rolesData.reduce((acc, roleItem) => {
@@ -72,7 +77,7 @@ export default function Usuarios() {
       }, {});
 
       // Count demandas by user
-      const demandasCount = demandasData.reduce((acc, demanda) => {
+      const demandasCount = demandasData?.reduce((acc, demanda) => {
         if (demanda.criado_por) {
           acc[demanda.criado_por] = (acc[demanda.criado_por] || 0) + 1;
         }
@@ -80,15 +85,24 @@ export default function Usuarios() {
           acc[demanda.responsavel_id] = (acc[demanda.responsavel_id] || 0) + 1;
         }
         return acc;
-      }, {});
+      }, {}) || {};
+
+      console.log('📈 Contagem de demandas por usuário:', demandasCount);
 
       // Combine profiles with roles and demandas count
-      return profilesData.map(profile => ({
+      const usuariosCompletos = profilesData.map(profile => ({
         ...profile,
         total_demandas: demandasCount[profile.id] || 0,
         role: rolesMap[profile.id] || 'usuario',
         ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
       }));
+
+      console.log('👥 Usuários com contagem:', usuariosCompletos.map(u => ({
+        nome: u.nome,
+        total_demandas: u.total_demandas
+      })));
+
+      return usuariosCompletos;
     }
   });
 
