@@ -131,8 +131,8 @@ export function EnvioWhatsAppProgress() {
         </CardHeader>
 
         {!state.isMinimized && (
-          <CardContent className="pt-0">
-            <div className="space-y-3">
+          <CardContent className="pt-0 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 space-y-3 overflow-hidden">
               {/* Mensagem */}
               <div className="text-xs">
                 <div className="font-medium mb-1">Mensagem:</div>
@@ -142,9 +142,9 @@ export function EnvioWhatsAppProgress() {
               </div>
 
               {/* Lista de Destinatários */}
-              <div>
+              <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="font-medium text-xs mb-2">Destinatários:</div>
-                <ScrollArea className="h-64 border rounded">
+                <ScrollArea className="flex-1 border rounded">
                   <div className="p-2 space-y-2">
                     {state.recipients.map((recipient, index) => (
                       <div
@@ -188,19 +188,22 @@ export function EnvioWhatsAppProgress() {
                   </div>
                 </ScrollArea>
               </div>
+            </div>
 
-              {/* Status Summary */}
-              <div className="flex justify-between text-xs bg-muted p-2 rounded">
-                <span className="text-green-600">
-                  ✓ {state.recipients.filter(r => r.status === 'sent').length} enviadas
-                </span>
-                <span className="text-red-600">
-                  ✗ {state.recipients.filter(r => r.status === 'error').length} erros
-                </span>
-                <span className="text-gray-600">
-                  ⏳ {state.recipients.filter(r => r.status === 'pending').length} pendentes
-                </span>
-              </div>
+            {/* Status Summary - fixo no final */}
+            <div className="mt-3 flex justify-between items-center text-xs bg-muted p-2 rounded flex-shrink-0">
+              <span className="flex items-center gap-1 text-green-600">
+                <CheckCircle className="h-3 w-3" />
+                {state.recipients.filter(r => r.status === 'sent').length} enviadas
+              </span>
+              <span className="flex items-center gap-1 text-red-600">
+                <XCircle className="h-3 w-3" />
+                {state.recipients.filter(r => r.status === 'error').length} erros
+              </span>
+              <span className="flex items-center gap-1 text-gray-600">
+                <Clock className="h-3 w-3" />
+                {state.recipients.filter(r => r.status === 'pending').length} pendentes
+              </span>
             </div>
           </CardContent>
         )}
