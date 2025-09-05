@@ -310,13 +310,16 @@ const AssessorIA = () => {
                       {documentosContexto.map((doc) => (
                         <div
                           key={doc.id}
-                          className="relative flex-shrink-0 w-20 h-20 bg-muted rounded-lg border border-border hover:border-primary/50 transition-colors group"
+                          className="relative flex-shrink-0 w-24 h-24 bg-muted rounded-lg border border-border hover:border-primary/50 transition-colors group"
                         >
-                          <div className="p-2 h-full flex flex-col items-center justify-center text-center">
-                            <FileText className="h-6 w-6 text-primary mb-1" />
-                            <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
-                              {doc.nome.length > 15 ? doc.nome.substring(0, 15) + '...' : doc.nome}
+                          <div className="p-2 h-full flex flex-col items-center justify-between text-center">
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                            <span className="text-[10px] font-medium text-foreground leading-tight break-words">
+                              {doc.nome.length > 20 ? doc.nome.substring(0, 20) + '...' : doc.nome}
                             </span>
+                            <Badge variant="outline" className="text-[9px] py-0 px-1 h-3 truncate max-w-full">
+                              {doc.categoria}
+                            </Badge>
                           </div>
                           <Button
                             variant="ghost"
@@ -326,11 +329,6 @@ const AssessorIA = () => {
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                          <div className="absolute bottom-1 left-1 right-1">
-                            <Badge variant="outline" className="text-xs py-0 px-1 h-4 truncate">
-                              {doc.categoria}
-                            </Badge>
-                          </div>
                         </div>
                       ))}
                     </div>
