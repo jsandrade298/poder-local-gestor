@@ -380,11 +380,15 @@ const SolicitarAgenda = () => {
     }
   }, [mensagens]);
 
-  // Auto-scroll quando abre o modal de uma agenda e vai para aba mensagens
+  // Auto-scroll quando abre o modal E quando muda para aba mensagens
   useEffect(() => {
     if (selectedAgenda && mensagens && mensagens.length > 0) {
-      // Aguarda um pouco mais para garantir que a DOM foi atualizada
-      setTimeout(scrollToBottom, 500);
+      // Aguarda a renderização completa da aba mensagens
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
   }, [selectedAgenda, mensagens]);
 
@@ -1086,7 +1090,12 @@ const SolicitarAgenda = () => {
               </DialogTitle>
             </DialogHeader>
 
-            <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden">
+            <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden" onValueChange={(value) => {
+              // Quando trocar para aba mensagens, fazer scroll para o final
+              if (value === "mensagens" && mensagens && mensagens.length > 0) {
+                setTimeout(scrollToBottom, 100);
+              }
+            }}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
                 <TabsTrigger value="participantes">Participantes</TabsTrigger>
