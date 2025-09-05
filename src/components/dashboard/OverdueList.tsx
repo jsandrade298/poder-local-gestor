@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Calendar, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -59,48 +60,88 @@ export function OverdueList({ title, demandas }: OverdueListProps) {
           </p>
         ) : (
           <>
-            {demandas.slice(0, 3).map((demanda) => (
-              <div
-                key={demanda.id}
-                className="p-3 rounded-lg bg-muted/50 border border-destructive/10 hover:bg-muted/70 transition-colors cursor-pointer"
-                onClick={(e) => handleSpecificDemandaClick(demanda.id, e)}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-medium text-foreground leading-tight line-clamp-1">
-                      {demanda.titulo}
-                    </h4>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      #{demanda.protocolo}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{demanda.diasAtraso} dias em atraso</span>
-                    </div>
-                    {demanda.area && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">{demanda.area}</span>
+            {demandas.length <= 3 ? (
+              // Mostrar até 3 demandas sem scroll
+              <div className="space-y-3">
+                {demandas.map((demanda) => (
+                  <div
+                    key={demanda.id}
+                    className="p-3 rounded-lg bg-muted/50 border border-destructive/10 hover:bg-muted/70 transition-colors cursor-pointer"
+                    onClick={(e) => handleSpecificDemandaClick(demanda.id, e)}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-medium text-foreground leading-tight line-clamp-1">
+                          {demanda.titulo}
+                        </h4>
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          #{demanda.protocolo}
+                        </Badge>
                       </div>
-                    )}
+                      
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{demanda.diasAtraso} dias em atraso</span>
+                        </div>
+                        {demanda.area && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{demanda.area}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                ))}
+              </div>
+            ) : (
+              // Mostrar com scroll quando há mais de 3 demandas
+              <ScrollArea className="h-[280px]">
+                <div className="space-y-3 pr-4">
+                  {demandas.map((demanda) => (
+                    <div
+                      key={demanda.id}
+                      className="p-3 rounded-lg bg-muted/50 border border-destructive/10 hover:bg-muted/70 transition-colors cursor-pointer"
+                      onClick={(e) => handleSpecificDemandaClick(demanda.id, e)}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-medium text-foreground leading-tight line-clamp-1">
+                            {demanda.titulo}
+                          </h4>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            #{demanda.protocolo}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{demanda.diasAtraso} dias em atraso</span>
+                          </div>
+                          {demanda.area && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">{demanda.area}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-            
-            {demandas.length > 3 && (
-              <div className="text-center pt-2">
-                <button 
-                  onClick={handleDemandaClick}
-                  className="text-xs text-primary hover:text-primary/80 font-medium"
-                >
-                  Ver todas as {demandas.length} demandas em atraso
-                </button>
-              </div>
+              </ScrollArea>
             )}
+            
+            <div className="text-center pt-2 border-t">
+              <button 
+                onClick={handleDemandaClick}
+                className="text-xs text-primary hover:text-primary/80 font-medium"
+              >
+                Ver todas as {demandas.length} demandas em atraso
+              </button>
+            </div>
           </>
         )}
       </CardContent>
