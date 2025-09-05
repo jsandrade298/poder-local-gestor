@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,8 +40,9 @@ export default function Kanban() {
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Buscar demandas do kanban
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas'],
+    queryKey: ['demandas-kanban'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demandas')
@@ -53,11 +54,15 @@ export default function Kanban() {
         .in('status', ['aberta', 'em_andamento', 'resolvida'])
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar demandas:', error);
+        throw error;
+      }
+      return data || [];
     }
   });
 
+  // Buscar responsáveis
   const { data: responsaveis = [] } = useQuery({
     queryKey: ['responsaveis'],
     queryFn: async () => {
@@ -66,22 +71,27 @@ export default function Kanban() {
         .select('id, nome')
         .order('nome');
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar responsáveis:', error);
+        throw error;
+      }
+      return data || [];
     }
   });
 
+  // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
+      const demandasIds = demandas.map(d => d.id);
       const { error } = await supabase
         .from('demandas')
         .update({ status: 'aguardando' })
-        .in('status', ['aberta', 'em_andamento', 'resolvida']);
+        .in('id', demandasIds);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
@@ -90,7 +100,8 @@ export default function Kanban() {
     }
   });
 
-  const removerDemandaKanbanMutation = useMutation({
+  // Mutation para remover demanda do kanban
+  const removerDemandaMutation = useMutation({
     mutationFn: async (demandaId: string) => {
       const { error } = await supabase
         .from('demandas')
@@ -100,15 +111,16 @@ export default function Kanban() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
       toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
-      console.error('Erro ao remover demanda do kanban:', error);
+      console.error('Erro ao remover demanda:', error);
       toast.error("Erro ao remover demanda do kanban");
     }
   });
 
+  // Mutation para atualizar status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ demandaId, newStatus }: { demandaId: string; newStatus: string }) => {
       const { error } = await supabase
@@ -119,12 +131,12 @@ export default function Kanban() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
-      toast.success("Status da demanda atualizado!");
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      toast.success("Status atualizado!");
     },
     onError: (error) => {
       console.error('Erro ao atualizar status:', error);
-      toast.error("Erro ao atualizar status da demanda");
+      toast.error("Erro ao atualizar status");
     }
   });
 
@@ -135,10 +147,8 @@ export default function Kanban() {
     const sourceStatus = result.source.droppableId;
     const destinationStatus = result.destination.droppableId;
 
-    // Se a demanda foi movida para a mesma coluna, não faz nada
     if (sourceStatus === destinationStatus) return;
 
-    // Atualizar o status da demanda no banco
     updateStatusMutation.mutate({ 
       demandaId, 
       newStatus: destinationStatus 
@@ -212,7 +222,11 @@ export default function Kanban() {
           <div className="flex gap-2">
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
+                <Button 
+                  variant="outline" 
+                  className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  disabled={demandas.length === 0}
+                >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Limpar Kanban
                 </Button>
@@ -221,7 +235,7 @@ export default function Kanban() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Isso removerá todas as demandas do kanban, alterando seu status para "Aguardando". 
+                    Isso removerá todas as {demandas.length} demandas do kanban, alterando seu status para "Aguardando". 
                     Esta ação não pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -230,8 +244,9 @@ export default function Kanban() {
                   <AlertDialogAction
                     onClick={() => limparKanbanMutation.mutate()}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={limparKanbanMutation.isPending}
                   >
-                    Limpar Kanban
+                    {limparKanbanMutation.isPending ? 'Limpando...' : 'Limpar Kanban'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -267,7 +282,7 @@ export default function Kanban() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`min-h-[200px] space-y-3 p-2 rounded-lg border-2 border-dashed transition-colors ${
+                        className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
                           snapshot.isDraggingOver 
                             ? 'border-primary bg-primary/5' 
                             : 'border-muted-foreground/20'
@@ -285,7 +300,7 @@ export default function Kanban() {
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group ${
-                                  snapshot.isDragging ? 'shadow-lg rotate-3' : ''
+                                  snapshot.isDragging ? 'shadow-lg rotate-2 scale-105' : ''
                                 }`}
                                 onClick={() => {
                                   setSelectedDemanda(demanda);
@@ -298,11 +313,13 @@ export default function Kanban() {
                                   className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    removerDemandaKanbanMutation.mutate(demanda.id);
+                                    removerDemandaMutation.mutate(demanda.id);
                                   }}
+                                  disabled={removerDemandaMutation.isPending}
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
+                                
                                 <CardHeader className="pb-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <CardTitle className="text-sm font-medium line-clamp-2">
@@ -373,6 +390,12 @@ export default function Kanban() {
                           </Draggable>
                         ))}
                         {provided.placeholder}
+                        
+                        {columnDemandas.length === 0 && (
+                          <div className="flex items-center justify-center h-32 text-muted-foreground">
+                            <p className="text-sm">Nenhuma demanda nesta coluna</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </Droppable>
@@ -382,6 +405,7 @@ export default function Kanban() {
           </div>
         </DragDropContext>
 
+        {/* Dialogs */}
         {selectedDemanda && (
           <ViewDemandaDialog
             demanda={selectedDemanda}
@@ -395,13 +419,23 @@ export default function Kanban() {
           <EditDemandaDialog
             demanda={selectedDemanda}
             open={isEditDialogOpen}
-            onOpenChange={setIsEditDialogOpen}
+            onOpenChange={(open) => {
+              setIsEditDialogOpen(open);
+              if (!open) {
+                queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+              }
+            }}
           />
         )}
 
         <AdicionarDemandasKanbanDialog
           open={isAdicionarDialogOpen}
-          onOpenChange={setIsAdicionarDialogOpen}
+          onOpenChange={(open) => {
+            setIsAdicionarDialogOpen(open);
+            if (!open) {
+              queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+            }
+          }}
         />
       </div>
     </div>

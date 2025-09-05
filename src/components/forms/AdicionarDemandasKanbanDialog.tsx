@@ -19,18 +19,17 @@ interface AdicionarDemandasKanbanDialogProps {
 
 export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarDemandasKanbanDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("aguardando");
   const [areaFilter, setAreaFilter] = useState("all");
   const [municipeFilter, setMunicipeFilter] = useState("all");
-  const [cidadeFilter, setCidadeFilter] = useState("all");
-  const [bairroFilter, setBairroFilter] = useState("all");
+  const [prioridadeFilter, setPrioridadeFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
-  // Buscar todas as demandas (incluindo canceladas)
+  // Buscar demandas não incluídas no kanban
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-todas'],
+    queryKey: ['demandas-nao-kanban'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demandas')
@@ -39,10 +38,14 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           areas(nome),
           municipes(nome)
         `)
+        .not('status', 'in', '(aberta,em_andamento,resolvida)')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar demandas:', error);
+        throw error;
+      }
+      return data || [];
     },
     enabled: open
   });
@@ -55,8 +58,11 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
         .select('id, nome')
         .order('nome');
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar áreas:', error);
+        throw error;
+      }
+      return data || [];
     },
     enabled: open
   });
@@ -69,55 +75,28 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
         .select('id, nome')
         .order('nome');
       
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Erro ao buscar responsáveis:', error);
+        throw error;
+      }
+      return data || [];
     },
     enabled: open
   });
 
-  // Buscar munícipes únicos das demandas
   const { data: municipes = [] } = useQuery({
-    queryKey: ['municipes-demandas'],
+    queryKey: ['municipes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('municipes')
         .select('id, nome')
         .order('nome');
       
-      if (error) throw error;
-      return data;
-    },
-    enabled: open
-  });
-
-  // Buscar cidades únicas das demandas
-  const { data: cidades = [] } = useQuery({
-    queryKey: ['cidades-demandas'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select('cidade')
-        .not('cidade', 'is', null)
-        .order('cidade');
-      
-      if (error) throw error;
-      return [...new Set(data.map(item => item.cidade))];
-    },
-    enabled: open
-  });
-
-  // Buscar bairros únicos das demandas
-  const { data: bairros = [] } = useQuery({
-    queryKey: ['bairros-demandas'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select('bairro')
-        .not('bairro', 'is', null)
-        .order('bairro');
-      
-      if (error) throw error;
-      return [...new Set(data.map(item => item.bairro))];
+      if (error) {
+        console.error('Erro ao buscar munícipes:', error);
+        throw error;
+      }
+      return data || [];
     },
     enabled: open
   });
@@ -132,7 +111,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
       queryClient.invalidateQueries({ queryKey: ['demandas-nao-kanban'] });
       toast.success(`${selectedDemandas.length} demanda(s) adicionada(s) ao kanban!`);
       setSelectedDemandas([]);
@@ -152,11 +131,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
     const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
     const matchesMunicipe = municipeFilter === "all" || demanda.municipe_id === municipeFilter;
-    const matchesCidade = cidadeFilter === "all" || demanda.cidade === cidadeFilter;
-    const matchesBairro = bairroFilter === "all" || demanda.bairro === bairroFilter;
+    const matchesPrioridade = prioridadeFilter === "all" || demanda.prioridade === prioridadeFilter;
     const matchesResponsavel = responsavelFilter === "all" || demanda.responsavel_id === responsavelFilter;
 
-    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesCidade && matchesBairro && matchesResponsavel;
+    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesPrioridade && matchesResponsavel;
   });
 
   const getStatusLabel = (status: string) => {
@@ -191,6 +169,16 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     }
   };
 
+  const getPrioridadeVariant = (prioridade: string) => {
+    switch (prioridade) {
+      case 'baixa': return 'secondary';
+      case 'media': return 'outline';
+      case 'alta': return 'default';
+      case 'urgente': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
   const handleSelectDemanda = (demandaId: string, checked: boolean) => {
     if (checked) {
       setSelectedDemandas(prev => [...prev, demandaId]);
@@ -221,6 +209,18 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     return responsavel?.nome || 'Não definido';
   };
 
+  const getMunicipeNome = (municipeId: string | undefined) => {
+    if (!municipeId) return 'N/A';
+    const municipe = municipes.find(m => m.id === municipeId);
+    return municipe?.nome || 'N/A';
+  };
+
+  const getAreaNome = (areaId: string | undefined) => {
+    if (!areaId) return 'N/A';
+    const area = areas.find(a => a.id === areaId);
+    return area?.nome || 'N/A';
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
@@ -234,8 +234,8 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
 
         <div className="space-y-4 flex-1 min-h-0 flex flex-col">
           {/* Filtros */}
-          <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
-            <div className="flex-1 min-w-[200px]">
+          <div className="flex flex-wrap gap-3 p-4 bg-muted/50 rounded-lg">
+            <div className="flex-1 min-w-[250px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -248,21 +248,18 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="aberta">Aberta</SelectItem>
-                <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="aguardando">Aguardando</SelectItem>
-                <SelectItem value="resolvida">Resolvida</SelectItem>
                 <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={areaFilter} onValueChange={setAreaFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Área" />
               </SelectTrigger>
               <SelectContent>
@@ -275,59 +272,16 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
               </SelectContent>
             </Select>
 
-            <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Munícipe" />
+            <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Prioridade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Munícipes</SelectItem>
-                {municipes.map((municipe) => (
-                  <SelectItem key={municipe.id} value={municipe.id}>
-                    {municipe.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Cidade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Cidades</SelectItem>
-                {cidades.map((cidade) => (
-                  <SelectItem key={cidade} value={cidade}>
-                    {cidade}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={bairroFilter} onValueChange={setBairroFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Bairro" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Bairros</SelectItem>
-                {bairros.map((bairro) => (
-                  <SelectItem key={bairro} value={bairro}>
-                    {bairro}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Responsáveis</SelectItem>
-                {responsaveis.map((responsavel) => (
-                  <SelectItem key={responsavel.id} value={responsavel.id}>
-                    {responsavel.nome}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="baixa">Baixa</SelectItem>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="alta">Alta</SelectItem>
+                <SelectItem value="urgente">Urgente</SelectItem>
               </SelectContent>
             </Select>
 
@@ -336,11 +290,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
               size="sm"
               onClick={() => {
                 setSearchTerm("");
-                setStatusFilter("all");
+                setStatusFilter("aguardando");
                 setAreaFilter("all");
                 setMunicipeFilter("all");
-                setCidadeFilter("all");
-                setBairroFilter("all");
+                setPrioridadeFilter("all");
                 setResponsavelFilter("all");
               }}
             >
@@ -381,6 +334,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
             ) : filteredDemandas.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Nenhuma demanda encontrada com os filtros selecionados.</p>
+                <p className="text-xs mt-1">Todas as demandas já estão no kanban ou foram canceladas.</p>
               </div>
             ) : (
               <Table>
@@ -422,10 +376,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{demanda.municipes?.nome || 'N/A'}</span>
+                        <span className="text-sm">{getMunicipeNome(demanda.municipe_id)}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{demanda.areas?.nome || 'N/A'}</span>
+                        <span className="text-sm">{getAreaNome(demanda.area_id)}</span>
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(demanda.status)}>
@@ -433,7 +387,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant={getPrioridadeVariant(demanda.prioridade)}>
                           {getPrioridadeLabel(demanda.prioridade)}
                         </Badge>
                       </TableCell>
@@ -459,7 +413,10 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
             onClick={handleConcluir}
             disabled={selectedDemandas.length === 0 || adicionarKanbanMutation.isPending}
           >
-            {adicionarKanbanMutation.isPending ? "Adicionando..." : `Adicionar ${selectedDemandas.length} demanda(s)`}
+            {adicionarKanbanMutation.isPending 
+              ? "Adicionando..." 
+              : `Adicionar ${selectedDemandas.length} demanda(s)`
+            }
           </Button>
         </DialogFooter>
       </DialogContent>
