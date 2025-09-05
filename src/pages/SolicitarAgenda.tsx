@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -1105,20 +1106,35 @@ const SolicitarAgenda = () => {
                            <div className="flex flex-col items-end gap-2">
                              <div className="flex items-center gap-2">
                                {getStatusBadge(agenda.status)}
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   if (confirm(`Tem certeza que deseja excluir a solicitação "${agenda.descricao_objetivo}"?`)) {
-                                     excluirAgendaMutation.mutate(agenda.id);
-                                   }
-                                 }}
-                                 disabled={excluirAgendaMutation.isPending}
-                               >
-                                 <Trash2 className="h-4 w-4" />
-                               </Button>
+                               <AlertDialog>
+                                 <AlertDialogTrigger asChild>
+                                   <Button
+                                     variant="outline"
+                                     size="sm"
+                                     className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                                     disabled={excluirAgendaMutation.isPending}
+                                   >
+                                     <Trash2 className="h-4 w-4" />
+                                   </Button>
+                                 </AlertDialogTrigger>
+                                 <AlertDialogContent>
+                                   <AlertDialogHeader>
+                                     <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                     <AlertDialogDescription>
+                                       Tem certeza que deseja excluir a solicitação "{agenda.descricao_objetivo}"? Esta ação não pode ser desfeita e todos os dados relacionados (mensagens, acompanhantes) serão perdidos.
+                                     </AlertDialogDescription>
+                                   </AlertDialogHeader>
+                                   <AlertDialogFooter>
+                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                     <AlertDialogAction 
+                                       onClick={() => excluirAgendaMutation.mutate(agenda.id)}
+                                       className="bg-destructive hover:bg-destructive/90"
+                                     >
+                                       Excluir
+                                     </AlertDialogAction>
+                                   </AlertDialogFooter>
+                                 </AlertDialogContent>
+                               </AlertDialog>
                              </div>
                              <div className="text-xs text-muted-foreground">
                                {formatDateTime(agenda.created_at)}
