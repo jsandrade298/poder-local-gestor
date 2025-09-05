@@ -2,15 +2,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Form,
   FormControl,
@@ -19,11 +16,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -36,10 +28,8 @@ import { toast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   solicitante_id: z.string().min(1, "Selecione um solicitante"),
-  data_pedido: z.date(),
-  data_hora_proposta: z.date({
-    required_error: "Selecione a data e hora da reunião",
-  }),
+  data_pedido: z.string().min(1, "Data do pedido é obrigatória"),
+  data_hora_proposta: z.string().min(1, "Data e hora da reunião são obrigatórias"),
   duracao_prevista: z.string().min(1, "Informe a duração prevista"),
   participantes: z.string().min(1, "Informe os participantes"),
   local_endereco: z.string().min(1, "Informe o local ou link da reunião"),
@@ -58,7 +48,10 @@ const SolicitarAgenda = () => {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      data_pedido: new Date(),
+      data_pedido: (() => {
+        const now = new Date();
+        return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+      })(),
       material_apoio: "",
       observacoes: "",
     },
@@ -91,7 +84,10 @@ const SolicitarAgenda = () => {
       });
 
       form.reset({
-        data_pedido: new Date(),
+        data_pedido: (() => {
+          const now = new Date();
+          return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+        })(),
         material_apoio: "",
         observacoes: "",
       });
@@ -161,37 +157,11 @@ const SolicitarAgenda = () => {
                   control={form.control}
                   name="data_pedido"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Data do Pedido *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy 'às' HH:mm")
-                              ) : (
-                                <span>Selecione a data e hora</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -202,37 +172,11 @@ const SolicitarAgenda = () => {
                   control={form.control}
                   name="data_hora_proposta"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Data/Hora Proposta para Reunião *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy 'às' HH:mm")
-                              ) : (
-                                <span>Selecione a data e hora</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -401,7 +345,15 @@ const SolicitarAgenda = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => form.reset()}
+                  onClick={() => {
+                    const now = new Date();
+                    const localDateTime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                    form.reset({
+                      data_pedido: localDateTime,
+                      material_apoio: "",
+                      observacoes: "",
+                    });
+                  }}
                 >
                   Limpar
                 </Button>
