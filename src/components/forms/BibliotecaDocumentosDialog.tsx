@@ -93,6 +93,15 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
     });
   };
 
+  const sanitizarNomeArquivo = (nome: string): string => {
+    return nome
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-zA-Z0-9.-]/g, '_') // Substitui caracteres especiais por underscore
+      .replace(/_+/g, '_') // Remove underscores duplicados
+      .toLowerCase();
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || !user) return;
@@ -117,8 +126,9 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           continue;
         }
 
-        // Upload do arquivo
-        const nomeArquivo = `${user.id}/${Date.now()}-${file.name}`;
+        // Upload do arquivo com nome sanitizado
+        const nomeArquivoSanitizado = sanitizarNomeArquivo(file.name);
+        const nomeArquivo = `${user.id}/${Date.now()}-${nomeArquivoSanitizado}`;
         const { error: uploadError } = await supabase.storage
           .from('documentos-modelo')
           .upload(nomeArquivo, file);
@@ -262,6 +272,9 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
             <Library className="h-5 w-5" />
             Biblioteca de Documentos Modelo
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Gerencie documentos modelo para usar como base na criação de novos documentos com a IA.
+          </p>
         </DialogHeader>
 
         <div className="space-y-4">
