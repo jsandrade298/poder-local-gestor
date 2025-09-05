@@ -184,7 +184,7 @@ const SolicitarAgenda = () => {
       if (!user?.id) return [];
 
       try {
-        // Buscar agendas onde sou solicitante ou validador
+        // Buscar agendas onde sou solicitante (não mais validador)
         const { data: agendas, error } = await supabase
           .from("agendas")
           .select(`
@@ -193,7 +193,7 @@ const SolicitarAgenda = () => {
               usuario_id
             )
           `)
-          .or(`solicitante_id.eq.${user.id},validador_id.eq.${user.id}`)
+          .eq("solicitante_id", user.id)
           .order("created_at", { ascending: false });
 
         if (error) {
