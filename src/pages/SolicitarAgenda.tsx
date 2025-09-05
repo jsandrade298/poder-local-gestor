@@ -640,12 +640,20 @@ const SolicitarAgenda = () => {
 
   // Lógica para abrir agenda específica via parâmetros de URL (notificações)
   useEffect(() => {
-    const agendaId = searchParams.get('agenda');
-    
     console.log("=== DEBUG ABERTURA DE AGENDA ===");
+    console.log("URL atual:", window.location.href);
+    console.log("SearchParams:", Object.fromEntries(searchParams.entries()));
+    
+    const agendaId = searchParams.get('agenda');
     console.log("Parâmetro agenda da URL:", agendaId);
-    console.log("Minhas agendas disponíveis:", minhasAgendas?.length);
-    console.log("Solicitações disponíveis:", solicitacoes?.length);
+    
+    if (minhasAgendas?.length > 0) {
+      console.log("Minhas agendas:", minhasAgendas.map(a => ({ id: a.id, descricao: a.descricao_objetivo })));
+    }
+    
+    if (solicitacoes?.length > 0) {
+      console.log("Solicitações:", solicitacoes.map(a => ({ id: a.id, descricao: a.descricao_objetivo })));
+    }
     
     if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Buscar nas minhas agendas primeiro
@@ -659,15 +667,17 @@ const SolicitarAgenda = () => {
       }
       
       if (agenda) {
-        console.log("Abrindo agenda:", agenda.id);
+        console.log("Abrindo agenda:", agenda.id, agenda.descricao_objetivo);
         setSelectedAgenda(agenda);
         
         // Limpar o parâmetro da URL após abrir
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       } else {
-        console.log("Agenda não encontrada!");
+        console.log("Agenda não encontrada para ID:", agendaId);
       }
+    } else if (agendaId) {
+      console.log("Parâmetro presente mas dados ainda não carregados");
     }
   }, [searchParams, minhasAgendas, solicitacoes]);
 
