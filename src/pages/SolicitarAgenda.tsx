@@ -564,23 +564,38 @@ const SolicitarAgenda = () => {
   }, [solicitacoes, user?.id]);
 
   const getStatusBadge = (status: string) => {
-    const variants = {
-      pendente: "secondary",
-      confirmado: "default",
-      recusado: "destructive",
-      remarcar: "outline",
-    } as const;
+    const statusConfig = {
+      pendente: { variant: "secondary" as const, className: "" },
+      confirmado: { variant: "default" as const, className: "" },
+      recusado: { variant: "destructive" as const, className: "" },
+      remarcar: { variant: "default" as const, className: "bg-yellow-500 text-white hover:bg-yellow-600" },
+    };
 
-    const customClass = status === "remarcar" ? "border-yellow-500 text-yellow-600" : "";
+    const config = statusConfig[status as keyof typeof statusConfig] || { variant: "secondary" as const, className: "" };
 
     return (
       <Badge 
-        variant={variants[status as keyof typeof variants] || "secondary"}
-        className={customClass}
+        variant={config.variant}
+        className={config.className}
       >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
+  };
+
+  const getStatusBorderClass = (status: string) => {
+    switch (status) {
+      case 'pendente':
+        return 'border-l-gray-400/50 hover:border-l-gray-400';
+      case 'confirmado':
+        return 'border-l-blue-500/50 hover:border-l-blue-500';
+      case 'recusado':
+        return 'border-l-red-500/50 hover:border-l-red-500';
+      case 'remarcar':
+        return 'border-l-yellow-500/50 hover:border-l-yellow-500';
+      default:
+        return 'border-l-primary/30 hover:border-l-primary';
+    }
   };
 
   // Component for status updater
@@ -926,7 +941,10 @@ const SolicitarAgenda = () => {
                   {minhasAgendas.map(agenda => (
                     <Card 
                       key={agenda.id} 
-                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 border-l-primary/30 hover:border-l-primary bg-card/60 backdrop-blur"
+                      className={cn(
+                        "cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 bg-card/60 backdrop-blur",
+                        getStatusBorderClass(agenda.status)
+                      )}
                       onClick={() => setSelectedAgenda(agenda)}
                     >
                       <CardContent className="p-4">
@@ -990,7 +1008,10 @@ const SolicitarAgenda = () => {
                   {solicitacoes.map(agenda => (
                     <Card 
                       key={agenda.id}
-                      className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 border-l-orange-400/30 hover:border-l-orange-400 bg-card/60 backdrop-blur"
+                      className={cn(
+                        "cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 bg-card/60 backdrop-blur",
+                        getStatusBorderClass(agenda.status)
+                      )}
                       onClick={() => setSelectedAgenda(agenda)}
                     >
                       <CardContent className="p-4">
