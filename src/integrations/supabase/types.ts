@@ -821,6 +821,10 @@ export type Database = {
         Args: { agenda_id_param: string }
         Returns: undefined
       }
+      enviar_mensagens_aniversario: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       generate_protocolo: {
         Args: Record<PropertyKey, never>
         Returns: string
