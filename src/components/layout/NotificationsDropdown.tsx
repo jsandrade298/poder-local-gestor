@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Bell, BellDot, Check, User, MessageSquare, AlertCircle, Trash2 } from "lucide-react";
+import { Bell, BellDot, Check, User, MessageSquare, AlertCircle, Trash2, Calendar } from "lucide-react";
 import { formatDateTime } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -127,6 +127,12 @@ export function NotificationsDropdown() {
         return <MessageSquare className="h-4 w-4" />;
       case 'atribuicao':
         return <AlertCircle className="h-4 w-4" />;
+      case 'agenda_solicitada':
+      case 'agenda_acompanhante':
+      case 'agenda_status':
+        return <Calendar className="h-4 w-4" />;
+      case 'agenda_mensagem':
+        return <MessageSquare className="h-4 w-4" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -140,6 +146,14 @@ export function NotificationsDropdown() {
         return 'bg-green-500';
       case 'atribuicao':
         return 'bg-orange-500';
+      case 'agenda_solicitada':
+        return 'bg-purple-500';
+      case 'agenda_acompanhante':
+        return 'bg-indigo-500';
+      case 'agenda_status':
+        return 'bg-yellow-500';
+      case 'agenda_mensagem':
+        return 'bg-green-500';
       default:
         return 'bg-gray-500';
     }

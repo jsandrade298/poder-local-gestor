@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/dateUtils";
+import { useSearchParams } from "react-router-dom";
 
 const formSchema = z.object({
   validador_id: z.string().min(1, "Selecione um validador"),
@@ -58,6 +59,7 @@ const SolicitarAgenda = () => {
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -142,7 +144,7 @@ const SolicitarAgenda = () => {
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
         mensagem: `Nova agenda: ${data.descricao_objetivo}`,
-        url_destino: "/solicitar-agenda",
+        url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
       });
 
       // Notificar acompanhantes
@@ -153,7 +155,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_acompanhante",
           titulo: "Você foi adicionado em uma agenda",
           mensagem: `Agenda: ${data.descricao_objetivo}`,
-          url_destino: "/solicitar-agenda",
+          url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
         }));
 
         await supabase.from("notificacoes").insert(notifAcompanhantes);
@@ -330,6 +332,32 @@ const SolicitarAgenda = () => {
     enabled: !!user?.id && activeTab === "solicitacoes",
   });
 
+  // Detectar redirecionamento de notificação
+  useEffect(() => {
+    const agendaId = searchParams.get('agenda');
+    
+    if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
+      // Procurar a agenda tanto nas minhas quanto nas solicitações
+      const todasAgendas = [...(minhasAgendas || []), ...(solicitacoes || [])];
+      const agenda = todasAgendas.find(a => a.id === agendaId);
+      
+      if (agenda) {
+        setSelectedAgenda(agenda);
+        
+        // Definir a aba correta baseado no contexto
+        if (minhasAgendas?.some(a => a.id === agendaId)) {
+          setActiveTab("minhas");
+        } else if (solicitacoes?.some(a => a.id === agendaId)) {
+          setActiveTab("solicitacoes");
+        }
+        
+        // Limpar os parâmetros da URL após o redirecionamento
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [searchParams, minhasAgendas, solicitacoes]);
+
   // Buscar mensagens - CORRIGIDO
   const { data: mensagens } = useQuery({
     queryKey: ["agenda-mensagens", selectedAgenda?.id],
@@ -473,7 +501,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Sua agenda foi ${status}`,
-            url_destino: "/solicitar-agenda",
+            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
           });
         }
 
@@ -486,7 +514,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Agenda foi ${status}`,
-            url_destino: "/solicitar-agenda",
+            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
           }));
 
         if (notifs.length > 0) {
@@ -550,7 +578,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_mensagem",
           titulo: "Nova mensagem na agenda",
           mensagem: mensagem.substring(0, 100),
-          url_destino: "/solicitar-agenda",
+          url_destino: `/solicitar-agenda?agenda=${agendaId}`,
         }));
 
         if (notifs.length > 0) {
