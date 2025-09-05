@@ -480,24 +480,25 @@ const WhatsApp = () => {
                 <p className="text-muted-foreground">Nenhum aniversariante hoje</p>
               </div>
             ) : (
-              <ScrollArea className="h-64 border rounded-lg">
-                <div className="p-4 space-y-3">
+              <ScrollArea className="h-80 border rounded-lg">
+                <div className="p-3 space-y-2">
                   {aniversariantes.map((aniversariante) => (
                     <div
                       key={aniversariante.id}
-                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-center space-x-3 p-2.5 border rounded-md hover:bg-muted/50 transition-colors"
                     >
                       <Checkbox
                         checked={aniversariantesSelecionados.has(aniversariante.id)}
                         onCheckedChange={() => toggleAniversariante(aniversariante.id)}
+                        className="flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{aniversariante.nome}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {aniversariante.telefone} • Aniversário: {formatarData(aniversariante.data_nascimento)}
+                        <p className="text-sm font-medium truncate text-foreground">{aniversariante.nome}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {aniversariante.telefone} • {formatarData(aniversariante.data_nascimento)}
                         </p>
                       </div>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="flex-shrink-0 text-xs">
                         <Cake className="h-3 w-3 mr-1" />
                         Hoje
                       </Badge>
@@ -505,6 +506,12 @@ const WhatsApp = () => {
                   ))}
                 </div>
               </ScrollArea>
+            )}
+            
+            {aniversariantes.length > 0 && (
+              <div className="text-xs text-muted-foreground text-center py-1">
+                {aniversariantesSelecionados.size} de {aniversariantes.length} selecionados
+              </div>
             )}
           </div>
 
