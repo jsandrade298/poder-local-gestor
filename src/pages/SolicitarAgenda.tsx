@@ -601,6 +601,7 @@ const SolicitarAgenda = () => {
             <Button
               size="sm"
               variant="outline"
+              className="border-blue-500 text-blue-500 hover:bg-blue-50 hover:text-blue-600"
               onClick={() => {
                 onUpdateStatus('confirmado');
                 setIsEditing(false);
@@ -612,6 +613,7 @@ const SolicitarAgenda = () => {
             <Button
               size="sm"
               variant="outline"
+              className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
               onClick={() => {
                 onUpdateStatus('recusado');
                 setIsEditing(false);
@@ -623,6 +625,7 @@ const SolicitarAgenda = () => {
             <Button
               size="sm"
               variant="outline"
+              className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 hover:text-yellow-700"
               onClick={() => {
                 onUpdateStatus('remarcar');
                 setIsEditing(false);
