@@ -84,15 +84,24 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        // Para arquivos TXT, retorna o conteúdo diretamente
+        // Apenas arquivos TXT por enquanto - PDFs precisam de extração especializada
         if (file.type === 'text/plain') {
           resolve(text);
         } else {
-          // Para outros tipos, extrai texto básico (implementação simples)
-          resolve(text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').trim());
+          // Para outros tipos, vamos extrair metadados básicos
+          resolve(`[Documento: ${file.name} - Tipo: ${file.type} - Tamanho: ${file.size} bytes]`);
         }
       };
-      reader.readAsText(file);
+      reader.onerror = () => {
+        resolve(`[Erro ao ler arquivo: ${file.name}]`);
+      };
+      
+      if (file.type === 'text/plain') {
+        reader.readAsText(file);
+      } else {
+        // Para não-texto, apenas retornar metadados
+        resolve(`[Documento: ${file.name} - Tipo: ${file.type} - Tamanho: ${file.size} bytes]`);
+      }
     });
   };
 
@@ -121,9 +130,11 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
 
     for (const file of Array.from(arquivosPendentes)) {
       try {
-        // Validar tipo de arquivo
+        // Validar tipo de arquivo - temporariamente apenas TXT para extração completa
         const tiposPermitidos = ['application/pdf', 'application/msword', 
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+        
+        const tiposComExtracao = ['text/plain']; // Apenas TXT tem extração completa por enquanto
         
         if (!tiposPermitidos.includes(file.type)) {
           toast({
@@ -132,6 +143,14 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
             variant: "destructive",
           });
           continue;
+        }
+
+        // Avisar sobre limitação de extração para PDFs/DOCs
+        if (!tiposComExtracao.includes(file.type)) {
+          toast({
+            title: "Arquivo adicionado",
+            description: `${file.name} foi adicionado, mas apenas metadados serão extraídos. Para extração completa, use arquivos TXT.`,
+          });
         }
 
         // Upload do arquivo com nome sanitizado
@@ -303,7 +322,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                   {uploadProgress ? 'Enviando...' : 'Selecionar Arquivos'}
                 </Button>
                 <span className="text-sm text-muted-foreground self-center">
-                  PDF, DOC, DOCX, TXT
+                  PDF, DOC, DOCX, TXT (apenas TXT com extração completa)
                 </span>
               </div>
               <input
