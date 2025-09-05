@@ -61,6 +61,7 @@ const WhatsApp = () => {
   const [aniversariantesSelecionados, setAniversariantesSelecionados] = useState<Set<string>>(new Set());
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [enviandoTeste, setEnviandoTeste] = useState(false);
+  const [enviandoTesteDemanda, setEnviandoTesteDemanda] = useState(false);
   const [demandas, setDemandas] = useState<any[]>([]);
 
   useEffect(() => {
@@ -754,6 +755,7 @@ const WhatsApp = () => {
                     <Button 
                       variant="outline"
                       onClick={async () => {
+                        setEnviandoTesteDemanda(true);
                         try {
                           if (!demandaSelecionada) {
                             toast.error('Selecione uma demanda para teste');
@@ -783,13 +785,24 @@ const WhatsApp = () => {
                         } catch (error) {
                           console.error('Erro:', error);
                           toast.error('Erro ao enviar teste');
+                        } finally {
+                          setEnviandoTesteDemanda(false);
                         }
                       }}
-                      disabled={!config.instancia_demandas || !config.demandas_ativo || !demandaSelecionada}
+                      disabled={!config.instancia_demandas || !config.demandas_ativo || !demandaSelecionada || enviandoTesteDemanda}
                       className="gap-2 w-full"
                     >
-                      <Send className="h-4 w-4" />
-                      Testar Notificação
+                      {enviandoTesteDemanda ? (
+                        <>
+                          <Clock className="h-4 w-4 animate-spin" />
+                          Enviando Teste...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Testar Notificação
+                        </>
+                      )}
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       Envia mensagem de teste para a demanda selecionada
