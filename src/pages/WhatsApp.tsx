@@ -428,68 +428,6 @@ const WhatsApp = () => {
                 <Badge variant="secondary">{aniversariantes.length}</Badge>
               </div>
               {aniversariantes.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleTodosAniversariantes}
-                  className="gap-2"
-                >
-                  {aniversariantesSelecionados.size === aniversariantes.length ? (
-                    <CheckSquare className="h-4 w-4" />
-                  ) : (
-                    <Square className="h-4 w-4" />
-                  )}
-                  {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
-                </Button>
-              )}
-            </div>
-
-            {aniversariantes.length === 0 ? (
-              <div className="text-center py-8 bg-muted/50 rounded-lg">
-                <Cake className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Nenhum aniversariante hoje</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-64 border rounded-lg">
-                <div className="p-4 space-y-3">
-                  {aniversariantes.map((aniversariante) => (
-                    <div
-                      key={aniversariante.id}
-                      className="flex items-center space-x-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                    >
-                      <Checkbox
-                        checked={aniversariantesSelecionados.has(aniversariante.id)}
-                        onCheckedChange={() => toggleAniversariante(aniversariante.id)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{aniversariante.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {aniversariante.telefone} • {formatarData(aniversariante.data_nascimento)}
-                        </p>
-                      </div>
-                      <Cake className="h-4 w-4 text-primary" />
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-
-            <div className="text-sm text-muted-foreground">
-              {aniversariantesSelecionados.size} de {aniversariantes.length} selecionados
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Lista de Aniversariantes */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <span className="font-medium">Aniversariantes de Hoje</span>
-                <Badge variant="secondary">{aniversariantes.length}</Badge>
-              </div>
-              {aniversariantes.length > 0 && (
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
