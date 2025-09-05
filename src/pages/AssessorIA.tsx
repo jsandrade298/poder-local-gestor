@@ -44,6 +44,7 @@ const AssessorIA = () => {
   const [selectedModel, setSelectedModel] = useState<'gpt-5' | 'gpt-5-mini'>('gpt-5-mini');
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,6 +99,14 @@ const AssessorIA = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+    }
+  }, [inputMessage]);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -384,6 +393,7 @@ const AssessorIA = () => {
               {/* Barra de Input */}
               <div className="flex gap-2">
                 <Textarea
+                  ref={textareaRef}
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyDown={handleKeyPress}
