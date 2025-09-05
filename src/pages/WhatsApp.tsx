@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageCircle, Cake, Settings, Send, Clock, Users } from "lucide-react";
+import { MessageCircle, Cake, Settings, Send, Clock, Users, Paperclip, X, CheckSquare, Square } from "lucide-react";
 
 interface WhatsAppInstance {
   id: string;
@@ -19,10 +21,23 @@ interface WhatsAppInstance {
   status: string;
 }
 
+interface Aniversariante {
+  id: string;
+  nome: string;
+  telefone: string;
+  data_nascimento: string;
+}
+
 interface WhatsAppConfig {
   instancia_aniversario: string;
   mensagem_aniversario: string;
   aniversario_ativo: boolean;
+}
+
+interface MediaFile {
+  file: File;
+  preview: string;
+  type: 'image' | 'video' | 'audio' | 'document';
 }
 
 const WhatsApp = () => {
@@ -34,12 +49,15 @@ const WhatsApp = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [aniversariantesHoje, setAniversariantesHoje] = useState<number>(0);
+  const [aniversariantes, setAniversariantes] = useState<Aniversariante[]>([]);
+  const [aniversariantesSelecionados, setAniversariantesSelecionados] = useState<Set<string>>(new Set());
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [enviandoTeste, setEnviandoTeste] = useState(false);
 
   useEffect(() => {
     fetchInstances();
     fetchConfig();
-    fetchAniversariantesHoje();
+    fetchAniversariantes();
   }, []);
 
   const fetchInstances = async () => {
@@ -85,21 +103,32 @@ const WhatsApp = () => {
     }
   };
 
-  const fetchAniversariantesHoje = async () => {
+  const fetchAniversariantes = async () => {
     try {
       const hoje = new Date();
       const mes = hoje.getMonth() + 1;
       const dia = hoje.getDate();
 
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('municipes')
-        .select('*', { count: 'exact', head: true })
+        .select('id, nome, telefone, data_nascimento')
         .not('data_nascimento', 'is', null)
-        .gte('data_nascimento', `1900-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`)
-        .lt('data_nascimento', `2100-${mes.toString().padStart(2, '0')}-${(dia + 1).toString().padStart(2, '0')}`);
+        .not('telefone', 'is', null);
 
       if (error) throw error;
-      setAniversariantesHoje(count || 0);
+
+      // Filtrar aniversariantes do dia
+      const aniversariantesHoje = (data || []).filter(municipe => {
+        if (!municipe.data_nascimento) return false;
+        const dataNascimento = new Date(municipe.data_nascimento);
+        return dataNascimento.getMonth() + 1 === mes && dataNascimento.getDate() === dia;
+      });
+
+      setAniversariantes(aniversariantesHoje);
+      
+      // Selecionar todos por padrão
+      const todosIds = new Set(aniversariantesHoje.map(a => a.id));
+      setAniversariantesSelecionados(todosIds);
     } catch (error) {
       console.error('Erro ao buscar aniversariantes:', error);
     }
@@ -135,22 +164,119 @@ const WhatsApp = () => {
     }
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const preview = e.target?.result as string;
+        let type: 'image' | 'video' | 'audio' | 'document' = 'document';
+        
+        if (file.type.startsWith('image/')) type = 'image';
+        else if (file.type.startsWith('video/')) type = 'video';
+        else if (file.type.startsWith('audio/')) type = 'audio';
+        
+        setMediaFiles(prev => [...prev, { file, preview, type }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeMediaFile = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleAniversariante = (id: string) => {
+    setAniversariantesSelecionados(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleTodosAniversariantes = () => {
+    if (aniversariantesSelecionados.size === aniversariantes.length) {
+      setAniversariantesSelecionados(new Set());
+    } else {
+      setAniversariantesSelecionados(new Set(aniversariantes.map(a => a.id)));
+    }
+  };
+
+  const formatarData = (dataString: string) => {
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR');
+  };
+
   const enviarMensagemTeste = async () => {
     if (!config.instancia_aniversario) {
       toast.error('Selecione uma instância primeiro');
       return;
     }
 
+    if (aniversariantesSelecionados.size === 0) {
+      toast.error('Selecione pelo menos um aniversariante');
+      return;
+    }
+
+    setEnviandoTeste(true);
     try {
-      const { data, error } = await supabase.functions.invoke('enviar-whatsapp-aniversario', {
-        body: { teste: true }
+      // Preparar arquivos de mídia se houver
+      const mediaData = await Promise.all(
+        mediaFiles.map(async (mediaFile) => {
+          const arrayBuffer = await mediaFile.file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const base64 = btoa(String.fromCharCode(...uint8Array));
+          
+          return {
+            filename: mediaFile.file.name,
+            mimetype: mediaFile.file.type,
+            data: base64
+          };
+        })
+      );
+
+      // Filtrar aniversariantes selecionados
+      const aniversariantesFiltrados = aniversariantes.filter(a => 
+        aniversariantesSelecionados.has(a.id)
+      );
+
+      const telefones = aniversariantesFiltrados.map(a => ({
+        id: a.id,
+        nome: a.nome,
+        telefone: a.telefone
+      }));
+
+      // Preparar mensagens personalizadas
+      const customMessages: Record<string, string> = {};
+      telefones.forEach(telefone => {
+        const mensagemPersonalizada = config.mensagem_aniversario.replace('{nome}', telefone.nome);
+        customMessages[telefone.telefone] = `[TESTE] ${mensagemPersonalizada}`;
+      });
+
+      const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
+        body: {
+          telefones,
+          mensagem: 'Será personalizada',
+          instanceName: config.instancia_aniversario,
+          tempoMinimo: 2,
+          tempoMaximo: 4,
+          mediaFiles: mediaData,
+          customMessages
+        }
       });
 
       if (error) throw error;
-      toast.success('Mensagem de teste enviada com sucesso!');
+      toast.success(`Mensagem de teste enviada para ${aniversariantesSelecionados.size} aniversariantes!`);
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
       toast.error('Erro ao enviar mensagem de teste');
+    } finally {
+      setEnviandoTeste(false);
     }
   };
 
@@ -229,16 +355,64 @@ const WhatsApp = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Status dos Aniversariantes de Hoje */}
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-5 w-5 text-primary" />
-              <span className="font-medium">Aniversariantes de Hoje</span>
+          {/* Lista de Aniversariantes */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <span className="font-medium">Aniversariantes de Hoje</span>
+                <Badge variant="secondary">{aniversariantes.length}</Badge>
+              </div>
+              {aniversariantes.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleTodosAniversariantes}
+                  className="gap-2"
+                >
+                  {aniversariantesSelecionados.size === aniversariantes.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                </Button>
+              )}
             </div>
-            <p className="text-2xl font-bold text-primary">{aniversariantesHoje}</p>
-            <p className="text-sm text-muted-foreground">
-              {aniversariantesHoje === 1 ? 'pessoa faz' : 'pessoas fazem'} aniversário hoje
-            </p>
+
+            {aniversariantes.length === 0 ? (
+              <div className="text-center py-8 bg-muted/50 rounded-lg">
+                <Cake className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum aniversariante hoje</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-64 border rounded-lg">
+                <div className="p-4 space-y-3">
+                  {aniversariantes.map((aniversariante) => (
+                    <div
+                      key={aniversariante.id}
+                      className="flex items-center space-x-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <Checkbox
+                        checked={aniversariantesSelecionados.has(aniversariante.id)}
+                        onCheckedChange={() => toggleAniversariante(aniversariante.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{aniversariante.nome}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {aniversariante.telefone} • {formatarData(aniversariante.data_nascimento)}
+                        </p>
+                      </div>
+                      <Cake className="h-4 w-4 text-primary" />
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            <div className="text-sm text-muted-foreground">
+              {aniversariantesSelecionados.size} de {aniversariantes.length} selecionados
+            </div>
           </div>
 
           <Separator />
@@ -308,6 +482,60 @@ const WhatsApp = () => {
             </div>
           </div>
 
+          {/* Upload de Mídias */}
+          <div className="space-y-2">
+            <Label>Mídias (Opcional)</Label>
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+              <div className="text-center">
+                <Paperclip className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Anexe imagens, vídeos, áudios ou documentos
+                  </p>
+                  <Input
+                    type="file"
+                    multiple
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                    className="cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Preview das mídias */}
+            {mediaFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label>Mídias Selecionadas</Label>
+                <ScrollArea className="h-32">
+                  <div className="grid grid-cols-2 gap-2">
+                    {mediaFiles.map((media, index) => (
+                      <div key={index} className="relative group border rounded-lg p-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                            {media.type === 'image' && '🖼️'}
+                            {media.type === 'video' && '🎥'}
+                            {media.type === 'audio' && '🎵'}
+                            {media.type === 'document' && '📄'}
+                          </div>
+                          <span className="truncate flex-1">{media.file.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeMediaFile(index)}
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
+
           {/* Botões de Ação */}
           <div className="flex gap-2 pt-4">
             <Button onClick={saveConfig} disabled={saving}>
@@ -316,10 +544,10 @@ const WhatsApp = () => {
             <Button 
               variant="outline" 
               onClick={enviarMensagemTeste}
-              disabled={!config.instancia_aniversario || aniversariantesHoje === 0}
+              disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
             >
               <Send className="h-4 w-4 mr-2" />
-              Enviar Teste
+              {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
             </Button>
           </div>
 
