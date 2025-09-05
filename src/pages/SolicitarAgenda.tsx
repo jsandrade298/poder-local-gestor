@@ -58,10 +58,10 @@ const SolicitarAgenda = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("solicitar");
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
+  const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
-  const [urlProcessed, setUrlProcessed] = useState(false);
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -336,26 +336,19 @@ const SolicitarAgenda = () => {
     enabled: !!user?.id && activeTab === "solicitacoes",
   });
 
-  // Resetar flag quando URL muda (nova navegação)
+  // Detectar redirecionamento de notificação - REFATORADO como demandas
   useEffect(() => {
-    const agendaId = searchParams.get('agenda');
-    if (!agendaId) {
-      setUrlProcessed(false);
-    }
-  }, [searchParams]);
-
-  // Detectar redirecionamento de notificação - CORRIGIDO para evitar loop
-  useEffect(() => {
+    // Processar redirecionamento de notificação
     const agendaId = searchParams.get('agenda');
     
-    // Só processar se há um agendaId na URL, não foi processado ainda, e há dados carregados
-    if (agendaId && !urlProcessed && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
+    if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Procurar a agenda tanto nas minhas quanto nas solicitações
       const todasAgendas = [...(minhasAgendas || []), ...(solicitacoes || [])];
       const agenda = todasAgendas.find(a => a.id === agendaId);
       
       if (agenda) {
         setSelectedAgenda(agenda);
+        setIsAgendaModalOpen(true);
         
         // Definir a aba correta baseado no contexto
         if (minhasAgendas?.some(a => a.id === agendaId)) {
@@ -364,13 +357,12 @@ const SolicitarAgenda = () => {
           setActiveTab("solicitacoes");
         }
         
-        // Marcar como processado e limpar URL
-        setUrlProcessed(true);
+        // Limpar os parâmetros da URL após o redirecionamento
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       }
     }
-  }, [searchParams, minhasAgendas, solicitacoes, urlProcessed]);
+  }, [searchParams, minhasAgendas, solicitacoes]);
 
   // Buscar mensagens - CORRIGIDO
   const { data: mensagens } = useQuery({
@@ -1077,7 +1069,10 @@ const SolicitarAgenda = () => {
                         "cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 bg-card/60 backdrop-blur",
                         getStatusBorderClass(agenda.status)
                       )}
-                      onClick={() => setSelectedAgenda(agenda)}
+                      onClick={() => {
+                        setSelectedAgenda(agenda);
+                        setIsAgendaModalOpen(true);
+                      }}
                     >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start gap-4">
@@ -1149,7 +1144,10 @@ const SolicitarAgenda = () => {
                          <div className="flex justify-between items-start gap-4">
                            <div 
                              className="flex-1 space-y-2 cursor-pointer"
-                             onClick={() => setSelectedAgenda(agenda)}
+                              onClick={() => {
+                                setSelectedAgenda(agenda);
+                                setIsAgendaModalOpen(true);
+                              }}
                            >
                              <h3 className="font-semibold text-base line-clamp-2 leading-tight">{agenda.titulo || agenda.descricao_objetivo}</h3>
                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -1224,7 +1222,10 @@ const SolicitarAgenda = () => {
       </Tabs>
 
         {/* Modal de Agenda com Tabs */}
-        <Dialog open={!!selectedAgenda} onOpenChange={() => setSelectedAgenda(null)}>
+        <Dialog open={isAgendaModalOpen} onOpenChange={(open) => {
+          setIsAgendaModalOpen(open);
+          if (!open) setSelectedAgenda(null);
+        }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
