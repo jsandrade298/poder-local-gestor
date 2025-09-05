@@ -926,10 +926,13 @@ export default function Demandas() {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => handleDeleteDemanda(demanda.id)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                >
+                                 <AlertDialogAction 
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     handleDeleteDemanda(demanda.id);
+                                   }}
+                                   className="bg-destructive hover:bg-destructive/90"
+                                 >
                                   Excluir
                                 </AlertDialogAction>
                               </AlertDialogFooter>

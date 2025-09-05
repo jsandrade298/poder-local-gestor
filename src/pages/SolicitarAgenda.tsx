@@ -1128,7 +1128,10 @@ const SolicitarAgenda = () => {
                                    <AlertDialogFooter>
                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                      <AlertDialogAction 
-                                       onClick={() => excluirAgendaMutation.mutate(agenda.id)}
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         excluirAgendaMutation.mutate(agenda.id);
+                                       }}
                                        className="bg-destructive hover:bg-destructive/90"
                                      >
                                        Excluir
