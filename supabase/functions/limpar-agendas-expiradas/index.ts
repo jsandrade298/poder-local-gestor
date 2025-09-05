@@ -19,13 +19,13 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Buscar agendas confirmadas que já passaram 10 minutos da data/hora proposta
+    // Buscar agendas confirmadas que já passaram 5 minutos da data/hora proposta
     const agora = new Date();
     const { data: agendasExpiradas, error: selectError } = await supabase
       .from('agendas')
       .select('id, descricao_objetivo, data_hora_proposta, status')
       .eq('status', 'confirmado')
-      .lt('data_hora_proposta', new Date(agora.getTime() - 10 * 60 * 1000).toISOString());
+      .lt('data_hora_proposta', new Date(agora.getTime() - 5 * 60 * 1000).toISOString());
 
     if (selectError) {
       console.error('❌ Erro ao buscar agendas expiradas:', selectError);
@@ -89,12 +89,12 @@ Deno.serve(async (req) => {
       throw deleteError;
     }
 
-    console.log(`✅ ${agendasExpiradas.length} agendas confirmadas expiradas (>10min após horário) foram excluídas com sucesso`);
+    console.log(`✅ ${agendasExpiradas.length} agendas confirmadas expiradas (>5min após horário) foram excluídas com sucesso`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `${agendasExpiradas.length} agendas confirmadas expiradas (>10min após horário) foram excluídas`,
+        message: `${agendasExpiradas.length} agendas confirmadas expiradas (>5min após horário) foram excluídas`,
         deletedCount: agendasExpiradas.length,
         deletedAgendas: agendasExpiradas.map(a => ({
           id: a.id,
