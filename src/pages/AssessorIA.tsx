@@ -104,6 +104,11 @@ const AssessorIA = () => {
         throw new Error(data.error);
       }
 
+      if (!data?.message) {
+        console.error('Resposta da API sem mensagem:', data);
+        throw new Error('Resposta inválida da IA');
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

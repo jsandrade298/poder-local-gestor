@@ -391,18 +391,19 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
             </CardContent>
           </Card>
 
-          {/* Botões de Ação */}
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleConfirmarSelecao}
-              disabled={documentosSelecionados.length === 0}
-            >
-              Usar {documentosSelecionados.length} Documento(s) no Contexto
-            </Button>
-          </div>
+        </div>
+
+        {/* Botões de Ação */}
+        <div className="flex justify-between pt-4 border-t">
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleConfirmarSelecao}
+            disabled={documentosSelecionados.length === 0}
+          >
+            Usar {documentosSelecionados.length} Documento(s) no Contexto
+          </Button>
         </div>
       </DialogContent>
 
