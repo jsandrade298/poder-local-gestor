@@ -389,8 +389,8 @@ const AssessorIA = () => {
                   onKeyDown={handleKeyPress}
                   placeholder="Ex: Gerar requerimento de informação sobre obras públicas..."
                   disabled={isLoading}
-                  className="flex-1 min-h-[60px] max-h-[200px]"
-                  rows={3}
+                  className="flex-1 min-h-[80px] max-h-[300px] resize-none"
+                  rows={4}
                 />
                 <Button 
                   onClick={sendMessage} 
