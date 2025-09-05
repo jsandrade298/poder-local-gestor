@@ -88,7 +88,14 @@ const WhatsApp = () => {
       const { data, error } = await supabase
         .from('configuracoes')
         .select('chave, valor')
-        .in('chave', ['whatsapp_instancia_aniversario', 'whatsapp_mensagem_aniversario', 'whatsapp_aniversario_ativo']);
+        .in('chave', [
+          'whatsapp_instancia_aniversario', 
+          'whatsapp_mensagem_aniversario', 
+          'whatsapp_aniversario_ativo',
+          'whatsapp_instancia_demandas',
+          'whatsapp_mensagem_demandas',
+          'whatsapp_demandas_ativo'
+        ]);
 
       if (error) throw error;
 
@@ -673,6 +680,58 @@ const WhatsApp = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Botão de Teste de Demanda */}
+              <div className="pt-4">
+                <Button 
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      // Buscar uma demanda de teste
+                      const { data: demanda } = await supabase
+                        .from('demandas')
+                        .select(`
+                          *,
+                          municipes (nome, telefone)
+                        `)
+                        .not('municipes.telefone', 'is', null)
+                        .limit(1)
+                        .single();
+
+                      if (!demanda) {
+                        toast.error('Nenhuma demanda com telefone encontrada');
+                        return;
+                      }
+
+                      const municipeData = demanda.municipes as any;
+
+                      await supabase.functions.invoke('whatsapp-notificar-demanda', {
+                        body: {
+                          demanda_id: demanda.id,
+                          municipe_nome: municipeData.nome,
+                          municipe_telefone: municipeData.telefone,
+                          status: 'Em Andamento (TESTE)',
+                          titulo_demanda: demanda.titulo,
+                          protocolo: demanda.protocolo
+                        }
+                      });
+
+                      toast.success('Notificação de teste enviada!');
+                    } catch (error) {
+                      console.error('Erro:', error);
+                      toast.error('Erro ao enviar teste');
+                    }
+                  }}
+                  disabled={!config.instancia_demandas || !config.demandas_ativo}
+                  className="gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  Testar Notificação
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Envia uma mensagem de teste para uma demanda existente
+                </p>
               </div>
 
               {config.demandas_ativo && (

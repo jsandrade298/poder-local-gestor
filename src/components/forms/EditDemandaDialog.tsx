@@ -163,9 +163,30 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'aberta': return 'Aberta';
+      case 'em_andamento': return 'Em Andamento';
+      case 'resolvida': return 'Resolvida';
+      case 'cancelada': return 'Cancelada';
+      case 'aguardando': return 'Aguardando';
+      default: return status;
+    }
+  };
+
   const updateDemanda = useMutation({
     mutationFn: async (data: typeof formData) => {
-      // Filtrar campos vazios e converter para null quando necessário
+      // Buscar status anterior
+      const { data: demandaAnterior } = await supabase
+        .from('demandas')
+        .select('status, municipes(nome, telefone)')
+        .eq('id', demanda.id)
+        .single();
+
+      const statusAnterior = demandaAnterior?.status;
+      const municipeData = demandaAnterior?.municipes as any;
+
+      // Atualizar demanda
       const cleanData = {
         ...data,
         area_id: data.area_id || null,
@@ -186,6 +207,25 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         .eq('id', demanda.id);
 
       if (error) throw error;
+
+      // Notificar se status mudou
+      if (statusAnterior !== data.status && municipeData?.telefone) {
+        try {
+          await supabase.functions.invoke('whatsapp-notificar-demanda', {
+            body: {
+              demanda_id: demanda.id,
+              municipe_nome: municipeData.nome,
+              municipe_telefone: municipeData.telefone,
+              status: getStatusLabel(data.status),
+              status_anterior: getStatusLabel(statusAnterior),
+              titulo_demanda: data.titulo,
+              protocolo: demanda.protocolo
+            }
+          });
+        } catch (notifError) {
+          console.error('Erro ao enviar notificação:', notifError);
+        }
+      }
 
       if (files.length > 0) {
         await uploadFiles(demanda.id);

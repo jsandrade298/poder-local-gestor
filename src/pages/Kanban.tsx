@@ -120,15 +120,61 @@ export default function Kanban() {
     }
   });
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'aberta': return 'Aberta';
+      case 'em_andamento': return 'Em Andamento';
+      case 'resolvida': return 'Resolvida';
+      case 'cancelada': return 'Cancelada';
+      case 'aguardando': return 'Aguardando';
+      default: return status;
+    }
+  };
+
   // Mutation para atualizar status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ demandaId, newStatus }: { demandaId: string; newStatus: string }) => {
+      // Primeiro buscar dados da demanda para notificação
+      const { data: demanda, error: fetchError } = await supabase
+        .from('demandas')
+        .select(`
+          *,
+          municipes (nome, telefone)
+        `)
+        .eq('id', demandaId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const oldStatus = demanda.status;
+
+      // Atualizar status
       const { error } = await supabase
         .from('demandas')
         .update({ status: newStatus })
         .eq('id', demandaId);
       
       if (error) throw error;
+
+      // Enviar notificação se tiver telefone
+      if (demanda.municipes?.telefone && oldStatus !== newStatus) {
+        try {
+          await supabase.functions.invoke('whatsapp-notificar-demanda', {
+            body: {
+              demanda_id: demandaId,
+              municipe_nome: demanda.municipes.nome,
+              municipe_telefone: demanda.municipes.telefone,
+              status: getStatusLabel(newStatus),
+              status_anterior: getStatusLabel(oldStatus),
+              titulo_demanda: demanda.titulo,
+              protocolo: demanda.protocolo
+            }
+          });
+        } catch (notifError) {
+          console.error('Erro ao enviar notificação:', notifError);
+          // Não falhar a operação se a notificação falhar
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
