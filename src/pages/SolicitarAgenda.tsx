@@ -571,8 +571,13 @@ const SolicitarAgenda = () => {
       remarcar: "outline",
     } as const;
 
+    const customClass = status === "remarcar" ? "border-yellow-500 text-yellow-600" : "";
+
     return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
+      <Badge 
+        variant={variants[status as keyof typeof variants] || "secondary"}
+        className={customClass}
+      >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
