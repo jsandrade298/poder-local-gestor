@@ -424,7 +424,7 @@ const WhatsApp = () => {
             <div className="space-y-1">
               <Label className="text-base font-medium">Sistema Automático</Label>
               <p className="text-sm text-muted-foreground">
-                Ativar envio automático de mensagens de aniversário às 9:00h diariamente
+                Ativar envio automático de mensagens de aniversário às 10:00h diariamente
               </p>
             </div>
             <Switch
@@ -622,7 +622,7 @@ const WhatsApp = () => {
                   <span className="font-medium">Sistema Automático Ativado</span>
                 </div>
                 <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                  Mensagens enviadas automaticamente todos os dias às 9:00h (UTC)
+                  Mensagens enviadas automaticamente todos os dias às 10:00h
                 </p>
               </div>
             ) : (
@@ -632,7 +632,7 @@ const WhatsApp = () => {
                   <span className="font-medium">Sistema Automático Desativado</span>
                 </div>
                 <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                  Ative o sistema para enviar mensagens automaticamente todos os dias às 9:00h
+                  Ative o sistema para enviar mensagens automaticamente todos os dias às 10:00h
                 </p>
               </div>
             )}
