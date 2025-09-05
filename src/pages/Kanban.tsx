@@ -8,7 +8,7 @@ import { Plus, Calendar, MapPin, User, AlertTriangle } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
-import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 
 interface Demanda {
@@ -26,15 +26,15 @@ interface Demanda {
 }
 
 const statusColumns = [
-  { id: 'aberta', title: 'Abertas', color: 'hsl(var(--chart-1))' },
-  { id: 'em_andamento', title: 'Em Andamento', color: 'hsl(var(--chart-2))' },
-  { id: 'aguardando', title: 'Aguardando', color: 'hsl(var(--chart-3))' },
-  { id: 'resolvida', title: 'Resolvidas', color: 'hsl(var(--chart-4))' },
+  { id: 'a_fazer', title: 'A Fazer', color: 'hsl(var(--chart-1))' },
+  { id: 'em_progresso', title: 'Em Progresso', color: 'hsl(var(--chart-2))' },
+  { id: 'feito', title: 'Feito', color: 'hsl(var(--chart-4))' },
 ];
 
 export default function Kanban() {
   const [selectedDemanda, setSelectedDemanda] = useState<Demanda | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: demandas = [], isLoading } = useQuery({
@@ -47,7 +47,7 @@ export default function Kanban() {
           areas(nome),
           municipes(nome)
         `)
-        .neq('status', 'cancelada')
+        .in('status', ['a_fazer', 'em_progresso', 'feito'])
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -149,16 +149,19 @@ export default function Kanban() {
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Kanban de Demandas</h1>
+            <h1 className="text-3xl font-bold text-foreground">Kanban de Produção Legislativa</h1>
             <p className="text-muted-foreground mt-1">
-              Gerencie o fluxo das demandas por status
+              Gerencie o fluxo das demandas na produção legislativa
             </p>
           </div>
-          <NovaDemandaDialog />
+          <Button onClick={() => setIsAdicionarDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar
+          </Button>
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {statusColumns.map((column) => {
               const columnDemandas = getDemandsByStatus(column.id);
               
@@ -292,6 +295,11 @@ export default function Kanban() {
             onOpenChange={setIsEditDialogOpen}
           />
         )}
+
+        <AdicionarDemandasKanbanDialog
+          open={isAdicionarDialogOpen}
+          onOpenChange={setIsAdicionarDialogOpen}
+        />
       </div>
     </div>
   );
