@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -33,7 +33,10 @@ interface DocumentoModelo {
   created_at: string;
 }
 
+import { useLocation } from "react-router-dom";
+
 const AssessorIA = () => {
+  const location = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +66,44 @@ const AssessorIA = () => {
       ]);
     }
   }, []);
+
+  // Processar dados vindos de demanda
+  useEffect(() => {
+    const promptData = location.state?.promptData;
+    if (promptData) {
+      // Construir prompt estruturado baseado nos dados da demanda
+      let prompt = `Com base na demanda a seguir, elabore um requerimento de informação:\n\n`;
+      
+      prompt += `**DADOS DA DEMANDA:**\n`;
+      prompt += `• Protocolo: ${promptData.protocolo}\n`;
+      prompt += `• Título: ${promptData.titulo}\n`;
+      prompt += `• Descrição: ${promptData.descricao}\n`;
+      
+      if (promptData.endereco) {
+        prompt += `• Endereço: ${promptData.endereco}\n`;
+      }
+      
+      if (promptData.area) {
+        prompt += `• Área: ${promptData.area}\n`;
+      }
+      
+      if (promptData.municipe) {
+        prompt += `• Munícipe solicitante: ${promptData.municipe}\n`;
+      }
+      
+      if (promptData.observacoes) {
+        prompt += `• Observações: ${promptData.observacoes}\n`;
+      }
+      
+      prompt += `\nPor favor, redija um requerimento de informação oficial baseado nestes dados, seguindo os modelos de documentos disponíveis na biblioteca.`;
+      
+      // Pré-preencher o campo de input
+      setInputMessage(prompt);
+      
+      // Limpar os dados do location.state para evitar repetição
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -348,13 +389,14 @@ const AssessorIA = () => {
               
               {/* Barra de Input */}
               <div className="flex gap-2">
-                <Input
+                <Textarea
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   placeholder="Ex: Gerar requerimento de informação sobre obras públicas..."
                   disabled={isLoading}
-                  className="flex-1"
+                  className="flex-1 min-h-[60px] max-h-[200px]"
+                  rows={3}
                 />
                 <Button 
                   onClick={sendMessage} 

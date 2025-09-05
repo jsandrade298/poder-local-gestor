@@ -3,11 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit } from "lucide-react";
+import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot } from "lucide-react";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DemandaAtividadesTab } from "./DemandaAtividadesTab";
+import { useNavigate } from "react-router-dom";
 
 interface ViewDemandaDialogProps {
   demanda: any;
@@ -17,6 +18,7 @@ interface ViewDemandaDialogProps {
 }
 
 export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewDemandaDialogProps) {
+  const navigate = useNavigate();
   const { data: responsaveis = [] } = useQuery({
     queryKey: ['responsaveis'],
     queryFn: async () => {
@@ -124,6 +126,31 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     }
   };
 
+  const openAssessorIA = () => {
+    // Construir endereço completo
+    const enderecoCompleto = [
+      demanda.logradouro && `${demanda.logradouro}${demanda.numero ? `, ${demanda.numero}` : ''}`,
+      demanda.bairro,
+      demanda.cidade && `${demanda.cidade}${demanda.cep ? ` - ${demanda.cep}` : ''}`,
+      demanda.complemento
+    ].filter(Boolean).join(', ');
+
+    // Construir prompt pré-estruturado
+    const promptData = {
+      titulo: demanda.titulo,
+      descricao: demanda.descricao,
+      endereco: enderecoCompleto,
+      area: demanda.areas?.nome,
+      municipe: demanda.municipes?.nome,
+      protocolo: demanda.protocolo,
+      observacoes: demanda.observacoes
+    };
+
+    // Navegar para o Assessor IA com os dados
+    navigate('/assessor-ia', { state: { promptData } });
+    onOpenChange(false); // Fechar modal
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -168,17 +195,27 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       )}
                     </div>
                   </div>
-                  {onEdit && (
+                  <div className="flex items-center gap-2 ml-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onEdit(demanda)}
-                      className="ml-4"
+                      onClick={openAssessorIA}
+                      className="bg-primary/10 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                     >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
+                      <Bot className="h-4 w-4 mr-2" />
+                      Assessor IA
                     </Button>
-                  )}
+                    {onEdit && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEdit(demanda)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
