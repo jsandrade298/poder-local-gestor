@@ -494,10 +494,19 @@ const SolicitarAgenda = () => {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
+      // Atualizar o selectedAgenda imediatamente para refletir no modal
+      if (selectedAgenda) {
+        setSelectedAgenda({ 
+          ...selectedAgenda, 
+          status: status as any 
+        });
+      }
+      
       toast({ title: "Status atualizado!" });
       queryClient.invalidateQueries({ queryKey: ["minhas-agendas"] });
       queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
+      queryClient.invalidateQueries({ queryKey: ["agenda-detalhada"] });
     },
     onError: (error) => {
       console.error(error);
