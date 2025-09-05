@@ -31,6 +31,11 @@ export function OverdueList({ title, demandas }: OverdueListProps) {
     navigate('/demandas?atraso=overdue');
   };
 
+  const handleSpecificDemandaClick = (demandaId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    navigate(`/demandas?id=${demandaId}`);
+  };
+
   return (
     <Card 
       className="backdrop-blur-sm bg-card/95 border-destructive/20 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
@@ -57,7 +62,8 @@ export function OverdueList({ title, demandas }: OverdueListProps) {
             {demandas.slice(0, 3).map((demanda) => (
               <div
                 key={demanda.id}
-                className="p-3 rounded-lg bg-muted/50 border border-destructive/10 hover:bg-muted/70 transition-colors"
+                className="p-3 rounded-lg bg-muted/50 border border-destructive/10 hover:bg-muted/70 transition-colors cursor-pointer"
+                onClick={(e) => handleSpecificDemandaClick(demanda.id, e)}
               >
                 <div className="space-y-1">
                   <div className="flex items-start justify-between gap-2">
