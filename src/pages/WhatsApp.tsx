@@ -328,7 +328,7 @@ const WhatsApp = () => {
         }
       });
 
-      console.log('Resposta da edge function:', { data, error });
+      console.log('Resposta da edge function:', JSON.stringify({ data, error }, null, 2));
 
       if (error) throw error;
       if (data && !data.success) throw new Error(data.error || 'Erro na função');
