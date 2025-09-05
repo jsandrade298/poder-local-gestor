@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2 } from "lucide-react";
+import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -79,14 +79,29 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const { data: instances, isLoading: loadingInstances, refetch: refetchInstances } = useQuery({
     queryKey: ["whatsapp-instances-status"],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("configurar-evolution", {
-        body: { action: "list_instances" }
-      });
+      const specificInstances = ["gabinete-whats-1", "gabinete-whats-2", "gabinete-whats-3"];
+      const connectedInstances = [];
 
-      if (error) throw error;
-      
-      // Filtrar apenas instâncias conectadas
-      return (data?.instances || []).filter(inst => inst.status === 'connected');
+      for (const instanceName of specificInstances) {
+        try {
+          const { data, error } = await supabase.functions.invoke("configurar-evolution", {
+            body: { action: "instance_status", instanceName }
+          });
+
+          if (!error && data?.status === 'connected') {
+            connectedInstances.push({
+              instanceName,
+              displayName: instanceName.replace('gabinete-whats-', 'Gabinete WhatsApp '),
+              status: 'connected',
+              number: data.phoneNumber
+            });
+          }
+        } catch (error) {
+          console.error(`Erro ao verificar instância ${instanceName}:`, error);
+        }
+      }
+
+      return connectedInstances;
     },
     enabled: open,
     refetchInterval: 10000, // Atualiza a cada 10 segundos
@@ -444,9 +459,11 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
               variant="ghost"
               size="sm"
               onClick={() => refetchInstances()}
-              className="mt-1"
+              className="mt-1 gap-2"
+              disabled={loadingInstances}
             >
-              Atualizar instâncias
+              <RefreshCw className={`h-4 w-4 ${loadingInstances ? 'animate-spin' : ''}`} />
+              {loadingInstances ? 'Verificando...' : 'Atualizar Conexões'}
             </Button>
           </div>
 
