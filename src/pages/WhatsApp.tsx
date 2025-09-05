@@ -326,46 +326,6 @@ const WhatsApp = () => {
     }
   };
 
-  // Nova função para testar o sistema automático de aniversários
-  const testarSistemaAutomatico = async () => {
-    if (!config.instancia_aniversario) {
-      toast.error('Configure uma instância primeiro');
-      return;
-    }
-
-    setEnviandoTeste(true);
-    try {
-      console.log('Testando sistema automático de aniversários...');
-      
-      const { data, error } = await supabase.functions.invoke('enviar-whatsapp-aniversario', {
-        body: { teste: true }
-      });
-
-      if (error) {
-        console.error('Erro na edge function:', error);
-        throw error;
-      }
-
-      console.log('Resposta do sistema automático:', data);
-      
-      if (data.success) {
-        toast.success(`✅ Sistema testado! ${data.message} (${data.count || 0} mensagens)`);
-        
-        if (data.aniversariantes && data.aniversariantes.length > 0) {
-          console.log('Aniversariantes processados:', data.aniversariantes);
-        }
-      } else {
-        toast.error(`❌ Erro no teste: ${data.error || 'Erro desconhecido'}`);
-      }
-      
-    } catch (error) {
-      console.error('Erro ao testar sistema automático:', error);
-      toast.error('Erro ao testar sistema automático de aniversários');
-    } finally {
-      setEnviandoTeste(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -521,21 +481,66 @@ const WhatsApp = () => {
 
           <Separator />
 
-          {/* Switch para Ativar/Desativar */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label className="text-base font-medium">Mensagens Automáticas</Label>
-              <p className="text-sm text-muted-foreground">
-                Enviar mensagens de aniversário automaticamente todos os dias
-              </p>
+          {/* Lista de Aniversariantes */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <span className="font-medium">Aniversariantes de Hoje</span>
+                <Badge variant="secondary">{aniversariantes.length}</Badge>
+              </div>
+              {aniversariantes.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleTodosAniversariantes}
+                  className="gap-2"
+                >
+                  {aniversariantesSelecionados.size === aniversariantes.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                </Button>
+              )}
             </div>
-            <Switch
-              checked={config.aniversario_ativo}
-              onCheckedChange={(checked) =>
-                setConfig(prev => ({ ...prev, aniversario_ativo: checked }))
-              }
-            />
+
+            {aniversariantes.length === 0 ? (
+              <div className="text-center py-8 bg-muted/50 rounded-lg">
+                <Cake className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum aniversariante hoje</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-64 border rounded-lg">
+                <div className="p-4 space-y-3">
+                  {aniversariantes.map((aniversariante) => (
+                    <div
+                      key={aniversariante.id}
+                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <Checkbox
+                        checked={aniversariantesSelecionados.has(aniversariante.id)}
+                        onCheckedChange={() => toggleAniversariante(aniversariante.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{aniversariante.nome}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {aniversariante.telefone} • Aniversário: {formatarData(aniversariante.data_nascimento)}
+                        </p>
+                      </div>
+                      <Badge variant="outline">
+                        <Cake className="h-3 w-3 mr-1" />
+                        Hoje
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
           </div>
+
+          <Separator />
 
           {/* Seleção de Instância */}
           <div className="space-y-2">
@@ -640,25 +645,81 @@ const WhatsApp = () => {
             )}
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex gap-2 pt-4 flex-wrap">
-            <Button 
-              variant="outline" 
-              onClick={enviarMensagemTeste}
-              disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
-            </Button>
-            
-            <Button 
-              variant="secondary" 
-              onClick={testarSistemaAutomatico}
-              disabled={!config.instancia_aniversario || enviandoTeste}
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              {enviandoTeste ? 'Testando...' : 'Testar Sistema Automático'}
-            </Button>
+          {/* Seção de Teste */}
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center gap-2">
+              <div className="h-px bg-border flex-1" />
+              <span className="text-sm text-muted-foreground font-medium">Teste de Aniversário</span>
+              <div className="h-px bg-border flex-1" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Box de Seleção de Munícipes */}
+              <div className="space-y-2">
+                <Label>Munícipes Selecionados</Label>
+                <div className="border rounded-lg p-3 min-h-16">
+                  {aniversariantesSelecionados.size === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Selecione aniversariantes acima para testar
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {aniversariantesSelecionados.size} munícipe(s) selecionado(s)
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {aniversariantes
+                          .filter(a => aniversariantesSelecionados.has(a.id))
+                          .slice(0, 3)
+                          .map(a => (
+                            <Badge key={a.id} variant="secondary" className="text-xs">
+                              {a.nome}
+                            </Badge>
+                          ))}
+                        {aniversariantesSelecionados.size > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{aniversariantesSelecionados.size - 3} mais
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botão de Teste */}
+              <div className="space-y-2">
+                <Label>Ação</Label>
+                <Button 
+                  variant="outline" 
+                  onClick={enviarMensagemTeste}
+                  disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
+                  className="w-full"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Enviar mensagem de teste para os aniversariantes selecionados
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Switch para Ativar/Desativar */}
+          <div className="flex items-center justify-between pt-4">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">Sistema Automático</Label>
+              <p className="text-sm text-muted-foreground">
+                Ativar envio automático de mensagens de aniversário às 9:00h diariamente
+              </p>
+            </div>
+            <Switch
+              checked={config.aniversario_ativo}
+              onCheckedChange={(checked) =>
+                setConfig(prev => ({ ...prev, aniversario_ativo: checked }))
+              }
+            />
           </div>
 
           {/* Informações sobre o Sistema Automático */}
@@ -669,11 +730,9 @@ const WhatsApp = () => {
                   <Clock className="h-4 w-4" />
                   <span className="font-medium">Sistema Automático Ativado</span>
                 </div>
-                <div className="text-sm text-green-600 dark:text-green-400 mt-2 space-y-1">
-                  <p>✅ Mensagens enviadas automaticamente todos os dias às 9:00h (UTC)</p>
-                  <p>✅ Sistema independente - não afeta outros módulos</p>
-                  <p>✅ Instância: {config.instancia_aniversario || 'Não selecionada'}</p>
-                </div>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                  Mensagens enviadas automaticamente todos os dias às 9:00h (UTC)
+                </p>
               </div>
             ) : (
               <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
@@ -694,10 +753,9 @@ const WhatsApp = () => {
                 <div className="space-y-2">
                   <span className="font-medium">Informações do Sistema</span>
                   <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
-                    <p>• O sistema roda automaticamente via Cron Job às 9:00h UTC diariamente</p>
                     <p>• Busca aniversariantes do dia atual baseado na data de nascimento</p>
                     <p>• Personaliza mensagens substituindo {'{nome}'} pelo nome do munícipe</p>
-                    <p>• Use "Testar Sistema Automático" para validar com munícipes aleatórios</p>
+                    <p>• Use "Enviar Teste" para validar com munícipes aleatórios</p>
                   </div>
                 </div>
               </div>
@@ -921,14 +979,6 @@ const WhatsApp = () => {
             <div className="flex gap-2 pt-4 border-t">
               <Button onClick={saveConfig} disabled={saving}>
                 {saving ? 'Salvando...' : 'Salvar Configurações'}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={enviarMensagemTeste}
-                disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {enviandoTeste ? 'Enviando...' : `Teste Aniversário (${aniversariantesSelecionados.size})`}
               </Button>
             </div>
           </Tabs>
