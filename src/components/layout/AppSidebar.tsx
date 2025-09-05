@@ -9,7 +9,8 @@ import {
   Settings,
   Home,
   Columns,
-  Calendar
+  Calendar,
+  Bot
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -31,6 +32,7 @@ const menuItems = [
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Kanban", url: "/kanban", icon: Columns },
   { title: "Solicitar Agenda", url: "/solicitar-agenda", icon: Calendar },
+  { title: "Assessor IA", url: "/assessor-ia", icon: Bot },
   { title: "Tags", url: "/tags", icon: Tags },
   { title: "Áreas", url: "/areas", icon: Building2 },
   { title: "Usuários", url: "/usuarios", icon: UserCheck },
