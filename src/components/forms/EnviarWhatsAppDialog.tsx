@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2, RefreshCw } from "lucide-react";
+import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -456,16 +456,6 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 </AlertDescription>
               </Alert>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => refetchInstances()}
-              className="mt-1 gap-2"
-              disabled={loadingInstances}
-            >
-              <RefreshCw className={`h-4 w-4 ${loadingInstances ? 'animate-spin' : ''}`} />
-              {loadingInstances ? 'Verificando...' : 'Atualizar Conexões'}
-            </Button>
           </div>
 
           {/* Seleção de Destinatários */}
