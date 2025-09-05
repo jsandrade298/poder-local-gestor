@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -58,6 +59,7 @@ const SolicitarAgenda = () => {
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
 
   // Função para fazer scroll para o final das mensagens
   const scrollToBottom = () => {
@@ -635,6 +637,29 @@ const SolicitarAgenda = () => {
       console.log("Solicitações:", solicitacoes);
     }
   }, [solicitacoes, user?.id]);
+
+  // Lógica para abrir agenda específica via parâmetros de URL (notificações)
+  useEffect(() => {
+    const agendaId = searchParams.get('agenda');
+    
+    if (agendaId) {
+      // Buscar nas minhas agendas primeiro
+      let agenda = minhasAgendas?.find(a => a.id === agendaId);
+      
+      // Se não encontrou, buscar nas solicitações
+      if (!agenda) {
+        agenda = solicitacoes?.find(a => a.id === agendaId);
+      }
+      
+      if (agenda) {
+        setSelectedAgenda(agenda);
+        
+        // Limpar o parâmetro da URL após abrir
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [searchParams, minhasAgendas, solicitacoes]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
