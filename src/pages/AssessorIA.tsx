@@ -19,6 +19,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  modelUsed?: 'gpt-5' | 'gpt-5-mini';
 }
 
 interface DocumentoModelo {
@@ -118,8 +119,11 @@ const AssessorIA = () => {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.message,
-        timestamp: new Date()
+        timestamp: new Date(),
+        modelUsed: data.modelUsed || selectedModel
       };
+
+      console.log('Modelo usado pela IA:', data.modelUsed);
 
       setMessages(prev => [...prev, assistantMessage]);
 
@@ -258,11 +262,18 @@ const AssessorIA = () => {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <p className={`text-xs mt-1 opacity-70 ${
-                        message.role === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
-                      }`}>
-                        {formatTimestamp(message.timestamp)}
-                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className={`text-xs opacity-70 ${
+                          message.role === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
+                        }`}>
+                          {formatTimestamp(message.timestamp)}
+                        </p>
+                        {message.role === 'assistant' && message.modelUsed && (
+                          <Badge variant="secondary" className="text-xs ml-2">
+                            {message.modelUsed}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
                     {message.role === 'user' && (

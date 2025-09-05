@@ -43,22 +43,26 @@ serve(async (req) => {
 
     const { message, conversationHistory = [], documentosContexto = [], model = 'gpt-5-mini' } = await req.json();
     
-    // Validar modelo
-    const validModels = ['gpt-5', 'gpt-5-mini'];
-    const modelMap = {
-      'gpt-5': 'gpt-4o',
-      'gpt-5-mini': 'gpt-4o-mini'
-    };
+    // Validar modelo (allowlist)
+    const ALLOWED_MODELS = ['gpt-5', 'gpt-5-mini'] as const;
+    type AllowedModel = typeof ALLOWED_MODELS[number];
     
-    if (!validModels.includes(model)) {
+    let validatedModel: AllowedModel = model;
+    if (!ALLOWED_MODELS.includes(model)) {
       return new Response(
-        JSON.stringify({ error: `Modelo inválido. Use: ${validModels.join(', ')}` }), 
+        JSON.stringify({ error: `Modelo inválido. Use um de: ${ALLOWED_MODELS.join(', ')}` }), 
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
+    
+    // Mapear para modelos OpenAI reais
+    const modelMap = {
+      'gpt-5': 'gpt-5-2025-08-07',
+      'gpt-5-mini': 'gpt-5-mini-2025-08-07'
+    } as const;
     
     if (!message) {
       return new Response(
@@ -71,7 +75,8 @@ serve(async (req) => {
     }
 
     console.log('Processando mensagem para IA:', message);
-    console.log('Modelo selecionado:', model);
+    console.log('Modelo selecionado:', validatedModel);
+    console.log('Modelo OpenAI usado:', modelMap[validatedModel]);
     console.log('Histórico de conversa:', conversationHistory.length, 'mensagens');
     console.log('Documentos no contexto:', documentosContexto.length);
 
@@ -137,9 +142,9 @@ ${contextosDocumentos}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: modelMap[model],
+        model: modelMap[validatedModel],
         messages: messages,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       }),
     });
 
@@ -175,6 +180,7 @@ ${contextosDocumentos}`;
     return new Response(
       JSON.stringify({ 
         message: assistantMessage,
+        modelUsed: validatedModel,
         conversationId: Date.now().toString() // ID simples para a conversa
       }), 
       {
