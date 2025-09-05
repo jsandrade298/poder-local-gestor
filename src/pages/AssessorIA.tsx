@@ -19,7 +19,6 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  modelUsed?: 'gpt-5' | 'gpt-5-mini';
 }
 
 interface DocumentoModelo {
@@ -39,7 +38,6 @@ const AssessorIA = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
   const [selectedModel, setSelectedModel] = useState<'gpt-5' | 'gpt-5-mini'>('gpt-5-mini');
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,48 +49,19 @@ const AssessorIA = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Inicializar ou carregar conversa
+  // Adicionar mensagem de boas-vindas inicial
   useEffect(() => {
-    initializeConversation();
-  }, []);
-
-  const initializeConversation = async () => {
-    try {
-      // Criar nova conversa se não existir
-      if (!conversationId) {
-        const { data: newConversation, error } = await supabase
-          .from('conversations')
-          .insert({
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            title: 'Nova conversa',
-            model_default: selectedModel
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('Erro ao criar conversa:', error);
-        } else {
-          setConversationId(newConversation.id);
-          setSelectedModel(newConversation.model_default as 'gpt-5' | 'gpt-5-mini');
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: 'Olá! Sou seu **Assessor Legislativo IA** especializado em redação de documentos oficiais municipais.\n\n📝 **Posso redigir:**\n• Requerimentos de informação\n• Indicações legislativas\n• Projetos de Lei (PLs)\n• Moções\n• Ofícios oficiais\n• Outros documentos legislativos\n\n💡 **Para melhores resultados:** Use a Biblioteca de Documentos para selecionar modelos como referência. Assim posso manter o formato e linguagem adequados aos padrões do seu município.\n\nComo posso ajudá-lo hoje?',
+          timestamp: new Date()
         }
-      }
-
-      // Adicionar mensagem de boas-vindas se não há mensagens
-      if (messages.length === 0) {
-        setMessages([
-          {
-            id: 'welcome',
-            role: 'assistant',
-            content: 'Olá! Sou seu **Assessor Legislativo IA** especializado em redação de documentos oficiais municipais.\n\n📝 **Posso redigir:**\n• Requerimentos de informação\n• Indicações legislativas\n• Projetos de Lei (PLs)\n• Moções\n• Ofícios oficiais\n• Outros documentos legislativos\n\n💡 **Para melhores resultados:** Use a Biblioteca de Documentos para selecionar modelos como referência. Assim posso manter o formato e linguagem adequados aos padrões do seu município.\n\nComo posso ajudá-lo hoje?',
-            timestamp: new Date()
-          }
-        ]);
-      }
-    } catch (error) {
-      console.error('Erro ao inicializar conversa:', error);
+      ]);
     }
-  };
+  }, []);
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -149,11 +118,8 @@ const AssessorIA = () => {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.message,
-        timestamp: new Date(),
-        modelUsed: data.modelUsed || selectedModel
+        timestamp: new Date()
       };
-
-      console.log('Modelo usado pela IA:', data.modelUsed);
 
       setMessages(prev => [...prev, assistantMessage]);
 
@@ -216,26 +182,6 @@ const AssessorIA = () => {
     setDocumentosContexto(prev => prev.filter(doc => doc.id !== documentoId));
   };
 
-  // Atualizar modelo padrão na conversa quando o usuário troca
-  const handleModelChange = async (newModel: 'gpt-5' | 'gpt-5-mini') => {
-    setSelectedModel(newModel);
-    
-    if (conversationId) {
-      try {
-        const { error } = await supabase
-          .from('conversations')
-          .update({ model_default: newModel })
-          .eq('id', conversationId);
-
-        if (error) {
-          console.error('Erro ao atualizar modelo da conversa:', error);
-        }
-      } catch (error) {
-        console.error('Erro ao salvar modelo:', error);
-      }
-    }
-  };
-
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <AppHeader />
@@ -269,7 +215,7 @@ const AssessorIA = () => {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Modelo:</span>
-                  <Select value={selectedModel} onValueChange={handleModelChange}>
+                  <Select value={selectedModel} onValueChange={(value: 'gpt-5' | 'gpt-5-mini') => setSelectedModel(value)}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
@@ -312,18 +258,11 @@ const AssessorIA = () => {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className={`text-xs opacity-70 ${
-                          message.role === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
-                        }`}>
-                          {formatTimestamp(message.timestamp)}
-                        </p>
-                        {message.role === 'assistant' && message.modelUsed && (
-                          <Badge variant="secondary" className="text-xs ml-2">
-                            {message.modelUsed}
-                          </Badge>
-                        )}
-                      </div>
+                      <p className={`text-xs mt-1 opacity-70 ${
+                        message.role === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
+                      }`}>
+                        {formatTimestamp(message.timestamp)}
+                      </p>
                     </div>
                     
                     {message.role === 'user' && (
