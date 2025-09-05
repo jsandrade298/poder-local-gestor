@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
       .select('id, status, data_hora_proposta, descricao_objetivo, created_at')
       .eq('id', agenda_id)
       .in('status', ['confirmado', 'recusado'])
-      .single();
+      .maybeSingle();
 
     if (selectError) {
       console.error('❌ Erro ao buscar agenda:', selectError);
