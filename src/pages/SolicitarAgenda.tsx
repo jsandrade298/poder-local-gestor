@@ -4,10 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -35,7 +37,7 @@ const formSchema = z.object({
   local_endereco: z.string().min(1, "Informe o local ou link da reunião"),
   descricao_objetivo: z.string().min(1, "Descreva o objetivo da reunião"),
   pauta_sugerida: z.string().min(1, "Informe a pauta sugerida"),
-  acompanha_mandato_id: z.string().min(1, "Selecione quem acompanha pelo mandato"),
+  acompanha_mandato_ids: z.array(z.string()).min(1, "Selecione pelo menos um responsável pelo mandato"),
   material_apoio: z.string().optional(),
   observacoes: z.string().optional(),
 });
@@ -51,6 +53,7 @@ const SolicitarAgenda = () => {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      acompanha_mandato_ids: [],
       material_apoio: "",
       observacoes: "",
     },
@@ -83,6 +86,7 @@ const SolicitarAgenda = () => {
       });
 
       form.reset({
+        acompanha_mandato_ids: [],
         material_apoio: "",
         observacoes: "",
       });
@@ -220,33 +224,61 @@ const SolicitarAgenda = () => {
                   )}
                 />
 
-                {/* Quem Acompanha pelo Mandato */}
+                {/* Quem Acompanha pelo Mandato - Múltipla seleção */}
                 <FormField
                   control={form.control}
-                  name="acompanha_mandato_id"
+                  name="acompanha_mandato_ids"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Quem Acompanha pelo Mandato *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o responsável" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {loadingUsuarios ? (
-                            <SelectItem value="loading" disabled>
-                              Carregando usuários...
-                            </SelectItem>
-                          ) : (
-                            usuarios?.map((usuario) => (
-                              <SelectItem key={usuario.id} value={usuario.id}>
-                                {usuario.nome}
+                      <div className="space-y-2">
+                        <Select 
+                          onValueChange={(value) => {
+                            if (value && !field.value.includes(value)) {
+                              field.onChange([...field.value, value]);
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione os responsáveis" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {loadingUsuarios ? (
+                              <SelectItem value="loading" disabled>
+                                Carregando usuários...
                               </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                            ) : (
+                              usuarios?.filter(usuario => !field.value.includes(usuario.id)).map((usuario) => (
+                                <SelectItem key={usuario.id} value={usuario.id}>
+                                  {usuario.nome}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Lista de usuários selecionados */}
+                        {field.value.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {field.value.map((userId) => {
+                              const usuario = usuarios?.find(u => u.id === userId);
+                              return usuario ? (
+                                <Badge key={userId} variant="secondary" className="flex items-center gap-1">
+                                  {usuario.nome}
+                                  <X 
+                                    className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                                    onClick={() => {
+                                      field.onChange(field.value.filter(id => id !== userId));
+                                    }}
+                                  />
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -370,6 +402,7 @@ const SolicitarAgenda = () => {
                   variant="outline"
                   onClick={() => {
                     form.reset({
+                      acompanha_mandato_ids: [],
                       material_apoio: "",
                       observacoes: "",
                     });
