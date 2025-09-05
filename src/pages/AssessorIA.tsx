@@ -315,7 +315,7 @@ const AssessorIA = () => {
                           <div className="p-2 h-full flex flex-col items-center justify-between text-center">
                             <FileText className="h-5 w-5 text-primary flex-shrink-0" />
                             <span className="text-[10px] font-medium text-foreground leading-tight break-words">
-                              {doc.nome.length > 20 ? doc.nome.substring(0, 20) + '...' : doc.nome}
+                              {doc.nome.length > 20 ? doc.nome.substring(0, 17) + '...' : doc.nome}
                             </span>
                             <Badge variant="outline" className="text-[9px] py-0 px-1 h-3 truncate max-w-full">
                               {doc.categoria}
