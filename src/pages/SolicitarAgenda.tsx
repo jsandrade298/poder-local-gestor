@@ -284,7 +284,7 @@ const SolicitarAgenda = () => {
       if (!user?.id) return [];
 
       try {
-        // Buscar agendas onde sou validador
+        // Buscar agendas onde sou validador (apenas pendentes e para remarcar)
         const { data: agendas, error } = await supabase
           .from("agendas")
           .select(`
@@ -294,6 +294,7 @@ const SolicitarAgenda = () => {
             )
           `)
           .eq("validador_id", user.id)
+          .not("status", "in", "(confirmado,recusado)")
           .order("created_at", { ascending: false });
 
         if (error) {
