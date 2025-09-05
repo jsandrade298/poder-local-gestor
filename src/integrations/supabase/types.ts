@@ -41,13 +41,6 @@ export type Database = {
             referencedRelation: "agendas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "agenda_acompanhantes_usuario_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       agenda_mensagens: {
@@ -81,13 +74,6 @@ export type Database = {
             columns: ["agenda_id"]
             isOneToOne: false
             referencedRelation: "agendas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agenda_mensagens_remetente_id_fkey"
-            columns: ["remetente_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -144,22 +130,7 @@ export type Database = {
           updated_at?: string
           validador_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "agendas_solicitante_id_fkey"
-            columns: ["solicitante_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agendas_validador_id_fkey"
-            columns: ["validador_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       anexos: {
         Row: {
