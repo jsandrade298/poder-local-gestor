@@ -159,7 +159,7 @@ export default function Kanban() {
       // Enviar notificação se tiver telefone
       if (demanda.municipes?.telefone && oldStatus !== newStatus) {
         try {
-          await supabase.functions.invoke('whatsapp-notificar-demanda', {
+          const { data: result } = await supabase.functions.invoke('whatsapp-notificar-demanda', {
             body: {
               demanda_id: demandaId,
               municipe_nome: demanda.municipes.nome,
@@ -170,9 +170,13 @@ export default function Kanban() {
               protocolo: demanda.protocolo
             }
           });
+          
+          if (result?.success) {
+            toast.success(`WhatsApp enviado para ${demanda.municipes.nome}!`);
+          }
         } catch (notifError) {
           console.error('Erro ao enviar notificação:', notifError);
-          // Não falhar a operação se a notificação falhar
+          toast.error("Erro ao enviar notificação WhatsApp");
         }
       }
     },
