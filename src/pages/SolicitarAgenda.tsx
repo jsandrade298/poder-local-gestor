@@ -1046,17 +1046,7 @@ const SolicitarAgenda = () => {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
-                      </div>
-                      <StatusBox
-                        currentStatus={selectedAgenda?.status || ""}
-                        canUpdate={user?.id === selectedAgenda?.validador_id}
-                        onUpdateStatus={(status) => updateStatusMutation.mutate({
-                          agendaId: selectedAgenda?.id,
-                          status
-                        })}
-                      />
+                      <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1110,7 +1100,24 @@ const SolicitarAgenda = () => {
                            <strong>Solicitado em:</strong> {formatDateTime(selectedAgenda?.data_pedido)}
                          </span>
                        </div>
-                     </div>
+                      </div>
+
+                      {/* Seção de Status e Ações */}
+                      <Separator />
+                      <div className="bg-muted/20 p-4 rounded-lg">
+                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                          <Edit className="h-4 w-4" />
+                          Status da Agenda
+                        </h4>
+                        <StatusBox
+                          currentStatus={selectedAgenda?.status || ""}
+                          canUpdate={user?.id === selectedAgenda?.validador_id}
+                          onUpdateStatus={(status) => updateStatusMutation.mutate({
+                            agendaId: selectedAgenda?.id,
+                            status
+                          })}
+                        />
+                      </div>
                   </CardContent>
                 </Card>
               </TabsContent>
