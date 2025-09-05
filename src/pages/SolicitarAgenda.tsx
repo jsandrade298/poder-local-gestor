@@ -335,23 +335,17 @@ const SolicitarAgenda = () => {
     enabled: !!user?.id && activeTab === "solicitacoes",
   });
 
-  // Detectar redirecionamento de notificação
+  // Detectar redirecionamento de notificação - CORRIGIDO
   useEffect(() => {
     const agendaId = searchParams.get('agenda');
-    console.log('=== DETECÇÃO AGENDA URL ===');
-    console.log('Parâmetro agenda:', agendaId);
-    console.log('Minhas agendas:', minhasAgendas?.length);
-    console.log('Solicitações:', solicitacoes?.length);
     
-    if (agendaId && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
+    // Só processar se há um agendaId na URL e não há modal já aberto
+    if (agendaId && !selectedAgenda && (minhasAgendas?.length > 0 || solicitacoes?.length > 0)) {
       // Procurar a agenda tanto nas minhas quanto nas solicitações
       const todasAgendas = [...(minhasAgendas || []), ...(solicitacoes || [])];
       const agenda = todasAgendas.find(a => a.id === agendaId);
       
-      console.log('Agenda encontrada:', agenda?.id);
-      
       if (agenda) {
-        console.log('Abrindo modal para agenda:', agenda.id);
         setSelectedAgenda(agenda);
         
         // Definir a aba correta baseado no contexto
@@ -366,7 +360,7 @@ const SolicitarAgenda = () => {
         window.history.replaceState({}, '', newUrl);
       }
     }
-  }, [searchParams, minhasAgendas, solicitacoes]);
+  }, [searchParams, minhasAgendas, solicitacoes, selectedAgenda]);
 
   // Buscar mensagens - CORRIGIDO
   const { data: mensagens } = useQuery({
