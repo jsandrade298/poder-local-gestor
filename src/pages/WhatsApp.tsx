@@ -490,19 +490,31 @@ const WhatsApp = () => {
                 <Badge variant="secondary">{aniversariantes.length}</Badge>
               </div>
               {aniversariantes.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleTodosAniversariantes}
-                  className="gap-2"
-                >
-                  {aniversariantesSelecionados.size === aniversariantes.length ? (
-                    <CheckSquare className="h-4 w-4" />
-                  ) : (
-                    <Square className="h-4 w-4" />
-                  )}
-                  {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleTodosAniversariantes}
+                    className="gap-2"
+                  >
+                    {aniversariantesSelecionados.size === aniversariantes.length ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                    {aniversariantesSelecionados.size === aniversariantes.length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={enviarMensagemTeste}
+                    disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
+                    className="gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -643,67 +655,6 @@ const WhatsApp = () => {
                 </ScrollArea>
               </div>
             )}
-          </div>
-
-          {/* Seção de Teste */}
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center gap-2">
-              <div className="h-px bg-border flex-1" />
-              <span className="text-sm text-muted-foreground font-medium">Teste de Aniversário</span>
-              <div className="h-px bg-border flex-1" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Box de Seleção de Munícipes */}
-              <div className="space-y-2">
-                <Label>Munícipes Selecionados</Label>
-                <div className="border rounded-lg p-3 min-h-16">
-                  {aniversariantesSelecionados.size === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Selecione aniversariantes acima para testar
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">
-                        {aniversariantesSelecionados.size} munícipe(s) selecionado(s)
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {aniversariantes
-                          .filter(a => aniversariantesSelecionados.has(a.id))
-                          .slice(0, 3)
-                          .map(a => (
-                            <Badge key={a.id} variant="secondary" className="text-xs">
-                              {a.nome}
-                            </Badge>
-                          ))}
-                        {aniversariantesSelecionados.size > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{aniversariantesSelecionados.size - 3} mais
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Botão de Teste */}
-              <div className="space-y-2">
-                <Label>Ação</Label>
-                <Button 
-                  variant="outline" 
-                  onClick={enviarMensagemTeste}
-                  disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
-                  className="w-full"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Enviar mensagem de teste para os aniversariantes selecionados
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* Switch para Ativar/Desativar */}
