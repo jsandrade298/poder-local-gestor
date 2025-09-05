@@ -300,25 +300,38 @@ const AssessorIA = () => {
             <div className="p-4 space-y-3 flex-shrink-0">
               {/* Documentos no Contexto */}
               {documentosContexto.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Documentos no Contexto:</span>
+                    <span className="text-sm font-medium">Documentos no Contexto ({documentosContexto.length}):</span>
                   </div>
                   <div className="w-full overflow-x-auto">
-                    <div className="flex gap-2 pb-2">
+                    <div className="flex gap-3 pb-2">
                       {documentosContexto.map((doc) => (
-                        <Badge key={doc.id} variant="secondary" className="gap-1 whitespace-nowrap flex-shrink-0">
-                          {doc.nome}
+                        <div
+                          key={doc.id}
+                          className="relative flex-shrink-0 w-20 h-20 bg-muted rounded-lg border border-border hover:border-primary/50 transition-colors group"
+                        >
+                          <div className="p-2 h-full flex flex-col items-center justify-center text-center">
+                            <FileText className="h-6 w-6 text-primary mb-1" />
+                            <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
+                              {doc.nome.length > 15 ? doc.nome.substring(0, 15) + '...' : doc.nome}
+                            </span>
+                          </div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => removerDocumentoContexto(doc.id)}
-                            className="h-4 w-4 p-0 hover:bg-transparent"
+                            className="absolute -top-1 -right-1 h-5 w-5 p-0 rounded-full bg-destructive hover:bg-destructive/80 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                        </Badge>
+                          <div className="absolute bottom-1 left-1 right-1">
+                            <Badge variant="outline" className="text-xs py-0 px-1 h-4 truncate">
+                              {doc.categoria}
+                            </Badge>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
