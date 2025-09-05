@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot } from "lucide-react";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
@@ -154,7 +153,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -162,16 +161,14 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="detalhes" className="flex-1 flex flex-col">
+        <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
             <TabsTrigger value="atividades">Atividades</TabsTrigger>
             <TabsTrigger value="anexos">Anexos ({anexos.length})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="detalhes" className="flex-1">
-            <ScrollArea className="h-[calc(90vh-200px)]">
-              <div className="space-y-4 p-1">
+          <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -301,50 +298,42 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="atividades" className="overflow-y-auto max-h-[calc(90vh-200px)]">
+            <DemandaAtividadesTab demandaId={demanda.id} />
+          </TabsContent>
+
+          <TabsContent value="anexos" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+            {anexos.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum anexo encontrado</p>
               </div>
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="atividades" className="flex-1">
-            <ScrollArea className="h-[calc(90vh-200px)]">
-              <DemandaAtividadesTab demandaId={demanda.id} />
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="anexos" className="flex-1">
-            <ScrollArea className="h-[calc(90vh-200px)]">
-              <div className="space-y-4 p-1">
-                {anexos.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhum anexo encontrado</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {anexos.map((anexo) => (
-                      <Card key={anexo.id} className="cursor-pointer hover:bg-muted/50" onClick={() => downloadAnexo(anexo)}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-8 w-8 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium">{anexo.nome_arquivo}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatDateTime(anexo.created_at)}
-                            </div>
+            ) : (
+              <div className="space-y-2">
+                {anexos.map((anexo) => (
+                  <Card key={anexo.id} className="cursor-pointer hover:bg-muted/50" onClick={() => downloadAnexo(anexo)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-8 w-8 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{anexo.nome_arquivo}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB
+                            </p>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(anexo.created_at)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </ScrollArea>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>
