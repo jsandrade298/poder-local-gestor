@@ -380,12 +380,13 @@ const SolicitarAgenda = () => {
     }
   }, [mensagens]);
 
-  // Auto-scroll quando abre o modal de uma agenda
+  // Auto-scroll quando abre o modal de uma agenda e vai para aba mensagens
   useEffect(() => {
-    if (selectedAgenda && mensagens) {
-      setTimeout(scrollToBottom, 200);
+    if (selectedAgenda && mensagens && mensagens.length > 0) {
+      // Aguarda um pouco mais para garantir que a DOM foi atualizada
+      setTimeout(scrollToBottom, 500);
     }
-  }, [selectedAgenda]);
+  }, [selectedAgenda, mensagens]);
 
   // Buscar detalhes completos da agenda selecionada incluindo acompanhantes
   const { data: agendaDetalhada } = useQuery({
