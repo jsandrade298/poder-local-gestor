@@ -4,6 +4,8 @@ import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown
 import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDemandaStatusMonitor } from "@/hooks/useDemandaStatusMonitor";
+import { useDemandaNotificationSender } from "@/hooks/useDemandaNotificationSender";
 import { LogOut, User } from "lucide-react";
 
 interface AuthLayoutProps {
@@ -14,6 +16,12 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const location = useLocation();
   const isLoginPage = location.pathname === "/login";
   const { user, loading, signOut } = useAuth();
+  
+  // Ativar monitor de status de demandas apenas se autenticado
+  useDemandaStatusMonitor();
+  
+  // Ativar sender para processar notificações automaticamente
+  useDemandaNotificationSender();
 
   // Mostrar loading enquanto verifica autenticação
   if (loading) {
