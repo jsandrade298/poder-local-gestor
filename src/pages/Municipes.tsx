@@ -370,11 +370,34 @@ export default function Municipes() {
             
             if (headerIndex !== -1 && values[headerIndex]) {
               if (key === 'data_nascimento') {
-                // Tentar converter data
+                // Tentar converter data no formato brasileiro DD/MM/AAAA
                 const dateValue = values[headerIndex];
                 if (dateValue && dateValue !== '') {
                   try {
-                    const date = new Date(dateValue);
+                    let date: Date;
+                    
+                    // Verificar se está no formato brasileiro DD/MM/AAAA ou DD/MM/AA
+                    if (dateValue.includes('/')) {
+                      const parts = dateValue.split('/');
+                      if (parts.length === 3) {
+                        const day = parseInt(parts[0]);
+                        const month = parseInt(parts[1]) - 1; // Mês é 0-indexado no JS
+                        let year = parseInt(parts[2]);
+                        
+                        // Se ano tem 2 dígitos, assumir 19xx ou 20xx
+                        if (year < 100) {
+                          year = year > 30 ? 1900 + year : 2000 + year;
+                        }
+                        
+                        date = new Date(year, month, day);
+                      } else {
+                        date = new Date(dateValue);
+                      }
+                    } else {
+                      // Formato ISO ou outro
+                      date = new Date(dateValue);
+                    }
+                    
                     if (!isNaN(date.getTime())) {
                       municipe[key] = date.toISOString().split('T')[0];
                     }
