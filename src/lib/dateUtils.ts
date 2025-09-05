@@ -26,7 +26,12 @@ export function formatDateOnly(dateString: string | Date): string {
       return 'Data inválida';
     }
     
-    return date.toLocaleDateString('pt-BR');
+    // Forçar formato brasileiro DD/MM/AAAA
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   } catch (error) {
     console.error('Erro ao formatar data:', error, 'Valor:', dateString);
     return 'Data inválida';
