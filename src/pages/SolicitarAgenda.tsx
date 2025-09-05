@@ -1048,17 +1048,15 @@ const SolicitarAgenda = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-lg">{selectedAgenda?.descricao_objetivo}</CardTitle>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <StatusBox
-                            currentStatus={selectedAgenda?.status || ""}
-                            canUpdate={user?.id === selectedAgenda?.validador_id}
-                            onUpdateStatus={(status) => updateStatusMutation.mutate({
-                              agendaId: selectedAgenda?.id,
-                              status
-                            })}
-                          />
-                        </div>
                       </div>
+                      <StatusBox
+                        currentStatus={selectedAgenda?.status || ""}
+                        canUpdate={user?.id === selectedAgenda?.validador_id}
+                        onUpdateStatus={(status) => updateStatusMutation.mutate({
+                          agendaId: selectedAgenda?.id,
+                          status
+                        })}
+                      />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
