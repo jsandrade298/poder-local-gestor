@@ -68,6 +68,8 @@ Deno.serve(async (req) => {
       dataLimite.setMinutes(dataLimite.getMinutes() + 5);
     }
 
+    console.log(`🕐 Agenda ${agenda.status}: agora=${agora.toISOString()}, limite=${dataLimite!.toISOString()}`);
+
     if (agora < dataLimite!) {
       console.log(`⏰ Ainda não é hora de excluir esta agenda ${agenda.status}`);
       return new Response(
