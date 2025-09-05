@@ -71,10 +71,9 @@ Seja sempre profissional, claro e objetivo. Forneça informações precisas e pr
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: messages,
-        max_tokens: 1000,
-        temperature: 0.7,
+        max_completion_tokens: 1000,
       }),
     });
 
