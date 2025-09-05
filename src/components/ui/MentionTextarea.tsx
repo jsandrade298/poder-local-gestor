@@ -101,6 +101,9 @@ export function MentionTextarea({
               fontSize: '14px',
               maxHeight: '200px',
               overflow: 'auto',
+              position: 'absolute',
+              zIndex: 9999,
+              marginTop: '2px',
             },
             item: {
               padding: '8px 12px',

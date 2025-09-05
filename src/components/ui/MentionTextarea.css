@@ -59,9 +59,10 @@
   overflow-y: auto !important;
   overflow-x: hidden !important;
   z-index: 9999 !important;
-  position: fixed !important;
+  position: absolute !important;
   width: auto !important;
   min-width: 200px !important;
+  margin-top: 2px !important;
 }
 
 .mention-input__suggestions__item {
