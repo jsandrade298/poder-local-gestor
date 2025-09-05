@@ -28,6 +28,7 @@ import { toast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   solicitante_id: z.string().min(1, "Selecione um solicitante"),
+  validador_id: z.string().min(1, "Selecione um validador"),
   data_hora_proposta: z.string().min(1, "Data e hora da reunião são obrigatórias"),
   duracao_prevista: z.string().min(1, "Informe a duração prevista"),
   participantes: z.string().min(1, "Informe os participantes"),
@@ -113,7 +114,7 @@ const SolicitarAgenda = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Solicitante */}
                 <FormField
                   control={form.control}
@@ -146,6 +147,38 @@ const SolicitarAgenda = () => {
                   )}
                 />
 
+                {/* Validador */}
+                <FormField
+                  control={form.control}
+                  name="validador_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Validador(a) *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o validador" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {loadingUsuarios ? (
+                            <SelectItem value="loading" disabled>
+                              Carregando usuários...
+                            </SelectItem>
+                          ) : (
+                            usuarios?.map((usuario) => (
+                              <SelectItem key={usuario.id} value={usuario.id}>
+                                {usuario.nome}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {/* Data do Pedido - Não editável */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none">Data do Pedido</label>
@@ -153,6 +186,9 @@ const SolicitarAgenda = () => {
                     {dataPedido}
                   </div>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* Data/Hora Proposta */}
                 <FormField
