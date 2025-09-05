@@ -259,6 +259,11 @@ const WhatsApp = () => {
   };
 
   const enviarMensagemTeste = async () => {
+    console.log('=== INICIANDO TESTE DE MENSAGEM ===');
+    console.log('Instância configurada:', config.instancia_aniversario);
+    console.log('Aniversariantes selecionados:', aniversariantesSelecionados.size);
+    console.log('Mensagem configurada:', config.mensagem_aniversario);
+    
     if (!config.instancia_aniversario) {
       toast.error('Selecione uma instância primeiro');
       return;
@@ -304,6 +309,13 @@ const WhatsApp = () => {
         customMessages[telefone.telefone] = `[TESTE] ${mensagemPersonalizada}`;
       });
 
+      console.log('Enviando dados para edge function:', {
+        telefones,
+        instanceName: config.instancia_aniversario,
+        customMessages,
+        mediaCount: mediaData.length
+      });
+
       const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
         body: {
           telefones,
@@ -316,11 +328,15 @@ const WhatsApp = () => {
         }
       });
 
+      console.log('Resposta da edge function:', { data, error });
+
       if (error) throw error;
+      if (data && !data.success) throw new Error(data.error || 'Erro na função');
+      
       toast.success(`Mensagem de teste enviada para ${aniversariantesSelecionados.size} aniversariantes!`);
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
-      toast.error('Erro ao enviar mensagem de teste');
+      toast.error(`Erro ao enviar mensagem de teste: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setEnviandoTeste(false);
     }
@@ -466,6 +482,7 @@ const WhatsApp = () => {
                     onClick={enviarMensagemTeste}
                     disabled={!config.instancia_aniversario || aniversariantesSelecionados.size === 0 || enviandoTeste}
                     className="gap-2"
+                    title={`Instância: ${config.instancia_aniversario || 'não selecionada'} | Selecionados: ${aniversariantesSelecionados.size}`}
                   >
                     <Send className="h-4 w-4 text-blue-600" />
                     {enviandoTeste ? 'Enviando...' : `Enviar Teste (${aniversariantesSelecionados.size})`}
