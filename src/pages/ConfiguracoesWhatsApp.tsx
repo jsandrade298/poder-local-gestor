@@ -40,6 +40,7 @@ export default function ConfiguracoesWhatsApp() {
       }, {});
 
       setConfigs(prev => ({ ...prev, ...configMap }));
+      console.log('Configurações carregadas:', configMap);
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
       toast({
@@ -52,6 +53,7 @@ export default function ConfiguracoesWhatsApp() {
 
   const salvarConfiguracoes = async () => {
     setLoading(true);
+    console.log('Salvando configurações:', configs);
     try {
       const updates = Object.entries(configs).map(([chave, valor]) => ({
         chave,
@@ -59,10 +61,14 @@ export default function ConfiguracoesWhatsApp() {
         updated_at: new Date().toISOString()
       }));
 
+      console.log('Updates a serem enviados:', updates);
+
       for (const update of updates) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('configuracoes')
           .upsert(update, { onConflict: 'chave' });
+        
+        console.log(`Upsert para ${update.chave}:`, { data, error });
         
         if (error) throw error;
       }
@@ -71,6 +77,9 @@ export default function ConfiguracoesWhatsApp() {
         title: "Sucesso",
         description: "Configurações salvas com sucesso",
       });
+      
+      // Recarregar configurações para confirmar que foram salvas
+      await carregarConfiguracoes();
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
       toast({
@@ -97,6 +106,72 @@ export default function ConfiguracoesWhatsApp() {
       });
     } catch (error) {
       console.error('Erro ao testar:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível enviar o teste",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const testarNotificacaoDemanda = async () => {
+    try {
+      // Verificar se as configurações estão ativas
+      if (!configs.whatsapp_demandas_ativo || configs.whatsapp_demandas_ativo !== 'true') {
+        toast({
+          title: "Erro",
+          description: "Ative as notificações de demanda antes de testar",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!configs.whatsapp_instancia_demandas || !configs.whatsapp_mensagem_demandas) {
+        toast({
+          title: "Erro", 
+          description: "Configure a instância e mensagem antes de testar",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Buscar um munícipe aleatório com telefone
+      const { data: municipe } = await supabase
+        .from('municipes')
+        .select('nome, telefone')
+        .not('telefone', 'is', null)
+        .limit(1)
+        .single();
+
+      if (!municipe) {
+        toast({
+          title: "Erro",
+          description: "Nenhum munícipe com telefone encontrado",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Enviar teste de notificação
+      const { data, error } = await supabase.functions.invoke('notificar-demanda', {
+        body: {
+          demanda_id: 'teste-' + Date.now(),
+          municipe_nome: municipe.nome,
+          municipe_telefone: municipe.telefone,
+          status: 'Em Andamento (TESTE)',
+          instancia: configs.whatsapp_instancia_demandas,
+          mensagem: configs.whatsapp_mensagem_demandas
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Teste enviado",
+        description: `Mensagem de teste enviada para ${municipe.nome}`,
+      });
+    } catch (error) {
+      console.error('Erro ao testar notificação:', error);
       toast({
         title: "Erro",
         description: "Não foi possível enviar o teste",
@@ -215,6 +290,10 @@ export default function ConfiguracoesWhatsApp() {
               Use {"{nome}"} para o nome e {"{status}"} para o novo status
             </p>
           </div>
+
+          <Button onClick={testarNotificacaoDemanda} variant="outline">
+            Enviar Teste de Notificação
+          </Button>
         </CardContent>
       </Card>
 
