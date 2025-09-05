@@ -298,6 +298,13 @@ export default function Demandas() {
 
   const handleEditDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
+    setIsViewDialogOpen(false);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditFromView = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setIsViewDialogOpen(false);
     setIsEditDialogOpen(true);
   };
 
@@ -932,6 +939,7 @@ export default function Demandas() {
             demanda={selectedDemanda}
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
+            onEdit={handleEditFromView}
           />
         )}
         

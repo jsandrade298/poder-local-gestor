@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
+import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 
 interface Demanda {
   id: string;
@@ -35,6 +36,7 @@ const statusColumns = [
 export default function Kanban() {
   const [selectedDemanda, setSelectedDemanda] = useState<Demanda | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -147,6 +149,12 @@ export default function Kanban() {
 
   const getDemandsByStatus = (status: string) => {
     return demandas.filter((demanda: Demanda) => demanda.status === status);
+  };
+
+  const handleEditDemanda = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setIsViewDialogOpen(false);
+    setIsEditDialogOpen(true);
   };
 
   if (isLoading) {
@@ -348,6 +356,15 @@ export default function Kanban() {
             demanda={selectedDemanda}
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
+            onEdit={handleEditDemanda}
+          />
+        )}
+
+        {selectedDemanda && (
+          <EditDemandaDialog
+            demanda={selectedDemanda}
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
           />
         )}
 

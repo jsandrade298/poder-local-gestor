@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, User, FileText, Clock, AlertTriangle } from "lucide-react";
+import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit } from "lucide-react";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,9 +13,10 @@ interface ViewDemandaDialogProps {
   demanda: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: (demanda: any) => void;
 }
 
-export function ViewDemandaDialog({ demanda, open, onOpenChange }: ViewDemandaDialogProps) {
+export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewDemandaDialogProps) {
   const { data: responsaveis = [] } = useQuery({
     queryKey: ['responsaveis'],
     queryFn: async () => {
@@ -142,25 +144,40 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange }: ViewDemandaDi
           <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">{demanda.titulo}</CardTitle>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={getStatusVariant(demanda.status)}>
-                    {getStatusLabel(demanda.status)}
-                  </Badge>
-                  <Badge 
-                    variant="outline"
-                    style={{ 
-                      borderColor: getPrioridadeColor(demanda.prioridade),
-                      color: getPrioridadeColor(demanda.prioridade)
-                    }}
-                  >
-                    {getPrioridadeLabel(demanda.prioridade)}
-                  </Badge>
-                  {isOverdue(demanda.data_prazo) && (
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      Atrasada
-                    </Badge>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{demanda.titulo}</CardTitle>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Badge variant={getStatusVariant(demanda.status)}>
+                        {getStatusLabel(demanda.status)}
+                      </Badge>
+                      <Badge 
+                        variant="outline"
+                        style={{ 
+                          borderColor: getPrioridadeColor(demanda.prioridade),
+                          color: getPrioridadeColor(demanda.prioridade)
+                        }}
+                      >
+                        {getPrioridadeLabel(demanda.prioridade)}
+                      </Badge>
+                      {isOverdue(demanda.data_prazo) && (
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Atrasada
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {onEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(demanda)}
+                      className="ml-4"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar
+                    </Button>
                   )}
                 </div>
               </CardHeader>
