@@ -1,27 +1,31 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const supabaseUrl = "https://nsoedzefrqjmbgahukub.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zb2VkemVmcnFqbWJnYWh1a3ViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjkxNDU2OCwiZXhwIjoyMDcyNDkwNTY4fQ.fVmZ3TQj6jQa6W2zKVRxfVHgGJYM_HslCEWNEvdL2sg";
+interface Municipe {
+  id: string;
+  nome: string;
+  telefone: string;
+  data_nascimento: string;
+}
 
-serve(async (req) => {
+const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Parse request body
-    const { teste = false } = await req.json().catch(() => ({}));
-    
-    console.log('Iniciando processo de envio de mensagens de aniversário', { teste });
+    console.log('Iniciando processo de envio de mensagens de aniversário');
+
+    // Inicializar cliente Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Buscar configurações
     const { data: configs, error: configError } = await supabase
@@ -30,8 +34,7 @@ serve(async (req) => {
       .in('chave', ['whatsapp_instancia_aniversario', 'whatsapp_mensagem_aniversario', 'whatsapp_aniversario_ativo']);
 
     if (configError) {
-      console.error('Erro ao buscar configurações:', configError);
-      throw new Error('Erro ao buscar configurações');
+      throw new Error(`Erro ao buscar configurações: ${configError.message}`);
     }
 
     const configMap = configs?.reduce((acc, item) => {
@@ -43,147 +46,158 @@ serve(async (req) => {
     const mensagemAniversario = configMap.whatsapp_mensagem_aniversario;
     const aniversarioAtivo = configMap.whatsapp_aniversario_ativo === 'true';
 
-    console.log('Configurações carregadas:', {
-      instancia: instanciaAniversario,
-      ativo: aniversarioAtivo,
-      mensagem: mensagemAniversario ? 'Configurada' : 'Não configurada'
-    });
+    console.log('Configurações:', { instanciaAniversario, aniversarioAtivo });
 
     // Verificar se está ativo
-    if (!aniversarioAtivo && !teste) {
+    if (!aniversarioAtivo) {
       console.log('Sistema de aniversário desativado');
-      return new Response(
-        JSON.stringify({ success: true, message: 'Sistema desativado', enviados: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ 
+        message: 'Sistema de mensagens de aniversário está desativado',
+        success: false 
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     if (!instanciaAniversario || !mensagemAniversario) {
-      console.log('Configurações incompletas');
-      return new Response(
-        JSON.stringify({ success: false, message: 'Configurações incompletas' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      throw new Error('Configurações de aniversário incompletas');
     }
 
-    // Buscar aniversariantes do dia
-    const hoje = new Date();
-    const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
-    const dia = hoje.getDate().toString().padStart(2, '0');
+    // Verificar se é uma chamada de teste
+    const body = await req.json().catch(() => ({}));
+    const isTeste = body.teste === true;
 
-    let query = supabase
-      .from('municipes')
-      .select('id, nome, telefone, data_nascimento')
-      .not('telefone', 'is', null)
-      .neq('telefone', '');
+    let aniversariantes: Municipe[] = [];
 
-    if (!teste) {
-      // Para produção, buscar apenas aniversariantes do dia
-      query = query.like('data_nascimento', `%-${mes}-${dia}`);
+    if (isTeste) {
+      // Para teste, buscar alguns munícipes aleatórios
+      const { data: municipesTeste, error: testeError } = await supabase
+        .from('municipes')
+        .select('id, nome, telefone, data_nascimento')
+        .not('telefone', 'is', null)
+        .limit(3);
+
+      if (testeError) throw testeError;
+      aniversariantes = municipesTeste || [];
+      console.log(`Modo teste: ${aniversariantes.length} munícipes para teste`);
     } else {
-      // Para teste, buscar os primeiros 2 registros com telefone
-      query = query.limit(2);
+      // Buscar aniversariantes do dia atual
+      const hoje = new Date();
+      const mes = hoje.getMonth() + 1;
+      const dia = hoje.getDate();
+
+      // Usar SQL raw para extrair mês e dia da data de nascimento
+      const { data: aniversariantesData, error: aniversariantesError } = await supabase
+        .from('municipes')
+        .select('id, nome, telefone, data_nascimento')
+        .not('telefone', 'is', null)
+        .not('data_nascimento', 'is', null);
+
+      if (aniversariantesError) {
+        throw new Error(`Erro ao buscar aniversariantes: ${aniversariantesError.message}`);
+      }
+
+      // Filtrar aniversariantes do dia no JavaScript
+      aniversariantes = (aniversariantesData || []).filter(municipe => {
+        if (!municipe.data_nascimento) return false;
+        const dataNascimento = new Date(municipe.data_nascimento);
+        return dataNascimento.getMonth() + 1 === mes && dataNascimento.getDate() === dia;
+      });
+
+      console.log(`Encontrados ${aniversariantes.length} aniversariantes do dia ${dia}/${mes}`);
     }
 
-    const { data: aniversariantes, error: aniversariantesError } = await query;
-
-    if (aniversariantesError) {
-      console.error('Erro ao buscar aniversariantes:', aniversariantesError);
-      throw new Error('Erro ao buscar aniversariantes');
+    if (aniversariantes.length === 0) {
+      return new Response(JSON.stringify({
+        message: isTeste ? 'Nenhum munícipe encontrado para teste' : 'Nenhum aniversariante hoje',
+        success: true,
+        count: 0
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
-    console.log(`Encontrados ${aniversariantes?.length || 0} aniversariantes`);
+    // Preparar dados para envio
+    const telefones = aniversariantes
+      .filter(m => m.telefone && m.telefone.trim() !== '')
+      .map(m => ({
+        id: m.id,
+        nome: m.nome,
+        telefone: m.telefone
+      }));
 
-    if (!aniversariantes || aniversariantes.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: teste ? 'Nenhum munícipe com telefone encontrado para teste' : 'Nenhum aniversariante hoje',
-          enviados: 0 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (telefones.length === 0) {
+      return new Response(JSON.stringify({
+        message: 'Nenhum aniversariante com telefone válido',
+        success: true,
+        count: 0
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
-    // Buscar detalhes da instância
-    const { data: instancia, error: instanciaError } = await supabase
-      .from('whatsapp_instances')
-      .select('*')
-      .eq('instance_name', instanciaAniversario)
-      .eq('active', true)
-      .single();
+    // Preparar mensagens personalizadas para cada aniversariante
+    const customMessages: Record<string, string> = {};
+    telefones.forEach(telefone => {
+      const mensagemPersonalizada = mensagemAniversario.replace('{nome}', telefone.nome);
+      const mensagemFinal = isTeste 
+        ? `[TESTE] ${mensagemPersonalizada}` 
+        : mensagemPersonalizada;
+      customMessages[telefone.telefone] = mensagemFinal;
+    });
 
-    if (instanciaError || !instancia) {
-      console.error('Instância não encontrada:', instanciaError);
-      throw new Error('Instância do WhatsApp não encontrada');
-    }
+    console.log('Mensagens personalizadas preparadas:', Object.keys(customMessages).length);
 
-    if (instancia.status !== 'connected') {
-      console.error('Instância não conectada:', instancia.status);
-      throw new Error('Instância do WhatsApp não está conectada');
-    }
-
-    console.log('Instância encontrada:', instancia.display_name);
-
-    // Preparar telefones e mensagens
-    const telefones = aniversariantes.map(aniversariante => aniversariante.telefone).filter(Boolean);
-    const mensagemPersonalizada = teste 
-      ? `[TESTE] ${mensagemAniversario}`
-      : mensagemAniversario;
-
-    // Chamar função de envio de WhatsApp
-    const { data: resultado, error: envioError } = await supabase.functions.invoke('enviar-whatsapp', {
+    // Chamar função de envio do WhatsApp
+    const { data: resultadoEnvio, error: envioError } = await supabase.functions.invoke('enviar-whatsapp', {
       body: {
         telefones,
-        mensagem: mensagemPersonalizada,
+        mensagem: 'Mensagem será personalizada', // Será substituída pelo customMessages
         instanceName: instanciaAniversario,
-        tempoMinimo: 1,
-        tempoMaximo: 3,
-        incluirTodos: false,
-        // Substituir {nome} pelo nome de cada aniversariante
-        customMessages: aniversariantes.reduce((acc, aniversariante) => {
-          if (aniversariante.telefone) {
-            acc[aniversariante.telefone] = mensagemPersonalizada.replace('{nome}', aniversariante.nome);
-          }
-          return acc;
-        }, {} as Record<string, string>)
+        tempoMinimo: 3,
+        tempoMaximo: 5,
+        customMessages // Passar mensagens personalizadas
       }
     });
 
     if (envioError) {
-      console.error('Erro ao enviar mensagens:', envioError);
-      throw new Error('Erro ao enviar mensagens via WhatsApp');
+      throw new Error(`Erro ao enviar mensagens: ${envioError.message}`);
     }
 
-    console.log('Resultado do envio:', resultado);
+    console.log('Resultado do envio:', resultadoEnvio);
 
-    const sucessos = resultado?.sucessos || 0;
-    const falhas = resultado?.falhas || 0;
+    return new Response(JSON.stringify({
+      message: isTeste 
+        ? `Mensagens de teste enviadas para ${telefones.length} contatos`
+        : `Mensagens de aniversário enviadas para ${telefones.length} aniversariantes`,
+      success: true,
+      count: telefones.length,
+      resultado: resultadoEnvio,
+      aniversariantes: aniversariantes.map(a => ({
+        nome: a.nome,
+        telefone: a.telefone
+      }))
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: teste 
-          ? `Teste concluído: ${sucessos} enviados, ${falhas} falhas`
-          : `Mensagens de aniversário enviadas: ${sucessos} sucessos, ${falhas} falhas`,
-        enviados: sucessos,
-        falhas,
-        aniversariantes: aniversariantes.length
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Erro na função de aniversário:', error);
+  } catch (error: any) {
+    console.error('Erro no envio de mensagens de aniversário:', error);
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        message: error.message || 'Erro interno do servidor' 
+        error: error.message,
+        success: false 
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       }
     );
   }
-});
+};
+
+serve(handler);
