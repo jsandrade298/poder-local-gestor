@@ -144,7 +144,7 @@ const SolicitarAgenda = () => {
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
         mensagem: `Nova agenda: ${data.descricao_objetivo}`,
-        url_destino: "/solicitar-agenda",
+        url_destino: `/solicitar-agenda?agenda=${agenda[0].id}`,
       });
 
       // Notificar acompanhantes
@@ -155,7 +155,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_acompanhante",
           titulo: "Você foi adicionado em uma agenda",
           mensagem: `Agenda: ${data.descricao_objetivo}`,
-          url_destino: "/solicitar-agenda",
+          url_destino: `/solicitar-agenda?agenda=${agenda[0].id}`,
         }));
 
         await supabase.from("notificacoes").insert(notifAcompanhantes);
@@ -475,7 +475,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Sua agenda foi ${status}`,
-            url_destino: "/solicitar-agenda",
+            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
           });
         }
 
@@ -488,7 +488,7 @@ const SolicitarAgenda = () => {
             tipo: "agenda_status",
             titulo: "Status da agenda atualizado",
             mensagem: `Agenda foi ${status}`,
-            url_destino: "/solicitar-agenda",
+            url_destino: `/solicitar-agenda?agenda=${agendaId}`,
           }));
 
         if (notifs.length > 0) {
@@ -552,7 +552,7 @@ const SolicitarAgenda = () => {
           tipo: "agenda_mensagem",
           titulo: "Nova mensagem na agenda",
           mensagem: mensagem.substring(0, 100),
-          url_destino: "/solicitar-agenda",
+          url_destino: `/solicitar-agenda?agenda=${selectedAgenda?.id}`,
         }));
 
         if (notifs.length > 0) {
