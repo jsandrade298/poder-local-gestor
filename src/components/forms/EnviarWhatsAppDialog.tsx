@@ -159,14 +159,32 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       // Processar destinatários sequencialmente
       const sendMessages = async () => {
         for (const recipient of recipients) {
+          // Verificar se o envio foi cancelado
+          const currentState = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+          if (currentState === 'true') {
+            break;
+          }
+          
           // Marcar como enviando
           updateRecipientStatus(recipient.id, 'sending');
           
           // Countdown real antes do envio
           const delay = Math.floor(Math.random() * (tempoMaximo - tempoMinimo + 1)) + tempoMinimo;
           for (let i = delay; i > 0; i--) {
+            // Verificar cancelamento durante countdown
+            const cancelledDuringCountdown = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+            if (cancelledDuringCountdown === 'true') {
+              return;
+            }
+            
             updateCountdown(recipient.id, i);
             await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          // Verificar cancelamento antes do envio
+          const cancelledBeforeSend = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+          if (cancelledBeforeSend === 'true') {
+            return;
           }
           
           try {

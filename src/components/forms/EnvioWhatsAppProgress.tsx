@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export function EnvioWhatsAppProgress() {
-  const { state, setMinimized, resetSending } = useWhatsAppSending();
+  const { state, setMinimized, resetSending, cancelSending } = useWhatsAppSending();
 
   // Não renderiza se não há envio ativo
   if (!state.isActive) {
@@ -68,12 +68,16 @@ export function EnvioWhatsAppProgress() {
   };
 
   return (
-    <div className={cn(
-      "fixed z-50 bg-background border border-border shadow-lg transition-all duration-300",
-      state.isMinimized 
-        ? "bottom-4 right-4 w-80 h-16 rounded-lg"
-        : "bottom-4 right-4 w-96 h-[500px] rounded-lg"
-    )}>
+    <div 
+      className={cn(
+        "fixed z-50 bg-background border border-border shadow-lg transition-all duration-300",
+        state.isMinimized 
+          ? "bottom-4 right-4 w-80 h-16 rounded-lg"
+          : "bottom-4 right-4 w-96 h-[500px] rounded-lg"
+      )}
+      data-whatsapp-sending-state
+      data-cancelled={state.isCancelled}
+    >
       <Card className="h-full">
         <CardHeader className="pb-2 space-y-1">
           <div className="flex items-center justify-between">
@@ -99,12 +103,24 @@ export function EnvioWhatsAppProgress() {
                   <Minimize2 className="h-3 w-3" />
                 )}
               </Button>
-              {isComplete && (
+              {!isComplete && !state.isCancelled && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelSending}
+                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                  title="Cancelar envio"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+              {(isComplete || state.isCancelled) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={resetSending}
                   className="h-6 w-6 p-0"
+                  title="Fechar"
                 >
                   <X className="h-3 w-3" />
                 </Button>

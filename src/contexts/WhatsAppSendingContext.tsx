@@ -13,6 +13,7 @@ interface RecipientProgress {
 interface WhatsAppSendingState {
   isActive: boolean;
   isMinimized: boolean;
+  isCancelled: boolean;
   totalRecipients: number;
   processedRecipients: number;
   currentRecipient?: RecipientProgress;
@@ -37,6 +38,7 @@ interface WhatsAppSendingContextType {
   setMinimized: (minimized: boolean) => void;
   finishSending: () => void;
   resetSending: () => void;
+  cancelSending: () => void;
 }
 
 const WhatsAppSendingContext = createContext<WhatsAppSendingContextType | undefined>(undefined);
@@ -44,6 +46,7 @@ const WhatsAppSendingContext = createContext<WhatsAppSendingContextType | undefi
 const initialState: WhatsAppSendingState = {
   isActive: false,
   isMinimized: false,
+  isCancelled: false,
   totalRecipients: 0,
   processedRecipients: 0,
   recipients: [],
@@ -71,6 +74,7 @@ export function WhatsAppSendingProvider({ children }: { children: ReactNode }) {
     setState({
       isActive: true,
       isMinimized: false,
+      isCancelled: false,
       totalRecipients: recipients.length,
       processedRecipients: 0,
       recipients,
@@ -128,6 +132,18 @@ export function WhatsAppSendingProvider({ children }: { children: ReactNode }) {
     setState(initialState);
   };
 
+  const cancelSending = () => {
+    setState(prev => ({
+      ...prev,
+      isCancelled: true,
+      recipients: prev.recipients.map(recipient => 
+        recipient.status === 'pending' || recipient.status === 'sending'
+          ? { ...recipient, status: 'error', error: 'Envio cancelado pelo usuário' }
+          : recipient
+      )
+    }));
+  };
+
   return (
     <WhatsAppSendingContext.Provider
       value={{
@@ -138,6 +154,7 @@ export function WhatsAppSendingProvider({ children }: { children: ReactNode }) {
         setMinimized,
         finishSending,
         resetSending,
+        cancelSending,
       }}
     >
       {children}
