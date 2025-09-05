@@ -742,6 +742,9 @@ const WhatsApp = () => {
                         })}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Selecione uma demanda para enviar mensagem de teste
+                    </p>
                     {demandas.length === 0 && (
                       <p className="text-sm text-muted-foreground">
                         Nenhuma demanda com telefone encontrada
