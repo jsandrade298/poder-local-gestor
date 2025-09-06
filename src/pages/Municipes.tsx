@@ -46,26 +46,61 @@ export default function Municipes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar munícipes com suas tags
+  // Buscar munícipes com suas tags - SEM LIMITE
   const { data: municipes = [], isLoading } = useQuery({
     queryKey: ['municipes'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select(`
-          *,
-          municipe_tags(
-            tags(
-              id,
-              nome,
-              cor
-            )
-          )
-        `)
-        .order('nome');
+      console.log('🔄 Iniciando busca de munícipes...');
       
-      if (error) throw error;
-      return data || [];
+      // Buscar todos os munícipes sem limite
+      let allMunicipes: any[] = [];
+      let from = 0;
+      const size = 1000; // Buscar em lotes de 1000
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from('municipes')
+          .select(`
+            *,
+            municipe_tags(
+              tags(
+                id,
+                nome,
+                cor
+              )
+            )
+          `, { count: 'exact' })
+          .order('nome')
+          .range(from, from + size - 1);
+        
+        if (error) {
+          console.error('❌ Erro ao buscar munícipes:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          allMunicipes = [...allMunicipes, ...data];
+          console.log(`📊 Carregados ${data.length} munícipes (${from + 1} a ${from + data.length})`);
+          
+          // Se retornou menos que o tamanho do lote, chegamos ao fim
+          if (data.length < size) {
+            hasMore = false;
+          } else {
+            from += size;
+          }
+        } else {
+          hasMore = false;
+        }
+        
+        // Log do total na primeira iteração
+        if (from === 0 && count !== null) {
+          console.log(`📈 Total de munícipes no banco: ${count}`);
+        }
+      }
+      
+      console.log(`✅ Total carregado: ${allMunicipes.length} munícipes`);
+      return allMunicipes;
     }
   });
 
