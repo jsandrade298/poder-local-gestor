@@ -46,12 +46,6 @@ export default function Municipes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Invalidar cache dos munícipes quando componente monta para garantir dados atualizados
-  useEffect(() => {
-    console.log('🔄 Componente Municipes montado - invalidando cache...');
-    queryClient.invalidateQueries({ queryKey: ['municipes'] });
-    queryClient.removeQueries({ queryKey: ['municipes'] }); // Remove cache completamente
-  }, [queryClient]);
 
   // Buscar munícipes com suas tags - SEM LIMITE
   const { data: municipes = [], isLoading } = useQuery({
@@ -109,10 +103,10 @@ export default function Municipes() {
       console.log(`✅ Total carregado: ${allMunicipes.length} munícipes`);
       return allMunicipes;
     },
-    staleTime: 0, // Sempre considerar dados como obsoletos
-    refetchOnMount: true, // Sempre refetch quando componente monta
-    refetchOnWindowFocus: true, // Refetch quando janela ganha foco
-    refetchOnReconnect: true // Refetch quando reconecta
+    staleTime: 5 * 60 * 1000, // Cache válido por 5 minutos
+    refetchOnMount: false, // Não refetch automático no mount
+    refetchOnWindowFocus: false, // Não refetch no foco
+    refetchOnReconnect: true // Apenas refetch na reconexão
   });
 
   // Buscar cidades únicas para o filtro
@@ -795,7 +789,10 @@ export default function Municipes() {
               onClick={() => {
                 console.log('🔄 Refresh manual dos munícipes');
                 queryClient.invalidateQueries({ queryKey: ['municipes'] });
-                queryClient.removeQueries({ queryKey: ['municipes'] });
+                toast({
+                  title: "Dados atualizados!",
+                  description: "Lista de munícipes foi atualizada."
+                });
               }}
               className="gap-2"
             >

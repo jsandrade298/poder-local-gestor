@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Configurar listener de autenticação PRIMEIRO
@@ -26,6 +28,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Invalidar cache quando usuário faz login
+        if (event === 'SIGNED_IN' && session) {
+          console.log('🔄 Login detectado - invalidando cache de dados');
+          queryClient.invalidateQueries({ queryKey: ['municipes'] });
+          queryClient.invalidateQueries({ queryKey: ['demandas'] });
+          queryClient.invalidateQueries({ queryKey: ['tags'] });
+        }
+        
+        // Limpar cache quando usuário faz logout
+        if (event === 'SIGNED_OUT') {
+          console.log('🧹 Logout detectado - limpando cache');
+          queryClient.clear();
+        }
       }
     );
 
@@ -37,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
