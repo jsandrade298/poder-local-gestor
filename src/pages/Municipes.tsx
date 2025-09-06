@@ -512,30 +512,13 @@ export default function Municipes() {
                   if (tagNames && tagNames.trim() !== '') {
                     console.log(`📋 Processando tags para ${municipe.nome || 'N/A'}: "${tagNames}"`);
                     
-                    // Separar tags usando múltiplos separadores
-                    let tagList: string[] = [];
-                    
-                    // Primeiro separar por vírgula
-                    if (tagNames.includes(',')) {
-                      tagList = tagNames.split(',');
-                    }
-                    // Depois por ponto e vírgula
-                    else if (tagNames.includes(';')) {
-                      tagList = tagNames.split(';');
-                    }
-                    // Depois por pipe
-                    else if (tagNames.includes('|')) {
-                      tagList = tagNames.split('|');
-                    }
-                    // Se não tem separador, é uma tag única
-                    else {
-                      tagList = [tagNames];
-                    }
-                    
-                    // Limpar e processar as tags
-                    const cleanTagList = tagList
-                      .map(name => name.trim().toLowerCase())
+                    // Separar tags usando regex para múltiplos separadores
+                    const tagList = tagNames.split(/[,;|]/)
+                      .map(name => name.trim())
                       .filter(name => name !== '');
+                    
+                    // Processar as tags (já limpos)
+                    const cleanTagList = tagList.map(name => name.toLowerCase());
                     
                     console.log(`📋 Tags encontradas: ${cleanTagList.join(', ')}`);
                     
