@@ -558,7 +558,7 @@ export default function PlanoAcao() {
                   <TableHead className="w-12 sticky left-0 bg-background" style={{ zIndex: 6 }}>
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </TableHead>
-                  <TableHead className="w-12 sticky left-12 bg-background" style={{ zIndex: 6 }}>
+                  <TableHead className="w-12">
                     <Checkbox />
                   </TableHead>
                   <TableHead style={{ width: columnWidths.eixo }} className="relative">
@@ -642,7 +642,7 @@ export default function PlanoAcao() {
                       <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
-                  <TableHead style={{ width: columnWidths.excluir, zIndex: 6 }} className="sticky right-0 bg-background">
+                  <TableHead style={{ width: columnWidths.excluir }}>
                     Excluir
                   </TableHead>
                 </TableRow>
@@ -685,8 +685,8 @@ export default function PlanoAcao() {
                                        </div>
                                      </TableCell>
                                      
-                                     {/* Checkbox - Sticky Left */}
-                                     <TableCell className="w-12 sticky left-12 bg-background z-10">
+                                     {/* Checkbox */}
+                                     <TableCell className="w-12">
                                        <Checkbox
                                          checked={action.concluida}
                                          onCheckedChange={() => handleToggleConcluida(action)}
@@ -947,8 +947,8 @@ export default function PlanoAcao() {
                                       )}
                                     </TableCell>
 
-                                     {/* Botão de exclusão - Sticky Right */}
-                                     <TableCell style={{ width: columnWidths.excluir }} className="sticky right-0 bg-background z-10">
+                                     {/* Botão de exclusão */}
+                                     <TableCell style={{ width: columnWidths.excluir }}>
                                        <AlertDialog>
                                          <AlertDialogTrigger asChild>
                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
