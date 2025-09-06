@@ -19,9 +19,9 @@ import { cn } from '@/lib/utils';
 export function MunicipeDeletionProgress() {
   const { state, setMinimized, resetDeletion, cancelDeletion } = useMunicipeDeletion();
 
-  // Scroll automático para acompanhar o item sendo processado
+  // Scroll automático para acompanhar o item sendo processado (somente se não foi cancelado)
   useEffect(() => {
-    if (!state.isActive || state.isMinimized) return;
+    if (!state.isActive || state.isMinimized || state.isCancelled) return;
     
     // Encontrar o item sendo excluído atualmente
     const currentMunicipe = state.municipes.find(m => m.status === 'deleting');
@@ -51,7 +51,26 @@ export function MunicipeDeletionProgress() {
     // Delay para garantir que o DOM foi atualizado com o novo status
     const timeoutId = setTimeout(scrollToCurrentItem, 300);
     return () => clearTimeout(timeoutId);
-  }, [state.municipes.map(m => `${m.id}-${m.status}`).join(','), state.isActive, state.isMinimized]);
+  }, [state.municipes.map(m => `${m.id}-${m.status}`).join(','), state.isActive, state.isMinimized, state.isCancelled]);
+
+  // Quando cancelado, fazer scroll para o primeiro munícipe pendente para mostrar os não processados
+  useEffect(() => {
+    if (!state.isCancelled || state.isMinimized) return;
+    
+    setTimeout(() => {
+      const firstPendingOrError = state.municipes.find(m => m.status === 'pending' || (m.status === 'error' && m.error?.includes('cancelada')));
+      if (firstPendingOrError) {
+        const element = document.querySelector(`[data-municipe-id="${firstPendingOrError.id}"]`) as HTMLElement;
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }
+      }
+    }, 500);
+  }, [state.isCancelled, state.isMinimized]);
 
   // Não renderiza se não há exclusão ativa
   if (!state.isActive) {
@@ -230,8 +249,13 @@ export function MunicipeDeletionProgress() {
               </span>
               <span className="flex items-center gap-1 text-gray-600">
                 <Clock className="h-3 w-3" />
-                {state.municipes.filter(m => m.status === 'pending').length} pendentes
+                {state.municipes.filter(m => m.status === 'pending').length} não processados
               </span>
+              {state.isCancelled && (
+                <span className="text-orange-600 font-medium">
+                  ⚠️ Cancelado
+                </span>
+              )}
             </div>
           </CardContent>
         )}
