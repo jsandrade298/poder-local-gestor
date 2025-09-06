@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useMunicipeDeletion } from '@/contexts/MunicipeDeletionContext';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -18,6 +18,41 @@ import { cn } from '@/lib/utils';
 
 export function MunicipeDeletionProgress() {
   const { state, setMinimized, resetDeletion, cancelDeletion } = useMunicipeDeletion();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Scroll automático para acompanhar o item sendo processado
+  useEffect(() => {
+    if (!state.isActive || state.isMinimized) return;
+    
+    // Encontrar o índice do item sendo excluído atualmente
+    const currentIndex = state.municipes.findIndex(m => m.status === 'deleting');
+    if (currentIndex === -1) return;
+
+    // Scroll para o item atual com animação suave
+    const scrollToCurrentItem = () => {
+      const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+      if (!scrollContainer) return;
+
+      const itemElement = scrollContainer.children[0]?.children[currentIndex + 1] as HTMLElement; // +1 por causa do padding
+      if (!itemElement) return;
+
+      const containerHeight = scrollContainer.clientHeight;
+      const itemOffsetTop = itemElement.offsetTop;
+      const itemHeight = itemElement.offsetHeight;
+      
+      // Calcular posição para centralizar o item
+      const targetScrollTop = itemOffsetTop - (containerHeight / 2) + (itemHeight / 2);
+      
+      scrollContainer.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
+      });
+    };
+
+    // Delay pequeno para garantir que o DOM foi atualizado
+    const timeoutId = setTimeout(scrollToCurrentItem, 100);
+    return () => clearTimeout(timeoutId);
+  }, [state.municipes, state.isActive, state.isMinimized]);
 
   // Não renderiza se não há exclusão ativa
   if (!state.isActive) {
@@ -144,17 +179,20 @@ export function MunicipeDeletionProgress() {
               {/* Lista de Munícipes */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="font-medium text-xs mb-2">Munícipes:</div>
-                <ScrollArea className="flex-1 border rounded">
+                <ScrollArea ref={scrollAreaRef} className="flex-1 border rounded">
                   <div className="p-2 space-y-2">
                     {state.municipes.map((municipe, index) => (
                       <div
                         key={municipe.id}
                         className={cn(
-                          "flex items-center justify-between p-2 rounded border text-xs",
-                          municipe.status === 'deleting' && "bg-red-50 border-red-200",
-                          municipe.status === 'deleted' && "bg-green-50 border-green-200",
-                          municipe.status === 'error' && "bg-red-50 border-red-200"
+                          "flex items-center justify-between p-2 rounded border text-xs transition-all duration-300",
+                          municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse",
+                          municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75",
+                          municipe.status === 'error' && "bg-red-50 border-red-200",
+                          municipe.status === 'pending' && "bg-gray-50 border-gray-200 opacity-60"
                         )}
+                        data-municipe-id={municipe.id}
+                        data-municipe-status={municipe.status}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{municipe.nome}</div>
