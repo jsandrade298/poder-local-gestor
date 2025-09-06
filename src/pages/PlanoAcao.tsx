@@ -212,9 +212,12 @@ export default function PlanoAcao() {
   };
 
   const handleQuickEdit = (action: any, field: string, value: any) => {
+    // Handle special case for responsavel_id
+    const finalValue = field === 'responsavel_id' && value === 'none' ? null : value;
+    
     updateAction.mutate({
       id: action.id,
-      updates: { [field]: value }
+      updates: { [field]: finalValue }
     });
   };
 
@@ -571,7 +574,7 @@ export default function PlanoAcao() {
                      {/* Responsável - Dropdown editável */}
                      <TableCell>
                        <Select 
-                         value={action.responsavel_id || ""} 
+                         value={action.responsavel_id || "none"} 
                          onValueChange={(value) => handleQuickEdit(action, 'responsavel_id', value)}
                        >
                          <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
@@ -580,7 +583,7 @@ export default function PlanoAcao() {
                            </div>
                          </SelectTrigger>
                          <SelectContent>
-                           <SelectItem value="">Sem responsável</SelectItem>
+                           <SelectItem value="none">Sem responsável</SelectItem>
                            {usuarios.map((usuario) => (
                              <SelectItem key={usuario.id} value={usuario.id}>
                                {usuario.nome}
