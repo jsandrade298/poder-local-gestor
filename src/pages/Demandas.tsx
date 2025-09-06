@@ -507,8 +507,8 @@ export default function Demandas() {
                 observacoes: demanda.observacoes || null,
                 criado_por: (await supabase.auth.getUser()).data.user?.id
               })
-              .select('id')
-              .single();
+               .select('id')
+               .single();
 
             if (error) {
               results.push({ success: false, titulo: demanda.titulo, error: error.message });
