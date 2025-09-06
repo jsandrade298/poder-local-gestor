@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ import { EditAcaoDialog } from "@/components/forms/EditAcaoDialog";
 import { EixosManagerDialog } from "@/components/forms/EixosManagerDialog";
 import { TemasManagerDialog } from "@/components/forms/TemasManagerDialog";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { ImportCSVDialogPlanoAcao } from "@/components/forms/ImportCSVDialogPlanoAcao";
 
 export default function PlanoAcao() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -414,6 +415,12 @@ export default function PlanoAcao() {
           <Button variant="outline" onClick={() => setShowTemasManager(true)}>
             Gerenciar Temas
           </Button>
+          <ImportCSVDialogPlanoAcao>
+            <Button variant="outline">
+              <Upload className="h-4 w-4 mr-2" />
+              Importar CSV
+            </Button>
+          </ImportCSVDialogPlanoAcao>
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
