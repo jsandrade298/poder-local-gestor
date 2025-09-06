@@ -47,6 +47,7 @@ export default function Municipes() {
   const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0, currentName: '' });
   const [isDeleteInterrupted, setIsDeleteInterrupted] = useState(false);
   const [isProgressMinimized, setIsProgressMinimized] = useState(false);
+  const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -706,6 +707,7 @@ export default function Municipes() {
       const total = municipeIds.length;
       
       // Mostrar modal de progresso
+      console.log('🚀 Iniciando exclusão em massa - abrindo modal de progresso');
       setShowProgressDialog(true);
       setDeleteProgress({ current: 0, total, currentName: '' });
       setIsDeleteInterrupted(false);
@@ -1372,12 +1374,13 @@ export default function Municipes() {
               <div className="flex gap-2">
                 <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
                 
-                <AlertDialog>
+                <AlertDialog open={showMassDeleteConfirm} onOpenChange={setShowMassDeleteConfirm}>
                   <AlertDialogTrigger asChild>
                     <Button 
                       variant="destructive" 
                       size="sm" 
                       className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-all duration-200 hover:scale-105"
+                      onClick={() => setShowMassDeleteConfirm(true)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Excluir
@@ -1394,7 +1397,10 @@ export default function Municipes() {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction 
-                        onClick={() => deleteMunicipesInBatch.mutate(selectedMunicipes)}
+                        onClick={() => {
+                          setShowMassDeleteConfirm(false);
+                          deleteMunicipesInBatch.mutate(selectedMunicipes);
+                        }}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
                         Excluir {selectedMunicipes.length} munícipe(s)
