@@ -40,6 +40,9 @@ export default function Municipes() {
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -134,11 +137,24 @@ export default function Municipes() {
     return matchesSearch && matchesTag && matchesBairro && matchesCidade;
   });
 
+  // Calcular paginação
+  const totalItems = filteredMunicipes.length;
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
+  const startIndex = itemsPerPage === -1 ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === -1 ? totalItems : startIndex + itemsPerPage;
+  const paginatedMunicipes = itemsPerPage === -1 ? filteredMunicipes : filteredMunicipes.slice(startIndex, endIndex);
+
+  // Reset da página quando filtros mudam
+  const resetPage = () => {
+    setCurrentPage(1);
+  };
+
   const clearFilters = () => {
     setSearchTerm("");
     setTagFilter("all");
     setBairroFilter("all");
     setCidadeFilter("all");
+    resetPage();
   };
 
   // Gerenciar seleção de munícipes
@@ -154,7 +170,7 @@ export default function Municipes() {
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      setSelectedMunicipes(filteredMunicipes.map(m => m.id));
+      setSelectedMunicipes(paginatedMunicipes.map(m => m.id));
     } else {
       setSelectedMunicipes([]);
     }
@@ -745,7 +761,10 @@ export default function Municipes() {
                   <Input
                     placeholder="Nome, email ou telefone..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      resetPage();
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -755,7 +774,10 @@ export default function Municipes() {
                 <label className="text-sm font-medium text-foreground">
                   Tag
                 </label>
-                <Select value={tagFilter} onValueChange={setTagFilter}>
+                <Select value={tagFilter} onValueChange={(value) => {
+                  setTagFilter(value);
+                  resetPage();
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas as tags" />
                   </SelectTrigger>
@@ -780,7 +802,10 @@ export default function Municipes() {
                 <label className="text-sm font-medium text-foreground">
                   Bairro
                 </label>
-                <Select value={bairroFilter} onValueChange={setBairroFilter}>
+                <Select value={bairroFilter} onValueChange={(value) => {
+                  setBairroFilter(value);
+                  resetPage();
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os bairros" />
                   </SelectTrigger>
@@ -799,7 +824,10 @@ export default function Municipes() {
                 <label className="text-sm font-medium text-foreground">
                   Cidade
                 </label>
-                <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+                <Select value={cidadeFilter} onValueChange={(value) => {
+                  setCidadeFilter(value);
+                  resetPage();
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas as cidades" />
                   </SelectTrigger>
@@ -852,14 +880,40 @@ export default function Municipes() {
           </Card>
         </div>
 
-        {/* Tabela de Munícipes */}
+        {/* Controles de Paginação e Tabela */}
         <Card className="shadow-sm border-0 bg-card">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Lista de Munícipes</span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {isLoading ? 'Carregando...' : `${filteredMunicipes.length} munícipes`}
-              </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Mostrar:</span>
+                  <Select 
+                    value={itemsPerPage.toString()} 
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 por página</SelectItem>
+                      <SelectItem value="50">50 por página</SelectItem>
+                      <SelectItem value="100">100 por página</SelectItem>
+                      <SelectItem value="-1">Mostrar todos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {isLoading ? 'Carregando...' : 
+                    itemsPerPage === -1 ? 
+                      `${filteredMunicipes.length} munícipes` :
+                      `${startIndex + 1}-${Math.min(endIndex, totalItems)} de ${totalItems} munícipes`
+                  }
+                </span>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -890,14 +944,14 @@ export default function Municipes() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredMunicipes.length === 0 ? (
+                ) : paginatedMunicipes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Nenhum munícipe encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMunicipes.map((municipe) => (
+                  paginatedMunicipes.map((municipe) => (
                     <TableRow key={municipe.id} className="hover:bg-muted/50">
                       <TableCell>
                         <Checkbox
@@ -1012,6 +1066,60 @@ export default function Municipes() {
               </TableBody>
             </Table>
           </CardContent>
+          
+          {/* Paginação */}
+          {totalPages > 1 && itemsPerPage !== -1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Dialog de Detalhes */}
