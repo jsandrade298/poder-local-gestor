@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X } from "lucide-react";
+import { Plus, Upload, X, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [searchMunicipe, setSearchMunicipe] = useState("");
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -36,6 +37,15 @@ export function NovaDemandaDialog() {
   const queryClient = useQueryClient();
 
   const { data: municipes = [] } = useMunicipesSelect();
+
+  // Filtrar munícipes baseado na busca
+  const filteredMunicipes = useMemo(() => {
+    if (!searchMunicipe) return municipes;
+    
+    return municipes.filter(municipe =>
+      municipe.nome.toLowerCase().includes(searchMunicipe.toLowerCase())
+    );
+  }, [municipes, searchMunicipe]);
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
@@ -153,6 +163,7 @@ export function NovaDemandaDialog() {
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       setOpen(false);
       setFiles([]);
+      setSearchMunicipe("");
       setFormData({
         titulo: "",
         descricao: "",
@@ -296,20 +307,42 @@ export function NovaDemandaDialog() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="municipe">Munícipe *</Label>
+                
+                {/* Campo de busca */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Digite para buscar munícipe..."
+                    value={searchMunicipe}
+                    onChange={(e) => setSearchMunicipe(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
                 <Select
                   value={formData.municipe_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, municipe_id: value }))}
+                  onValueChange={(value) => {
+                    setFormData(prev => ({ ...prev, municipe_id: value }));
+                    // Limpar busca após seleção
+                    setSearchMunicipe("");
+                  }}
                   required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o munícipe" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {municipes.map((municipe) => (
-                      <SelectItem key={municipe.id} value={municipe.id}>
-                        {municipe.nome}
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    {filteredMunicipes.length > 0 ? (
+                      filteredMunicipes.map((municipe) => (
+                        <SelectItem key={municipe.id} value={municipe.id}>
+                          {municipe.nome}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-results" disabled>
+                        {searchMunicipe ? "Nenhum munícipe encontrado" : "Carregando..."}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
