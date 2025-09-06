@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.enviar-whatsapp-twilio]
 verify_jwt = false
+
+[functions.create-user-custom]
+verify_jwt = false

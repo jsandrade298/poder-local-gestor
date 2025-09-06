@@ -102,17 +102,19 @@ export default function Usuarios() {
         throw new Error("A senha deve ter pelo menos 6 caracteres");
       }
 
-      // Usar a função do banco para criar usuário sem validação de domínio
-      const { data, error } = await supabase.rpc('create_user_direct', {
-        user_email: userData.email,
-        user_password: userData.senha,
-        user_name: userData.nome,
-        user_phone: userData.telefone,
-        user_cargo: userData.cargo
+      // Usar Edge Function para criar usuário sem validação de domínio
+      const { data, error } = await supabase.functions.invoke('create-user-custom', {
+        body: {
+          email: userData.email,
+          password: userData.senha,
+          nome: userData.nome,
+          telefone: userData.telefone,
+          cargo: userData.cargo
+        }
       });
 
       if (error) {
-        console.error('Erro na função create_user_direct:', error);
+        console.error('Erro na função create-user-custom:', error);
         throw error;
       }
 
