@@ -47,25 +47,54 @@ export default function Demandas() {
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
     queryKey: ['demandas', pageSize, currentPage, searchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter],
     queryFn: async () => {
-      // Se "Todas", buscar todas as demandas
+      // Se "Todas", buscar todas as demandas em lotes
       if (pageSize === "all") {
-        const { data, error } = await supabase
-          .from('demandas')
-          .select(`
-            *,
-            areas(nome),
-            municipes(nome)
-          `)
-          .order('created_at', { ascending: false });
+        console.log('🔄 Demandas: Carregando todas as demandas em lotes...');
         
-        if (error) throw error;
-        return { demandas: data || [], total: data?.length || 0 };
+        const BATCH_SIZE = 1000;
+        let allDemandas: any[] = [];
+        let hasMore = true;
+        let offset = 0;
+        
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('demandas')
+            .select(`
+              *,
+              areas(nome),
+              municipes(nome)
+            `)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + BATCH_SIZE - 1);
+          
+          if (error) {
+            console.error('❌ Demandas: Erro ao buscar lote:', error);
+            throw error;
+          }
+          
+          if (data && data.length > 0) {
+            allDemandas = [...allDemandas, ...data];
+            offset += BATCH_SIZE;
+            
+            // Se retornou menos que o tamanho do lote, não há mais dados
+            hasMore = data.length === BATCH_SIZE;
+            
+            console.log(`📦 Demandas: Lote carregado - ${data.length} demandas (total: ${allDemandas.length})`);
+          } else {
+            hasMore = false;
+          }
+        }
+        
+        console.log(`✅ Demandas: ${allDemandas.length} demandas carregadas em lotes`);
+        return { demandas: allDemandas, total: allDemandas.length };
       }
 
-      // Busca paginada
+      // Busca paginada normal
       const itemsPerPage = pageSize as number;
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
+
+      console.log(`🔄 Demandas: Carregando página ${currentPage} (${itemsPerPage} por página)`);
 
       // Buscar com paginação
       const { data, error, count } = await supabase
@@ -78,7 +107,12 @@ export default function Demandas() {
         .order('created_at', { ascending: false })
         .range(from, to);
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Demandas: Erro ao buscar página:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Demandas: Página ${currentPage} carregada - ${data?.length || 0} demandas`);
       return { demandas: data || [], total: count || 0 };
     }
   });
