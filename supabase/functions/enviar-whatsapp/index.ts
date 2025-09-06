@@ -336,6 +336,15 @@ serve(async (req) => {
           
           console.log('💬 Enviando mensagem de texto');
           const textUrl = `${instance.api_url}/message/sendText/${instance.instance_id}`;
+          console.log('URL da API:', textUrl);
+          console.log('Headers da API:', JSON.stringify(apiHeaders, null, 2));
+          console.log('Payload:', JSON.stringify({
+            number: normalizedPhone,
+            text: mensagemParaEnviar,
+            linkPreview: false,
+            delay: 1200
+          }, null, 2));
+          
           const textResponse = await fetch(textUrl, {
             method: 'POST',
             headers: apiHeaders,
@@ -347,7 +356,12 @@ serve(async (req) => {
             })
           });
           
+          const responseText = await textResponse.text();
+          console.log('Status da resposta:', textResponse.status);
+          console.log('Resposta completa da API:', responseText);
+          
           if (textResponse.ok) {
+            console.log('✅ Texto enviado com sucesso');
             successCount++;
             results.push({
               telefone: rawPhone,
@@ -356,12 +370,13 @@ serve(async (req) => {
               mensagem: 'Texto enviado'
             });
           } else {
+            console.error('❌ Erro ao enviar texto:', responseText);
             errorCount++;
             results.push({
               telefone: rawPhone,
               tipo: 'texto',
               status: 'erro',
-              erro: `Erro no texto: ${textResponse.status}`
+              erro: `Erro no texto: ${textResponse.status} - ${responseText}`
             });
           }
         }
