@@ -1183,7 +1183,9 @@ export default function Municipes() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => {
                               e.preventDefault();
-                              console.log('Excluir clicado para:', municipe.nome);
+                              e.stopPropagation();
+                              console.log('🗑️ Excluir clicado para:', municipe.nome);
+                              console.log('🔧 Definindo munícipe para exclusão e abrindo modal');
                               setMunicipeToDelete(municipe);
                               setShowDeleteDialog(true);
                             }}>
