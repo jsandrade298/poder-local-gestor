@@ -58,15 +58,29 @@ export function MunicipeDeletionProgress() {
     if (!state.isCancelled || state.isMinimized) return;
     
     setTimeout(() => {
-      const firstPendingOrError = state.municipes.find(m => m.status === 'pending' || (m.status === 'error' && m.error?.includes('cancelada')));
-      if (firstPendingOrError) {
-        const element = document.querySelector(`[data-municipe-id="${firstPendingOrError.id}"]`) as HTMLElement;
+      // Primeiro tentar encontrar um item pendente
+      let targetElement = state.municipes.find(m => m.status === 'pending');
+      
+      // Se não houver pendentes, procurar por erros de cancelamento
+      if (!targetElement) {
+        targetElement = state.municipes.find(m => m.status === 'error' && m.error?.includes('cancelada'));
+      }
+      
+      if (targetElement) {
+        const element = document.querySelector(`[data-municipe-id="${targetElement.id}"]`) as HTMLElement;
         if (element) {
+          console.log('📍 Fazendo scroll para item não processado:', targetElement.nome);
           element.scrollIntoView({
             behavior: 'smooth',
             block: 'start',
             inline: 'nearest'
           });
+          
+          // Destacar o item temporariamente
+          element.style.boxShadow = '0 0 10px rgba(255, 165, 0, 0.5)';
+          setTimeout(() => {
+            element.style.boxShadow = '';
+          }, 2000);
         }
       }
     }, 500);
@@ -192,23 +206,24 @@ export function MunicipeDeletionProgress() {
         </CardHeader>
 
         {!state.isMinimized && (
-          <CardContent className="pt-0 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 120px)' }}>
-            <div className="flex-1 space-y-3 overflow-hidden min-h-0">
+          <CardContent className="pt-0 flex flex-col" style={{ height: 'calc(100% - 120px)' }}>
+            <div className="flex-1 space-y-3 min-h-0 flex flex-col">
               {/* Lista de Munícipes */}
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0">
                 <div className="font-medium text-xs mb-2">Munícipes:</div>
-                <ScrollArea className="flex-1 border rounded">
+                <ScrollArea className="flex-1 border rounded min-h-[200px] max-h-[300px] overflow-y-scroll" style={{ scrollbarWidth: 'thin' }}>
                   <div className="p-2 space-y-2">
                     {state.municipes.map((municipe, index) => (
                       <div
                         key={municipe.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded border text-xs transition-all duration-300",
-                          municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse",
-                          municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75",
-                          municipe.status === 'error' && "bg-red-50 border-red-200",
-                          municipe.status === 'pending' && "bg-gray-50 border-gray-200 opacity-60"
-                        )}
+                         className={cn(
+                           "flex items-center gap-3 p-3 rounded border text-xs transition-all duration-300",
+                           municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse",
+                           municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75",
+                           municipe.status === 'error' && "bg-red-50 border-red-200",
+                           municipe.status === 'pending' && state.isCancelled && "bg-orange-50 border-orange-300 ring-1 ring-orange-200",
+                           municipe.status === 'pending' && !state.isCancelled && "bg-gray-50 border-gray-200 opacity-60"
+                         )}
                         data-municipe-id={municipe.id}
                         data-municipe-status={municipe.status}
                       >
