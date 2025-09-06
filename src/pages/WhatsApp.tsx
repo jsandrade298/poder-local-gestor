@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageCircle, Cake, Settings, Send, Clock, Users, Paperclip, X, CheckSquare, Square, FileText, AlertCircle } from "lucide-react";
-import { WhatsAppLogsViewer } from "@/components/WhatsAppLogsViewer";
+
 
 interface WhatsAppInstance {
   id: string;
@@ -437,7 +437,7 @@ const WhatsApp = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="aniversario" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="aniversario" className="flex items-center gap-2">
                 <Cake className="h-4 w-4" />
                 Aniversários
@@ -445,10 +445,6 @@ const WhatsApp = () => {
               <TabsTrigger value="demandas" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Demandas
-              </TabsTrigger>
-              <TabsTrigger value="logs" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Histórico
               </TabsTrigger>
             </TabsList>
 
@@ -904,10 +900,6 @@ const WhatsApp = () => {
               )}
             </TabsContent>
 
-            {/* Aba de Histórico/Logs */}
-            <TabsContent value="logs" className="space-y-6">
-              <WhatsAppLogsViewer />
-            </TabsContent>
 
             {/* Botões de Ação Globais */}
             <div className="flex gap-2 pt-4 border-t">
