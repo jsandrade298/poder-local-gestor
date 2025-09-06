@@ -37,6 +37,8 @@ interface WhatsAppConfig {
   instancia_demandas: string;
   mensagem_demandas: string;
   demandas_ativo: boolean;
+  tempo_minimo_aniversario: number;
+  tempo_maximo_aniversario: number;
 }
 
 interface MediaFile {
@@ -53,7 +55,9 @@ const WhatsApp = () => {
     aniversario_ativo: false,
     instancia_demandas: '',
     mensagem_demandas: 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
-    demandas_ativo: false
+    demandas_ativo: false,
+    tempo_minimo_aniversario: 2,
+    tempo_maximo_aniversario: 5
   });
   const [loading, setLoading] = useState(true);
   const [demandaSelecionada, setDemandaSelecionada] = useState<string>('');
@@ -99,7 +103,9 @@ const WhatsApp = () => {
           'whatsapp_aniversario_ativo',
           'whatsapp_instancia_demandas',
           'whatsapp_mensagem_demandas',
-          'whatsapp_demandas_ativo'
+          'whatsapp_demandas_ativo',
+          'whatsapp_tempo_minimo_aniversario',
+          'whatsapp_tempo_maximo_aniversario'
         ]);
 
       if (error) throw error;
@@ -115,7 +121,9 @@ const WhatsApp = () => {
       aniversario_ativo: configMap.whatsapp_aniversario_ativo === 'true',
       instancia_demandas: configMap.whatsapp_instancia_demandas || '',
       mensagem_demandas: configMap.whatsapp_mensagem_demandas || 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
-      demandas_ativo: configMap.whatsapp_demandas_ativo === 'true'
+      demandas_ativo: configMap.whatsapp_demandas_ativo === 'true',
+      tempo_minimo_aniversario: parseInt(configMap.whatsapp_tempo_minimo_aniversario) || 2,
+      tempo_maximo_aniversario: parseInt(configMap.whatsapp_tempo_maximo_aniversario) || 5
     });
     } catch (error) {
       console.error('Erro ao buscar configurações:', error);
@@ -190,7 +198,9 @@ const WhatsApp = () => {
         { chave: 'whatsapp_aniversario_ativo', valor: config.aniversario_ativo.toString() },
         { chave: 'whatsapp_instancia_demandas', valor: config.instancia_demandas },
         { chave: 'whatsapp_mensagem_demandas', valor: config.mensagem_demandas },
-        { chave: 'whatsapp_demandas_ativo', valor: config.demandas_ativo.toString() }
+        { chave: 'whatsapp_demandas_ativo', valor: config.demandas_ativo.toString() },
+        { chave: 'whatsapp_tempo_minimo_aniversario', valor: config.tempo_minimo_aniversario.toString() },
+        { chave: 'whatsapp_tempo_maximo_aniversario', valor: config.tempo_maximo_aniversario.toString() }
       ];
 
       for (const configItem of configsToSave) {
@@ -334,8 +344,8 @@ const WhatsApp = () => {
           telefones,
           mensagem: '', // Deixar vazio pois usaremos apenas customMessages
           instanceName: config.instancia_aniversario,
-          tempoMinimo: 2,
-          tempoMaximo: 4,
+          tempoMinimo: config.tempo_minimo_aniversario,
+          tempoMaximo: config.tempo_maximo_aniversario,
           mediaFiles: mediaData,
           customMessages
         }
@@ -595,6 +605,43 @@ const WhatsApp = () => {
               <p className="mt-1">
                 <strong>Exemplo:</strong> {config.mensagem_aniversario.replace('{nome}', 'João Silva')}
               </p>
+            </div>
+          </div>
+
+          {/* Configuração de Delay */}
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Configuração de Delay</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="tempo-min-aniv">Tempo mínimo (segundos)</Label>
+                <Input
+                  id="tempo-min-aniv"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={config.tempo_minimo_aniversario}
+                  onChange={(e) =>
+                    setConfig(prev => ({ ...prev, tempo_minimo_aniversario: Number(e.target.value) }))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="tempo-max-aniv">Tempo máximo (segundos)</Label>
+                <Input
+                  id="tempo-max-aniv"
+                  type="number"
+                  min="1"
+                  max="300"
+                  value={config.tempo_maximo_aniversario}
+                  onChange={(e) =>
+                    setConfig(prev => ({ ...prev, tempo_maximo_aniversario: Number(e.target.value) }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>⏱️ Define o intervalo aleatório entre envios para evitar bloqueios</p>
+              <p>💡 Recomendado: 2-5 segundos para poucos contatos, 5-15 segundos para muitos contatos</p>
             </div>
           </div>
 
