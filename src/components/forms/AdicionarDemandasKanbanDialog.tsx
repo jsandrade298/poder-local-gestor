@@ -10,6 +10,7 @@ import { Search, Filter } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { formatDateTime } from '@/lib/dateUtils';
 
 interface AdicionarDemandasKanbanDialogProps {
@@ -84,27 +85,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     enabled: open
   });
 
-  const { data: municipes = [] } = useQuery({
-    queryKey: ['municipes-select'], // Chave específica para seleção
-    queryFn: async () => {
-      console.log('🔄 Kanban Form: Carregando munícipes para seleção...');
-      
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('id, nome')
-        .order('nome')
-        .limit(10000); // Limite alto para garantir que pega todos
-      
-      if (error) {
-        console.error('❌ Kanban Form: Erro ao buscar munícipes:', error);
-        throw error;
-      }
-      
-      console.log(`✅ Kanban Form: ${data?.length || 0} munícipes carregados para seleção`);
-      return data || [];
-    },
-    enabled: open
-  });
+  const { data: municipes = [] } = useMunicipesSelect();
 
   const adicionarKanbanMutation = useMutation({
     mutationFn: async (demandaIds: string[]) => {

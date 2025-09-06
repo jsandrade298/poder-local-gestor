@@ -9,6 +9,7 @@ import { Plus, Upload, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
@@ -34,27 +35,7 @@ export function NovaDemandaDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: municipes = [] } = useQuery({
-    queryKey: ['municipes-select'], // Chave específica para seleção
-    queryFn: async () => {
-      console.log('🔄 Form: Carregando munícipes para seleção...');
-      
-      // Para formulários, buscar apenas id e nome mas SEM LIMITE
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('id, nome')
-        .order('nome')
-        .limit(10000); // Limite alto para garantir que pega todos
-      
-      if (error) {
-        console.error('❌ Form: Erro ao buscar munícipes:', error);
-        throw error;
-      }
-      
-      console.log(`✅ Form: ${data?.length || 0} munícipes carregados para seleção`);
-      return data;
-    }
-  });
+  const { data: municipes = [] } = useMunicipesSelect();
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
