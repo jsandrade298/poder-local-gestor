@@ -42,13 +42,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: configs, error: configError } = await supabase
       .from('configuracoes')
       .select('chave, valor')
-      .in('chave', [
-        'whatsapp_instancia_aniversario', 
-        'whatsapp_mensagem_aniversario', 
-        'whatsapp_aniversario_ativo',
-        'whatsapp_tempo_minimo_aniversario',
-        'whatsapp_tempo_maximo_aniversario'
-      ]);
+      .in('chave', ['whatsapp_instancia_aniversario', 'whatsapp_mensagem_aniversario', 'whatsapp_aniversario_ativo']);
 
     if (configError) {
       throw new Error(`Erro ao buscar configurações: ${configError.message}`);
@@ -62,15 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
     const instanciaAniversario = configMap.whatsapp_instancia_aniversario;
     const mensagemAniversario = configMap.whatsapp_mensagem_aniversario;
     const aniversarioAtivo = configMap.whatsapp_aniversario_ativo === 'true';
-    const tempoMinimo = parseInt(configMap.whatsapp_tempo_minimo_aniversario) || 2;
-    const tempoMaximo = parseInt(configMap.whatsapp_tempo_maximo_aniversario) || 5;
 
-    console.log('Configurações:', { 
-      instanciaAniversario, 
-      aniversarioAtivo, 
-      tempoMinimo, 
-      tempoMaximo 
-    });
+    console.log('Configurações:', { instanciaAniversario, aniversarioAtivo });
 
     // Verificar se está ativo
     if (!aniversarioAtivo) {
@@ -184,8 +171,8 @@ const handler = async (req: Request): Promise<Response> => {
         telefones,
         mensagem: 'Mensagem será personalizada', // Será substituída pelo customMessages
         instanceName: instanciaAniversario,
-        tempoMinimo: tempoMinimo,
-        tempoMaximo: tempoMaximo,
+        tempoMinimo: 3,
+        tempoMaximo: 5,
         customMessages // Passar mensagens personalizadas
       }
     });
