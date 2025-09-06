@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -564,92 +564,86 @@ export default function PlanoAcao() {
                   <TableHead style={{ width: columnWidths.eixo }} className="relative">
                     Eixo
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('eixo', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.prioridade }} className="relative">
                     Prioridade
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('prioridade', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.tema }} className="relative">
                     Tema
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('tema', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.acao }} className="relative">
                     Ação
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('acao', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.responsavel }} className="relative">
                     Responsável
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('responsavel', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.apoio }} className="relative">
                     Apoio
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('apoio', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.status }} className="relative">
                     Status
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('status', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.prazo }} className="relative">
                     Prazo
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('prazo', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
                   <TableHead style={{ width: columnWidths.atualizacao }} className="relative">
                     Atualização
                     <div 
-                      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                       onMouseDown={(e) => handleResizeStart('atualizacao', e)}
                     >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
+                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
                     </div>
                   </TableHead>
-                  <TableHead style={{ width: columnWidths.excluir, zIndex: 6 }} className="sticky right-0 bg-background relative">
+                  <TableHead style={{ width: columnWidths.excluir, zIndex: 6 }} className="sticky right-0 bg-background">
                     Excluir
-                    <div 
-                      className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
-                      onMouseDown={(e) => handleResizeStart('excluir', e)}
-                    >
-                      <div className="w-full h-full group-hover:bg-primary/50" />
-                    </div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -918,13 +912,16 @@ export default function PlanoAcao() {
                                     <TableCell style={{ width: columnWidths.atualizacao }}>
                                       {editingCell?.actionId === action.id && editingCell?.field === 'atualizacao' ? (
                                         <div className="flex gap-2 items-start">
-                                          <Textarea
-                                            value={editingValue}
-                                            onChange={(e) => setEditingValue(e.target.value)}
-                                            style={{ width: Math.max(columnWidths.atualizacao - 100, 200) }}
-                                            className="min-h-[60px]"
-                                            autoFocus
-                                          />
+                                           <Textarea
+                                             value={editingValue}
+                                             onChange={(e) => setEditingValue(e.target.value)}
+                                             style={{ 
+                                               width: Math.max(columnWidths.atualizacao - 100, 200),
+                                               whiteSpace: 'pre-wrap'
+                                             }}
+                                             className="min-h-[60px] whitespace-pre-wrap"
+                                             autoFocus
+                                           />
                                           <div className="flex flex-col gap-1">
                                             <Button size="sm" onClick={handleCellSave}>
                                               Salvar
@@ -935,14 +932,18 @@ export default function PlanoAcao() {
                                           </div>
                                         </div>
                                       ) : (
-                                        <div 
-                                          className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
-                                          style={{ maxWidth: columnWidths.atualizacao - 20 }}
-                                          onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
-                                          title={action.atualizacao}
-                                        >
-                                          {action.atualizacao || 'Clique para editar'}
-                                        </div>
+                                         <div 
+                                           className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
+                                           style={{ 
+                                             maxWidth: columnWidths.atualizacao - 20,
+                                             wordBreak: 'break-word',
+                                             whiteSpace: 'pre-wrap'
+                                           }}
+                                           onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
+                                           title={action.atualizacao}
+                                         >
+                                           {action.atualizacao || 'Clique para editar'}
+                                         </div>
                                       )}
                                     </TableCell>
 
