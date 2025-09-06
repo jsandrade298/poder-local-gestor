@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,6 +43,8 @@ export default function Municipes() {
   const [importResults, setImportResults] = useState<any[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
+  const [showProgressDialog, setShowProgressDialog] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0, currentName: '' });
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -698,10 +701,33 @@ export default function Municipes() {
   const deleteMunicipesInBatch = useMutation({
     mutationFn: async (municipeIds: string[]) => {
       const results = [];
+      const total = municipeIds.length;
       
-      for (const municipeId of municipeIds) {
+      // Mostrar modal de progresso
+      setShowProgressDialog(true);
+      setDeleteProgress({ current: 0, total, currentName: '' });
+      
+      for (let i = 0; i < municipeIds.length; i++) {
+        const municipeId = municipeIds[i];
+        
+        // Buscar nome do munícipe para mostrar no progresso
+        const { data: municipeData } = await supabase
+          .from('municipes')
+          .select('nome')
+          .eq('id', municipeId)
+          .single();
+        
+        const municipeNome = municipeData?.nome || `Munícipe ${i + 1}`;
+        
+        // Atualizar progresso
+        setDeleteProgress({ 
+          current: i + 1, 
+          total, 
+          currentName: municipeNome 
+        });
+        
         try {
-          console.log('Iniciando exclusão do munícipe:', municipeId);
+          console.log(`Excluindo ${i + 1}/${total}: ${municipeNome}`);
           
           // Primeiro, remover todas as tags associadas ao munícipe
           const { error: tagDeleteError } = await supabase
@@ -721,18 +747,25 @@ export default function Municipes() {
             .select();
           
           if (error) {
-            results.push({ id: municipeId, success: false, error: error.message });
+            results.push({ id: municipeId, success: false, error: error.message, nome: municipeNome });
           } else {
-            results.push({ id: municipeId, success: true });
+            results.push({ id: municipeId, success: true, nome: municipeNome });
           }
         } catch (err) {
-          results.push({ id: municipeId, success: false, error: 'Erro inesperado' });
+          results.push({ id: municipeId, success: false, error: 'Erro inesperado', nome: municipeNome });
         }
+        
+        // Pequena pausa para não sobrecarregar o servidor
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       return results;
     },
     onSuccess: (results) => {
+      // Fechar modal de progresso
+      setShowProgressDialog(false);
+      setDeleteProgress({ current: 0, total: 0, currentName: '' });
+      
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
       
@@ -758,6 +791,10 @@ export default function Municipes() {
       setSelectAll(false);
     },
     onError: (error) => {
+      // Fechar modal de progresso
+      setShowProgressDialog(false);
+      setDeleteProgress({ current: 0, total: 0, currentName: '' });
+      
       toast({
         title: "Erro na exclusão em massa",
         description: error.message,
@@ -1529,6 +1566,51 @@ export default function Municipes() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Modal de progresso para exclusão em massa */}
+        <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
+          <DialogContent className="sm:max-w-[400px]" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-destructive" />
+                Excluindo Munícipes
+              </DialogTitle>
+              <DialogDescription>
+                Aguarde enquanto os munícipes são removidos do sistema...
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Barra de progresso */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progresso</span>
+                  <span>{deleteProgress.current} / {deleteProgress.total}</span>
+                </div>
+                <Progress 
+                  value={deleteProgress.total > 0 ? (deleteProgress.current / deleteProgress.total) * 100 : 0} 
+                  className="h-2"
+                />
+              </div>
+              
+              {/* Munícipe sendo processado */}
+              {deleteProgress.currentName && (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Processando:</div>
+                  <div className="text-sm font-medium bg-muted p-2 rounded">
+                    {deleteProgress.currentName}
+                  </div>
+                </div>
+              )}
+              
+              {/* Indicador de carregamento */}
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                <span>Removendo dados e relacionamentos...</span>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
