@@ -111,6 +111,10 @@ serve(async (req) => {
       'Content-Type': 'application/json',
       'apikey': instance.instance_token,
     };
+    
+    console.log('API URL:', instance.api_url);
+    console.log('Instance ID:', instance.instance_id);
+    console.log('Token configurado:', instance.instance_token ? 'Sim' : 'Não');
 
     // Função auxiliar para converter formatos de áudio
     const convertAudioFormat = (mimeType: string): string => {
@@ -152,7 +156,9 @@ serve(async (req) => {
 
     // Processar cada telefone
     for (let i = 0; i < phoneList.length; i++) {
-      const rawPhone = phoneList[i];
+      // Se phoneList contém objetos, extrair o telefone
+      const telefoneItem = phoneList[i];
+      const rawPhone = typeof telefoneItem === 'object' ? telefoneItem.telefone : telefoneItem;
       const normalizedPhone = normalizePhone(rawPhone);
       
       console.log(`\n📱 [${i + 1}/${phoneList.length}] Processando: ${normalizedPhone}`);
@@ -335,6 +341,11 @@ serve(async (req) => {
           }
           
           console.log('💬 Enviando mensagem de texto');
+          console.log('Custom messages disponíveis:', Object.keys(customMessages));
+          console.log('Telefone atual:', rawPhone);
+          console.log('Mensagem personalizada:', customMessages[rawPhone]);
+          console.log('Mensagem final:', mensagemParaEnviar);
+          
           const textUrl = `${instance.api_url}/message/sendText/${instance.instance_id}`;
           console.log('URL da API:', textUrl);
           console.log('Headers da API:', JSON.stringify(apiHeaders, null, 2));
