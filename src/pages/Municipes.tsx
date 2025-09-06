@@ -40,6 +40,8 @@ export default function Municipes() {
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -1182,9 +1184,8 @@ export default function Municipes() {
                             <DropdownMenuItem onClick={(e) => {
                               e.preventDefault();
                               console.log('Excluir clicado para:', municipe.nome);
-                              if (window.confirm(`Tem certeza que deseja excluir o munícipe "${municipe.nome}"?`)) {
-                                deleteMunicipe.mutate(municipe.id);
-                              }
+                              setMunicipeToDelete(municipe);
+                              setShowDeleteDialog(true);
                             }}>
                               <Trash2 className="h-4 w-4 mr-2" />
                               <span className="text-destructive">Excluir</span>
@@ -1492,6 +1493,40 @@ export default function Municipes() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de confirmação para exclusão individual */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o munícipe <strong>"{municipeToDelete?.nome}"</strong>? 
+                Esta ação não pode ser desfeita e removerá todos os dados associados, incluindo demandas e tags.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowDeleteDialog(false);
+                setMunicipeToDelete(null);
+              }}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  if (municipeToDelete) {
+                    deleteMunicipe.mutate(municipeToDelete.id);
+                    setShowDeleteDialog(false);
+                    setMunicipeToDelete(null);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deleteMunicipe.isPending}
+              >
+                {deleteMunicipe.isPending ? 'Excluindo...' : 'Excluir'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
