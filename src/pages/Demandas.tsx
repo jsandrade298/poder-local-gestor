@@ -496,19 +496,35 @@ export default function Demandas() {
               'urgente': 'urgente'
             };
             
+            // Mapear status para valores válidos do enum
+            const statusMap: Record<string, string> = {
+              'aberta': 'aberta',
+              'em andamento': 'em_andamento',
+              'resolvida': 'resolvida',
+              'cancelada': 'cancelada'
+            };
+            
             console.log('🔍 Demanda original:', JSON.stringify({
               titulo: demanda.titulo,
               prioridade_original: demanda.prioridade,
-              prioridade_type: typeof demanda.prioridade
+              status_original: demanda.status,
+              prioridade_type: typeof demanda.prioridade,
+              status_type: typeof demanda.status
             }));
             
             const prioridadeNormalizada = demanda.prioridade 
               ? prioridadeMap[demanda.prioridade.toLowerCase()] || 'media'
               : 'media';
               
-            console.log('✅ Prioridade normalizada:', JSON.stringify({
-              original: demanda.prioridade,
-              normalizada: prioridadeNormalizada
+            const statusNormalizado = demanda.status 
+              ? statusMap[demanda.status.toLowerCase()] || 'aberta'
+              : 'aberta';
+              
+            console.log('✅ Valores normalizados:', JSON.stringify({
+              prioridade_original: demanda.prioridade,
+              prioridade_normalizada: prioridadeNormalizada,
+              status_original: demanda.status,
+              status_normalizado: statusNormalizado
             }));
 
             const { data, error } = await supabase
@@ -519,7 +535,7 @@ export default function Demandas() {
                 municipe_id: demanda.municipeId,
                 area_id: demanda.areaId || null,
                 responsavel_id: demanda.responsavelId || null,
-                status: demanda.status || 'aberta',
+                status: statusNormalizado,
                 prioridade: prioridadeNormalizada,
                 logradouro: demanda.logradouro || null,
                 numero: demanda.numero || null,
