@@ -253,7 +253,11 @@ serve(async (req) => {
             mediaType = 'audio';
           }
           
-          console.log(`🎯 Tipo detectado: ${mediaType} (baseado no mimetype: ${mimeType})`);
+          console.log(`🎯 DETECÇÃO DE TIPO:`);
+          console.log(`   mimeType: ${mimeType}`);
+          console.log(`   mediaType detectado: ${mediaType}`);
+          console.log(`   filename: ${media.filename}`);
+          console.log(`   Vai para o branch: ${mediaType === 'video' ? 'VIDEO (correto)' : mediaType === 'document' ? 'DOCUMENT (errado para video)' : mediaType}`);
           
           try {
             if (mediaType === 'audio') {
