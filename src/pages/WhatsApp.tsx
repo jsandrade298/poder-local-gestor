@@ -160,11 +160,15 @@ const WhatsApp = () => {
 
       if (error) throw error;
 
-      // Filtrar aniversariantes do dia
+      // Filtrar aniversariantes do dia - correção para fuso horário
       const aniversariantesHoje = (data || []).filter(municipe => {
         if (!municipe.data_nascimento) return false;
-        const dataNascimento = new Date(municipe.data_nascimento);
-        return dataNascimento.getMonth() + 1 === mes && dataNascimento.getDate() === dia;
+        
+        // Extrair mês e dia diretamente da string da data para evitar problemas de fuso horário
+        const dataString = municipe.data_nascimento; // formato: 'YYYY-MM-DD'
+        const [ano, mesNasc, diaNasc] = dataString.split('-').map(Number);
+        
+        return mesNasc === mes && diaNasc === dia;
       });
 
       setAniversariantes(aniversariantesHoje);
@@ -254,8 +258,9 @@ const WhatsApp = () => {
   };
 
   const formatarData = (dataString: string) => {
-    const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR');
+    // Extrair diretamente da string para evitar problemas de fuso horário
+    const [ano, mes, dia] = dataString.split('-');
+    return `${dia}/${mes}/${ano}`;
   };
 
   const enviarMensagemTeste = async () => {
