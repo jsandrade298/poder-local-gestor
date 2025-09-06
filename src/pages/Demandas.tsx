@@ -686,16 +686,36 @@ export default function Demandas() {
           });
 
           return demanda;
-        }).filter(d => d.titulo && d.titulo.trim() !== '' && d.descricao && d.descricao.trim() !== '' && d.municipeId);
+        });
 
-        if (demandas.length === 0) {
+        console.log(`📊 Total de linhas processadas: ${demandas.length}`);
+        
+        // Analisar problemas antes de filtrar
+        const problemAnalysis = demandas.map((d, index) => {
+          const problems = [];
+          if (!d.titulo || d.titulo.trim() === '') problems.push('título vazio');
+          if (!d.descricao || d.descricao.trim() === '') problems.push('descrição vazia');
+          if (!d.municipeId) problems.push(d.municipeError || 'munícipe não encontrado');
+          return { index: index + 2, problems }; // +2 porque linha 1 é header
+        }).filter(p => p.problems.length > 0);
+        
+        console.log(`❌ Demandas com problemas: ${problemAnalysis.length}`);
+        problemAnalysis.slice(0, 10).forEach(p => {
+          console.log(`   Linha ${p.index}: ${p.problems.join(', ')}`);
+        });
+        
+        const demandasValidas = demandas.filter(d => d.titulo && d.titulo.trim() !== '' && d.descricao && d.descricao.trim() !== '' && d.municipeId);
+        
+        console.log(`✅ Demandas válidas para importação: ${demandasValidas.length}`);
+
+        if (demandasValidas.length === 0) {
           toast.error("Nenhuma demanda válida encontrada. Verifique os campos obrigatórios: título, descrição e munícipe.");
           return;
         }
 
         // Limpar resultados anteriores antes de nova importação
         setImportResults([]);
-        importDemandas.mutate(demandas);
+        importDemandas.mutate(demandasValidas);
       } catch (error) {
         toast.error("Erro ao processar arquivo CSV. Verifique se o formato está correto.");
       }
