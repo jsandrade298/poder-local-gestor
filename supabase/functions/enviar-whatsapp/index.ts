@@ -193,6 +193,13 @@ serve(async (req) => {
           // Compatibilidade: suporte tanto para 'mimetype' quanto para 'type'
           const mimeType = media.mimetype || media.type || 'application/octet-stream';
           console.log(`📎 Enviando mídia ${mimeType} (${mediaIndex + 1}/${mediaFiles.length})`);
+          console.log(`📋 Dados da mídia:`, { 
+            type: media.type, 
+            mimetype: media.mimetype, 
+            filename: media.filename, 
+            url: media.url ? 'presente' : 'ausente',
+            data: media.data ? 'presente' : 'ausente'
+          });
           
           // Se media tem URL, baixar o arquivo primeiro
           let mediaData = media.data;
@@ -210,6 +217,7 @@ serve(async (req) => {
               uint8Array.forEach(byte => binary += String.fromCharCode(byte));
               mediaData = btoa(binary);
               console.log(`✅ Arquivo baixado e convertido para base64 (${mediaData.length} caracteres)`);
+              console.log(`📊 Tamanho do arquivo: ${arrayBuffer.byteLength} bytes`);
             } catch (error) {
               console.error(`❌ Erro ao baixar arquivo:`, error);
               errorCount++;
@@ -244,6 +252,9 @@ serve(async (req) => {
           } else if (mimeType.startsWith('audio/')) {
             mediaType = 'audio';
           }
+          
+          console.log(`🎯 Tipo detectado: ${mediaType} (baseado no mimetype: ${mimeType})`);
+          
           try {
             if (mediaType === 'audio') {
               // Tratamento especial para áudio
@@ -332,25 +343,51 @@ serve(async (req) => {
             } else {
               // Imagens e vídeos
               const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
-              const mediaPayload = {
+              
+              // Para vídeos, usar endpoint específico se necessário
+              let finalUrl = mediaUrl;
+              let finalPayload = {
                 number: normalizedPhone,
                 mediatype: mediaType,
                 media: mediaData, // Usar dados baixados
                 delay: 1200
               };
               
+              // Tratamento especial para vídeos grandes ou específicos
+              if (mediaType === 'video') {
+                console.log(`🎬 Enviando vídeo - mimetype: ${mimeType}, filename: ${media.filename}`);
+                
+                // Para alguns tipos de vídeo, pode ser necessário especificar o formato
+                if (media.filename) {
+                  finalPayload.fileName = media.filename;
+                }
+                
+                // Garantir que vídeos sejam enviados como mídia visual
+                finalPayload.mediatype = 'video';
+              }
+              
                // Adicionar caption na primeira mídia visual
                const mensagemParaEnviar = customMessages[rawPhone] || mensagem || '';
                if (!messageSent && mensagemParaEnviar && (mediaType === 'image' || mediaType === 'video')) {
-                 mediaPayload.caption = mensagemParaEnviar;
+                 finalPayload.caption = mensagemParaEnviar;
                  messageSent = true;
                }
               
-              const mediaResponse = await fetch(mediaUrl, {
+              console.log(`📤 Enviando ${mediaType} para ${normalizedPhone}`, {
+                url: finalUrl,
+                mediatype: finalPayload.mediatype,
+                hasCaption: !!finalPayload.caption,
+                dataSize: mediaData.length
+              });
+              
+              const mediaResponse = await fetch(finalUrl, {
                 method: 'POST',
                 headers: apiHeaders,
-                body: JSON.stringify(mediaPayload)
+                body: JSON.stringify(finalPayload)
               });
+              
+              const responseText = await mediaResponse.text();
+              console.log(`📱 Resposta da API (${mediaResponse.status}):`, responseText);
               
               if (mediaResponse.ok) {
                 console.log(`✅ ${mediaType} enviado com sucesso`);
@@ -362,12 +399,13 @@ serve(async (req) => {
                   mensagem: `${mediaType} enviado`
                 });
               } else {
+                console.error(`❌ Erro ao enviar ${mediaType}:`, responseText);
                 errorCount++;
                 results.push({
                   telefone: rawPhone,
                   tipo: mediaType,
                   status: 'erro',
-                  erro: `Erro na ${mediaType}: ${mediaResponse.status}`
+                  erro: `Erro na ${mediaType}: ${mediaResponse.status} - ${responseText}`
                 });
               }
             }
