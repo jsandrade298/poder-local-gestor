@@ -496,9 +496,20 @@ export default function Demandas() {
               'urgente': 'urgente'
             };
             
+            console.log('🔍 Demanda original:', {
+              titulo: demanda.titulo,
+              prioridade_original: demanda.prioridade,
+              prioridade_type: typeof demanda.prioridade
+            });
+            
             const prioridadeNormalizada = demanda.prioridade 
               ? prioridadeMap[demanda.prioridade.toLowerCase()] || 'media'
               : 'media';
+              
+            console.log('✅ Prioridade normalizada:', {
+              original: demanda.prioridade,
+              normalizada: prioridadeNormalizada
+            });
 
             const { data, error } = await supabase
               .from('demandas')
@@ -649,6 +660,9 @@ export default function Demandas() {
                 if (responsavelId) {
                   demanda.responsavelId = responsavelId;
                 }
+              } else if (key === 'prioridade') {
+                console.log('📋 Processando prioridade do CSV:', { key, value, original: value });
+                demanda[key] = value;
               } else {
                 demanda[key] = value;
               }
