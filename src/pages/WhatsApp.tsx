@@ -332,7 +332,7 @@ const WhatsApp = () => {
       const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
         body: {
           telefones,
-          mensagem: 'Será personalizada',
+          mensagem: '', // Deixar vazio pois usaremos apenas customMessages
           instanceName: config.instancia_aniversario,
           tempoMinimo: 2,
           tempoMaximo: 4,

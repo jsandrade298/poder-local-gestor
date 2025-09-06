@@ -297,7 +297,7 @@ serve(async (req) => {
               };
               
                // Adicionar caption na primeira mídia visual
-               const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
+               const mensagemParaEnviar = customMessages[rawPhone] || mensagem || '';
                if (!messageSent && mensagemParaEnviar && (mediaType === 'image' || mediaType === 'video')) {
                  mediaPayload.caption = mensagemParaEnviar;
                  messageSent = true;
@@ -343,7 +343,7 @@ serve(async (req) => {
         }
         
         // Enviar texto se houver e ainda não foi enviado como caption
-        const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
+        const mensagemParaEnviar = customMessages[rawPhone] || mensagem || '';
         if (mensagemParaEnviar && !messageSent) {
           // Pequeno delay se já enviou mídia
           if (mediaFiles.length > 0) {
