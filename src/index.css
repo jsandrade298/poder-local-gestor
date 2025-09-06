@@ -158,31 +158,27 @@ table {
   will-change: transform;
 }
 
-/* Estilos para as células sticky */
-.sticky {
-  position: sticky !important;
+/* Forçar exibição das barras de scroll */
+.scrollbar-always {
+  scrollbar-width: auto !important;
+  overflow: auto !important;
 }
 
-/* Sombra para células sticky */
-.sticky.left-0::after,
-.sticky.left-12::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -8px;
-  bottom: 0;
-  width: 8px;
-  background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
-  pointer-events: none;
+.scrollbar-always::-webkit-scrollbar {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
 }
 
-.sticky.right-0::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -8px;
-  bottom: 0;
-  width: 8px;
-  background: linear-gradient(to left, rgba(0,0,0,0.05), transparent);
-  pointer-events: none;
+.scrollbar-always::-webkit-scrollbar-track {
+  background: hsl(var(--muted)) !important;
+}
+
+.scrollbar-always::-webkit-scrollbar-thumb {
+  background: hsl(var(--border)) !important;
+  border-radius: 8px !important;
+}
+
+.scrollbar-always::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent)) !important;
 }

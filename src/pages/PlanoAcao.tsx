@@ -551,11 +551,11 @@ export default function PlanoAcao() {
             <span className="text-sm text-muted-foreground">{tableHeight}px</span>
           </div>
           
-          <div className="w-full overflow-auto" style={{ height: tableHeight }}>
+          <div className="w-full overflow-auto scrollbar-always" style={{ height: tableHeight, scrollbarWidth: 'auto' }}>
             <Table className="relative" style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}>
               <TableHeader className="sticky top-0 bg-background" style={{ zIndex: 5 }}>
                 <TableRow>
-                  <TableHead className="w-12 sticky left-0 bg-background" style={{ zIndex: 6 }}>
+                  <TableHead className="w-12">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </TableHead>
                   <TableHead className="w-12">
@@ -678,8 +678,8 @@ export default function PlanoAcao() {
                                       snapshot.isDragging && "shadow-lg bg-background"
                                     )}
                                   >
-                                     {/* Handle de drag - Sticky Left */}
-                                     <TableCell className="w-12 p-2 sticky left-0 bg-background z-10">
+                                     {/* Handle de drag */}
+                                     <TableCell className="w-12 p-2">
                                        <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
                                          <GripVertical className="h-4 w-4 text-muted-foreground" />
                                        </div>
