@@ -184,7 +184,7 @@ export function MunicipeDeletionProgress() {
                       <div
                         key={municipe.id}
                         className={cn(
-                          "flex items-center justify-between p-2 rounded border text-xs transition-all duration-300",
+                          "flex items-center gap-3 p-3 rounded border text-xs transition-all duration-300",
                           municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse",
                           municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75",
                           municipe.status === 'error' && "bg-red-50 border-red-200",
@@ -196,22 +196,20 @@ export function MunicipeDeletionProgress() {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{municipe.nome}</div>
                           {municipe.error && (
-                            <div className="text-red-600 text-xs truncate" title={municipe.error}>
+                            <div className="text-red-600 text-xs truncate mt-1" title={municipe.error}>
                               {municipe.error}
                             </div>
                           )}
                         </div>
                         
-                        <div className="flex items-center gap-2 ml-2">
-                          <div className="flex items-center gap-1">
-                            {getStatusIcon(municipe.status)}
-                            <Badge 
-                              variant={getStatusBadgeVariant(municipe.status)}
-                              className="text-xs px-1 py-0"
-                            >
-                              {getStatusText(municipe.status)}
-                            </Badge>
-                          </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {getStatusIcon(municipe.status)}
+                          <Badge 
+                            variant={getStatusBadgeVariant(municipe.status)}
+                            className="text-xs px-2 py-1 whitespace-nowrap"
+                          >
+                            {getStatusText(municipe.status)}
+                          </Badge>
                         </div>
                       </div>
                     ))}
