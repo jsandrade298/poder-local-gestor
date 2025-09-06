@@ -49,8 +49,11 @@ export default function PlanoAcao() {
     apoio: 200,
     status: 120,
     prazo: 120,
-    atualizacao: 320
+    atualizacao: 320,
+    excluir: 80
   });
+  
+  const [tableHeight, setTableHeight] = useState(600);
   
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [startX, setStartX] = useState(0);
@@ -530,14 +533,28 @@ export default function PlanoAcao() {
       {/* Tabela com Scroll contido no Card */}
       <Card>
         <CardContent className="p-0">
-          <div className="w-full h-[600px] overflow-auto">
-            <Table className="min-w-[1400px] relative">
-              <TableHeader className="sticky top-0 z-10 bg-background">
+          {/* Controles de altura da tabela */}
+          <div className="p-4 border-b flex items-center gap-4">
+            <label className="text-sm font-medium">Altura da tabela:</label>
+            <input
+              type="range"
+              min="400"
+              max="800"
+              value={tableHeight}
+              onChange={(e) => setTableHeight(Number(e.target.value))}
+              className="flex-1 max-w-xs"
+            />
+            <span className="text-sm text-muted-foreground">{tableHeight}px</span>
+          </div>
+          
+          <div className="w-full overflow-auto" style={{ height: tableHeight }}>
+            <Table className="relative" style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}>
+              <TableHeader className="sticky top-0 bg-background" style={{ zIndex: 5 }}>
                 <TableRow>
-                  <TableHead className="w-12 sticky left-0 bg-background z-20">
+                  <TableHead className="w-12 sticky left-0 bg-background" style={{ zIndex: 6 }}>
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </TableHead>
-                  <TableHead className="w-12 sticky left-12 bg-background z-20">
+                  <TableHead className="w-12 sticky left-12 bg-background" style={{ zIndex: 6 }}>
                     <Checkbox />
                   </TableHead>
                   <TableHead style={{ width: columnWidths.eixo }} className="relative">
@@ -621,7 +638,15 @@ export default function PlanoAcao() {
                       <div className="w-full h-full group-hover:bg-primary/50" />
                     </div>
                   </TableHead>
-                  <TableHead className="w-16 sticky right-0 bg-background z-20">Excluir</TableHead>
+                  <TableHead style={{ width: columnWidths.excluir, zIndex: 6 }} className="sticky right-0 bg-background relative">
+                    Excluir
+                    <div 
+                      className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 group"
+                      onMouseDown={(e) => handleResizeStart('excluir', e)}
+                    >
+                      <div className="w-full h-full group-hover:bg-primary/50" />
+                    </div>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <DragDropContext onDragEnd={handleDragEnd}>
@@ -655,20 +680,20 @@ export default function PlanoAcao() {
                                       snapshot.isDragging && "shadow-lg bg-background"
                                     )}
                                   >
-                                    {/* Handle de drag - Sticky Left */}
-                                    <TableCell className="w-12 p-2 sticky left-0 bg-background z-10">
-                                      <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                      </div>
-                                    </TableCell>
-                                    
-                                    {/* Checkbox - Sticky Left */}
-                                    <TableCell className="w-12 sticky left-12 bg-background z-10">
-                                      <Checkbox
-                                        checked={action.concluida}
-                                        onCheckedChange={() => handleToggleConcluida(action)}
-                                      />
-                                    </TableCell>
+                                     {/* Handle de drag - Sticky Left */}
+                                     <TableCell className="w-12 p-2 sticky left-0 bg-background" style={{ zIndex: 4 }}>
+                                       <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                         <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                       </div>
+                                     </TableCell>
+                                     
+                                     {/* Checkbox - Sticky Left */}
+                                     <TableCell className="w-12 sticky left-12 bg-background" style={{ zIndex: 4 }}>
+                                       <Checkbox
+                                         checked={action.concluida}
+                                         onCheckedChange={() => handleToggleConcluida(action)}
+                                       />
+                                     </TableCell>
 
                                     {/* Eixo */}
                                     <TableCell style={{ width: columnWidths.eixo }}>
@@ -917,8 +942,8 @@ export default function PlanoAcao() {
                                       )}
                                     </TableCell>
 
-                                    {/* Botão de exclusão - Sticky Right */}
-                                    <TableCell className="w-16 sticky right-0 bg-background z-10">
+                                     {/* Botão de exclusão - Sticky Right */}
+                                     <TableCell style={{ width: columnWidths.excluir, zIndex: 4 }} className="sticky right-0 bg-background">
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
