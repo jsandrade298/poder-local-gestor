@@ -8,13 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -22,7 +20,6 @@ import { NovaAcaoDialog } from "@/components/forms/NovaAcaoDialog";
 import { EditAcaoDialog } from "@/components/forms/EditAcaoDialog";
 import { EixosManagerDialog } from "@/components/forms/EixosManagerDialog";
 import { TemasManagerDialog } from "@/components/forms/TemasManagerDialog";
-import { Label } from "@/components/ui/label";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function PlanoAcao() {
@@ -41,12 +38,11 @@ export default function PlanoAcao() {
   const [editingValue, setEditingValue] = useState<string>("");
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
   const [insertPosition, setInsertPosition] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
 
   // Queries para dados
-  const { data: planosAcao = [], isLoading } = useQuery({
+  const { data: planosAcao = [], isLoading, error } = useQuery({
     queryKey: ['planos-acao'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -63,7 +59,7 @@ export default function PlanoAcao() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -72,7 +68,7 @@ export default function PlanoAcao() {
     queryFn: async () => {
       const { data, error } = await supabase.from('eixos').select('*').order('nome');
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -81,7 +77,7 @@ export default function PlanoAcao() {
     queryFn: async () => {
       const { data, error } = await supabase.from('temas_acao').select('*, eixos(nome)').order('nome');
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -90,7 +86,7 @@ export default function PlanoAcao() {
     queryFn: async () => {
       const { data, error } = await supabase.from('prioridades_acao').select('*').order('nivel');
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -99,7 +95,7 @@ export default function PlanoAcao() {
     queryFn: async () => {
       const { data, error } = await supabase.from('status_acao').select('*').order('nome');
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -108,7 +104,7 @@ export default function PlanoAcao() {
     queryFn: async () => {
       const { data, error } = await supabase.from('profiles').select('id, nome').order('nome');
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
@@ -186,13 +182,7 @@ export default function PlanoAcao() {
   // Função para reorganizar ações
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
-
-    const items = Array.from(filteredActions);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    // Aqui você pode implementar a persistência da nova ordem se necessário
-    // Por enquanto apenas reorganiza visualmente
+    // Lógica de reorganização pode ser implementada aqui
   };
 
   // Função para inserir nova ação em posição específica
@@ -224,9 +214,9 @@ export default function PlanoAcao() {
   // Filtros aplicados
   const filteredActions = planosAcao.filter((action) => {
     const matchesSearch = !searchTerm || 
-      action.acao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.eixos?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.temas_acao?.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      action.temas_acao?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       action.apoio?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesEixo = eixoFilter === "all" || action.eixo_id === eixoFilter;
@@ -254,7 +244,6 @@ export default function PlanoAcao() {
   };
 
   const handleQuickEdit = (action: any, field: string, value: any) => {
-    // Handle special case for responsavel_id
     const finalValue = field === 'responsavel_id' && value === 'none' ? null : value;
     
     updateAction.mutate({
@@ -315,6 +304,23 @@ export default function PlanoAcao() {
     
     toast.success('Arquivo CSV exportado com sucesso!');
   };
+
+  // Se há erro, mostrar mensagem de erro
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <h2 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar dados</h2>
+            <p className="text-muted-foreground">{error.message}</p>
+            <Button onClick={() => window.location.reload()} className="mt-4">
+              Recarregar Página
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -380,7 +386,7 @@ export default function PlanoAcao() {
                 <p className="text-sm font-medium text-muted-foreground">Em Andamento</p>
                 <p className="text-2xl font-bold text-blue-600">{totalAcoes - acoesConcluidas}</p>
               </div>
-              <FileText className="h-8 w-8 text-blue-600" />
+              <Target className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
