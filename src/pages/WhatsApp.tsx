@@ -286,7 +286,15 @@ const WhatsApp = () => {
         mediaFiles.map(async (mediaFile) => {
           const arrayBuffer = await mediaFile.file.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
-          const base64 = btoa(String.fromCharCode(...uint8Array));
+          
+          // Converter para base64 de forma mais eficiente para arquivos grandes
+          let binary = '';
+          const chunkSize = 0x8000; // 32KB chunks
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, Array.from(chunk));
+          }
+          const base64 = btoa(binary);
           
           return {
             filename: mediaFile.file.name,
