@@ -701,8 +701,8 @@ export default function Municipes() {
   // Função para excluir munícipes em massa
   const deleteMunicipesInBatch = useMutation({
     mutationFn: async (municipeIds: string[]) => {
-      // Buscar nomes dos munícipes para o contexto
-      const { data: municipesList, error: fetchError } = await supabase
+      // Buscar nomes dos munícipes MANTENDO A ORDEM dos IDs selecionados
+      const { data: allMunicipesData, error: fetchError } = await supabase
         .from('municipes')
         .select('id, nome')
         .in('id', municipeIds);
@@ -711,15 +711,24 @@ export default function Municipes() {
         throw fetchError;
       }
 
-      // Iniciar o contexto de exclusão
-      startDeletion({ municipes: municipesList || [] });
+      // Reorganizar na ordem dos IDs selecionados para manter consistência visual
+      const municipesList = municipeIds.map(id => {
+        const municipe = allMunicipesData?.find(m => m.id === id);
+        return {
+          id,
+          nome: municipe?.nome || `Munícipe ${id.slice(0, 8)}...`
+        };
+      });
+
+      // Iniciar o contexto de exclusão com a ordem correta
+      startDeletion({ municipes: municipesList });
 
       const results = [];
       
       for (let i = 0; i < municipeIds.length; i++) {
         const municipeId = municipeIds[i];
-        const municipeData = municipesList?.find(m => m.id === municipeId);
-        const municipeNome = municipeData?.nome || `Munícipe ${i + 1}`;
+        const municipeData = municipesList[i]; // Usar o índice para manter ordem
+        const municipeNome = municipeData.nome;
         
         // Verificar se foi cancelado
         if (deletionState.isCancelled) {
