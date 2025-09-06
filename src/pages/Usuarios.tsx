@@ -301,10 +301,24 @@ export default function Usuarios() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Deletar usuário usando Admin API
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
-      return { success: true };
+      console.log('🔄 DELETE - Iniciando exclusão para userId:', userId);
+      
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId }
+      });
+
+      if (error) {
+        console.error('❌ DELETE - Erro na função:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('❌ DELETE - Falha na resposta:', data);
+        throw new Error(data.error || 'Erro ao excluir usuário');
+      }
+
+      console.log('✅ DELETE - Sucesso:', data);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
