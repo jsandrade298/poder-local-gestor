@@ -487,6 +487,19 @@ export default function Demandas() {
         // Processar lote atual
         for (const demanda of batch) {
           try {
+            // Mapear prioridade para valores válidos do enum
+            const prioridadeMap: Record<string, string> = {
+              'alta': 'alta',
+              'média': 'media',
+              'media': 'media',
+              'baixa': 'baixa',
+              'urgente': 'urgente'
+            };
+            
+            const prioridadeNormalizada = demanda.prioridade 
+              ? prioridadeMap[demanda.prioridade.toLowerCase()] || 'media'
+              : 'media';
+
             const { data, error } = await supabase
               .from('demandas')
               .insert({
@@ -496,7 +509,7 @@ export default function Demandas() {
                 area_id: demanda.areaId || null,
                 responsavel_id: demanda.responsavelId || null,
                 status: demanda.status || 'aberta',
-                prioridade: demanda.prioridade || 'media',
+                prioridade: prioridadeNormalizada,
                 logradouro: demanda.logradouro || null,
                 numero: demanda.numero || null,
                 bairro: demanda.bairro || null,
