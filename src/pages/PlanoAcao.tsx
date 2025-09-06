@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -311,13 +311,17 @@ export default function PlanoAcao() {
   const handleResizeMove = (e: MouseEvent) => {
     if (!isResizing) return;
     
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(80, startWidth + deltaX); // Mínimo de 80px
-    
-    setColumnWidths(prev => ({
-      ...prev,
-      [isResizing]: newWidth
-    }));
+    try {
+      const deltaX = e.clientX - startX;
+      const newWidth = Math.max(80, startWidth + deltaX); // Mínimo de 80px
+      
+      setColumnWidths(prev => ({
+        ...prev,
+        [isResizing]: newWidth
+      }));
+    } catch (error) {
+      console.error('Erro no redimensionamento:', error);
+    }
   };
 
   const handleResizeEnd = () => {
@@ -325,6 +329,14 @@ export default function PlanoAcao() {
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', handleResizeEnd);
   };
+
+  // Cleanup dos event listeners ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, []);
 
   const exportToCSV = () => {
     const headers = [
@@ -749,12 +761,13 @@ export default function PlanoAcao() {
                                      <TableCell style={{ width: columnWidths.acao }}>
                                        {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
                                          <div className="flex gap-2 items-start">
-                                          <Textarea
-                                            value={editingValue}
+                                           <Textarea
+                                             value={editingValue}
                                              onChange={(e) => setEditingValue(e.target.value)}
                                              style={{ width: Math.max(columnWidths.acao - 100, 200) }}
-                                            autoFocus
-                                          />
+                                             className="min-h-[60px]"
+                                             autoFocus
+                                           />
                                           <div className="flex flex-col gap-1">
                                             <Button size="sm" onClick={handleCellSave}>
                                               Salvar
