@@ -137,3 +137,52 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Previne sobreposição com elementos de z-index alto */
+.sidebar {
+  z-index: 40;
+}
+
+/* Melhora a visualização dos handles de redimensionamento */
+.cursor-col-resize {
+  cursor: col-resize !important;
+}
+
+/* Garante que o scroll funcione apenas dentro da tabela */
+.overflow-auto {
+  contain: layout;
+}
+
+/* Melhora a performance do scroll */
+table {
+  will-change: transform;
+}
+
+/* Estilos para as células sticky */
+.sticky {
+  position: sticky !important;
+}
+
+/* Sombra para células sticky */
+.sticky.left-0::after,
+.sticky.left-12::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(to right, rgba(0,0,0,0.05), transparent);
+  pointer-events: none;
+}
+
+.sticky.right-0::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(to left, rgba(0,0,0,0.05), transparent);
+  pointer-events: none;
+}

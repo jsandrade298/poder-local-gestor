@@ -304,30 +304,34 @@ export default function PlanoAcao() {
   const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     
-    try {
-      const deltaX = e.clientX - startX;
-      const newWidth = Math.max(80, startWidth + deltaX);
-      
-      setColumnWidths(prev => ({
-        ...prev,
-        [isResizing]: newWidth
-      }));
-    } catch (error) {
-      console.error('Erro no redimensionamento:', error);
-    }
+    e.preventDefault();
+    const deltaX = e.clientX - startX;
+    const newWidth = Math.max(50, Math.min(800, startWidth + deltaX)); // Min 50px, Max 800px
+    
+    setColumnWidths(prev => ({
+      ...prev,
+      [isResizing]: newWidth
+    }));
   }, [isResizing, startX, startWidth]);
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(null);
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', handleResizeEnd);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   }, [handleResizeMove]);
 
   const handleResizeStart = (columnName: string, e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     setIsResizing(columnName);
     setStartX(e.clientX);
     setStartWidth(columnWidths[columnName as keyof typeof columnWidths]);
+    
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
     
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('mouseup', handleResizeEnd);
@@ -681,14 +685,14 @@ export default function PlanoAcao() {
                                     )}
                                   >
                                      {/* Handle de drag - Sticky Left */}
-                                     <TableCell className="w-12 p-2 sticky left-0 bg-background" style={{ zIndex: 4 }}>
+                                     <TableCell className="w-12 p-2 sticky left-0 bg-background z-10">
                                        <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
                                          <GripVertical className="h-4 w-4 text-muted-foreground" />
                                        </div>
                                      </TableCell>
                                      
                                      {/* Checkbox - Sticky Left */}
-                                     <TableCell className="w-12 sticky left-12 bg-background" style={{ zIndex: 4 }}>
+                                     <TableCell className="w-12 sticky left-12 bg-background z-10">
                                        <Checkbox
                                          checked={action.concluida}
                                          onCheckedChange={() => handleToggleConcluida(action)}
@@ -943,29 +947,29 @@ export default function PlanoAcao() {
                                     </TableCell>
 
                                      {/* Botão de exclusão - Sticky Right */}
-                                     <TableCell style={{ width: columnWidths.excluir, zIndex: 4 }} className="sticky right-0 bg-background">
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
-                                              Excluir
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </TableCell>
+                                     <TableCell style={{ width: columnWidths.excluir }} className="sticky right-0 bg-background z-10">
+                                       <AlertDialog>
+                                         <AlertDialogTrigger asChild>
+                                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                             <Trash2 className="h-4 w-4" />
+                                           </Button>
+                                         </AlertDialogTrigger>
+                                         <AlertDialogContent>
+                                           <AlertDialogHeader>
+                                             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                             <AlertDialogDescription>
+                                               Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
+                                             </AlertDialogDescription>
+                                           </AlertDialogHeader>
+                                           <AlertDialogFooter>
+                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                             <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
+                                               Excluir
+                                             </AlertDialogAction>
+                                           </AlertDialogFooter>
+                                         </AlertDialogContent>
+                                       </AlertDialog>
+                                     </TableCell>
                                   </TableRow>
                                 )}
                               </Draggable>
