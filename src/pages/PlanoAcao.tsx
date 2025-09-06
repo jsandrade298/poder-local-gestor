@@ -551,9 +551,24 @@ export default function PlanoAcao() {
             <span className="text-sm text-muted-foreground">{tableHeight}px</span>
           </div>
           
-          <div className="w-full overflow-auto scrollbar-always" style={{ height: tableHeight, scrollbarWidth: 'auto' }}>
-            <Table className="relative" style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}>
-              <TableHeader className="sticky top-0 bg-background" style={{ zIndex: 5 }}>
+          {/* Container com scroll vertical sempre visível */}
+          <div 
+            className="relative bg-background"
+            style={{ height: tableHeight }}
+          >
+            <div 
+              className="h-full plano-acao-scroll"
+              style={{ 
+                overflowY: 'scroll',
+                overflowX: 'auto'
+              }}
+            >
+              <Table 
+                className="relative w-full" 
+                style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}
+              >
+                {/* Header fixo com backdrop blur */}
+                <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
                 <TableRow>
                   <TableHead className="w-12">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -984,7 +999,8 @@ export default function PlanoAcao() {
                   )}
                 </Droppable>
               </DragDropContext>
-            </Table>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

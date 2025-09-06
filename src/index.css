@@ -87,7 +87,38 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+}
+
+/* Plano de Ação - Scroll sempre visível */
+.plano-acao-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(156 163 175) rgb(243 244 246);
+  scrollbar-gutter: stable;
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+.plano-acao-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.plano-acao-scroll::-webkit-scrollbar-track {
+  background: rgb(243 244 246);
+  border-radius: 4px;
+}
+
+.plano-acao-scroll::-webkit-scrollbar-thumb {
+  background: rgb(156 163 175);
+  border-radius: 4px;
+}
+
+.plano-acao-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
+}
+
+.plano-acao-scroll::-webkit-scrollbar-corner {
+  background: rgb(243 244 246);
+}
 
   .dark {
     --background: 222.2 84% 4.9%;
