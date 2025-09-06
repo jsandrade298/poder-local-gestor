@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
 
 export default function Municipes() {
-  const { startDeletion, updateMunicipeStatus, state: deletionState } = useMunicipeDeletion();
+  const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
@@ -743,13 +743,23 @@ export default function Municipes() {
 
       const results = [];
       
+      // Criar uma referência compartilhada para o estado de cancelamento
+      let isCancelled = false;
+      
+      // Função para verificar cancelamento
+      const checkCancellation = () => {
+        const currentState = document.querySelector('[data-deletion-state]')?.getAttribute('data-cancelled');
+        isCancelled = currentState === 'true';
+        return isCancelled;
+      };
+      
       for (let i = 0; i < municipeIds.length; i++) {
         const municipeId = municipeIds[i];
         const municipeData = municipesList[i]; // Usar o índice para manter ordem
         const municipeNome = municipeData.nome;
         
-        // Verificar se foi cancelado
-        if (deletionState.isCancelled) {
+        // Verificar se foi cancelado usando função que busca estado atual
+        if (checkCancellation()) {
           console.log('🛑 Exclusão cancelada pelo usuário');
           break;
         }
@@ -787,6 +797,12 @@ export default function Municipes() {
         } catch (err) {
           updateMunicipeStatus(municipeId, 'error', 'Erro inesperado');
           results.push({ id: municipeId, success: false, error: 'Erro inesperado', nome: municipeNome });
+        }
+        
+        // Verificar cancelamento após cada exclusão
+        if (checkCancellation()) {
+          console.log('🛑 Exclusão cancelada após processar', municipeNome);
+          break;
         }
         
         // Pequena pausa para não sobrecarregar o servidor

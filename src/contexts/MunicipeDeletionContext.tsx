@@ -94,6 +94,7 @@ export function MunicipeDeletionProvider({ children }: { children: ReactNode }) 
   };
 
   const cancelDeletion = () => {
+    console.log('🛑 Cancelamento solicitado - parando exclusão');
     setState(prev => ({
       ...prev,
       isCancelled: true,
