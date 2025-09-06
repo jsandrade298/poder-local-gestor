@@ -469,17 +469,17 @@ export default function PlanoAcao() {
         </CardContent>
       </Card>
 
-      {/* Tabela com Drag & Drop e Scroll Horizontal */}
+      {/* Tabela com Scroll contido no Card */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table className="min-w-[1400px]">
-              <TableHeader>
+          <div className="w-full h-[600px] overflow-auto">
+            <Table className="min-w-[1400px] relative">
+              <TableHeader className="sticky top-0 z-20 bg-background">
                 <TableRow>
-                  <TableHead className="w-12 sticky left-0 bg-background z-10 border-r">
+                  <TableHead className="w-12 sticky left-0 bg-background z-30">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </TableHead>
-                  <TableHead className="w-12 sticky left-12 bg-background z-10 border-r">
+                  <TableHead className="w-12 sticky left-12 bg-background z-30">
                     <Checkbox />
                   </TableHead>
                   <TableHead className="w-32">Eixo</TableHead>
@@ -491,7 +491,7 @@ export default function PlanoAcao() {
                   <TableHead className="w-32">Status</TableHead>
                   <TableHead className="w-32">Prazo</TableHead>
                   <TableHead className="w-80">Atualização</TableHead>
-                  <TableHead className="w-16 sticky right-0 bg-background z-10 border-l">Excluir</TableHead>
+                  <TableHead className="w-16 sticky right-0 bg-background z-30">Excluir</TableHead>
                 </TableRow>
               </TableHeader>
               <DragDropContext onDragEnd={handleDragEnd}>
@@ -525,15 +525,15 @@ export default function PlanoAcao() {
                                       snapshot.isDragging && "shadow-lg bg-background"
                                     )}
                                   >
-                                    {/* Handle de drag - Sticky Left */}
-                                    <TableCell className="w-12 p-2 sticky left-0 bg-background z-10 border-r">
-                                      <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                      </div>
-                                    </TableCell>
-                                    
-                                    {/* Checkbox - Sticky Left */}
-                                    <TableCell className="w-12 sticky left-12 bg-background z-10 border-r">
+                                     {/* Handle de drag - Sticky Left */}
+                                     <TableCell className="w-12 p-2 sticky left-0 bg-background z-10">
+                                       <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                         <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                       </div>
+                                     </TableCell>
+                                     
+                                     {/* Checkbox - Sticky Left */}
+                                     <TableCell className="w-12 sticky left-12 bg-background z-10">
                                       <Checkbox
                                         checked={action.concluida}
                                         onCheckedChange={() => handleToggleConcluida(action)}
@@ -783,8 +783,8 @@ export default function PlanoAcao() {
                                       )}
                                     </TableCell>
 
-                                    {/* Botão de exclusão - Sticky Right */}
-                                    <TableCell className="w-16 sticky right-0 bg-background z-10 border-l">
+                                     {/* Botão de exclusão - Sticky Right */}
+                                     <TableCell className="w-16 sticky right-0 bg-background z-10">
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
