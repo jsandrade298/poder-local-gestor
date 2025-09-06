@@ -191,7 +191,35 @@ serve(async (req) => {
           }
           
           // Compatibilidade: suporte tanto para 'mimetype' quanto para 'type'
-          const mimeType = media.mimetype || media.type || 'application/octet-stream';
+          // Se não tem mimetype mas tem type, construir mimetype baseado no type e filename
+          let mimeType = media.mimetype;
+          if (!mimeType && media.type) {
+            if (media.type === 'video') {
+              mimeType = 'video/mp4'; // default para vídeos
+              if (media.filename) {
+                if (media.filename.toLowerCase().includes('.webm')) mimeType = 'video/webm';
+                else if (media.filename.toLowerCase().includes('.avi')) mimeType = 'video/avi';
+                else if (media.filename.toLowerCase().includes('.mov')) mimeType = 'video/quicktime';
+              }
+            } else if (media.type === 'image') {
+              mimeType = 'image/jpeg'; // default para imagens
+              if (media.filename) {
+                if (media.filename.toLowerCase().includes('.png')) mimeType = 'image/png';
+                else if (media.filename.toLowerCase().includes('.gif')) mimeType = 'image/gif';
+                else if (media.filename.toLowerCase().includes('.webp')) mimeType = 'image/webp';
+              }
+            } else if (media.type === 'audio') {
+              mimeType = 'audio/mp3'; // default para áudios
+              if (media.filename) {
+                if (media.filename.toLowerCase().includes('.ogg')) mimeType = 'audio/ogg';
+                else if (media.filename.toLowerCase().includes('.wav')) mimeType = 'audio/wav';
+                else if (media.filename.toLowerCase().includes('.m4a')) mimeType = 'audio/mp4';
+              }
+            }
+          }
+          if (!mimeType) {
+            mimeType = 'application/octet-stream';
+          }
           console.log(`📎 Enviando mídia ${mimeType} (${mediaIndex + 1}/${mediaFiles.length})`);
           console.log(`📋 Dados da mídia:`, { 
             type: media.type, 
