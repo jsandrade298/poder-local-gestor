@@ -346,17 +346,6 @@ export default function Usuarios() {
   const handleCreateUser = () => {
     if (!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim()) return;
     
-    // Validar se o email tem domínio válido
-    const domain = newUser.email.split('@')[1];
-    if (domain && domain.split('.').length < 2) {
-      toast({
-        title: "Email inválido",
-        description: "Use um domínio válido como gmail.com, outlook.com, etc.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     createUserMutation.mutate(newUser);
   };
 
@@ -466,13 +455,10 @@ export default function Usuarios() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="usuario@exemplo.com (use domínios reais como gmail.com)"
+                  placeholder="usuario@gabinete.gov.br"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">
-                  ⚠️ Use domínios válidos (gmail.com, outlook.com, etc). Domínios como "usuario@usuario.com" são rejeitados pelo sistema.
-                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="senha">Senha</Label>
