@@ -124,15 +124,6 @@ export default function Usuarios() {
 
       // Atualizar perfil com informações adicionais
       if (authData.user) {
-        // Confirmar o email automaticamente para usuários criados por admin
-        const { error: confirmError } = await supabase.functions.invoke('reset-password', {
-          body: { userId: authData.user.id, newPassword: userData.senha }
-        });
-        
-        if (confirmError) {
-          console.warn("Erro ao confirmar email automaticamente:", confirmError);
-        }
-
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
