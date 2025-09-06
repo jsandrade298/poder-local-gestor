@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload, Save } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,36 @@ export default function PlanoAcao() {
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [startX, setStartX] = useState(0);
   const [startWidth, setStartWidth] = useState(0);
+
+  // Carregar layout salvo ao inicializar
+  useEffect(() => {
+    const savedLayout = localStorage.getItem('plano-acao-layout');
+    if (savedLayout) {
+      try {
+        const layout = JSON.parse(savedLayout);
+        if (layout.columnWidths) {
+          setColumnWidths(layout.columnWidths);
+        }
+        if (layout.tableHeight) {
+          setTableHeight(layout.tableHeight);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar layout salvo:', error);
+      }
+    }
+  }, []);
+
+  // Função para salvar layout
+  const saveLayout = () => {
+    const layout = {
+      columnWidths,
+      tableHeight,
+      savedAt: new Date().toISOString()
+    };
+    
+    localStorage.setItem('plano-acao-layout', JSON.stringify(layout));
+    toast.success('Layout salvo com sucesso!');
+  };
 
   const queryClient = useQueryClient();
 
@@ -726,6 +756,17 @@ export default function PlanoAcao() {
               className="flex-1 max-w-xs"
             />
             <span className="text-sm text-muted-foreground">{tableHeight}px</span>
+            
+            {/* Botão Salvar Layout */}
+            <Button
+              onClick={saveLayout}
+              variant="outline"
+              size="sm"
+              className="ml-4"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Salvar Layout
+            </Button>
           </div>
           
           {/* Container com scroll vertical sempre visível */}
