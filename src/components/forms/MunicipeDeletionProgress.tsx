@@ -18,41 +18,40 @@ import { cn } from '@/lib/utils';
 
 export function MunicipeDeletionProgress() {
   const { state, setMinimized, resetDeletion, cancelDeletion } = useMunicipeDeletion();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Scroll automático para acompanhar o item sendo processado
   useEffect(() => {
     if (!state.isActive || state.isMinimized) return;
     
-    // Encontrar o índice do item sendo excluído atualmente
-    const currentIndex = state.municipes.findIndex(m => m.status === 'deleting');
-    if (currentIndex === -1) return;
+    // Encontrar o item sendo excluído atualmente
+    const currentMunicipe = state.municipes.find(m => m.status === 'deleting');
+    if (!currentMunicipe) return;
 
-    // Scroll para o item atual com animação suave
+    console.log('🔄 Auto-scroll para:', currentMunicipe.nome);
+
     const scrollToCurrentItem = () => {
-      const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-      if (!scrollContainer) return;
-
-      const itemElement = scrollContainer.children[0]?.children[currentIndex + 1] as HTMLElement; // +1 por causa do padding
-      if (!itemElement) return;
-
-      const containerHeight = scrollContainer.clientHeight;
-      const itemOffsetTop = itemElement.offsetTop;
-      const itemHeight = itemElement.offsetHeight;
+      // Buscar o elemento no DOM usando o data attribute
+      const itemElement = document.querySelector(`[data-municipe-id="${currentMunicipe.id}"]`) as HTMLElement;
       
-      // Calcular posição para centralizar o item
-      const targetScrollTop = itemOffsetTop - (containerHeight / 2) + (itemHeight / 2);
+      if (!itemElement) {
+        console.log('❌ Item não encontrado no DOM:', currentMunicipe.id);
+        return;
+      }
+
+      console.log('✅ Elemento encontrado, fazendo scroll...');
       
-      scrollContainer.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: 'smooth'
+      // Usar scrollIntoView para scroll automático suave
+      itemElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
       });
     };
 
-    // Delay pequeno para garantir que o DOM foi atualizado
-    const timeoutId = setTimeout(scrollToCurrentItem, 100);
+    // Delay para garantir que o DOM foi atualizado com o novo status
+    const timeoutId = setTimeout(scrollToCurrentItem, 300);
     return () => clearTimeout(timeoutId);
-  }, [state.municipes, state.isActive, state.isMinimized]);
+  }, [state.municipes.map(m => `${m.id}-${m.status}`).join(','), state.isActive, state.isMinimized]);
 
   // Não renderiza se não há exclusão ativa
   if (!state.isActive) {
@@ -179,7 +178,7 @@ export function MunicipeDeletionProgress() {
               {/* Lista de Munícipes */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="font-medium text-xs mb-2">Munícipes:</div>
-                <ScrollArea ref={scrollAreaRef} className="flex-1 border rounded">
+                <ScrollArea className="flex-1 border rounded">
                   <div className="p-2 space-y-2">
                     {state.municipes.map((municipe, index) => (
                       <div
