@@ -25,22 +25,36 @@ export function useDashboardData() {
   const { data: municipes = [], isLoading: isLoadingMunicipes } = useQuery({
     queryKey: ['municipes-dashboard'], // Chave específica para dashboard
     queryFn: async () => {
-      // Para dashboard, fazer query com limite mas buscar em lotes para ter o total real
+      console.log('🔄 Dashboard: Carregando munícipes...');
+      
+      // Para dashboard, buscar em lotes para ter o total real sem sobrecarregar
       let allMunicipes: any[] = [];
       let from = 0;
       const size = 1000;
       let hasMore = true;
+      let totalExpected = 0;
       
       while (hasMore) {
-        const { data, error } = await supabase
+        const { data, error, count } = await supabase
           .from('municipes')
-          .select('*')
+          .select('*', { count: 'exact' })
           .range(from, from + size - 1);
         
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Dashboard: Erro ao buscar munícipes:', error);
+          throw error;
+        }
+        
+        // Armazenar total esperado na primeira iteração
+        if (from === 0 && count !== null) {
+          totalExpected = count;
+          console.log(`📈 Dashboard: Total esperado no banco: ${totalExpected}`);
+        }
         
         if (data && data.length > 0) {
           allMunicipes = [...allMunicipes, ...data];
+          console.log(`📊 Dashboard: Lote ${Math.floor(from/size) + 1}: ${data.length} munícipes`);
+          
           if (data.length < size) {
             hasMore = false;
           } else {
@@ -49,8 +63,14 @@ export function useDashboardData() {
         } else {
           hasMore = false;
         }
+        
+        // Verificação de segurança
+        if (totalExpected > 0 && allMunicipes.length >= totalExpected) {
+          hasMore = false;
+        }
       }
       
+      console.log(`✅ Dashboard: Total carregado: ${allMunicipes.length} munícipes`);
       return allMunicipes;
     }
   });

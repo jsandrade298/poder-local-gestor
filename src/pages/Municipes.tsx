@@ -53,11 +53,39 @@ export default function Municipes() {
     queryFn: async () => {
       console.log('🔄 Iniciando busca de munícipes...');
       
-      // Buscar todos os munícipes sem limite
+      // Estratégia 1: Tentar buscar tudo de uma vez sem range
+      try {
+        const { data: allData, error: allError, count } = await supabase
+          .from('municipes')
+          .select(`
+            *,
+            municipe_tags(
+              tags(
+                id,
+                nome,
+                cor
+              )
+            )
+          `, { count: 'exact' })
+          .order('nome')
+          .limit(10000); // Limite alto para forçar buscar tudo
+        
+        if (!allError && allData) {
+          console.log(`✅ Busca única: ${allData.length} munícipes carregados (total no banco: ${count})`);
+          return allData;
+        }
+        
+        console.log('⚠️ Busca única falhou, tentando em lotes...');
+      } catch (e) {
+        console.log('⚠️ Busca única falhou, tentando em lotes...', e);
+      }
+      
+      // Estratégia 2: Buscar em lotes se a primeira falhar
       let allMunicipes: any[] = [];
       let from = 0;
       const size = 1000; // Buscar em lotes de 1000
       let hasMore = true;
+      let totalExpected = 0;
       
       while (hasMore) {
         const { data, error, count } = await supabase
@@ -80,9 +108,15 @@ export default function Municipes() {
           throw error;
         }
         
+        // Armazenar total esperado na primeira iteração
+        if (from === 0 && count !== null) {
+          totalExpected = count;
+          console.log(`📈 Total esperado no banco: ${totalExpected}`);
+        }
+        
         if (data && data.length > 0) {
           allMunicipes = [...allMunicipes, ...data];
-          console.log(`📊 Carregados ${data.length} munícipes (${from + 1} a ${from + data.length})`);
+          console.log(`📊 Lote ${Math.floor(from/size) + 1}: ${data.length} munícipes (${from + 1} a ${from + data.length})`);
           
           // Se retornou menos que o tamanho do lote, chegamos ao fim
           if (data.length < size) {
@@ -94,13 +128,25 @@ export default function Municipes() {
           hasMore = false;
         }
         
-        // Log do total na primeira iteração
-        if (from === 0 && count !== null) {
-          console.log(`📈 Total de munícipes no banco: ${count}`);
+        // Verificação de segurança: se já temos o total esperado, parar
+        if (totalExpected > 0 && allMunicipes.length >= totalExpected) {
+          hasMore = false;
+        }
+        
+        // Verificação de segurança: evitar loop infinito
+        if (from > 50000) {
+          console.warn('⚠️ Limite de segurança atingido');
+          hasMore = false;
         }
       }
       
-      console.log(`✅ Total carregado: ${allMunicipes.length} munícipes`);
+      console.log(`✅ Total final carregado: ${allMunicipes.length} munícipes (esperado: ${totalExpected})`);
+      
+      // Verificar se carregamos todos os registros esperados
+      if (totalExpected > 0 && allMunicipes.length < totalExpected) {
+        console.warn(`⚠️ ATENÇÃO: Carregados ${allMunicipes.length} de ${totalExpected} munícipes`);
+      }
+      
       return allMunicipes;
     },
     staleTime: 5 * 60 * 1000, // Cache válido por 5 minutos
@@ -791,6 +837,23 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Botão de debug temporário */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                console.log('🔍 DEBUG: Total de munícipes carregados:', municipes.length);
+                console.log('🔍 DEBUG: Primeiros 5 munícipes:', municipes.slice(0, 5).map(m => m.nome));
+                console.log('🔍 DEBUG: Últimos 5 munícipes:', municipes.slice(-5).map(m => m.nome));
+                toast({
+                  title: "Debug Info",
+                  description: `Total carregado: ${municipes.length} munícipes. Veja o console para detalhes.`
+                });
+              }}
+              className="gap-2"
+            >
+              🔍 Debug
+            </Button>
             <Button 
               variant="ghost" 
               size="sm"

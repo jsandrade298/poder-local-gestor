@@ -37,12 +37,21 @@ export function NovaDemandaDialog() {
   const { data: municipes = [] } = useQuery({
     queryKey: ['municipes-select'], // Chave específica para seleção
     queryFn: async () => {
+      console.log('🔄 Form: Carregando munícipes para seleção...');
+      
+      // Para formulários, buscar apenas id e nome mas SEM LIMITE
       const { data, error } = await supabase
         .from('municipes')
         .select('id, nome')
-        .order('nome');
+        .order('nome')
+        .limit(10000); // Limite alto para garantir que pega todos
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Form: Erro ao buscar munícipes:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Form: ${data?.length || 0} munícipes carregados para seleção`);
       return data;
     }
   });

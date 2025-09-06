@@ -87,15 +87,20 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
   const { data: municipes = [] } = useQuery({
     queryKey: ['municipes-select'], // Chave específica para seleção
     queryFn: async () => {
+      console.log('🔄 Kanban Form: Carregando munícipes para seleção...');
+      
       const { data, error } = await supabase
         .from('municipes')
         .select('id, nome')
-        .order('nome');
+        .order('nome')
+        .limit(10000); // Limite alto para garantir que pega todos
       
       if (error) {
-        console.error('Erro ao buscar munícipes:', error);
+        console.error('❌ Kanban Form: Erro ao buscar munícipes:', error);
         throw error;
       }
+      
+      console.log(`✅ Kanban Form: ${data?.length || 0} munícipes carregados para seleção`);
       return data || [];
     },
     enabled: open
