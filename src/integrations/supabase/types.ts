@@ -533,6 +533,33 @@ export type Database = {
         }
         Relationships: []
       }
+      eixos: {
+        Row: {
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       logs_aniversario: {
         Row: {
           aniversariantes: Json | null
@@ -730,6 +757,124 @@ export type Database = {
           },
         ]
       }
+      planos_acao: {
+        Row: {
+          acao: string
+          apoio: string | null
+          atualizacao: string | null
+          concluida: boolean
+          created_at: string
+          created_by: string
+          eixo_id: string | null
+          id: string
+          prazo: string | null
+          prioridade_id: string | null
+          responsavel_id: string | null
+          status_id: string | null
+          tema_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          acao: string
+          apoio?: string | null
+          atualizacao?: string | null
+          concluida?: boolean
+          created_at?: string
+          created_by: string
+          eixo_id?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade_id?: string | null
+          responsavel_id?: string | null
+          status_id?: string | null
+          tema_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acao?: string
+          apoio?: string | null
+          atualizacao?: string | null
+          concluida?: boolean
+          created_at?: string
+          created_by?: string
+          eixo_id?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade_id?: string | null
+          responsavel_id?: string | null
+          status_id?: string | null
+          tema_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_acao_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_acao_eixo_id_fkey"
+            columns: ["eixo_id"]
+            isOneToOne: false
+            referencedRelation: "eixos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_acao_prioridade_id_fkey"
+            columns: ["prioridade_id"]
+            isOneToOne: false
+            referencedRelation: "prioridades_acao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_acao_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_acao_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "status_acao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_acao_tema_id_fkey"
+            columns: ["tema_id"]
+            isOneToOne: false
+            referencedRelation: "temas_acao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prioridades_acao: {
+        Row: {
+          cor: string | null
+          created_at: string
+          id: string
+          nivel: number
+          nome: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nivel: number
+          nome: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nivel?: number
+          nome?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null
@@ -760,6 +905,27 @@ export type Database = {
         }
         Relationships: []
       }
+      status_acao: {
+        Row: {
+          cor: string | null
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           cor: string | null
@@ -783,6 +949,38 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      temas_acao: {
+        Row: {
+          created_at: string
+          eixo_id: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          eixo_id?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          eixo_id?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "temas_acao_eixo_id_fkey"
+            columns: ["eixo_id"]
+            isOneToOne: false
+            referencedRelation: "eixos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_integrations: {
         Row: {
