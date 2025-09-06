@@ -4,21 +4,59 @@ import { formatDateOnly } from '@/lib/dateUtils';
 
 export function useDashboardData() {
   const { data: demandas = [], isLoading: isLoadingDemandas } = useQuery({
-    queryKey: ['demandas'],
+    queryKey: ['demandas-dashboard'], // Chave específica para dashboard
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select(`
-          *,
-          areas(nome),
-          municipes(nome)
-        `);
+      console.log('🔄 Dashboard: Carregando demandas em lotes...');
       
-      if (error) {
-        console.error('Erro ao buscar demandas:', error);
-        throw error;
+      // Carregar demandas em lotes para garantir que pega todas
+      const BATCH_SIZE = 1000;
+      let allDemandas: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      let totalExpected = 0;
+      
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from('demandas')
+          .select(`
+            *,
+            areas(nome),
+            municipes(nome)
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(offset, offset + BATCH_SIZE - 1);
+        
+        if (error) {
+          console.error('❌ Dashboard: Erro ao buscar demandas:', error);
+          throw error;
+        }
+        
+        // Armazenar total esperado na primeira iteração
+        if (offset === 0 && count !== null) {
+          totalExpected = count;
+          console.log(`📈 Dashboard: Total de demandas esperado: ${totalExpected}`);
+        }
+        
+        if (data && data.length > 0) {
+          allDemandas = [...allDemandas, ...data];
+          offset += BATCH_SIZE;
+          
+          // Se retornou menos que o tamanho do lote, não há mais dados
+          hasMore = data.length === BATCH_SIZE;
+          
+          console.log(`📦 Dashboard: Lote de demandas carregado - ${data.length} demandas (total: ${allDemandas.length})`);
+        } else {
+          hasMore = false;
+        }
+        
+        // Verificação de segurança
+        if (totalExpected > 0 && allDemandas.length >= totalExpected) {
+          hasMore = false;
+        }
       }
-      return data || [];
+      
+      console.log(`✅ Dashboard: ${allDemandas.length} demandas carregadas em lotes`);
+      return allDemandas;
     }
   });
 
