@@ -194,6 +194,47 @@ serve(async (req) => {
           const mimeType = media.mimetype || media.type || 'application/octet-stream';
           console.log(`📎 Enviando mídia ${mimeType} (${mediaIndex + 1}/${mediaFiles.length})`);
           
+          // Se media tem URL, baixar o arquivo primeiro
+          let mediaData = media.data;
+          if (media.url && !mediaData) {
+            console.log(`📥 Baixando arquivo de: ${media.url}`);
+            try {
+              const response = await fetch(media.url);
+              if (!response.ok) {
+                throw new Error(`Erro ao baixar arquivo: ${response.status}`);
+              }
+              const arrayBuffer = await response.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+              // Converter para base64
+              let binary = '';
+              uint8Array.forEach(byte => binary += String.fromCharCode(byte));
+              mediaData = btoa(binary);
+              console.log(`✅ Arquivo baixado e convertido para base64 (${mediaData.length} caracteres)`);
+            } catch (error) {
+              console.error(`❌ Erro ao baixar arquivo:`, error);
+              errorCount++;
+              results.push({
+                telefone: rawPhone,
+                tipo: 'media',
+                status: 'erro',
+                erro: `Erro ao baixar arquivo: ${error.message}`
+              });
+              continue;
+            }
+          }
+          
+          if (!mediaData) {
+            console.error(`❌ Dados de mídia não encontrados`);
+            errorCount++;
+            results.push({
+              telefone: rawPhone,
+              tipo: 'media',
+              status: 'erro',
+              erro: 'Dados de mídia não encontrados'
+            });
+            continue;
+          }
+          
           // Detectar tipo de mídia pelo mimetype/type
           let mediaType = 'document'; // padrão
           if (mimeType.startsWith('image/')) {
@@ -215,7 +256,7 @@ serve(async (req) => {
               
               const audioPayload = {
                 number: normalizedPhone,
-                audio: media.data, // Enviar só o base64 sem prefixo
+                audio: mediaData, // Enviar só o base64 sem prefixo
                 encoding: true,
                 delay: 1200
               };
@@ -254,7 +295,7 @@ serve(async (req) => {
               const docPayload = {
                 number: normalizedPhone,
                 mediatype: 'document',
-                media: media.data, // Enviar só o base64 sem prefixo
+                media: mediaData, // Usar dados baixados
                 fileName: media.filename || 'documento.pdf',
                 delay: 1200
               };
@@ -294,7 +335,7 @@ serve(async (req) => {
               const mediaPayload = {
                 number: normalizedPhone,
                 mediatype: mediaType,
-                media: media.data, // Enviar só o base64 sem prefixo
+                media: mediaData, // Usar dados baixados
                 delay: 1200
               };
               
