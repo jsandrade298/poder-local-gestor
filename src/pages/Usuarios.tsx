@@ -134,13 +134,30 @@ export default function Usuarios() {
 
         if (profileError) throw profileError;
 
+        // Confirmar email automaticamente para usuários criados por admin
+        try {
+          const { error: confirmError } = await supabase.functions.invoke('confirm-user-email', {
+            body: { userId: authData.user.id }
+          });
+          
+          if (confirmError) {
+            console.warn("Erro ao confirmar email automaticamente:", confirmError);
+          }
+        } catch (confirmErr) {
+          console.warn("Erro na confirmação de email:", confirmErr);
+        }
+
         // Dar papel de admin para todos os usuários (acesso completo)
+        // Isso agora será feito automaticamente pela trigger do banco
+        // Mas vamos garantir que seja admin mesmo
         const { error: roleError } = await supabase
           .from('user_roles')
           .update({ role: 'admin' })
           .eq('user_id', authData.user.id);
 
-        if (roleError) throw roleError;
+        if (roleError) {
+          console.warn("Role já definido pela trigger:", roleError);
+        }
       }
 
       return authData;
