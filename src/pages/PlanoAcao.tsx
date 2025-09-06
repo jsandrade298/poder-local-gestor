@@ -45,22 +45,29 @@ export default function PlanoAcao() {
   const { data: planosAcao = [], isLoading, error } = useQuery({
     queryKey: ['planos-acao'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('planos_acao')
-        .select(`
-          *,
-          eixos(nome, cor),
-          prioridades_acao(nome, nivel, cor),
-          temas_acao(nome),
-          status_acao(nome, cor),
-          responsavel:profiles!responsavel_id(nome),
-          criador:profiles!created_by(nome)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    }
+      try {
+        const { data, error } = await supabase
+          .from('planos_acao')
+          .select(`
+            *,
+            eixos(nome, cor),
+            prioridades_acao(nome, nivel, cor),
+            temas_acao(nome),
+            status_acao(nome, cor),
+            responsavel:profiles!responsavel_id(nome),
+            criador:profiles!created_by(nome)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error('Erro ao carregar planos:', err);
+        throw err;
+      }
+    },
+    retry: 1,
+    staleTime: 30000
   });
 
   const { data: eixos = [] } = useQuery({
@@ -212,7 +219,7 @@ export default function PlanoAcao() {
   );
 
   // Filtros aplicados
-  const filteredActions = planosAcao.filter((action) => {
+  const filteredActions = planosAcao?.filter((action) => {
     const matchesSearch = !searchTerm || 
       action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -228,7 +235,7 @@ export default function PlanoAcao() {
       (concluidaFilter === "false" && !action.concluida);
 
     return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesConcluida;
-  });
+  }) || [];
 
   // Calcular estatísticas
   const totalAcoes = filteredActions.length;
@@ -312,8 +319,8 @@ export default function PlanoAcao() {
         <Card>
           <CardContent className="p-6 text-center">
             <h2 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar dados</h2>
-            <p className="text-muted-foreground">{error.message}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">
+            <p className="text-muted-foreground mb-4">{(error as Error)?.message || 'Erro desconhecido'}</p>
+            <Button onClick={() => window.location.reload()}>
               Recarregar Página
             </Button>
           </CardContent>
