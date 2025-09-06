@@ -5,8 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WhatsAppSendingProvider } from "@/contexts/WhatsAppSendingContext";
+import { MunicipeDeletionProvider } from "@/contexts/MunicipeDeletionContext";
 import { DemandaNotificationProvider } from "@/contexts/DemandaNotificationContext";
 import { EnvioWhatsAppProgress } from "@/components/forms/EnvioWhatsAppProgress";
+import { MunicipeDeletionProgress } from "@/components/forms/MunicipeDeletionProgress";
 import { DemandaNotificationProgress } from "@/components/forms/DemandaNotificationProgress";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import Dashboard from "./pages/Dashboard";
@@ -31,6 +33,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <WhatsAppSendingProvider>
+        <MunicipeDeletionProvider>
         <DemandaNotificationProvider>
           <TooltipProvider>
           <Toaster />
@@ -58,9 +61,11 @@ const App = () => (
             </AuthLayout>
           </BrowserRouter>
           <EnvioWhatsAppProgress />
+          <MunicipeDeletionProgress />
           <DemandaNotificationProgress />
           </TooltipProvider>
         </DemandaNotificationProvider>
+        </MunicipeDeletionProvider>
       </WhatsAppSendingProvider>
     </AuthProvider>
   </QueryClientProvider>

@@ -22,8 +22,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
 
 export default function Municipes() {
+  const { startDeletion, updateMunicipeStatus, state: deletionState } = useMunicipeDeletion();
   const [searchTerm, setSearchTerm] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
@@ -43,10 +45,6 @@ export default function Municipes() {
   const [importResults, setImportResults] = useState<any[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
-  const [showProgressDialog, setShowProgressDialog] = useState(false);
-  const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0, currentName: '' });
-  const [isDeleteInterrupted, setIsDeleteInterrupted] = useState(false);
-  const [isProgressMinimized, setIsProgressMinimized] = useState(false);
   const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -703,42 +701,37 @@ export default function Municipes() {
   // Função para excluir munícipes em massa
   const deleteMunicipesInBatch = useMutation({
     mutationFn: async (municipeIds: string[]) => {
+      // Buscar nomes dos munícipes para o contexto
+      const { data: municipesList, error: fetchError } = await supabase
+        .from('municipes')
+        .select('id, nome')
+        .in('id', municipeIds);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Iniciar o contexto de exclusão
+      startDeletion({ municipes: municipesList || [] });
+
       const results = [];
-      const total = municipeIds.length;
-      
-      // Mostrar modal de progresso
-      console.log('🚀 Iniciando exclusão em massa - abrindo modal de progresso');
-      setShowProgressDialog(true);
-      setDeleteProgress({ current: 0, total, currentName: '' });
-      setIsDeleteInterrupted(false);
-      setIsProgressMinimized(false);
       
       for (let i = 0; i < municipeIds.length; i++) {
-        // Verificar se a exclusão foi interrompida
-        if (isDeleteInterrupted) {
-          console.log('🛑 Exclusão interrompida pelo usuário');
-          break;
-        }
         const municipeId = municipeIds[i];
-        
-        // Buscar nome do munícipe para mostrar no progresso
-        const { data: municipeData } = await supabase
-          .from('municipes')
-          .select('nome')
-          .eq('id', municipeId)
-          .single();
-        
+        const municipeData = municipesList?.find(m => m.id === municipeId);
         const municipeNome = municipeData?.nome || `Munícipe ${i + 1}`;
         
-        // Atualizar progresso
-        setDeleteProgress({ 
-          current: i + 1, 
-          total, 
-          currentName: municipeNome 
-        });
-        
+        // Verificar se foi cancelado
+        if (deletionState.isCancelled) {
+          console.log('🛑 Exclusão cancelada pelo usuário');
+          break;
+        }
+
         try {
-          console.log(`Excluindo ${i + 1}/${total}: ${municipeNome}`);
+          console.log(`Excluindo ${i + 1}/${municipeIds.length}: ${municipeNome}`);
+          
+          // Atualizar status para "excluindo"
+          updateMunicipeStatus(municipeId, 'deleting');
           
           // Primeiro, remover todas as tags associadas ao munícipe
           const { error: tagDeleteError } = await supabase
@@ -758,11 +751,14 @@ export default function Municipes() {
             .select();
           
           if (error) {
+            updateMunicipeStatus(municipeId, 'error', error.message);
             results.push({ id: municipeId, success: false, error: error.message, nome: municipeNome });
           } else {
+            updateMunicipeStatus(municipeId, 'deleted');
             results.push({ id: municipeId, success: true, nome: municipeNome });
           }
         } catch (err) {
+          updateMunicipeStatus(municipeId, 'error', 'Erro inesperado');
           results.push({ id: municipeId, success: false, error: 'Erro inesperado', nome: municipeNome });
         }
         
@@ -773,10 +769,6 @@ export default function Municipes() {
       return results;
     },
     onSuccess: (results) => {
-      // Fechar modal de progresso
-      setShowProgressDialog(false);
-      setDeleteProgress({ current: 0, total: 0, currentName: '' });
-      
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
       
@@ -802,10 +794,6 @@ export default function Municipes() {
       setSelectAll(false);
     },
     onError: (error) => {
-      // Fechar modal de progresso
-      setShowProgressDialog(false);
-      setDeleteProgress({ current: 0, total: 0, currentName: '' });
-      
       toast({
         title: "Erro na exclusão em massa",
         description: error.message,
@@ -813,21 +801,6 @@ export default function Municipes() {
       });
     }
   });
-
-  // Função para interromper exclusão em massa
-  const handleInterruptDeletion = () => {
-    setIsDeleteInterrupted(true);
-    toast({
-      title: "Exclusão interrompida",
-      description: "A operação será cancelada após o munícipe atual.",
-      variant: "default"
-    });
-  };
-
-  // Função para minimizar/maximizar modal de progresso
-  const toggleMinimizeProgress = () => {
-    setIsProgressMinimized(!isProgressMinimized);
-  };
 
   // Função para excluir munícipe individual
   const deleteMunicipe = useMutation({
@@ -1597,118 +1570,7 @@ export default function Municipes() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Modal de progresso para exclusão em massa */}
-        <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
-          <DialogContent 
-            className={`transition-all duration-300 ${isProgressMinimized ? 'sm:max-w-[300px]' : 'sm:max-w-[450px]'}`} 
-            onPointerDownOutside={(e) => e.preventDefault()}
-          >
-            <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Trash2 className="h-5 w-5 text-destructive" />
-                  Excluindo Munícipes
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleMinimizeProgress}
-                    className="h-8 w-8 p-0"
-                  >
-                    {isProgressMinimized ? (
-                      <CheckSquare className="h-4 w-4" />
-                    ) : (
-                      <Square className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </DialogTitle>
-              {!isProgressMinimized && (
-                <DialogDescription>
-                  Aguarde enquanto os munícipes são removidos do sistema...
-                </DialogDescription>
-              )}
-            </DialogHeader>
-            
-            {!isProgressMinimized && (
-              <div className="space-y-4">
-                {/* Barra de progresso */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progresso</span>
-                    <span>{deleteProgress.current} / {deleteProgress.total}</span>
-                  </div>
-                  <Progress 
-                    value={deleteProgress.total > 0 ? (deleteProgress.current / deleteProgress.total) * 100 : 0} 
-                    className="h-2"
-                  />
-                </div>
-                
-                {/* Munícipe sendo processado */}
-                {deleteProgress.currentName && (
-                  <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Processando:</div>
-                    <div className="text-sm font-medium bg-muted p-2 rounded">
-                      {deleteProgress.currentName}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Indicador de carregamento */}
-                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-                  <span>{isDeleteInterrupted ? 'Finalizando...' : 'Removendo dados e relacionamentos...'}</span>
-                </div>
-                
-                {/* Botões de controle */}
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleInterruptDeletion}
-                    disabled={isDeleteInterrupted || deleteProgress.current >= deleteProgress.total}
-                    className="flex-1"
-                  >
-                    {isDeleteInterrupted ? 'Interrompendo...' : 'Interromper Exclusão'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleMinimizeProgress}
-                    className="px-3"
-                  >
-                    Minimizar
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {/* Versão minimizada */}
-            {isProgressMinimized && (
-              <div className="py-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Progresso: {deleteProgress.current}/{deleteProgress.total}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent"></div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleMinimizeProgress}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Expandir
-                    </Button>
-                  </div>
-                </div>
-                <Progress 
-                  value={deleteProgress.total > 0 ? (deleteProgress.current / deleteProgress.total) * 100 : 0} 
-                  className="h-1 mt-2"
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        
       </div>
     </div>
   );
