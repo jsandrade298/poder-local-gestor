@@ -427,20 +427,6 @@ export default function Demandas() {
           if (error) {
             results.push({ success: false, titulo: demanda.titulo, error: error.message });
           } else {
-            // Se tem tag, tentar associar
-            if (demanda.tagId) {
-              const { error: tagError } = await supabase
-                .from('demanda_tags')
-                .insert({
-                  demanda_id: data.id,
-                  tag_id: demanda.tagId
-                });
-              
-              if (tagError) {
-                console.warn(`Erro ao associar tag para ${demanda.titulo}:`, tagError);
-              }
-            }
-            
             results.push({ success: true, titulo: demanda.titulo, id: data.id });
           }
         } catch (err) {
@@ -506,22 +492,19 @@ export default function Demandas() {
           cep: ['cep', 'zip'],
           complemento: ['complemento', 'complement'],
           data_prazo: ['data_prazo', 'prazo', 'deadline'],
-          observacoes: ['observacoes', 'observações', 'notes'],
-          tag: ['tag', 'tags', 'etiqueta']
+          observacoes: ['observacoes', 'observações', 'notes']
         };
 
         // Buscar dados necessários para mapeamento
-        const [existingMunicipes, existingAreas, existingResponsaveis, existingTags] = await Promise.all([
+        const [existingMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
           supabase.from('municipes').select('id, nome'),
           supabase.from('areas').select('id, nome'),
-          supabase.from('profiles').select('id, nome'),
-          supabase.from('tags').select('id, nome')
+          supabase.from('profiles').select('id, nome')
         ]);
 
         const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase(), m.id]) || []);
         const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase(), a.id]) || []);
         const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase(), r.id]) || []);
-        const tagMap = new Map(existingTags.data?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
 
         // Processar dados
         const demandas = lines.slice(1).map(line => {
@@ -560,11 +543,6 @@ export default function Demandas() {
                 const responsavelId = responsavelMap.get(value.toLowerCase().trim());
                 if (responsavelId) {
                   demanda.responsavelId = responsavelId;
-                }
-              } else if (key === 'tag') {
-                const tagId = tagMap.get(value.toLowerCase().trim());
-                if (tagId) {
-                  demanda.tagId = tagId;
                 }
               } else {
                 demanda[key] = value;

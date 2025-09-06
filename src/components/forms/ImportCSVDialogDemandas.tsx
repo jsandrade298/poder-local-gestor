@@ -38,8 +38,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
       'cep',
       'complemento',
       'data_prazo',
-      'observacoes',
-      'tag'
+      'observacoes'
     ];
 
     const exampleData = [
@@ -58,8 +57,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
         '01234-567',
         'Próximo à escola',
         '2025-12-31',
-        'Demanda solicitada pelos moradores locais',
-        'Infraestrutura'
+        'Demanda solicitada pelos moradores locais'
       ],
       [
         'Problema no asfalto da Avenida Principal',
@@ -76,8 +74,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
         '05678-901',
         '',
         '2025-10-15',
-        'Reportado por múltiplos munícipes',
-        'Urgente'
+        'Reportado por múltiplos munícipes'
       ]
     ];
 
@@ -398,10 +395,6 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span>observacoes</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>tag (nome da tag existente)</span>
                       </div>
                     </div>
                   </CardContent>
