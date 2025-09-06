@@ -406,12 +406,12 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                 <h3 className="text-lg font-semibold">Dicas Importantes</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>• Os campos <strong>titulo</strong>, <strong>descricao</strong> e <strong>municipe_nome</strong> são obrigatórios</p>
-                  <p>• O <strong>municipe_nome</strong> deve corresponder exatamente ao nome de um munícipe já cadastrado</p>
-                  <p>• <strong>area_nome</strong> e <strong>responsavel_nome</strong> devem corresponder a registros existentes no sistema</p>
-                  <p>• <strong>status</strong> deve ser: aberta, em_andamento, aguardando, resolvida ou cancelada</p>
-                  <p>• <strong>prioridade</strong> deve ser: baixa, media, alta ou urgente</p>
+                  <p>• O <strong>municipe_nome</strong> deve corresponder exatamente ao nome de um munícipe já cadastrado (ex: "Maria Silva Santos", "João Carlos Oliveira")</p>
+                  <p>• <strong>responsavel_nome</strong> deve corresponder ao nome de um usuário cadastrado (ex: "João Silva", "Ana Costa")</p>
+                  <p>• <strong>area_nome</strong> deve corresponder a uma área existente no sistema</p>
+                  <p>• <strong>status</strong> deve ser: aberta, em_andamento, resolvida ou cancelada</p>
+                  <p>• <strong>prioridade</strong> deve ser: baixa, media ou alta</p>
                   <p>• <strong>data_prazo</strong> deve estar no formato AAAA-MM-DD (ex: 2025-12-31)</p>
-                  <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
                   <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
                 </div>
