@@ -1,0 +1,5 @@
+nome,telefone,email,tags
+João Silva,(11) 99999-1111,joao@email.com,"tag1, tag2"
+Maria Santos,(11) 99999-2222,maria@email.com,"tag1; tag3"
+Pedro Costa,(11) 99999-3333,pedro@email.com,"tag2|tag3"
+Ana Oliveira,(11) 99999-4444,ana@email.com,tag1

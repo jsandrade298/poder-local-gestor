@@ -333,20 +333,28 @@ export default function Municipes() {
           } else {
             // Se tem tags, tentar associar múltiplas tags
             if (municipe.tagIds && municipe.tagIds.length > 0) {
+              console.log(`📋 Inserindo ${municipe.tagIds.length} tags para munícipe ${municipe.nome}:`, municipe.tagIds);
+              
               const tagInserts = municipe.tagIds.map((tagId: string) => ({
                 municipe_id: data.id,
                 tag_id: tagId
               }));
+              
+              console.log(`📋 Dados de inserção das tags:`, tagInserts);
               
               const { error: tagError } = await supabase
                 .from('municipe_tags')
                 .insert(tagInserts);
               
               if (tagError) {
-                console.warn(`Erro ao associar tags para ${municipe.nome}:`, tagError);
+                console.warn(`❌ Erro ao associar tags para ${municipe.nome}:`, tagError);
+              } else {
+                console.log(`✅ ${tagInserts.length} tags associadas com sucesso para ${municipe.nome}`);
               }
             } else if (municipe.tagId) {
               // Compatibilidade com formato antigo (uma única tag)
+              console.log(`📋 Inserindo tag única para munícipe ${municipe.nome}: ${municipe.tagId}`);
+              
               const { error: tagError } = await supabase
                 .from('municipe_tags')
                 .insert({
@@ -355,7 +363,9 @@ export default function Municipes() {
                 });
               
               if (tagError) {
-                console.warn(`Erro ao associar tag para ${municipe.nome}:`, tagError);
+                console.warn(`❌ Erro ao associar tag para ${municipe.nome}:`, tagError);
+              } else {
+                console.log(`✅ Tag associada com sucesso para ${municipe.nome}`);
               }
             }
             
@@ -500,21 +510,49 @@ export default function Municipes() {
                   // Processar múltiplas tags - separadas por vírgula, ponto e vírgula, ou pipe
                   const tagNames = values[headerIndex];
                   if (tagNames && tagNames.trim() !== '') {
-                    const separators = /[,;|]/; // Aceita vírgula, ponto e vírgula ou pipe
-                    const tagList = tagNames.split(separators)
+                    console.log(`📋 Processando tags para ${municipe.nome || 'N/A'}: "${tagNames}"`);
+                    
+                    // Separar tags usando múltiplos separadores
+                    let tagList: string[] = [];
+                    
+                    // Primeiro separar por vírgula
+                    if (tagNames.includes(',')) {
+                      tagList = tagNames.split(',');
+                    }
+                    // Depois por ponto e vírgula
+                    else if (tagNames.includes(';')) {
+                      tagList = tagNames.split(';');
+                    }
+                    // Depois por pipe
+                    else if (tagNames.includes('|')) {
+                      tagList = tagNames.split('|');
+                    }
+                    // Se não tem separador, é uma tag única
+                    else {
+                      tagList = [tagNames];
+                    }
+                    
+                    // Limpar e processar as tags
+                    const cleanTagList = tagList
                       .map(name => name.trim().toLowerCase())
                       .filter(name => name !== '');
                     
+                    console.log(`📋 Tags encontradas: ${cleanTagList.join(', ')}`);
+                    
                     const tagIds: string[] = [];
-                    tagList.forEach(tagName => {
+                    cleanTagList.forEach(tagName => {
                       const tagId = tagMap.get(tagName);
                       if (tagId) {
                         tagIds.push(tagId);
+                        console.log(`✅ Tag "${tagName}" encontrada com ID: ${tagId}`);
+                      } else {
+                        console.log(`❌ Tag "${tagName}" não encontrada no sistema`);
                       }
                     });
                     
                     if (tagIds.length > 0) {
                       municipe.tagIds = tagIds;
+                      console.log(`📋 Total de ${tagIds.length} tags associadas ao munícipe ${municipe.nome || 'N/A'}`);
                     }
                   }
                 } else {
