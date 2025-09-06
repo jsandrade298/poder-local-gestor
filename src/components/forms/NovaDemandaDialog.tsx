@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X, Search } from "lucide-react";
+import { Plus, Upload, X, Search, ChevronDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -308,43 +308,47 @@ export function NovaDemandaDialog() {
               <div className="space-y-2">
                 <Label htmlFor="municipe">Munícipe *</Label>
                 
-                {/* Campo de busca */}
+                {/* Select com busca integrada */}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
-                    placeholder="Digite para buscar munícipe..."
+                    placeholder="Digite para buscar ou clique para ver todos..."
                     value={searchMunicipe}
                     onChange={(e) => setSearchMunicipe(e.target.value)}
-                    className="pl-10"
+                    className="pr-10"
                   />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
+                  
+                  {/* Dropdown com resultados */}
+                  {(searchMunicipe.length > 0 || filteredMunicipes.length > 0) && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                      {filteredMunicipes.length > 0 ? (
+                        filteredMunicipes.map((municipe) => (
+                          <div
+                            key={municipe.id}
+                            className="px-3 py-2 hover:bg-accent cursor-pointer text-sm"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, municipe_id: municipe.id }));
+                              setSearchMunicipe(municipe.nome);
+                            }}
+                          >
+                            {municipe.nome}
+                          </div>
+                        ))
+                      ) : searchMunicipe.length > 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Nenhum munícipe encontrado
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
                 
-                <Select
-                  value={formData.municipe_id}
-                  onValueChange={(value) => {
-                    setFormData(prev => ({ ...prev, municipe_id: value }));
-                    // Limpar busca após seleção
-                    setSearchMunicipe("");
-                  }}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o munícipe" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto">
-                    {filteredMunicipes.length > 0 ? (
-                      filteredMunicipes.map((municipe) => (
-                        <SelectItem key={municipe.id} value={municipe.id}>
-                          {municipe.nome}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-results" disabled>
-                        {searchMunicipe ? "Nenhum munícipe encontrado" : "Carregando..."}
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                {/* Mostrar munícipe selecionado */}
+                {formData.municipe_id && !searchMunicipe && (
+                  <div className="text-xs text-muted-foreground">
+                    Selecionado: {municipes.find(m => m.id === formData.municipe_id)?.nome}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
