@@ -190,15 +190,17 @@ serve(async (req) => {
             await new Promise(r => setTimeout(r, mediaDelay));
           }
           
-          console.log(`📎 Enviando mídia ${media.mimetype} (${mediaIndex + 1}/${mediaFiles.length})`);
+          // Compatibilidade: suporte tanto para 'mimetype' quanto para 'type'
+          const mimeType = media.mimetype || media.type || 'application/octet-stream';
+          console.log(`📎 Enviando mídia ${mimeType} (${mediaIndex + 1}/${mediaFiles.length})`);
           
-          // Detectar tipo de mídia pelo mimetype
+          // Detectar tipo de mídia pelo mimetype/type
           let mediaType = 'document'; // padrão
-          if (media.mimetype.startsWith('image/')) {
+          if (mimeType.startsWith('image/')) {
             mediaType = 'image';
-          } else if (media.mimetype.startsWith('video/')) {
+          } else if (mimeType.startsWith('video/')) {
             mediaType = 'video';
-          } else if (media.mimetype.startsWith('audio/')) {
+          } else if (mimeType.startsWith('audio/')) {
             mediaType = 'audio';
           }
           try {
