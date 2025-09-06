@@ -102,65 +102,25 @@ export default function Usuarios() {
         throw new Error("A senha deve ter pelo menos 6 caracteres");
       }
 
-      // Criar usuário no Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.senha,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: userData.nome
-          }
-        }
+      // Usar a função do banco para criar usuário sem validação de domínio
+      const { data, error } = await supabase.rpc('create_user_direct', {
+        user_email: userData.email,
+        user_password: userData.senha,
+        user_name: userData.nome,
+        user_phone: userData.telefone,
+        user_cargo: userData.cargo
       });
 
-      if (authError) {
-        // Se o erro for de usuário já existente, mostrar mensagem específica
-        if (authError.message.includes('already registered')) {
-          throw new Error("Este email já está registrado no sistema");
-        }
-        throw authError;
+      if (error) {
+        console.error('Erro na função create_user_direct:', error);
+        throw error;
       }
 
-      // Atualizar perfil com informações adicionais
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            telefone: userData.telefone,
-            cargo: userData.cargo
-          })
-          .eq('id', authData.user.id);
-
-        if (profileError) throw profileError;
-
-        // Confirmar email automaticamente para usuários criados por admin
-        try {
-          const { error: confirmError } = await supabase.functions.invoke('confirm-user-email', {
-            body: { userId: authData.user.id }
-          });
-          
-          if (confirmError) {
-            console.warn("Erro ao confirmar email automaticamente:", confirmError);
-          }
-        } catch (confirmErr) {
-          console.warn("Erro na confirmação de email:", confirmErr);
-        }
-
-        // Dar papel de admin para todos os usuários (acesso completo)
-        // Isso agora será feito automaticamente pela trigger do banco
-        // Mas vamos garantir que seja admin mesmo
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .update({ role: 'admin' })
-          .eq('user_id', authData.user.id);
-
-        if (roleError) {
-          console.warn("Role já definido pela trigger:", roleError);
-        }
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao criar usuário');
       }
 
-      return authData;
+      return data;
     },
     onSuccess: () => {
       // Forçar recarregamento imediato dos dados

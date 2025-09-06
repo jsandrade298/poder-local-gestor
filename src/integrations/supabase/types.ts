@@ -1107,6 +1107,16 @@ export type Database = {
         Args: { agenda_id_param: string }
         Returns: undefined
       }
+      create_user_direct: {
+        Args: {
+          user_cargo?: string
+          user_email: string
+          user_name: string
+          user_password: string
+          user_phone?: string
+        }
+        Returns: Json
+      }
       enviar_mensagens_aniversario: {
         Args: Record<PropertyKey, never>
         Returns: undefined
