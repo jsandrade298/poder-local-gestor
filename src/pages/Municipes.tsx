@@ -45,6 +45,8 @@ export default function Municipes() {
   const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
   const [showProgressDialog, setShowProgressDialog] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0, currentName: '' });
+  const [isDeleteInterrupted, setIsDeleteInterrupted] = useState(false);
+  const [isProgressMinimized, setIsProgressMinimized] = useState(false);
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -706,8 +708,15 @@ export default function Municipes() {
       // Mostrar modal de progresso
       setShowProgressDialog(true);
       setDeleteProgress({ current: 0, total, currentName: '' });
+      setIsDeleteInterrupted(false);
+      setIsProgressMinimized(false);
       
       for (let i = 0; i < municipeIds.length; i++) {
+        // Verificar se a exclusão foi interrompida
+        if (isDeleteInterrupted) {
+          console.log('🛑 Exclusão interrompida pelo usuário');
+          break;
+        }
         const municipeId = municipeIds[i];
         
         // Buscar nome do munícipe para mostrar no progresso
@@ -802,6 +811,21 @@ export default function Municipes() {
       });
     }
   });
+
+  // Função para interromper exclusão em massa
+  const handleInterruptDeletion = () => {
+    setIsDeleteInterrupted(true);
+    toast({
+      title: "Exclusão interrompida",
+      description: "A operação será cancelada após o munícipe atual.",
+      variant: "default"
+    });
+  };
+
+  // Função para minimizar/maximizar modal de progresso
+  const toggleMinimizeProgress = () => {
+    setIsProgressMinimized(!isProgressMinimized);
+  };
 
   // Função para excluir munícipe individual
   const deleteMunicipe = useMutation({
@@ -1569,46 +1593,114 @@ export default function Municipes() {
 
         {/* Modal de progresso para exclusão em massa */}
         <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
-          <DialogContent className="sm:max-w-[400px]" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogContent 
+            className={`transition-all duration-300 ${isProgressMinimized ? 'sm:max-w-[300px]' : 'sm:max-w-[450px]'}`} 
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Trash2 className="h-5 w-5 text-destructive" />
-                Excluindo Munícipes
+              <DialogTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5 text-destructive" />
+                  Excluindo Munícipes
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleMinimizeProgress}
+                    className="h-8 w-8 p-0"
+                  >
+                    {isProgressMinimized ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </DialogTitle>
-              <DialogDescription>
-                Aguarde enquanto os munícipes são removidos do sistema...
-              </DialogDescription>
+              {!isProgressMinimized && (
+                <DialogDescription>
+                  Aguarde enquanto os munícipes são removidos do sistema...
+                </DialogDescription>
+              )}
             </DialogHeader>
             
-            <div className="space-y-4">
-              {/* Barra de progresso */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progresso</span>
-                  <span>{deleteProgress.current} / {deleteProgress.total}</span>
+            {!isProgressMinimized && (
+              <div className="space-y-4">
+                {/* Barra de progresso */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progresso</span>
+                    <span>{deleteProgress.current} / {deleteProgress.total}</span>
+                  </div>
+                  <Progress 
+                    value={deleteProgress.total > 0 ? (deleteProgress.current / deleteProgress.total) * 100 : 0} 
+                    className="h-2"
+                  />
+                </div>
+                
+                {/* Munícipe sendo processado */}
+                {deleteProgress.currentName && (
+                  <div className="space-y-2">
+                    <div className="text-sm text-muted-foreground">Processando:</div>
+                    <div className="text-sm font-medium bg-muted p-2 rounded">
+                      {deleteProgress.currentName}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Indicador de carregamento */}
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                  <span>{isDeleteInterrupted ? 'Finalizando...' : 'Removendo dados e relacionamentos...'}</span>
+                </div>
+                
+                {/* Botões de controle */}
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleInterruptDeletion}
+                    disabled={isDeleteInterrupted || deleteProgress.current >= deleteProgress.total}
+                    className="flex-1"
+                  >
+                    {isDeleteInterrupted ? 'Interrompendo...' : 'Interromper Exclusão'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleMinimizeProgress}
+                    className="px-3"
+                  >
+                    Minimizar
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* Versão minimizada */}
+            {isProgressMinimized && (
+              <div className="py-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Progresso: {deleteProgress.current}/{deleteProgress.total}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent"></div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleMinimizeProgress}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Expandir
+                    </Button>
+                  </div>
                 </div>
                 <Progress 
                   value={deleteProgress.total > 0 ? (deleteProgress.current / deleteProgress.total) * 100 : 0} 
-                  className="h-2"
+                  className="h-1 mt-2"
                 />
               </div>
-              
-              {/* Munícipe sendo processado */}
-              {deleteProgress.currentName && (
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Processando:</div>
-                  <div className="text-sm font-medium bg-muted p-2 rounded">
-                    {deleteProgress.currentName}
-                  </div>
-                </div>
-              )}
-              
-              {/* Indicador de carregamento */}
-              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-                <span>Removendo dados e relacionamentos...</span>
-              </div>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
