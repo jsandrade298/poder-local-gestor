@@ -190,10 +190,19 @@ serve(async (req) => {
             await new Promise(r => setTimeout(r, mediaDelay));
           }
           
-          console.log(`📎 Enviando mídia ${media.type} (${mediaIndex + 1}/${mediaFiles.length})`);
+          console.log(`📎 Enviando mídia ${media.mimetype} (${mediaIndex + 1}/${mediaFiles.length})`);
           
+          // Detectar tipo de mídia pelo mimetype
+          let mediaType = 'document'; // padrão
+          if (media.mimetype.startsWith('image/')) {
+            mediaType = 'image';
+          } else if (media.mimetype.startsWith('video/')) {
+            mediaType = 'video';
+          } else if (media.mimetype.startsWith('audio/')) {
+            mediaType = 'audio';
+          }
           try {
-            if (media.type === 'audio') {
+            if (mediaType === 'audio') {
               // Tratamento especial para áudio
               const audioUrl = `${instance.api_url}/message/sendWhatsAppAudio/${instance.instance_id}`;
               
@@ -204,7 +213,7 @@ serve(async (req) => {
               
               const audioPayload = {
                 number: normalizedPhone,
-                audio: media.url,
+                audio: `data:${media.mimetype};base64,${media.data}`,
                 encoding: true, // Importante para Evolution API processar corretamente
                 delay: 1200
               };
@@ -237,13 +246,13 @@ serve(async (req) => {
                   erro: `Erro no áudio: ${audioResponse.status}`
                 });
               }
-            } else if (media.type === 'document') {
+            } else if (mediaType === 'document') {
               // Documentos (PDF, DOC, etc)
               const docUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
               const docPayload = {
                 number: normalizedPhone,
                 mediatype: 'document',
-                media: media.url,
+                media: `data:${media.mimetype};base64,${media.data}`,
                 fileName: media.filename || 'documento.pdf',
                 delay: 1200
               };
@@ -282,13 +291,13 @@ serve(async (req) => {
               const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
               const mediaPayload = {
                 number: normalizedPhone,
-                mediatype: media.type,
-                media: media.url,
+                mediatype: mediaType,
+                media: `data:${media.mimetype};base64,${media.data}`,
                 delay: 1200
               };
               
               // Adicionar caption na primeira mídia visual
-              if (!messageSent && mensagem && (media.type === 'image' || media.type === 'video')) {
+              if (!messageSent && mensagem && (mediaType === 'image' || mediaType === 'video')) {
                 mediaPayload.caption = mensagem;
                 messageSent = true;
               }
@@ -300,30 +309,30 @@ serve(async (req) => {
               });
               
               if (mediaResponse.ok) {
-                console.log(`✅ ${media.type} enviado com sucesso`);
+                console.log(`✅ ${mediaType} enviado com sucesso`);
                 successCount++;
                 results.push({
                   telefone: rawPhone,
-                  tipo: media.type,
+                  tipo: mediaType,
                   status: 'sucesso',
-                  mensagem: `${media.type} enviado`
+                  mensagem: `${mediaType} enviado`
                 });
               } else {
                 errorCount++;
                 results.push({
                   telefone: rawPhone,
-                  tipo: media.type,
+                  tipo: mediaType,
                   status: 'erro',
-                  erro: `Erro na ${media.type}: ${mediaResponse.status}`
+                  erro: `Erro na ${mediaType}: ${mediaResponse.status}`
                 });
               }
             }
           } catch (mediaError) {
-            console.error(`❌ Erro ao processar mídia ${media.type}:`, mediaError);
+            console.error(`❌ Erro ao processar mídia ${mediaType}:`, mediaError);
             errorCount++;
             results.push({
               telefone: rawPhone,
-              tipo: media.type,
+              tipo: mediaType,
               status: 'erro',
               erro: mediaError.message
             });
