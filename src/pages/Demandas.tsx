@@ -35,27 +35,56 @@ export default function Demandas() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
+  
+  // Estados para paginação
+  const [pageSize, setPageSize] = useState<number | "all">("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Buscar demandas primeiro
-  const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas'],
+  // Buscar demandas com paginação eficiente
+  const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
+    queryKey: ['demandas', pageSize, currentPage, searchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Se "Todas", buscar todas as demandas
+      if (pageSize === "all") {
+        const { data, error } = await supabase
+          .from('demandas')
+          .select(`
+            *,
+            areas(nome),
+            municipes(nome)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        return { demandas: data || [], total: data?.length || 0 };
+      }
+
+      // Busca paginada
+      const itemsPerPage = pageSize as number;
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+
+      // Buscar com paginação
+      const { data, error, count } = await supabase
         .from('demandas')
         .select(`
           *,
           areas(nome),
           municipes(nome)
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
       
       if (error) throw error;
-      return data;
+      return { demandas: data || [], total: count || 0 };
     }
   });
+  
+  const demandas = demandasData.demandas;
+  const totalDemandas = demandasData.total;
   
   useEffect(() => {
     const atrasoParam = searchParams.get('atraso');
@@ -249,6 +278,19 @@ export default function Demandas() {
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
   });
 
+  // Paginação para dados filtrados (quando pageSize !== "all")
+  const paginatedDemandas = pageSize === "all" 
+    ? filteredDemandas 
+    : filteredDemandas;
+
+  // Calcular total de páginas
+  const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
+
+  // Resetar página quando mudar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
+
 
   // Mutação para excluir demanda
   const deleteMutation = useMutation({
@@ -345,7 +387,7 @@ export default function Demandas() {
       'created_at'
     ];
 
-    const csvData = filteredDemandas.map(demanda => [
+    const csvData = paginatedDemandas.map(demanda => [
       demanda.protocolo || '',
       demanda.titulo || '',
       demanda.descricao || '',
@@ -391,46 +433,62 @@ export default function Demandas() {
     link.click();
     document.body.removeChild(link);
 
-    toast.success(`CSV exportado com sucesso! ${filteredDemandas.length} demandas exportadas.`);
+    toast.success(`CSV exportado com sucesso! ${paginatedDemandas.length} demandas exportadas.`);
   };
 
-  // Função para processar CSV importado
+  // Função para processar demandas em lotes
   const importDemandas = useMutation({
     mutationFn: async (demandas: any[]) => {
+      console.log(`📥 Iniciando importação de ${demandas.length} demandas`);
+      
+      // Processar em lotes para evitar problemas de performance
+      const BATCH_SIZE = 50; // Processar 50 demandas por vez
       const results = [];
       
-      for (const demanda of demandas) {
-        try {
-          const { data, error } = await supabase
-            .from('demandas')
-            .insert({
-              titulo: demanda.titulo,
-              descricao: demanda.descricao,
-              municipe_id: demanda.municipeId,
-              area_id: demanda.areaId || null,
-              responsavel_id: demanda.responsavelId || null,
-              status: demanda.status || 'aberta',
-              prioridade: demanda.prioridade || 'media',
-              logradouro: demanda.logradouro || null,
-              numero: demanda.numero || null,
-              bairro: demanda.bairro || null,
-              cidade: demanda.cidade || 'São Paulo',
-              cep: demanda.cep || null,
-              complemento: demanda.complemento || null,
-              data_prazo: demanda.data_prazo || null,
-              observacoes: demanda.observacoes || null,
-              criado_por: (await supabase.auth.getUser()).data.user?.id
-            })
-            .select('id')
-            .single();
+      // Dividir em lotes
+      for (let i = 0; i < demandas.length; i += BATCH_SIZE) {
+        const batch = demandas.slice(i, i + BATCH_SIZE);
+        console.log(`🔄 Processando lote ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(demandas.length / BATCH_SIZE)} (${batch.length} demandas)`);
+        
+        // Processar lote atual
+        for (const demanda of batch) {
+          try {
+            const { data, error } = await supabase
+              .from('demandas')
+              .insert({
+                titulo: demanda.titulo,
+                descricao: demanda.descricao,
+                municipe_id: demanda.municipeId,
+                area_id: demanda.areaId || null,
+                responsavel_id: demanda.responsavelId || null,
+                status: demanda.status || 'aberta',
+                prioridade: demanda.prioridade || 'media',
+                logradouro: demanda.logradouro || null,
+                numero: demanda.numero || null,
+                bairro: demanda.bairro || null,
+                cidade: demanda.cidade || 'São Paulo',
+                cep: demanda.cep || null,
+                complemento: demanda.complemento || null,
+                data_prazo: demanda.data_prazo || null,
+                observacoes: demanda.observacoes || null,
+                criado_por: (await supabase.auth.getUser()).data.user?.id
+              })
+              .select('id')
+              .single();
 
-          if (error) {
-            results.push({ success: false, titulo: demanda.titulo, error: error.message });
-          } else {
-            results.push({ success: true, titulo: demanda.titulo, id: data.id });
+            if (error) {
+              results.push({ success: false, titulo: demanda.titulo, error: error.message });
+            } else {
+              results.push({ success: true, titulo: demanda.titulo, id: data.id });
+            }
+          } catch (err) {
+            results.push({ success: false, titulo: demanda.titulo, error: 'Erro inesperado' });
           }
-        } catch (err) {
-          results.push({ success: false, titulo: demanda.titulo, error: 'Erro inesperado' });
+        }
+        
+        // Pequena pausa entre lotes para não sobrecarregar o servidor
+        if (i + BATCH_SIZE < demandas.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
       
@@ -786,10 +844,32 @@ export default function Demandas() {
                 </Select>
               </div>
 
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <Button variant="outline" onClick={clearFilters}>
                   Limpar Filtros
                 </Button>
+                
+                {/* Controle de Paginação */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Mostrar:</span>
+                  <Select 
+                    value={pageSize.toString()} 
+                    onValueChange={(value) => {
+                      setPageSize(value === "all" ? "all" : parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -797,14 +877,14 @@ export default function Demandas() {
 
         {/* Lista de Demandas */}
         <div className="space-y-4">
-          {filteredDemandas.length === 0 ? (
+          {paginatedDemandas.length === 0 ? (
             <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground">Nenhuma demanda encontrada.</p>
               </CardContent>
             </Card>
           ) : (
-            filteredDemandas.map((demanda) => (
+            paginatedDemandas.map((demanda) => (
               <Card 
                 key={demanda.id} 
                 className="backdrop-blur-sm bg-card/95 border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
@@ -925,6 +1005,81 @@ export default function Demandas() {
             ))
           )}
         </div>
+
+        {/* Paginação e Contador */}
+        {pageSize !== "all" && totalDemandas > 0 && (
+          <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                {/* Contador */}
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a{" "}
+                  {Math.min(currentPage * (pageSize as number), totalDemandas)} de {totalDemandas} demandas
+                </div>
+                
+                {/* Navegação */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {/* Páginas */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          className="w-8 h-8 p-0"
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Total quando mostrar todas */}
+        {pageSize === "all" && (
+          <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+            <CardContent className="p-4">
+              <div className="text-center text-sm text-muted-foreground">
+                Total: {paginatedDemandas.length} demandas
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Dialog de Visualização */}
         {selectedDemanda && (
