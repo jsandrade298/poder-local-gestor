@@ -296,11 +296,12 @@ serve(async (req) => {
                 delay: 1200
               };
               
-              // Adicionar caption na primeira mídia visual
-              if (!messageSent && mensagem && (mediaType === 'image' || mediaType === 'video')) {
-                mediaPayload.caption = mensagem;
-                messageSent = true;
-              }
+               // Adicionar caption na primeira mídia visual
+               const mensagemParaEnviar = customMessages[rawPhone] || mensagem;
+               if (!messageSent && mensagemParaEnviar && (mediaType === 'image' || mediaType === 'video')) {
+                 mediaPayload.caption = mensagemParaEnviar;
+                 messageSent = true;
+               }
               
               const mediaResponse = await fetch(mediaUrl, {
                 method: 'POST',
