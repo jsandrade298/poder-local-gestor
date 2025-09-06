@@ -1,0 +1,297 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Edit2, Trash2, Save, X } from "lucide-react";
+import { toast } from "sonner";
+
+interface TemasManagerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingValues, setEditingValues] = useState({ nome: '', eixo_id: '' });
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTema, setNewTema] = useState({ nome: '', eixo_id: '' });
+
+  const queryClient = useQueryClient();
+
+  const { data: temas = [], isLoading } = useQuery({
+    queryKey: ['temas-manager'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('temas_acao')
+        .select('*, eixos(nome, cor)')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: eixos = [] } = useQuery({
+    queryKey: ['eixos-for-temas'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('eixos').select('*').order('nome');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const createTema = useMutation({
+    mutationFn: async (tema: { nome: string; eixo_id: string }) => {
+      const { data, error } = await supabase.from('temas_acao').insert([tema]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['temas-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['temas-acao'] });
+      setIsCreating(false);
+      setNewTema({ nome: '', eixo_id: '' });
+      toast.success('Tema criado com sucesso!');
+    }
+  });
+
+  const updateTema = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+      const { data, error } = await supabase
+        .from('temas_acao')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['temas-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['temas-acao'] });
+      setEditingId(null);
+      toast.success('Tema atualizado com sucesso!');
+    }
+  });
+
+  const deleteTema = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('temas_acao').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['temas-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['temas-acao'] });
+      toast.success('Tema excluído com sucesso!');
+    },
+    onError: (error: any) => {
+      if (error.code === '23503') {
+        toast.error('Não é possível excluir este tema pois existem ações vinculadas a ele.');
+      } else {
+        toast.error('Erro ao excluir tema');
+      }
+    }
+  });
+
+  const handleEdit = (tema: any) => {
+    setEditingId(tema.id);
+    setEditingValues({
+      nome: tema.nome,
+      eixo_id: tema.eixo_id || ''
+    });
+  };
+
+  const handleSave = () => {
+    if (editingId) {
+      updateTema.mutate({ id: editingId, updates: editingValues });
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditingValues({ nome: '', eixo_id: '' });
+  };
+
+  const handleCreate = () => {
+    if (newTema.nome.trim() && newTema.eixo_id) {
+      createTema.mutate(newTema);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Gerenciar Temas</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Criar novo tema */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Novo Tema
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!isCreating ? (
+                <Button onClick={() => setIsCreating(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Tema
+                </Button>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="novo-nome">Nome</Label>
+                    <Input
+                      id="novo-nome"
+                      value={newTema.nome}
+                      onChange={(e) => setNewTema({ ...newTema, nome: e.target.value })}
+                      placeholder="Nome do tema"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="novo-eixo">Eixo</Label>
+                    <Select
+                      value={newTema.eixo_id}
+                      onValueChange={(value) => setNewTema({ ...newTema, eixo_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um eixo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {eixos.map((eixo) => (
+                          <SelectItem key={eixo.id} value={eixo.id}>
+                            {eixo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button onClick={handleCreate} size="sm">
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setIsCreating(false)}>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Lista de temas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Temas Existentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Eixo</TableHead>
+                    <TableHead className="w-24">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center">
+                        Carregando...
+                      </TableCell>
+                    </TableRow>
+                  ) : temas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center">
+                        Nenhum tema encontrado
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    temas.map((tema) => (
+                      <TableRow key={tema.id}>
+                        <TableCell>
+                          {editingId === tema.id ? (
+                            <Input
+                              value={editingValues.nome}
+                              onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
+                              className="h-8"
+                            />
+                          ) : (
+                            tema.nome
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingId === tema.id ? (
+                            <Select
+                              value={editingValues.eixo_id}
+                              onValueChange={(value) => setEditingValues({ ...editingValues, eixo_id: value })}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {eixos.map((eixo) => (
+                                  <SelectItem key={eixo.id} value={eixo.id}>
+                                    {eixo.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded"
+                                style={{ backgroundColor: tema.eixos?.cor }}
+                              />
+                              {tema.eixos?.nome}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingId === tema.id ? (
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={handleSave}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={handleCancel}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => handleEdit(tema)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => deleteTema.mutate(tema.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

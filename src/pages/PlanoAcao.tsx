@@ -20,6 +20,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { NovaAcaoDialog } from "@/components/forms/NovaAcaoDialog";
 import { EditAcaoDialog } from "@/components/forms/EditAcaoDialog";
+import { EixosManagerDialog } from "@/components/forms/EixosManagerDialog";
+import { TemasManagerDialog } from "@/components/forms/TemasManagerDialog";
+import { Label } from "@/components/ui/label";
 
 export default function PlanoAcao() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,6 +34,10 @@ export default function PlanoAcao() {
   const [isNewActionDialogOpen, setIsNewActionDialogOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<any>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [showEixosManager, setShowEixosManager] = useState(false);
+  const [showTemasManager, setShowTemasManager] = useState(false);
+  const [editingCell, setEditingCell] = useState<{actionId: string, field: string} | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -211,6 +218,27 @@ export default function PlanoAcao() {
     });
   };
 
+  const handleCellEdit = (actionId: string, field: string, currentValue: string) => {
+    setEditingCell({ actionId, field });
+    setEditingValue(currentValue || '');
+  };
+
+  const handleCellSave = () => {
+    if (editingCell) {
+      const action = filteredActions.find(a => a.id === editingCell.actionId);
+      if (action) {
+        handleQuickEdit(action, editingCell.field, editingValue);
+      }
+      setEditingCell(null);
+      setEditingValue('');
+    }
+  };
+
+  const handleCellCancel = () => {
+    setEditingCell(null);
+    setEditingValue('');
+  };
+
   const exportToCSV = () => {
     const headers = [
       'Eixo', 'Prioridade', 'Tema', 'Ação', 'Responsável', 
@@ -257,6 +285,12 @@ export default function PlanoAcao() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowEixosManager(true)}>
+            Gerenciar Eixos
+          </Button>
+          <Button variant="outline" onClick={() => setShowTemasManager(true)}>
+            Gerenciar Temas
+          </Button>
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
@@ -444,15 +478,83 @@ export default function PlanoAcao() {
                     </TableCell>
                     <TableCell>{action.temas_acao?.nome}</TableCell>
                     <TableCell className="max-w-[300px]">
-                      <div className="truncate" title={action.acao}>
-                        {action.acao}
-                      </div>
+                      {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
+                        <Input
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCellSave();
+                            if (e.key === 'Escape') handleCellCancel();
+                          }}
+                          autoFocus
+                          className="h-8"
+                        />
+                      ) : (
+                        <div 
+                          className="truncate cursor-pointer hover:bg-muted/50 p-1 rounded" 
+                          title={action.acao}
+                          onClick={() => handleCellEdit(action.id, 'acao', action.acao)}
+                        >
+                          {action.acao}
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell>{action.responsavel?.nome}</TableCell>
+                    <TableCell>
+                      {editingCell?.actionId === action.id && editingCell?.field === 'responsavel_id' ? (
+                        <Select
+                          value={editingValue}
+                          onValueChange={(value) => {
+                            setEditingValue(value);
+                            handleQuickEdit(action, 'responsavel_id', value);
+                            setEditingCell(null);
+                          }}
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {usuarios.map((usuario) => (
+                              <SelectItem key={usuario.id} value={usuario.id}>
+                                {usuario.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div 
+                          className="cursor-pointer hover:bg-muted/50 p-1 rounded"
+                          onClick={() => handleCellEdit(action.id, 'responsavel_id', action.responsavel_id || '')}
+                        >
+                          {action.responsavel?.nome || '-'}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="max-w-[150px]">
-                      <div className="truncate" title={action.apoio}>
-                        {action.apoio}
-                      </div>
+                      {editingCell?.actionId === action.id && editingCell?.field === 'apoio' ? (
+                        <Input
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCellSave();
+                            if (e.key === 'Escape') handleCellCancel();
+                          }}
+                          autoFocus
+                          className="h-8"
+                        />
+                      ) : (
+                        <div 
+                          className="truncate cursor-pointer hover:bg-muted/50 p-1 rounded" 
+                          title={action.apoio}
+                          onClick={() => handleCellEdit(action.id, 'apoio', action.apoio || '')}
+                        >
+                          {action.apoio || '-'}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge 
@@ -528,6 +630,16 @@ export default function PlanoAcao() {
           }
         }}
         action={editingAction}
+      />
+
+      <EixosManagerDialog
+        open={showEixosManager}
+        onOpenChange={setShowEixosManager}
+      />
+
+      <TemasManagerDialog
+        open={showTemasManager}
+        onOpenChange={setShowTemasManager}
       />
     </div>
   );
