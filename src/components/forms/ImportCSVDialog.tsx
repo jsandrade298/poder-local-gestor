@@ -52,7 +52,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
         'Apt 45',
         '1985-05-15',
         'Munícipe cadastrada em 2024',
-        'Família'
+        'Família, Idoso'
       ],
       [
         'José Santos Oliveira',
@@ -66,7 +66,21 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
         '',
         '1978-12-03',
         'Comerciante local',
-        'Empresário'
+         'Comerciante, Empresário'
+       ],
+       [
+         'Ana Costa Silva',
+         '(11) 97777-3333',
+         'ana.costa@email.com',
+         'Rua São Paulo',
+         '789',
+         'Jardim Paulista',
+         'São Paulo',
+         '04567-890',
+         'Casa',
+         '1990-08-20',
+         'Professora',
+         'Educação, Cultura'
       ]
     ];
 
@@ -376,10 +390,10 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span>observacoes</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>tag (nome da tag existente)</span>
-                      </div>
+                       <div className="flex items-center gap-2 md:col-span-2">
+                         <FileText className="h-4 w-4 text-muted-foreground" />
+                         <span>tag (use vírgula para múltiplas tags: "Tag1, Tag2")</span>
+                       </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -392,10 +406,12 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                   <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
                   <p>• Datas devem estar no formato DD/MM/AAAA (ex: 15/05/1985) ou DD/MM/AA (ex: 15/05/85)</p>
                   <p>• Se um campo estiver vazio, deixe a célula em branco</p>
-                  <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
-                  <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
-                  <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
-                  <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
+                   <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
+                   <p>• Para múltiplas tags, separe-as com vírgula: "Tag1, Tag2, Tag3"</p>
+                   <p>• Exemplo de múltiplas tags: "Família, Idoso" ou "Empresário, Comércio"</p>
+                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
+                   <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
+                   <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
                 </div>
               </div>
 
