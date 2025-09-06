@@ -90,7 +90,9 @@ export function NovoMunicipeDialog() {
       return municipe;
     },
     onSuccess: (municipe) => {
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       setOpen(false);
       setFormData({
         nome: "",

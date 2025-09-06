@@ -205,7 +205,9 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         title: "Munícipe atualizado com sucesso!",
         description: "As informações foram salvas no sistema."
       });
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       setOpen(false);
     },
     onError: (error) => {

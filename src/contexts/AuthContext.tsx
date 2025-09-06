@@ -32,7 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Invalidar cache quando usuário faz login
         if (event === 'SIGNED_IN' && session) {
           console.log('🔄 Login detectado - invalidando cache de dados');
-          queryClient.invalidateQueries({ queryKey: ['municipes'] });
+          queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+          queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+          queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
           queryClient.invalidateQueries({ queryKey: ['demandas'] });
           queryClient.invalidateQueries({ queryKey: ['tags'] });
         }

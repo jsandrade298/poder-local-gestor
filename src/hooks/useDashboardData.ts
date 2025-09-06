@@ -23,14 +23,35 @@ export function useDashboardData() {
   });
 
   const { data: municipes = [], isLoading: isLoadingMunicipes } = useQuery({
-    queryKey: ['municipes'],
+    queryKey: ['municipes-dashboard'], // Chave específica para dashboard
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('*');
+      // Para dashboard, fazer query com limite mas buscar em lotes para ter o total real
+      let allMunicipes: any[] = [];
+      let from = 0;
+      const size = 1000;
+      let hasMore = true;
       
-      if (error) throw error;
-      return data;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('municipes')
+          .select('*')
+          .range(from, from + size - 1);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allMunicipes = [...allMunicipes, ...data];
+          if (data.length < size) {
+            hasMore = false;
+          } else {
+            from += size;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      return allMunicipes;
     }
   });
 

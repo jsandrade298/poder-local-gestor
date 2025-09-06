@@ -85,7 +85,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
   });
 
   const { data: municipes = [] } = useQuery({
-    queryKey: ['municipes'],
+    queryKey: ['municipes-select'], // Chave específica para seleção
     queryFn: async () => {
       const { data, error } = await supabase
         .from('municipes')

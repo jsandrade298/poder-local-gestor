@@ -56,7 +56,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
   });
 
   const { data: municipes = [] } = useQuery({
-    queryKey: ['municipes'],
+    queryKey: ['municipes-select'], // Chave específica para seleção
     queryFn: async () => {
       const { data, error } = await supabase
         .from('municipes')

@@ -49,7 +49,7 @@ export default function Municipes() {
 
   // Buscar munícipes com suas tags - SEM LIMITE
   const { data: municipes = [], isLoading } = useQuery({
-    queryKey: ['municipes'],
+    queryKey: ['municipes-complete'], // Chave única para esta query complexa
     queryFn: async () => {
       console.log('🔄 Iniciando busca de munícipes...');
       
@@ -354,7 +354,9 @@ export default function Municipes() {
       const errorCount = results.filter(r => !r.success).length;
       
       setImportResults(results);
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       
       // Não usar toast aqui - mostrar no modal
       console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
@@ -634,7 +636,9 @@ export default function Municipes() {
         console.error('Erros na remoção de duplicados:', result.errors);
       }
       
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       setShowDuplicatesDialog(false);
       setDuplicates([]);
       setSelectedForRemoval(new Set());
@@ -705,7 +709,9 @@ export default function Municipes() {
         });
       }
       
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       setSelectedMunicipes([]);
       setSelectAll(false);
     },
@@ -752,7 +758,9 @@ export default function Municipes() {
         title: "Munícipe excluído com sucesso!",
         description: "O munícipe foi removido do sistema."
       });
-      queryClient.invalidateQueries({ queryKey: ['municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
     },
     onError: (error) => {
       toast({
@@ -788,7 +796,9 @@ export default function Municipes() {
               size="sm"
               onClick={() => {
                 console.log('🔄 Refresh manual dos munícipes');
-                queryClient.invalidateQueries({ queryKey: ['municipes'] });
+                queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+                queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+                queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
                 toast({
                   title: "Dados atualizados!",
                   description: "Lista de munícipes foi atualizada."
