@@ -213,8 +213,8 @@ serve(async (req) => {
               
               const audioPayload = {
                 number: normalizedPhone,
-                audio: `data:${media.mimetype};base64,${media.data}`,
-                encoding: true, // Importante para Evolution API processar corretamente
+                audio: media.data, // Enviar só o base64 sem prefixo
+                encoding: true,
                 delay: 1200
               };
               
@@ -252,7 +252,7 @@ serve(async (req) => {
               const docPayload = {
                 number: normalizedPhone,
                 mediatype: 'document',
-                media: `data:${media.mimetype};base64,${media.data}`,
+                media: media.data, // Enviar só o base64 sem prefixo
                 fileName: media.filename || 'documento.pdf',
                 delay: 1200
               };
@@ -292,7 +292,7 @@ serve(async (req) => {
               const mediaPayload = {
                 number: normalizedPhone,
                 mediatype: mediaType,
-                media: `data:${media.mimetype};base64,${media.data}`,
+                media: media.data, // Enviar só o base64 sem prefixo
                 delay: 1200
               };
               
