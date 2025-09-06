@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,11 @@ export default function PlanoAcao() {
   const [editingValue, setEditingValue] = useState<string>("");
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
   const [insertPosition, setInsertPosition] = useState<number | null>(null);
+  
+  // Estados para importação CSV
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResults, setImportResults] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Estado para larguras das colunas
   const [columnWidths, setColumnWidths] = useState({
@@ -206,6 +211,166 @@ export default function PlanoAcao() {
       console.error('Erro:', error);
     }
   });
+
+  // Função para importação CSV
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportResults([]);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        toast.error('Arquivo CSV vazio ou inválido');
+        setIsImporting(false);
+        return;
+      }
+
+      const headers = lines[0].split(';').map(h => h.trim().replace(/"/g, ''));
+      const expectedHeaders = ['acao', 'eixo', 'prioridade', 'tema', 'responsavel', 'apoio', 'status', 'prazo', 'atualizacao'];
+      
+      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        toast.error(`Headers obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
+        setIsImporting(false);
+        return;
+      }
+
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        toast.error('Usuário não autenticado');
+        setIsImporting(false);
+        return;
+      }
+
+      const results = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(';').map(v => v.trim().replace(/"/g, ''));
+        const row: any = {};
+        
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+
+        if (!row.acao?.trim()) {
+          results.push({
+            success: false,
+            acao: row.acao || `Linha ${i + 1}`,
+            error: 'Campo "acao" é obrigatório'
+          });
+          continue;
+        }
+
+        try {
+          // Buscar IDs das referências
+          let eixo_id = null;
+          if (row.eixo?.trim()) {
+            const eixo = eixos.find(e => e.nome.toLowerCase() === row.eixo.toLowerCase().trim());
+            eixo_id = eixo?.id || null;
+          }
+
+          let prioridade_id = null;
+          if (row.prioridade?.trim()) {
+            const prioridade = prioridades.find(p => p.nome.toLowerCase() === row.prioridade.toLowerCase().trim());
+            prioridade_id = prioridade?.id || null;
+          }
+
+          let tema_id = null;
+          if (row.tema?.trim()) {
+            const tema = temas.find(t => t.nome.toLowerCase() === row.tema.toLowerCase().trim());
+            tema_id = tema?.id || null;
+          }
+
+          let status_id = null;
+          if (row.status?.trim()) {
+            const status = statusAcao.find(s => s.nome.toLowerCase() === row.status.toLowerCase().trim());
+            status_id = status?.id || null;
+          }
+
+          let responsavel_id = null;
+          if (row.responsavel?.trim()) {
+            const responsavel = usuarios.find(u => u.nome.toLowerCase() === row.responsavel.toLowerCase().trim());
+            responsavel_id = responsavel?.id || null;
+          }
+
+          // Processar data
+          let prazoDate = null;
+          if (row.prazo?.trim()) {
+            const dateFormats = [
+              /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
+              /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+            ];
+            
+            if (dateFormats[0].test(row.prazo)) {
+              const [day, month, year] = row.prazo.split('/');
+              prazoDate = `${year}-${month}-${day}`;
+            } else if (dateFormats[1].test(row.prazo)) {
+              prazoDate = row.prazo;
+            }
+          }
+
+          const { error } = await supabase
+            .from('planos_acao')
+            .insert({
+              acao: row.acao.trim(),
+              eixo_id,
+              prioridade_id,
+              tema_id,
+              responsavel_id,
+              apoio: row.apoio?.trim() || null,
+              status_id,
+              prazo: prazoDate,
+              atualizacao: row.atualizacao?.trim() || null,
+              concluida: false,
+              created_by: user.user.id
+            });
+
+          if (error) {
+            results.push({
+              success: false,
+              acao: row.acao,
+              error: error.message
+            });
+          } else {
+            results.push({
+              success: true,
+              acao: row.acao
+            });
+          }
+        } catch (err) {
+          results.push({
+            success: false,
+            acao: row.acao,
+            error: err instanceof Error ? err.message : 'Erro inesperado'
+          });
+        }
+      }
+
+      setImportResults(results);
+      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
+      
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+      
+      if (errorCount === 0) {
+        toast.success(`${successCount} ações importadas com sucesso!`);
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} ações importadas. ${errorCount} erros encontrados.`);
+      } else {
+        toast.error("Nenhuma ação foi importada devido a erros.");
+      }
+    } catch (error) {
+      toast.error(`Erro na importação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      console.error('Erro na importação:', error);
+    }
+    
+    setIsImporting(false);
+  };
 
   // Função para reorganizar ações
   const handleDragEnd = (result: any) => {
@@ -415,7 +580,12 @@ export default function PlanoAcao() {
           <Button variant="outline" onClick={() => setShowTemasManager(true)}>
             Gerenciar Temas
           </Button>
-          <ImportCSVDialogPlanoAcao>
+          <ImportCSVDialogPlanoAcao
+            onFileSelect={handleFileSelect}
+            isImporting={isImporting}
+            fileInputRef={fileInputRef}
+            importResults={importResults}
+          >
             <Button variant="outline">
               <Upload className="h-4 w-4 mr-2" />
               Importar CSV
