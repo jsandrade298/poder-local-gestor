@@ -298,6 +298,30 @@ export default function Usuarios() {
     }
   });
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // Deletar usuário usando Admin API
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) throw error;
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      toast({
+        title: "Usuário excluído",
+        description: "O usuário foi excluído com sucesso do sistema.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao excluir usuário",
+        description: error.message || "Erro ao excluir usuário.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
       return usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -360,12 +384,8 @@ export default function Usuarios() {
     });
   };
 
-  const handleToggleUserStatus = (userId: string, currentStatus: boolean) => {
-    // Placeholder for toggle status functionality
-    toast({
-      title: "Status do usuário",
-      description: `Status do usuário seria ${currentStatus ? 'desativado' : 'ativado'}. Funcionalidade requer implementação de status no banco.`,
-    });
+  const handleDeleteUser = (userId: string) => {
+    deleteUserMutation.mutate(userId);
   };
 
 
@@ -762,12 +782,34 @@ export default function Usuarios() {
                            <DropdownMenuItem onClick={() => handleResetPassword(usuario)}>
                              Reset Senha
                            </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleToggleUserStatus(usuario.id, usuario.ativo)}
-                            className={usuario.ativo ? "text-destructive" : "text-success"}
-                          >
-                            {usuario.ativo ? "Desativar" : "Ativar"}
-                          </DropdownMenuItem>
+                           <AlertDialog>
+                             <AlertDialogTrigger asChild>
+                               <DropdownMenuItem 
+                                 onSelect={(e) => e.preventDefault()}
+                                 className="text-destructive"
+                               >
+                                 Excluir
+                               </DropdownMenuItem>
+                             </AlertDialogTrigger>
+                             <AlertDialogContent>
+                               <AlertDialogHeader>
+                                 <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+                                 <AlertDialogDescription>
+                                   Tem certeza que deseja excluir o usuário "{usuario.nome}"? 
+                                   Esta ação não pode ser desfeita e todos os dados do usuário serão removidos permanentemente.
+                                 </AlertDialogDescription>
+                               </AlertDialogHeader>
+                               <AlertDialogFooter>
+                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                 <AlertDialogAction
+                                   onClick={() => handleDeleteUser(usuario.id)}
+                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                 >
+                                   Excluir
+                                 </AlertDialogAction>
+                               </AlertDialogFooter>
+                             </AlertDialogContent>
+                           </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
