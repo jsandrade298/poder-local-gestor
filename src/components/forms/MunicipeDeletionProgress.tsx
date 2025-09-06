@@ -211,7 +211,7 @@ export function MunicipeDeletionProgress() {
               {/* Lista de Munícipes */}
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="font-medium text-xs mb-2">Munícipes:</div>
-                <ScrollArea className="flex-1 border rounded min-h-[200px] max-h-[300px] overflow-y-scroll" style={{ scrollbarWidth: 'thin' }}>
+                <ScrollArea className="flex-1 border rounded h-[300px]">
                   <div className="p-2 space-y-2">
                     {state.municipes.map((municipe, index) => (
                       <div
