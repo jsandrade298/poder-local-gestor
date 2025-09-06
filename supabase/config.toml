@@ -1,5 +1,10 @@
 project_id = "nsoedzefrqjmbgahukub"
 
+[auth]
+# Disable email validation to allow any email format
+enable_email_autoconfirm = true
+email_double_confirm_changes = false
+
 [functions.backup-automatico]
 verify_jwt = false
 
