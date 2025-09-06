@@ -307,8 +307,22 @@ export default function Municipes() {
           if (error) {
             results.push({ success: false, nome: municipe.nome, error: error.message });
           } else {
-            // Se tem tag, tentar associar
-            if (municipe.tagId) {
+            // Se tem tags, tentar associar múltiplas tags
+            if (municipe.tagIds && municipe.tagIds.length > 0) {
+              const tagInserts = municipe.tagIds.map((tagId: string) => ({
+                municipe_id: data.id,
+                tag_id: tagId
+              }));
+              
+              const { error: tagError } = await supabase
+                .from('municipe_tags')
+                .insert(tagInserts);
+              
+              if (tagError) {
+                console.warn(`Erro ao associar tags para ${municipe.nome}:`, tagError);
+              }
+            } else if (municipe.tagId) {
+              // Compatibilidade com formato antigo (uma única tag)
               const { error: tagError } = await supabase
                 .from('municipe_tags')
                 .insert({
@@ -400,7 +414,7 @@ export default function Municipes() {
           complemento: ['complemento', 'complement'],
           data_nascimento: ['data_nascimento', 'data de nascimento', 'nascimento', 'birth_date'],
           observacoes: ['observacoes', 'observações', 'notes', 'obs'],
-          tag: ['tag', 'tags', 'etiqueta']
+          tag: ['tag', 'tags', 'etiqueta', 'etiquetas']
         };
 
         // Buscar todas as tags existentes para fazer o mapeamento
@@ -456,23 +470,35 @@ export default function Municipes() {
                      // Ignorar datas inválidas
                    }
                  }
-               } else if (key === 'tag') {
-                 // Processar tag - buscar o ID da tag pelo nome
-                 const tagName = values[headerIndex];
-                 if (tagName && tagName.trim() !== '') {
-                   const tagId = tagMap.get(tagName.toLowerCase().trim());
-                   if (tagId) {
-                     municipe.tagId = tagId;
-                   }
-                 }
-               } else {
-                 municipe[key] = values[headerIndex];
-               }
-             }
-           });
+                } else if (key === 'tag' || key === 'tags') {
+                  // Processar múltiplas tags - separadas por vírgula, ponto e vírgula, ou pipe
+                  const tagNames = values[headerIndex];
+                  if (tagNames && tagNames.trim() !== '') {
+                    const separators = /[,;|]/; // Aceita vírgula, ponto e vírgula ou pipe
+                    const tagList = tagNames.split(separators)
+                      .map(name => name.trim().toLowerCase())
+                      .filter(name => name !== '');
+                    
+                    const tagIds: string[] = [];
+                    tagList.forEach(tagName => {
+                      const tagId = tagMap.get(tagName);
+                      if (tagId) {
+                        tagIds.push(tagId);
+                      }
+                    });
+                    
+                    if (tagIds.length > 0) {
+                      municipe.tagIds = tagIds;
+                    }
+                  }
+                } else {
+                  municipe[key] = values[headerIndex];
+                }
+              }
+            });
 
-           console.log(`📋 Linha ${index + 2}: ${JSON.stringify(municipe)}`);
-           return municipe;
+            console.log(`📋 Linha ${index + 2}: ${JSON.stringify(municipe)}`);
+            return municipe;
         }).filter(m => {
           const hasName = m.nome && m.nome.trim() !== '';
           console.log(`📋 Munícipe ${m.nome || 'sem nome'}: ${hasName ? 'válido' : 'inválido'}`);

@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +30,7 @@ export function NovoMunicipeDialog() {
     complemento: "",
     data_nascimento: "",
     observacoes: "",
-    tag_id: ""
+    tag_ids: [] as string[]
   });
 
   const { toast } = useToast();
@@ -68,18 +70,20 @@ export function NovoMunicipeDialog() {
 
       if (error) throw error;
 
-      // Se uma tag foi selecionada, criar a relação
-      if (data.tag_id && municipe) {
+      // Se tags foram selecionadas, criar as relações
+      if (data.tag_ids.length > 0 && municipe) {
+        const tagInserts = data.tag_ids.map(tagId => ({
+          municipe_id: municipe.id,
+          tag_id: tagId
+        }));
+
         const { error: tagError } = await supabase
           .from('municipe_tags')
-          .insert({
-            municipe_id: municipe.id,
-            tag_id: data.tag_id
-          });
+          .insert(tagInserts);
 
         if (tagError) {
-          console.warn('Erro ao vincular tag:', tagError);
-          // Não vamos falhar a criação do munícipe por causa da tag
+          console.warn('Erro ao vincular tags:', tagError);
+          // Não vamos falhar a criação do munícipe por causa das tags
         }
       }
 
@@ -100,7 +104,7 @@ export function NovoMunicipeDialog() {
         complemento: "",
         data_nascimento: "",
         observacoes: "",
-        tag_id: ""
+        tag_ids: []
       });
       
       // Abrir dialog para criar demanda
@@ -127,6 +131,23 @@ export function NovoMunicipeDialog() {
       return;
     }
     createMunicipe.mutate(formData);
+  };
+
+  // Funções para gerenciar tags múltiplas
+  const handleTagToggle = (tagId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tag_ids: prev.tag_ids.includes(tagId)
+        ? prev.tag_ids.filter(id => id !== tagId)
+        : [...prev.tag_ids, tagId]
+    }));
+  };
+
+  const removeTag = (tagId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tag_ids: prev.tag_ids.filter(id => id !== tagId)
+    }));
   };
 
   return (
@@ -268,28 +289,61 @@ export function NovoMunicipeDialog() {
               <h3 className="text-lg font-semibold">Informações Adicionais</h3>
               
               <div className="space-y-2">
-                <Label htmlFor="tag">Tag</Label>
-                <Select
-                  value={formData.tag_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, tag_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma tag" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tags.map((tag) => (
-                      <SelectItem key={tag.id} value={tag.id}>
-                        <div className="flex items-center gap-2">
+                <Label>Tags</Label>
+                
+                {/* Tags selecionadas */}
+                {formData.tag_ids.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
+                    {formData.tag_ids.map(tagId => {
+                      const tag = tags.find(t => t.id === tagId);
+                      return tag ? (
+                        <Badge 
+                          key={tag.id} 
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                          style={{ 
+                            backgroundColor: `${tag.cor}20`,
+                            borderColor: tag.cor,
+                            color: tag.cor
+                          }}
+                        >
                           <div 
-                            className="w-3 h-3 rounded-full" 
+                            className="w-2 h-2 rounded-full" 
                             style={{ backgroundColor: tag.cor }}
                           />
                           {tag.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                          <X 
+                            className="h-3 w-3 cursor-pointer hover:bg-white/20 rounded-full" 
+                            onClick={() => removeTag(tag.id)}
+                          />
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+                
+                {/* Seletor de tags */}
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-lg p-3">
+                  {tags.map((tag) => (
+                    <div key={tag.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`tag-${tag.id}`}
+                        checked={formData.tag_ids.includes(tag.id)}
+                        onCheckedChange={() => handleTagToggle(tag.id)}
+                      />
+                      <label
+                        htmlFor={`tag-${tag.id}`}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: tag.cor }}
+                        />
+                        {tag.nome}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">

@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Edit } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Edit, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +36,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     complemento: "",
     data_nascimento: "",
     observacoes: "",
-    tag_id: ""
+    tag_ids: [] as string[]
   });
 
   // Atualizar formData quando municipe muda
@@ -53,7 +54,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         complemento: "",
         data_nascimento: municipe.data_nascimento || "",
         observacoes: municipe.observacoes || "",
-        tag_id: ""
+        tag_ids: []
       });
     }
   }, [municipe]);
@@ -110,30 +111,32 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     }
   });
 
-  // Buscar tag atual do munícipe
-  const { data: currentTag } = useQuery({
-    queryKey: ['municipe-tag', municipe?.id],
+  // Buscar tags atuais do munícipe
+  const { data: currentTags = [] } = useQuery({
+    queryKey: ['municipe-tags', municipe?.id],
     queryFn: async () => {
-      if (!municipe?.id) return null;
+      if (!municipe?.id) return [];
       
       const { data, error } = await supabase
         .from('municipe_tags')
-        .select('tag_id')
-        .eq('municipe_id', municipe.id)
-        .maybeSingle();
+        .select('tag_id, tags(id, nome, cor)')
+        .eq('municipe_id', municipe.id);
       
       if (error) throw error;
-      return data?.tag_id || "";
+      return data;
     },
     enabled: !!municipe?.id && open
   });
 
-  // Atualizar tag_id quando currentTag carrega
+  // Carregar tags atuais quando currentTags mudar
   useEffect(() => {
-    if (currentTag !== undefined) {
-      setFormData(prev => ({ ...prev, tag_id: currentTag || "none" }));
+    if (currentTags && currentTags.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        tag_ids: currentTags.map((ct: any) => ct.tag_id)
+      }));
     }
-  }, [currentTag]);
+  }, [currentTags]);
 
   const updateMunicipe = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -168,7 +171,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
 
       if (updateError) throw updateError;
 
-      // Gerenciar tag
+      // Gerenciar tags
       // Primeiro, remover todas as tags existentes
       const { error: deleteError } = await supabase
         .from('municipe_tags')
@@ -179,18 +182,19 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         console.warn('Erro ao remover tags existentes:', deleteError);
       }
 
-      // Se uma nova tag foi selecionada, adicionar (não adicionar se for "none")
-      if (data.tag_id && data.tag_id !== "none") {
+      // Adicionar novas tags
+      if (formData.tag_ids.length > 0) {
+        const tagInserts = formData.tag_ids.map(tagId => ({
+          municipe_id: municipe.id,
+          tag_id: tagId
+        }));
+
         const { error: tagError } = await supabase
           .from('municipe_tags')
-          .insert({
-            municipe_id: municipe.id,
-            tag_id: data.tag_id
-          });
+          .insert(tagInserts);
 
         if (tagError) {
-          console.warn('Erro ao atualizar tag:', tagError);
-          // Não falhar a operação inteira por causa da tag
+          console.warn('Erro ao atualizar tags:', tagError);
         }
       }
 
@@ -224,6 +228,23 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
       return;
     }
     updateMunicipe.mutate(formData);
+  };
+
+  // Funções para gerenciar tags múltiplas
+  const handleTagToggle = (tagId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tag_ids: prev.tag_ids.includes(tagId)
+        ? prev.tag_ids.filter(id => id !== tagId)
+        : [...prev.tag_ids, tagId]
+    }));
+  };
+
+  const removeTag = (tagId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tag_ids: prev.tag_ids.filter(id => id !== tagId)
+    }));
   };
 
   const defaultTrigger = (
@@ -370,29 +391,61 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
             <h3 className="text-lg font-semibold">Informações Adicionais</h3>
             
             <div className="space-y-2">
-              <Label htmlFor="tag">Tag</Label>
-              <Select
-                value={formData.tag_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, tag_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma tag</SelectItem>
-                  {tags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      <div className="flex items-center gap-2">
+              <Label>Tags</Label>
+              
+              {/* Tags selecionadas */}
+              {formData.tag_ids.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
+                  {formData.tag_ids.map(tagId => {
+                    const tag = tags.find(t => t.id === tagId);
+                    return tag ? (
+                      <Badge 
+                        key={tag.id} 
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                        style={{ 
+                          backgroundColor: `${tag.cor}20`,
+                          borderColor: tag.cor,
+                          color: tag.cor
+                        }}
+                      >
                         <div 
-                          className="w-3 h-3 rounded-full" 
+                          className="w-2 h-2 rounded-full" 
                           style={{ backgroundColor: tag.cor }}
                         />
                         {tag.nome}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                        <X 
+                          className="h-3 w-3 cursor-pointer hover:bg-white/20 rounded-full" 
+                          onClick={() => removeTag(tag.id)}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              
+              {/* Seletor de tags */}
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-lg p-3">
+                {tags.map((tag) => (
+                  <div key={tag.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-tag-${tag.id}`}
+                      checked={formData.tag_ids.includes(tag.id)}
+                      onCheckedChange={() => handleTagToggle(tag.id)}
+                    />
+                    <label
+                      htmlFor={`edit-tag-${tag.id}`}
+                      className="flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: tag.cor }}
+                      />
+                      {tag.nome}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
