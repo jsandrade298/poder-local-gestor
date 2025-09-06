@@ -553,11 +553,11 @@ export default function PlanoAcao() {
           
           {/* Container com scroll vertical sempre visível */}
           <div 
-            className="relative bg-background"
+            className="relative bg-background border rounded-lg"
             style={{ height: tableHeight }}
           >
             <div 
-              className="h-full plano-acao-scroll"
+              className="h-full custom-scrollbar"
               style={{ 
                 overflowY: 'scroll',
                 overflowX: 'auto'
