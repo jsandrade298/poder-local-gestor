@@ -34,6 +34,8 @@ interface WhatsAppConfig {
   instancia_aniversario: string;
   mensagem_aniversario: string;
   aniversario_ativo: boolean;
+  tempo_minimo_aniversario: number;
+  tempo_maximo_aniversario: number;
   instancia_demandas: string;
   mensagem_demandas: string;
   demandas_ativo: boolean;
@@ -51,6 +53,8 @@ const WhatsApp = () => {
     instancia_aniversario: '',
     mensagem_aniversario: 'Olá {nome}, feliz aniversário! 🎉🎂 Desejamos um dia repleto de alegria e felicidade!',
     aniversario_ativo: false,
+    tempo_minimo_aniversario: 1,
+    tempo_maximo_aniversario: 3,
     instancia_demandas: '',
     mensagem_demandas: 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
     demandas_ativo: false
@@ -97,6 +101,8 @@ const WhatsApp = () => {
           'whatsapp_instancia_aniversario', 
           'whatsapp_mensagem_aniversario', 
           'whatsapp_aniversario_ativo',
+          'whatsapp_tempo_minimo_aniversario',
+          'whatsapp_tempo_maximo_aniversario',
           'whatsapp_instancia_demandas',
           'whatsapp_mensagem_demandas',
           'whatsapp_demandas_ativo'
@@ -113,6 +119,8 @@ const WhatsApp = () => {
       instancia_aniversario: configMap.whatsapp_instancia_aniversario || '',
       mensagem_aniversario: configMap.whatsapp_mensagem_aniversario || 'Olá {nome}, feliz aniversário! 🎉🎂 Desejamos um dia repleto de alegria e felicidade!',
       aniversario_ativo: configMap.whatsapp_aniversario_ativo === 'true',
+      tempo_minimo_aniversario: parseInt(configMap.whatsapp_tempo_minimo_aniversario) || 1,
+      tempo_maximo_aniversario: parseInt(configMap.whatsapp_tempo_maximo_aniversario) || 3,
       instancia_demandas: configMap.whatsapp_instancia_demandas || '',
       mensagem_demandas: configMap.whatsapp_mensagem_demandas || 'Olá {nome}, sua demanda foi atualizada para: {status}. Obrigado por utilizar nossos serviços!',
       demandas_ativo: configMap.whatsapp_demandas_ativo === 'true'
@@ -188,6 +196,8 @@ const WhatsApp = () => {
         { chave: 'whatsapp_instancia_aniversario', valor: config.instancia_aniversario },
         { chave: 'whatsapp_mensagem_aniversario', valor: config.mensagem_aniversario },
         { chave: 'whatsapp_aniversario_ativo', valor: config.aniversario_ativo.toString() },
+        { chave: 'whatsapp_tempo_minimo_aniversario', valor: config.tempo_minimo_aniversario.toString() },
+        { chave: 'whatsapp_tempo_maximo_aniversario', valor: config.tempo_maximo_aniversario.toString() },
         { chave: 'whatsapp_instancia_demandas', valor: config.instancia_demandas },
         { chave: 'whatsapp_mensagem_demandas', valor: config.mensagem_demandas },
         { chave: 'whatsapp_demandas_ativo', valor: config.demandas_ativo.toString() }
@@ -329,15 +339,15 @@ const WhatsApp = () => {
         mediaCount: mediaData.length
       });
 
-      const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
+      const { data, error } = await supabase.functions.invoke('enviar-whatsapp-aniversario-completo', {
         body: {
           telefones,
-          mensagem: '', // Deixar vazio pois usaremos apenas customMessages
+          mensagem: config.mensagem_aniversario,
           instanceName: config.instancia_aniversario,
-          tempoMinimo: 2,
-          tempoMaximo: 4,
+          tempoMinimo: config.tempo_minimo_aniversario || 2,
+          tempoMaximo: config.tempo_maximo_aniversario || 4,
           mediaFiles: mediaData,
-          customMessages
+          teste: true
         }
       });
 
