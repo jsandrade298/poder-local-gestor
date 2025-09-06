@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Plus, Calendar as CalendarIcon, CheckCircle, Target } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ import { EditAcaoDialog } from "@/components/forms/EditAcaoDialog";
 import { EixosManagerDialog } from "@/components/forms/EixosManagerDialog";
 import { TemasManagerDialog } from "@/components/forms/TemasManagerDialog";
 import { Label } from "@/components/ui/label";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function PlanoAcao() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,6 +39,8 @@ export default function PlanoAcao() {
   const [showTemasManager, setShowTemasManager] = useState(false);
   const [editingCell, setEditingCell] = useState<{actionId: string, field: string} | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
+  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  const [insertPosition, setInsertPosition] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -131,6 +134,7 @@ export default function PlanoAcao() {
       queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
       toast.success('Ação criada com sucesso!');
       setIsNewActionDialogOpen(false);
+      setInsertPosition(null);
     },
     onError: (error) => {
       toast.error('Erro ao criar ação');
@@ -178,6 +182,44 @@ export default function PlanoAcao() {
       console.error('Erro:', error);
     }
   });
+
+  // Função para reorganizar ações
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const items = Array.from(filteredActions);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // Aqui você pode implementar a persistência da nova ordem se necessário
+    // Por enquanto apenas reorganiza visualmente
+  };
+
+  // Função para inserir nova ação em posição específica
+  const handleInsertAction = (position: number) => {
+    setInsertPosition(position);
+    setIsNewActionDialogOpen(true);
+  };
+
+  // Componente para inserção entre linhas
+  const InsertRow = ({ index }: { index: number }) => (
+    <tr 
+      className="group cursor-pointer hover:bg-muted/50 transition-colors"
+      onMouseEnter={() => setHoveredRowIndex(index)}
+      onMouseLeave={() => setHoveredRowIndex(null)}
+      onClick={() => handleInsertAction(index)}
+    >
+      <td colSpan={12} className="p-2 text-center">
+        <div className={cn(
+          "flex items-center justify-center gap-2 text-muted-foreground transition-all duration-200",
+          hoveredRowIndex === index ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}>
+          <Plus className="h-4 w-4" />
+          <span className="text-sm font-medium">Adicionar nova ação aqui</span>
+        </div>
+      </td>
+    </tr>
+  );
 
   // Filtros aplicados
   const filteredActions = planosAcao.filter((action) => {
@@ -414,12 +456,13 @@ export default function PlanoAcao() {
         </CardContent>
       </Card>
 
-      {/* Tabela */}
+      {/* Tabela com Drag & Drop */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead className="w-12">
                   <Checkbox />
                 </TableHead>
@@ -435,291 +478,328 @@ export default function PlanoAcao() {
                 <TableHead className="w-12">Excluir</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : filteredActions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
-                    Nenhuma ação encontrada
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredActions.map((action) => (
-                  <TableRow key={action.id} className={action.concluida ? "opacity-60" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={action.concluida}
-                        onCheckedChange={() => handleToggleConcluida(action)}
-                      />
-                    </TableCell>
-                     {/* Eixo - Dropdown editável */}
-                     <TableCell>
-                       <Select 
-                         value={action.eixo_id || ""} 
-                         onValueChange={(value) => handleQuickEdit(action, 'eixo_id', value)}
-                       >
-                         <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                           <Badge 
-                             variant="outline" 
-                             style={{ 
-                               borderColor: action.eixos?.cor, 
-                               color: action.eixos?.cor 
-                             }}
-                           >
-                             {action.eixos?.nome || 'Selecionar eixo'}
-                           </Badge>
-                         </SelectTrigger>
-                         <SelectContent>
-                           {eixos.map((eixo) => (
-                             <SelectItem key={eixo.id} value={eixo.id}>
-                               <div className="flex items-center gap-2">
-                                 <div 
-                                   className="w-3 h-3 rounded-full" 
-                                   style={{ backgroundColor: eixo.cor }}
-                                 />
-                                 {eixo.nome}
-                               </div>
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </TableCell>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="actions-table">
+                {(provided) => (
+                  <TableBody {...provided.droppableProps} ref={provided.innerRef}>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={12} className="text-center py-8">
+                          Carregando...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredActions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={12} className="text-center py-8">
+                          Nenhuma ação encontrada
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <>
+                        <InsertRow index={0} />
+                        {filteredActions.map((action, index) => (
+                          <React.Fragment key={action.id}>
+                            <Draggable draggableId={action.id} index={index}>
+                              {(provided, snapshot) => (
+                                <TableRow 
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={cn(
+                                    action.concluida ? "opacity-60" : "",
+                                    snapshot.isDragging && "shadow-lg bg-background"
+                                  )}
+                                >
+                                  {/* Handle de drag */}
+                                  <TableCell className="w-8 p-2">
+                                    <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  </TableCell>
+                                  
+                                  {/* Checkbox */}
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={action.concluida}
+                                      onCheckedChange={() => handleToggleConcluida(action)}
+                                    />
+                                  </TableCell>
 
-                     {/* Prioridade - Dropdown editável */}
-                     <TableCell>
-                       <Select 
-                         value={action.prioridade_id || ""} 
-                         onValueChange={(value) => handleQuickEdit(action, 'prioridade_id', value)}
-                       >
-                         <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                           <Badge 
-                             variant="outline"
-                             style={{ 
-                               borderColor: action.prioridades_acao?.cor, 
-                               color: action.prioridades_acao?.cor 
-                             }}
-                           >
-                             {action.prioridades_acao?.nome || 'Selecionar prioridade'}
-                           </Badge>
-                         </SelectTrigger>
-                         <SelectContent>
-                           {prioridades.map((prioridade) => (
-                             <SelectItem key={prioridade.id} value={prioridade.id}>
-                               <div className="flex items-center gap-2">
-                                 <div 
-                                   className="w-3 h-3 rounded-full" 
-                                   style={{ backgroundColor: prioridade.cor }}
-                                 />
-                                 {prioridade.nome}
-                               </div>
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </TableCell>
+                                  {/* Eixo - Dropdown editável */}
+                                  <TableCell>
+                                    <Select 
+                                      value={action.eixo_id || ""} 
+                                      onValueChange={(value) => handleQuickEdit(action, 'eixo_id', value)}
+                                    >
+                                      <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
+                                        <Badge 
+                                          variant="outline" 
+                                          style={{ 
+                                            borderColor: action.eixos?.cor, 
+                                            color: action.eixos?.cor 
+                                          }}
+                                        >
+                                          {action.eixos?.nome || 'Selecionar eixo'}
+                                        </Badge>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {eixos.map((eixo) => (
+                                          <SelectItem key={eixo.id} value={eixo.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div 
+                                                className="w-3 h-3 rounded-full" 
+                                                style={{ backgroundColor: eixo.cor }}
+                                              />
+                                              {eixo.nome}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
 
-                     {/* Tema - Dropdown editável */}
-                     <TableCell>
-                       <Select 
-                         value={action.tema_id || ""} 
-                         onValueChange={(value) => handleQuickEdit(action, 'tema_id', value)}
-                       >
-                         <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                           <Badge variant="secondary">
-                             {action.temas_acao?.nome || 'Selecionar tema'}
-                           </Badge>
-                         </SelectTrigger>
-                         <SelectContent>
-                           {temas.map((tema) => (
-                             <SelectItem key={tema.id} value={tema.id}>
-                               {tema.nome}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </TableCell>
-                     {/* Ação - Textarea editável */}
-                     <TableCell className="min-w-[200px]">
-                       {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
-                         <div className="flex gap-2 items-start">
-                           <Textarea
-                             value={editingValue}
-                             onChange={(e) => setEditingValue(e.target.value)}
-                             className="min-h-[60px]"
-                             autoFocus
-                           />
-                           <div className="flex flex-col gap-1">
-                             <Button size="sm" onClick={handleCellSave}>
-                               Salvar
-                             </Button>
-                             <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                               Cancelar
-                             </Button>
-                           </div>
-                         </div>
-                       ) : (
-                         <div 
-                           className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
-                           onClick={() => handleCellEdit(action.id, 'acao', action.acao)}
-                         >
-                           {action.acao || 'Clique para editar'}
-                         </div>
-                       )}
-                     </TableCell>
-                     {/* Responsável - Dropdown editável */}
-                     <TableCell>
-                       <Select 
-                         value={action.responsavel_id || "none"} 
-                         onValueChange={(value) => handleQuickEdit(action, 'responsavel_id', value)}
-                       >
-                         <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                           <div className="text-left">
-                             {action.responsavel?.nome || 'Selecionar responsável'}
-                           </div>
-                         </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="none">Sem responsável</SelectItem>
-                           {usuarios.map((usuario) => (
-                             <SelectItem key={usuario.id} value={usuario.id}>
-                               {usuario.nome}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </TableCell>
-                     {/* Apoio - Campo de texto simples */}
-                     <TableCell>
-                       {action.apoio || '-'}
-                     </TableCell>
-                     {/* Status - Dropdown editável */}
-                     <TableCell>
-                       <Select 
-                         value={action.status_id || ""} 
-                         onValueChange={(value) => handleQuickEdit(action, 'status_id', value)}
-                       >
-                         <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                           <Badge 
-                             variant="outline"
-                             style={{ 
-                               borderColor: action.status_acao?.cor, 
-                               color: action.status_acao?.cor 
-                             }}
-                           >
-                             {action.status_acao?.nome || 'Selecionar status'}
-                           </Badge>
-                         </SelectTrigger>
-                         <SelectContent>
-                           {statusAcao.map((status) => (
-                             <SelectItem key={status.id} value={status.id}>
-                               <div className="flex items-center gap-2">
-                                 <div 
-                                   className="w-3 h-3 rounded-full" 
-                                   style={{ backgroundColor: status.cor }}
-                                 />
-                                 {status.nome}
-                               </div>
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </TableCell>
+                                  {/* Prioridade - Dropdown editável */}
+                                  <TableCell>
+                                    <Select 
+                                      value={action.prioridade_id || ""} 
+                                      onValueChange={(value) => handleQuickEdit(action, 'prioridade_id', value)}
+                                    >
+                                      <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
+                                        <Badge 
+                                          variant="outline"
+                                          style={{ 
+                                            borderColor: action.prioridades_acao?.cor, 
+                                            color: action.prioridades_acao?.cor 
+                                          }}
+                                        >
+                                          {action.prioridades_acao?.nome || 'Selecionar prioridade'}
+                                        </Badge>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {prioridades.map((prioridade) => (
+                                          <SelectItem key={prioridade.id} value={prioridade.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div 
+                                                className="w-3 h-3 rounded-full" 
+                                                style={{ backgroundColor: prioridade.cor }}
+                                              />
+                                              {prioridade.nome}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
 
-                     {/* Prazo - Calendário editável */}
-                     <TableCell>
-                       <Popover>
-                         <PopoverTrigger asChild>
-                           <Button 
-                             variant="outline" 
-                             className={cn(
-                               "w-full justify-start text-left font-normal border-0 hover:bg-muted",
-                               !action.prazo && "text-muted-foreground"
-                             )}
-                           >
-                             <CalendarIcon className="mr-2 h-4 w-4" />
-                             {action.prazo ? (
-                               format(new Date(action.prazo), 'dd/MM/yyyy')
-                             ) : (
-                               "Selecionar prazo"
-                             )}
-                           </Button>
-                         </PopoverTrigger>
-                         <PopoverContent className="w-auto p-0" align="start">
-                           <Calendar
-                             mode="single"
-                             selected={action.prazo ? new Date(action.prazo) : undefined}
-                             onSelect={(date) => {
-                               const isoDate = date ? date.toISOString().split('T')[0] : null;
-                               handleQuickEdit(action, 'prazo', isoDate);
-                             }}
-                             initialFocus
-                             className="pointer-events-auto"
-                           />
-                         </PopoverContent>
-                       </Popover>
-                     </TableCell>
+                                  {/* Tema - Dropdown editável */}
+                                  <TableCell>
+                                    <Select 
+                                      value={action.tema_id || ""} 
+                                      onValueChange={(value) => handleQuickEdit(action, 'tema_id', value)}
+                                    >
+                                      <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
+                                        <Badge variant="secondary">
+                                          {action.temas_acao?.nome || 'Selecionar tema'}
+                                        </Badge>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {temas.map((tema) => (
+                                          <SelectItem key={tema.id} value={tema.id}>
+                                            {tema.nome}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
 
-                     {/* Atualização - Textarea editável */}
-                     <TableCell>
-                       {editingCell?.actionId === action.id && editingCell?.field === 'atualizacao' ? (
-                         <div className="flex gap-2 items-start">
-                           <Textarea
-                             value={editingValue}
-                             onChange={(e) => setEditingValue(e.target.value)}
-                             className="min-h-[60px]"
-                             autoFocus
-                           />
-                           <div className="flex flex-col gap-1">
-                             <Button size="sm" onClick={handleCellSave}>
-                               Salvar
-                             </Button>
-                             <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                               Cancelar
-                             </Button>
-                           </div>
-                         </div>
-                       ) : (
-                         <div 
-                           className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
-                           onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
-                         >
-                           {action.atualizacao || 'Clique para editar'}
-                         </div>
-                       )}
-                     </TableCell>
+                                  {/* Ação - Textarea editável */}
+                                  <TableCell className="min-w-[200px]">
+                                    {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
+                                      <div className="flex gap-2 items-start">
+                                        <Textarea
+                                          value={editingValue}
+                                          onChange={(e) => setEditingValue(e.target.value)}
+                                          className="min-h-[60px]"
+                                          autoFocus
+                                        />
+                                        <div className="flex flex-col gap-1">
+                                          <Button size="sm" onClick={handleCellSave}>
+                                            Salvar
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={handleCellCancel}>
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div 
+                                        className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
+                                        onClick={() => handleCellEdit(action.id, 'acao', action.acao)}
+                                      >
+                                        {action.acao || 'Clique para editar'}
+                                      </div>
+                                    )}
+                                  </TableCell>
 
-                     {/* Botão de exclusão */}
-                     <TableCell>
-                       <AlertDialog>
-                         <AlertDialogTrigger asChild>
-                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                             <Trash2 className="h-4 w-4" />
-                           </Button>
-                         </AlertDialogTrigger>
-                         <AlertDialogContent>
-                           <AlertDialogHeader>
-                             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                             <AlertDialogDescription>
-                               Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
-                             </AlertDialogDescription>
-                           </AlertDialogHeader>
-                           <AlertDialogFooter>
-                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                             <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
-                               Excluir
-                             </AlertDialogAction>
-                           </AlertDialogFooter>
-                         </AlertDialogContent>
-                       </AlertDialog>
-                     </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
+                                  {/* Responsável - Dropdown editável */}
+                                  <TableCell>
+                                    <Select 
+                                      value={action.responsavel_id || "none"} 
+                                      onValueChange={(value) => handleQuickEdit(action, 'responsavel_id', value)}
+                                    >
+                                      <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
+                                        <div className="text-left">
+                                          {action.responsavel?.nome || 'Selecionar responsável'}
+                                        </div>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">Sem responsável</SelectItem>
+                                        {usuarios.map((usuario) => (
+                                          <SelectItem key={usuario.id} value={usuario.id}>
+                                            {usuario.nome}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+
+                                  {/* Apoio - Campo de texto simples */}
+                                  <TableCell>
+                                    {action.apoio || '-'}
+                                  </TableCell>
+
+                                  {/* Status - Dropdown editável */}
+                                  <TableCell>
+                                    <Select 
+                                      value={action.status_id || ""} 
+                                      onValueChange={(value) => handleQuickEdit(action, 'status_id', value)}
+                                    >
+                                      <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
+                                        <Badge 
+                                          variant="outline"
+                                          style={{ 
+                                            borderColor: action.status_acao?.cor, 
+                                            color: action.status_acao?.cor 
+                                          }}
+                                        >
+                                          {action.status_acao?.nome || 'Selecionar status'}
+                                        </Badge>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {statusAcao.map((status) => (
+                                          <SelectItem key={status.id} value={status.id}>
+                                            <div className="flex items-center gap-2">
+                                              <div 
+                                                className="w-3 h-3 rounded-full" 
+                                                style={{ backgroundColor: status.cor }}
+                                              />
+                                              {status.nome}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+
+                                  {/* Prazo - Calendário editável */}
+                                  <TableCell>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button 
+                                          variant="outline" 
+                                          className={cn(
+                                            "w-full justify-start text-left font-normal border-0 hover:bg-muted",
+                                            !action.prazo && "text-muted-foreground"
+                                          )}
+                                        >
+                                          <CalendarIcon className="mr-2 h-4 w-4" />
+                                          {action.prazo ? (
+                                            format(new Date(action.prazo), 'dd/MM/yyyy')
+                                          ) : (
+                                            "Selecionar prazo"
+                                          )}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                          mode="single"
+                                          selected={action.prazo ? new Date(action.prazo) : undefined}
+                                          onSelect={(date) => {
+                                            const isoDate = date ? date.toISOString().split('T')[0] : null;
+                                            handleQuickEdit(action, 'prazo', isoDate);
+                                          }}
+                                          initialFocus
+                                          className="pointer-events-auto"
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </TableCell>
+
+                                  {/* Atualização - Textarea editável */}
+                                  <TableCell>
+                                    {editingCell?.actionId === action.id && editingCell?.field === 'atualizacao' ? (
+                                      <div className="flex gap-2 items-start">
+                                        <Textarea
+                                          value={editingValue}
+                                          onChange={(e) => setEditingValue(e.target.value)}
+                                          className="min-h-[60px]"
+                                          autoFocus
+                                        />
+                                        <div className="flex flex-col gap-1">
+                                          <Button size="sm" onClick={handleCellSave}>
+                                            Salvar
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={handleCellCancel}>
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div 
+                                        className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
+                                        onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
+                                      >
+                                        {action.atualizacao || 'Clique para editar'}
+                                      </div>
+                                    )}
+                                  </TableCell>
+
+                                  {/* Botão de exclusão */}
+                                  <TableCell>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
+                                            Excluir
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Draggable>
+                            <InsertRow index={index + 1} />
+                          </React.Fragment>
+                        ))}
+                      </>
+                    )}
+                    {provided.placeholder}
+                  </TableBody>
+                )}
+              </Droppable>
+            </DragDropContext>
           </Table>
         </CardContent>
       </Card>
@@ -734,16 +814,8 @@ export default function PlanoAcao() {
       <EditAcaoDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        onSubmit={(data) => {
-          if (editingAction) {
-            updateAction.mutate({
-              id: editingAction.id,
-              updates: data
-            });
-            setIsEditDialogOpen(false);
-          }
-        }}
         action={editingAction}
+        onSubmit={(data) => updateAction.mutate({ id: editingAction?.id, updates: data })}
       />
 
       <EixosManagerDialog
