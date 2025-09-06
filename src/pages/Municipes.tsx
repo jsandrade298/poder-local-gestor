@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
@@ -45,6 +45,13 @@ export default function Municipes() {
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Invalidar cache dos munícipes quando componente monta para garantir dados atualizados
+  useEffect(() => {
+    console.log('🔄 Componente Municipes montado - invalidando cache...');
+    queryClient.invalidateQueries({ queryKey: ['municipes'] });
+    queryClient.removeQueries({ queryKey: ['municipes'] }); // Remove cache completamente
+  }, [queryClient]);
 
   // Buscar munícipes com suas tags - SEM LIMITE
   const { data: municipes = [], isLoading } = useQuery({
@@ -101,7 +108,11 @@ export default function Municipes() {
       
       console.log(`✅ Total carregado: ${allMunicipes.length} munícipes`);
       return allMunicipes;
-    }
+    },
+    staleTime: 0, // Sempre considerar dados como obsoletos
+    refetchOnMount: true, // Sempre refetch quando componente monta
+    refetchOnWindowFocus: true, // Refetch quando janela ganha foco
+    refetchOnReconnect: true // Refetch quando reconecta
   });
 
   // Buscar cidades únicas para o filtro
@@ -778,6 +789,19 @@ export default function Municipes() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => {
+                console.log('🔄 Refresh manual dos munícipes');
+                queryClient.invalidateQueries({ queryKey: ['municipes'] });
+                queryClient.removeQueries({ queryKey: ['municipes'] });
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </Button>
             <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
             <Button 
               variant="outline" 
