@@ -701,19 +701,37 @@ export default function Municipes() {
   // Função para excluir munícipes em massa
   const deleteMunicipesInBatch = useMutation({
     mutationFn: async (municipeIds: string[]) => {
-      // Buscar nomes dos munícipes MANTENDO A ORDEM dos IDs selecionados
-      const { data: allMunicipesData, error: fetchError } = await supabase
-        .from('municipes')
-        .select('id, nome')
-        .in('id', municipeIds);
+      console.log(`🗑️ Iniciando exclusão em massa de ${municipeIds.length} munícipes`);
+      
+      // Processar em lotes para evitar URLs muito longas
+      const BATCH_SIZE = 100; // Processar 100 munícipes por vez
+      const batches = [];
+      
+      for (let i = 0; i < municipeIds.length; i += BATCH_SIZE) {
+        batches.push(municipeIds.slice(i, i + BATCH_SIZE));
+      }
+      
+      let allMunicipesList: any[] = [];
+      
+      // Buscar nomes dos munícipes em lotes
+      for (const batch of batches) {
+        const { data: batchData, error: fetchError } = await supabase
+          .from('municipes')
+          .select('id, nome')
+          .in('id', batch);
 
-      if (fetchError) {
-        throw fetchError;
+        if (fetchError) {
+          throw fetchError;
+        }
+        
+        if (batchData) {
+          allMunicipesList = [...allMunicipesList, ...batchData];
+        }
       }
 
       // Reorganizar na ordem dos IDs selecionados para manter consistência visual
       const municipesList = municipeIds.map(id => {
-        const municipe = allMunicipesData?.find(m => m.id === id);
+        const municipe = allMunicipesList.find(m => m.id === id);
         return {
           id,
           nome: municipe?.nome || `Munícipe ${id.slice(0, 8)}...`
