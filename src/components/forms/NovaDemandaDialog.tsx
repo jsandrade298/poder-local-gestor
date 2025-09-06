@@ -15,6 +15,7 @@ export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
+  const [showMunicipeDropdown, setShowMunicipeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -164,6 +165,7 @@ export function NovaDemandaDialog() {
       setOpen(false);
       setFiles([]);
       setSearchMunicipe("");
+      setShowMunicipeDropdown(false);
       setFormData({
         titulo: "",
         descricao: "",
@@ -311,24 +313,36 @@ export function NovaDemandaDialog() {
                 {/* Select com busca integrada */}
                 <div className="relative">
                   <Input
-                    placeholder="Digite para buscar ou clique para ver todos..."
+                    placeholder={formData.municipe_id ? 
+                      municipes.find(m => m.id === formData.municipe_id)?.nome || "Selecione um munícipe" 
+                      : "Digite para buscar munícipe..."
+                    }
                     value={searchMunicipe}
-                    onChange={(e) => setSearchMunicipe(e.target.value)}
+                    onChange={(e) => {
+                      setSearchMunicipe(e.target.value);
+                      setShowMunicipeDropdown(true);
+                    }}
+                    onFocus={() => setShowMunicipeDropdown(true)}
+                    onBlur={() => {
+                      // Delay para permitir clique nos itens
+                      setTimeout(() => setShowMunicipeDropdown(false), 200);
+                    }}
                     className="pr-10"
                   />
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
                   
-                  {/* Dropdown com resultados */}
-                  {(searchMunicipe.length > 0 || filteredMunicipes.length > 0) && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                  {/* Dropdown com resultados - só aparece quando necessário */}
+                  {showMunicipeDropdown && (searchMunicipe.length > 0 || !formData.municipe_id) && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                       {filteredMunicipes.length > 0 ? (
                         filteredMunicipes.map((municipe) => (
                           <div
                             key={municipe.id}
-                            className="px-3 py-2 hover:bg-accent cursor-pointer text-sm"
+                            className="px-3 py-2 hover:bg-accent cursor-pointer text-sm border-b last:border-b-0"
                             onClick={() => {
                               setFormData(prev => ({ ...prev, municipe_id: municipe.id }));
-                              setSearchMunicipe(municipe.nome);
+                              setSearchMunicipe("");
+                              setShowMunicipeDropdown(false);
                             }}
                           >
                             {municipe.nome}
@@ -342,13 +356,6 @@ export function NovaDemandaDialog() {
                     </div>
                   )}
                 </div>
-                
-                {/* Mostrar munícipe selecionado */}
-                {formData.municipe_id && !searchMunicipe && (
-                  <div className="text-xs text-muted-foreground">
-                    Selecionado: {municipes.find(m => m.id === formData.municipe_id)?.nome}
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">
