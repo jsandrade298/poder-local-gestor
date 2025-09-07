@@ -650,19 +650,56 @@ export default function Demandas() {
           observacoes: ['observacoes', 'observações', 'obs', 'notes']
         };
 
-        // Buscar dados existentes
+        // Buscar dados existentes usando carregamento em lotes
         console.log('🔍 Carregando dados do sistema...');
-        const [existingMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
-          supabase.from('municipes').select('id, nome'),
+        
+        // Função para carregar todos os munícipes em lotes
+        const carregarTodosMunicipes = async () => {
+          let allMunicipes: Array<{ id: string; nome: string }> = [];
+          let from = 0;
+          const pageSize = 1000;
+          let hasMore = true;
+          
+          while (hasMore) {
+            console.log(`📦 Carregando lote ${Math.floor(from / pageSize) + 1} de munícipes (registros ${from + 1}-${from + pageSize})...`);
+            
+            const { data, error } = await supabase
+              .from('municipes')
+              .select('id, nome')
+              .order('nome')
+              .range(from, from + pageSize - 1);
+              
+            if (error) {
+              console.error('❌ Erro ao buscar munícipes:', error);
+              throw error;
+            }
+            
+            if (data && data.length > 0) {
+              allMunicipes = [...allMunicipes, ...data];
+              console.log(`✅ Lote carregado: ${data.length} munícipes (total: ${allMunicipes.length})`);
+              
+              // Se retornou menos que o pageSize, chegamos ao fim
+              hasMore = data.length === pageSize;
+              from += pageSize;
+            } else {
+              hasMore = false;
+            }
+          }
+          
+          return allMunicipes;
+        };
+
+        const [allMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
+          carregarTodosMunicipes(),
           supabase.from('areas').select('id, nome'),
           supabase.from('profiles').select('id, nome')
         ]);
 
-        console.log(`📊 Dados carregados: ${existingMunicipes.data?.length || 0} munícipes, ${existingAreas.data?.length || 0} áreas, ${existingResponsaveis.data?.length || 0} responsáveis`);
+        console.log(`📊 Dados carregados: ${allMunicipes?.length || 0} munícipes (em lotes), ${existingAreas.data?.length || 0} áreas, ${existingResponsaveis.data?.length || 0} responsáveis`);
 
         // Criar maps normalizados
         const municipeMap = new Map();
-        existingMunicipes.data?.forEach(m => {
+        allMunicipes?.forEach(m => {
           // Normalizar removendo espaços extras e convertendo para minúsculas
           const normalized = m.nome.toLowerCase().trim().replace(/\s+/g, ' ');
           municipeMap.set(normalized, m.id);
@@ -798,7 +835,7 @@ export default function Demandas() {
             demandasComDados,
             municipeMap,
             municipesNaoEncontrados: Array.from(municipesNaoEncontrados.values()),
-            municipesExistentes: existingMunicipes.data || []
+            municipesExistentes: allMunicipes || []
           });
           setShowValidacaoModal(true);
           return;
