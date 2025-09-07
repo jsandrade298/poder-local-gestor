@@ -59,20 +59,50 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     setSelectedMunicipes(municipesSelecionados);
   }, [municipesSelecionados]);
 
-  // Buscar munícipes
+  // Buscar munícipes em lotes
   const { data: municipes } = useQuery({
     queryKey: ["municipes-whatsapp"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("municipes")
-        .select("id, nome, telefone")
-        .not("telefone", "is", null)
-        .order("nome");
-
-      if (error) throw error;
-      return data || [];
+      console.log('🔄 Carregando TODOS os munícipes com telefone em lotes...');
+      
+      let allMunicipes: Array<{ id: string; nome: string; telefone: string }> = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        console.log(`📦 Carregando lote ${Math.floor(from / pageSize) + 1} (registros ${from + 1}-${from + pageSize})...`);
+        
+        const { data, error } = await supabase
+          .from("municipes")
+          .select("id, nome, telefone")
+          .not("telefone", "is", null)
+          .order("nome")
+          .range(from, from + pageSize - 1);
+          
+        if (error) {
+          console.error('❌ Erro ao buscar munícipes:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          allMunicipes = [...allMunicipes, ...data];
+          console.log(`✅ Lote carregado: ${data.length} munícipes (total: ${allMunicipes.length})`);
+          
+          // Se retornou menos que o pageSize, chegamos ao fim
+          hasMore = data.length === pageSize;
+          from += pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      console.log(`🎯 Total final: ${allMunicipes.length} munícipes com telefone carregados em lotes`);
+      return allMunicipes;
     },
     enabled: open,
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
+    gcTime: 10 * 60 * 1000, // Manter cache por 10 minutos
   });
 
   // Buscar instâncias conectadas usando a edge function
