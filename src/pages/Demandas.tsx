@@ -637,6 +637,14 @@ export default function Demandas() {
           supabase.from('profiles').select('id, nome')
         ]);
 
+        console.log(`📊 Dados para mapeamento:`, {
+          municipes: existingMunicipes.data?.length || 0,
+          areas: existingAreas.data?.length || 0,
+          responsaveis: existingResponsaveis.data?.length || 0
+        });
+
+        console.log(`👥 Responsáveis disponíveis:`, existingResponsaveis.data?.map(r => r.nome) || []);
+
         const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase(), m.id]) || []);
         const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase(), a.id]) || []);
         const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase(), r.id]) || []);
@@ -675,10 +683,17 @@ export default function Demandas() {
                 if (areaId) {
                   demanda.areaId = areaId;
                 }
-              } else if (key === 'responsavel_nome') {
+               } else if (key === 'responsavel_nome') {
+                console.log('👤 Processando responsável do CSV:', JSON.stringify({ 
+                  value, 
+                  valueLower: value.toLowerCase().trim(),
+                  found: responsavelMap.has(value.toLowerCase().trim())
+                }));
                 const responsavelId = responsavelMap.get(value.toLowerCase().trim());
                 if (responsavelId) {
                   demanda.responsavelId = responsavelId;
+                } else {
+                  demanda.responsavelError = `Responsável "${value}" não encontrado`;
                 }
               } else if (key === 'prioridade') {
                 console.log('📋 Processando prioridade do CSV:', JSON.stringify({ key, value, original: value, type: typeof value }));
@@ -700,12 +715,19 @@ export default function Demandas() {
           if (!d.titulo || d.titulo.trim() === '') problems.push('título vazio');
           if (!d.descricao || d.descricao.trim() === '') problems.push('descrição vazia');
           if (!d.municipeId) problems.push(d.municipeError || 'munícipe não encontrado');
-          return { index: index + 2, problems }; // +2 porque linha 1 é header
+          if (d.responsavelError) problems.push(d.responsavelError);
+          return { 
+            index: index + 2, 
+            problems,
+            titulo: d.titulo,
+            municipe: d.municipe_nome,
+            responsavel: d.responsavel_nome
+          }; // +2 porque linha 1 é header
         }).filter(p => p.problems.length > 0);
         
         console.log(`❌ Demandas com problemas: ${problemAnalysis.length}`);
         problemAnalysis.slice(0, 10).forEach(p => {
-          console.log(`   Linha ${p.index}: ${p.problems.join(', ')}`);
+          console.log(`   Linha ${p.index} (${p.titulo}): ${p.problems.join(', ')}`);
         });
         
         const demandasValidas = demandas.filter(d => d.titulo && d.titulo.trim() !== '' && d.descricao && d.descricao.trim() !== '' && d.municipeId);
