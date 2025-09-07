@@ -44,7 +44,7 @@ interface ValidarMunicipesDialogProps {
   municipesExistentes: Array<{ id: string; nome: string }>;
   importStats?: {
     totalLinhas: number;
-    municipesEncontrados: number;
+    demandasOk: number;
     municipesNaoEncontrados: number;
     demandasValidas: number;
   } | null;
@@ -158,13 +158,13 @@ export function ValidarMunicipesDialog({
 
         {/* Estatísticas da importação */}
         {importStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">{importStats.totalLinhas}</div>
-              <div className="text-xs text-muted-foreground">Total analisado</div>
+              <div className="text-xs text-muted-foreground">Linhas analisadas</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{importStats.municipesEncontrados}</div>
+              <div className="text-2xl font-bold text-green-600">{importStats.demandasOk}</div>
               <div className="text-xs text-muted-foreground">Demandas OK</div>
             </div>
             <div className="text-center">

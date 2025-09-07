@@ -783,6 +783,7 @@ export default function Demandas() {
                   const info = municipesNaoEncontrados.get(value);
                   info.demandasCount++;
                   info.demandas.push(demanda.titulo || `Linha ${i + 1}`);
+                  info.linhas.push(i + 1);
                 }
               } else if (key === 'area_nome') {
                 const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -838,7 +839,7 @@ export default function Demandas() {
         // Preparar estatísticas
         const stats = {
           totalLinhas: lines.length - 1, // -1 para excluir header
-          municipesEncontrados: demandasComDados.filter(d => !d.municipe_nao_encontrado).length,
+          demandasOk: demandasComDados.filter(d => !d.municipe_nao_encontrado).length,
           municipesNaoEncontrados: municipesNaoEncontrados.size,
           demandasValidas: demandasComDados.length
         };
@@ -882,7 +883,7 @@ export default function Demandas() {
   const [tempImportData, setTempImportData] = useState<any>(null);
   const [importStats, setImportStats] = useState<{
     totalLinhas: number;
-    municipesEncontrados: number;
+    demandasOk: number;
     municipesNaoEncontrados: number;
     demandasValidas: number;
   } | null>(null);
