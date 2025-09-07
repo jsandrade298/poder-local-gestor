@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Users, Plus, ArrowRight, Check, ChevronsUpDown, UserPlus } from 'lucide-react';
+import { Search, Users, Plus, ArrowRight, Check, ChevronsUpDown, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useMunicipesSelect } from '@/hooks/useMunicipesSelect';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ interface MunicipeNaoEncontrado {
 
 interface DecisaoMunicipe {
   nomeOriginal: string;
-  tipo: 'existente' | 'novo';
+  tipo: 'existente' | 'novo' | 'descartar';
   municipeId?: string;
   novoNome?: string;
   // Campos expandidos para criação completa
@@ -103,6 +103,7 @@ export function ValidarMunicipesDialog({
       // Priorizar vinculação: só aceitar "novo" se não há munícipe selecionado
       if (d.tipo === 'existente' && !d.municipeId) return true;
       if (d.tipo === 'novo' && !d.novoNome?.trim()) return true;
+      if (d.tipo === 'descartar') return false; // Descarte é sempre válido
       return false;
     });
 
@@ -160,9 +161,20 @@ export function ValidarMunicipesDialog({
                       <CardTitle className="text-sm font-medium">
                         {municipe.nome}
                       </CardTitle>
-                      <Badge variant="secondary">
-                        {municipe.demandasCount} demanda{municipe.demandasCount > 1 ? 's' : ''}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {municipe.demandasCount} demanda{municipe.demandasCount > 1 ? 's' : ''}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDecisao(municipe.nome, { tipo: 'descartar' })}
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          title="Descartar demandas deste munícipe"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Demandas: {municipe.demandas.slice(0, 2).join(', ')}
@@ -171,9 +183,34 @@ export function ValidarMunicipesDialog({
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="space-y-4">
-                      {/* Combobox para vincular a munícipe existente */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Vincular a munícipe existente:</Label>
+                      {/* Mostrar se foi descartado */}
+                      {decisao?.tipo === 'descartar' ? (
+                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                          <div className="flex items-center gap-2 text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                            <span className="text-sm font-medium">Demandas descartadas</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            As {municipe.demandasCount} demandas deste munícipe serão ignoradas na importação.
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDecisoes(prev => {
+                              const newDecisoes = {...prev};
+                              delete newDecisoes[municipe.nome];
+                              return newDecisoes;
+                            })}
+                            className="mt-2 h-6 text-xs"
+                          >
+                            Desfazer descarte
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Combobox para vincular a munícipe existente */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Vincular a munícipe existente:</Label>
                         <Popover 
                           open={openComboboxes[municipe.nome]} 
                           onOpenChange={(open) => setComboboxOpen(municipe.nome, open)}
@@ -400,10 +437,12 @@ export function ValidarMunicipesDialog({
                           </div>
                         </div>
                       )}
+                        </>
+                      )}
                     </div>
 
                     {/* Indicador de decisão */}
-                    {decisao && (
+                    {decisao && decisao.tipo !== 'descartar' && (
                       <div className="mt-3 p-2 bg-muted rounded text-xs flex items-center gap-2">
                         <ArrowRight className="h-3 w-3" />
                         {decisao.tipo === 'existente' ? (

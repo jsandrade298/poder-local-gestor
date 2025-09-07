@@ -869,14 +869,30 @@ export default function Demandas() {
         }
       }
 
+      // Filtrar decisões de descarte
+      const decisoesDescartadas = decisoes.filter(d => d.tipo === 'descartar');
+      const decisoesValidas = decisoes.filter(d => d.tipo !== 'descartar');
+      
+      console.log(`📋 Processando ${decisoesValidas.length} decisões válidas`);
+      console.log(`🗑️ Descartando ${decisoesDescartadas.length} munícipes com suas demandas`);
+
       // Aplicar decisões de munícipes existentes
-      const municipesExistentes = decisoes.filter(d => d.tipo === 'existente');
+      const municipesExistentes = decisoesValidas.filter(d => d.tipo === 'existente');
       municipesExistentes.forEach(decisao => {
         municipeMap.set(decisao.nomeOriginal, decisao.municipeId);
       });
 
-      // Atualizar IDs dos munícipes nas demandas
-      demandasComDados.forEach(demanda => {
+      // Remover demandas de munícipes descartados
+      const demandasNaoDescartadas = demandasComDados.filter(demanda => {
+        if (demanda.municipe_nao_encontrado) {
+          const foiDescartado = decisoesDescartadas.some(d => d.nomeOriginal === demanda.municipe_nao_encontrado);
+          return !foiDescartado;
+        }
+        return true;
+      });
+
+      // Atualizar IDs dos munícipes nas demandas restantes
+      demandasNaoDescartadas.forEach(demanda => {
         if (demanda.municipe_nao_encontrado) {
           const municipeId = municipeMap.get(demanda.municipe_nao_encontrado);
           if (municipeId) {
@@ -886,7 +902,7 @@ export default function Demandas() {
       });
 
       // Filtrar apenas demandas com dados mínimos
-      const demandasValidas = demandasComDados.filter(d => 
+      const demandasValidas = demandasNaoDescartadas.filter(d => 
         d.titulo && d.municipeId
       );
 
