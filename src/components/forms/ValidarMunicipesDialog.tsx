@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Users, Plus, ArrowRight } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Search, Users, Plus, ArrowRight, Check, ChevronsUpDown, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useMunicipesSelect } from '@/hooks/useMunicipesSelect';
+import { cn } from '@/lib/utils';
 
 interface MunicipeNaoEncontrado {
   nome: string;
@@ -20,6 +24,16 @@ interface DecisaoMunicipe {
   tipo: 'existente' | 'novo';
   municipeId?: string;
   novoNome?: string;
+  // Campos expandidos para criação completa
+  telefone?: string;
+  email?: string;
+  endereco?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  cep?: string;
+  data_nascimento?: string;
+  observacoes?: string;
 }
 
 interface ValidarMunicipesDialogProps {
@@ -38,12 +52,11 @@ export function ValidarMunicipesDialog({
   onDecisoes
 }: ValidarMunicipesDialogProps) {
   const [decisoes, setDecisoes] = useState<Record<string, DecisaoMunicipe>>({});
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Filtrar munícipes existentes baseado na busca
-  const municipesFiltrados = municipesExistentes.filter(m =>
-    m.nome.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const [expandedForms, setExpandedForms] = useState<Record<string, boolean>>({});
+  const [openComboboxes, setOpenComboboxes] = useState<Record<string, boolean>>({});
+  
+  // Hook para carregar todos os munícipes em lotes
+  const { data: allMunicipes = [], isLoading } = useMunicipesSelect();
 
   const handleDecisao = (nomeOriginal: string, decisao: Partial<DecisaoMunicipe>) => {
     setDecisoes(prev => ({
@@ -56,6 +69,20 @@ export function ValidarMunicipesDialog({
     }));
   };
 
+  const toggleExpandedForm = (nomeOriginal: string) => {
+    setExpandedForms(prev => ({
+      ...prev,
+      [nomeOriginal]: !prev[nomeOriginal]
+    }));
+  };
+
+  const setComboboxOpen = (nomeOriginal: string, open: boolean) => {
+    setOpenComboboxes(prev => ({
+      ...prev,
+      [nomeOriginal]: open
+    }));
+  };
+
   const handleConfirmar = () => {
     const decisoesList = municipesNaoEncontrados.map(m => {
       const decisao = decisoes[m.nome];
@@ -64,7 +91,8 @@ export function ValidarMunicipesDialog({
         return {
           nomeOriginal: m.nome,
           tipo: 'novo' as const,
-          novoNome: m.nome
+          novoNome: m.nome,
+          cidade: 'Santo André'
         };
       }
       return decisao;
@@ -72,6 +100,7 @@ export function ValidarMunicipesDialog({
 
     // Validar se todas as decisões estão completas
     const invalidas = decisoesList.filter(d => {
+      // Priorizar vinculação: só aceitar "novo" se não há munícipe selecionado
       if (d.tipo === 'existente' && !d.municipeId) return true;
       if (d.tipo === 'novo' && !d.novoNome?.trim()) return true;
       return false;
@@ -119,38 +148,6 @@ export function ValidarMunicipesDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-auto space-y-4">
-          {/* Busca de munícipes existentes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                Buscar Munícipes Existentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Input
-                placeholder="Digite o nome para buscar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="mb-2"
-              />
-              {searchTerm && (
-                <div className="max-h-40 overflow-auto space-y-1">
-                  {municipesFiltrados.slice(0, 10).map(m => (
-                    <div key={m.id} className="text-sm p-2 bg-muted rounded">
-                      {m.nome}
-                    </div>
-                  ))}
-                  {municipesFiltrados.length > 10 && (
-                    <div className="text-xs text-muted-foreground p-2">
-                      ... e mais {municipesFiltrados.length - 10} resultados
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Lista de munícipes não encontrados */}
           <div className="space-y-3">
             {municipesNaoEncontrados.map((municipe, index) => {
@@ -173,55 +170,236 @@ export function ValidarMunicipesDialog({
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Opção 1: Munícipe Existente */}
+                    <div className="space-y-4">
+                      {/* Combobox para vincular a munícipe existente */}
                       <div className="space-y-2">
-                        <Label className="text-xs font-medium">Vincular a munícipe existente:</Label>
-                        <Select
-                          value={decisao?.tipo === 'existente' ? decisao.municipeId : ''}
-                          onValueChange={(value) => handleDecisao(municipe.nome, {
-                            tipo: 'existente',
-                            municipeId: value
-                          })}
+                        <Label className="text-sm font-medium">Vincular a munícipe existente:</Label>
+                        <Popover 
+                          open={openComboboxes[municipe.nome]} 
+                          onOpenChange={(open) => setComboboxOpen(municipe.nome, open)}
                         >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Selecionar munícipe existente..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {municipesFiltrados.slice(0, 50).map(m => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openComboboxes[municipe.nome]}
+                              className="w-full justify-between h-9"
+                            >
+                              {decisao?.tipo === 'existente' && decisao.municipeId
+                                ? allMunicipes.find(m => m.id === decisao.municipeId)?.nome
+                                : "Buscar e selecionar munícipe..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" side="bottom" align="start">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Digite para buscar munícipe..." 
+                                className="h-9"
+                              />
+                              <CommandList>
+                                <CommandEmpty>
+                                  {isLoading ? "Carregando..." : "Nenhum munícipe encontrado."}
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {allMunicipes.map((m) => (
+                                    <CommandItem
+                                      key={m.id}
+                                      value={m.nome}
+                                      onSelect={() => {
+                                        handleDecisao(municipe.nome, {
+                                          tipo: 'existente',
+                                          municipeId: m.id
+                                        });
+                                        setComboboxOpen(municipe.nome, false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          decisao?.municipeId === m.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {m.nome}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
-                      {/* Opção 2: Criar Novo */}
+                      {/* Opção criar novo munícipe */}
                       <div className="space-y-2">
-                        <Label className="text-xs font-medium">Ou criar novo munícipe:</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Nome do novo munícipe"
-                            value={decisao?.tipo === 'novo' ? decisao.novoNome || municipe.nome : municipe.nome}
-                            onChange={(e) => handleDecisao(municipe.nome, {
-                              tipo: 'novo',
-                              novoNome: e.target.value
-                            })}
-                            className="h-8"
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDecisao(municipe.nome, {
-                              tipo: 'novo',
-                              novoNome: municipe.nome
-                            })}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Ou criar novo munícipe:</Label>
+                          {decisao?.tipo === 'novo' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => toggleExpandedForm(municipe.nome)}
+                              className="h-6 px-2 text-xs"
+                            >
+                              <UserPlus className="h-3 w-3 mr-1" />
+                              {expandedForms[municipe.nome] ? 'Ocultar' : 'Expandir'} formulário
+                            </Button>
+                          )}
                         </div>
+                        <Input
+                          placeholder="Nome do novo munícipe"
+                          value={decisao?.tipo === 'novo' ? decisao.novoNome || '' : ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value.trim()) {
+                              handleDecisao(municipe.nome, {
+                                tipo: 'novo',
+                                novoNome: value,
+                                cidade: 'Santo André'
+                              });
+                            }
+                          }}
+                          onFocus={() => {
+                            if (!decisao || decisao.tipo !== 'novo') {
+                              handleDecisao(municipe.nome, {
+                                tipo: 'novo',
+                                novoNome: municipe.nome,
+                                cidade: 'Santo André'
+                              });
+                            }
+                          }}
+                          className="h-9"
+                        />
                       </div>
+
+                      {/* Formulário expandido para criação completa */}
+                      {decisao?.tipo === 'novo' && expandedForms[municipe.nome] && (
+                        <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
+                          <div className="text-xs font-medium text-muted-foreground mb-2">
+                            Dados completos do munícipe:
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Telefone</Label>
+                              <Input
+                                placeholder="(11) 99999-9999"
+                                value={decisao.telefone || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  telefone: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Email</Label>
+                              <Input
+                                type="email"
+                                placeholder="email@exemplo.com"
+                                value={decisao.email || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  email: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Endereço</Label>
+                              <Input
+                                placeholder="Rua, Avenida..."
+                                value={decisao.endereco || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  endereco: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Número</Label>
+                              <Input
+                                placeholder="123"
+                                value={decisao.numero || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  numero: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Bairro</Label>
+                              <Input
+                                placeholder="Nome do bairro"
+                                value={decisao.bairro || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  bairro: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Cidade</Label>
+                              <Input
+                                placeholder="Santo André"
+                                value={decisao.cidade || 'Santo André'}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  cidade: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">CEP</Label>
+                              <Input
+                                placeholder="09000-000"
+                                value={decisao.cep || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  cep: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Data de Nascimento</Label>
+                              <Input
+                                type="date"
+                                value={decisao.data_nascimento || ''}
+                                onChange={(e) => handleDecisao(municipe.nome, {
+                                  ...decisao,
+                                  data_nascimento: e.target.value
+                                })}
+                                className="h-8"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-xs">Observações</Label>
+                            <Textarea
+                              placeholder="Observações adicionais..."
+                              value={decisao.observacoes || ''}
+                              onChange={(e) => handleDecisao(municipe.nome, {
+                                ...decisao,
+                                observacoes: e.target.value
+                              })}
+                              className="h-16 resize-none"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Indicador de decisão */}
