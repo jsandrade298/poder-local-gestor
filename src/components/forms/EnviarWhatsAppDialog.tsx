@@ -411,11 +411,13 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     }
   };
 
-  // Filtrar munícipes para busca - mostrar todos que correspondem à busca
-  const filteredMunicipes = municipes?.filter(m => 
-    m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
-     m.telefone?.includes(searchMunicipe)
-  ) || [];
+  // Filtrar munícipes para busca - usando todos os munícipes carregados em lotes
+  const filteredMunicipes = municipes?.filter(m => {
+    if (!searchMunicipe.trim()) return true; // Se não há busca, mostrar todos
+    
+    return m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
+           m.telefone?.includes(searchMunicipe);
+  }) || [];
 
   const totalDestinatarios = incluirTodos 
     ? (municipes?.length || 0)
