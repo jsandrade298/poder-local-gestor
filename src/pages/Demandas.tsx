@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
 import { useLocation, useSearchParams } from "react-router-dom";
+import { LoadingDialog } from '@/components/ui/loading-dialog';
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -595,6 +596,10 @@ export default function Demandas() {
       return;
     }
 
+    // Mostrar modal de loading
+    setShowLoadingModal(true);
+    setLoadingMessage('Processando arquivo CSV...');
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -652,6 +657,7 @@ export default function Demandas() {
 
         // Buscar dados existentes usando carregamento em lotes
         console.log('🔍 Carregando dados do sistema...');
+        setLoadingMessage('Carregando dados do sistema...');
         
         // Função para carregar todos os munícipes em lotes
         const carregarTodosMunicipes = async () => {
@@ -724,15 +730,15 @@ export default function Demandas() {
         });
 
         // Coletar munícipes únicos para criar e analisar
-        const municipesNaoEncontrados = new Map();
+        const municipesNaoEncontrados = new Map<string, { nome: string; demandasCount: number; demandas: string[]; linhas: number[] }>();
         const demandasComDados = [];
         
         // Primeira passada: identificar dados e munícipes novos
         for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          if (!line.trim()) continue;
+          const csvLine = lines[i];
+          if (!csvLine.trim()) continue;
           
-          const values = line.split(separator).map(v => 
+          const values = csvLine.split(separator).map(v => 
             v.replace(/^["']|["']$/g, '').trim()
           );
           
@@ -770,7 +776,8 @@ export default function Demandas() {
                     municipesNaoEncontrados.set(value, {
                       nome: value,
                       demandasCount: 0,
-                      demandas: []
+                      demandas: [],
+                      linhas: []
                     });
                   }
                   const info = municipesNaoEncontrados.get(value);
@@ -828,6 +835,17 @@ export default function Demandas() {
         console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
         console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
 
+        // Preparar estatísticas
+        const stats = {
+          totalLinhas: lines.length - 1, // -1 para excluir header
+          municipesEncontrados: demandasComDados.filter(d => !d.municipe_nao_encontrado).length,
+          municipesNaoEncontrados: municipesNaoEncontrados.size,
+          demandasValidas: demandasComDados.length
+        };
+        
+        setImportStats(stats);
+        setShowLoadingModal(false);
+
         // Se há munícipes não encontrados, mostrar modal de validação
         if (municipesNaoEncontrados.size > 0) {
           // Armazenar dados temporariamente para usar após validação
@@ -859,7 +877,15 @@ export default function Demandas() {
 
   // Estados para modal de validação
   const [showValidacaoModal, setShowValidacaoModal] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [tempImportData, setTempImportData] = useState<any>(null);
+  const [importStats, setImportStats] = useState<{
+    totalLinhas: number;
+    municipesEncontrados: number;
+    municipesNaoEncontrados: number;
+    demandasValidas: number;
+  } | null>(null);
 
   // Função para finalizar importação após validação
   const finalizarImportacao = async (demandasComDados: any[], municipeMap: Map<string, string>, decisoes: any[]) => {
@@ -1466,9 +1492,20 @@ export default function Demandas() {
           onOpenChange={setShowValidacaoModal}
           municipesNaoEncontrados={tempImportData?.municipesNaoEncontrados || []}
           municipesExistentes={tempImportData?.municipesExistentes || []}
+          importStats={importStats}
           onDecisoes={handleValidacaoDecisoes}
         />
-      </div>
+        
+        <LoadingDialog 
+          open={showLoadingModal}
+          message={loadingMessage}
+        />
+      
+      <LoadingDialog 
+        open={showLoadingModal}
+        message={loadingMessage}
+      />
+    </div>
     </div>
   );
 }

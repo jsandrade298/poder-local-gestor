@@ -17,6 +17,7 @@ interface MunicipeNaoEncontrado {
   nome: string;
   demandasCount: number;
   demandas: string[];
+  linhas: number[];
 }
 
 interface DecisaoMunicipe {
@@ -41,6 +42,12 @@ interface ValidarMunicipesDialogProps {
   onOpenChange: (open: boolean) => void;
   municipesNaoEncontrados: MunicipeNaoEncontrado[];
   municipesExistentes: Array<{ id: string; nome: string }>;
+  importStats?: {
+    totalLinhas: number;
+    municipesEncontrados: number;
+    municipesNaoEncontrados: number;
+    demandasValidas: number;
+  } | null;
   onDecisoes: (decisoes: DecisaoMunicipe[]) => void;
 }
 
@@ -49,6 +56,7 @@ export function ValidarMunicipesDialog({
   onOpenChange,
   municipesNaoEncontrados,
   municipesExistentes,
+  importStats,
   onDecisoes
 }: ValidarMunicipesDialogProps) {
   const [decisoes, setDecisoes] = useState<Record<string, DecisaoMunicipe>>({});
@@ -136,7 +144,7 @@ export function ValidarMunicipesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -148,6 +156,28 @@ export function ValidarMunicipesDialog({
           </p>
         </DialogHeader>
 
+        {/* Estatísticas da importação */}
+        {importStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{importStats.totalLinhas}</div>
+              <div className="text-xs text-muted-foreground">Total analisado</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{importStats.municipesEncontrados}</div>
+              <div className="text-xs text-muted-foreground">Demandas OK</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">{importStats.municipesNaoEncontrados}</div>
+              <div className="text-xs text-muted-foreground">Munícipes p/ verificar</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{importStats.demandasValidas}</div>
+              <div className="text-xs text-muted-foreground">Demandas válidas</div>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto space-y-4">
           {/* Lista de munícipes não encontrados */}
           <div className="space-y-3">
@@ -158,9 +188,14 @@ export function ValidarMunicipesDialog({
                 <Card key={index} className="border-l-4 border-l-orange-500">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        {municipe.nome}
-                      </CardTitle>
+                      <div className="flex flex-col">
+                        <CardTitle className="text-sm font-medium">
+                          {municipe.nome}
+                        </CardTitle>
+                        <div className="text-xs text-muted-foreground">
+                          Linhas: {municipe.linhas.join(', ')}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary">
                           {municipe.demandasCount} demanda{municipe.demandasCount > 1 ? 's' : ''}
