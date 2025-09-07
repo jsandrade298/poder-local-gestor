@@ -635,11 +635,11 @@ export default function Demandas() {
           observacoes: ['observacoes', 'observações', 'notes']
         };
 
-        // Buscar dados necessários para mapeamento
+        // Buscar dados necessários para mapeamento - FORÇAR BUSCA COMPLETA
         const [existingMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
-          supabase.from('municipes').select('id, nome'),
-          supabase.from('areas').select('id, nome'),
-          supabase.from('profiles').select('id, nome')
+          supabase.from('municipes').select('id, nome').order('nome').limit(50000),
+          supabase.from('areas').select('id, nome').order('nome').limit(1000),
+          supabase.from('profiles').select('id, nome').order('nome').limit(1000)
         ]);
 
         console.log(`📊 Dados para mapeamento:`, {
@@ -656,9 +656,24 @@ export default function Demandas() {
 
         // Processar dados
         console.log(`🔄 Iniciando processamento: ${lines.length - 1} linhas de dados (excluindo header)`);
-        const demandas = lines.slice(1).map(line => {
+        
+        // Debug do mapeamento de headers
+        console.log('🗂️ Mapeamento de campos CSV:');
+        Object.keys(expectedColumns).forEach(key => {
+          const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
+          const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
+          console.log(`   ${key}: coluna ${headerIndex} (${headerIndex >= 0 ? headers[headerIndex] : 'NÃO ENCONTRADO'})`);
+        });
+        
+        const demandas = lines.slice(1).map((line, lineIndex) => {
           const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
           const demanda: any = {};
+          
+          // Debug da primeira linha
+          if (lineIndex === 0) {
+            console.log(`🔍 Primeira linha de dados (valores):`, values);
+            console.log(`🔍 Quantidade de valores: ${values.length}, quantidade de headers: ${headers.length}`);
+          }
 
           Object.keys(expectedColumns).forEach(key => {
             const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
@@ -701,6 +716,9 @@ export default function Demandas() {
                 } else {
                   demanda.responsavelError = `Responsável "${value}" não encontrado`;
                 }
+              } else if (key === 'status') {
+                console.log('📋 Processando status do CSV:', JSON.stringify({ key, value, original: value, type: typeof value }));
+                demanda[key] = value;
               } else if (key === 'prioridade') {
                 console.log('📋 Processando prioridade do CSV:', JSON.stringify({ key, value, original: value, type: typeof value }));
                 demanda[key] = value;
