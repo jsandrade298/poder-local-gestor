@@ -6,11 +6,9 @@ export function useMunicipesSelect() {
   return useQuery({
     queryKey: ['municipes-select-optimized'],
     queryFn: async () => {
-      console.log('🔄 Shared Hook: Carregando munícipes para formulários...');
+      console.log('🔄 Shared Hook: Carregando TODOS os munícipes sem qualquer limitação...');
       
-      // Carregar TODOS os munícipes sem limite
-      console.log('🔄 Shared Hook: Buscando TODOS os munícipes sem limitação...');
-      
+      // Buscar TODOS os munícipes do sistema sem limitação
       const { data, error } = await supabase
         .from('municipes')
         .select('id, nome')

@@ -635,14 +635,15 @@ export default function Demandas() {
           observacoes: ['observacoes', 'observações', 'notes']
         };
 
-        // Buscar dados necessários para mapeamento - FORÇAR BUSCA COMPLETA
+        // Buscar TODOS os dados necessários para mapeamento SEM LIMITAÇÕES
+        console.log('🔍 Buscando todos os dados do sistema...');
         const [existingMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
-          supabase.from('municipes').select('id, nome').order('nome').limit(50000),
-          supabase.from('areas').select('id, nome').order('nome').limit(1000),
-          supabase.from('profiles').select('id, nome').order('nome').limit(1000)
+          supabase.from('municipes').select('id, nome').order('nome'),
+          supabase.from('areas').select('id, nome').order('nome'),
+          supabase.from('profiles').select('id, nome').order('nome')
         ]);
 
-        console.log(`📊 Dados para mapeamento:`, {
+        console.log(`📊 Total de dados carregados:`, {
           municipes: existingMunicipes.data?.length || 0,
           areas: existingAreas.data?.length || 0,
           responsaveis: existingResponsaveis.data?.length || 0
@@ -650,9 +651,30 @@ export default function Demandas() {
 
         console.log(`👥 Responsáveis disponíveis:`, existingResponsaveis.data?.map(r => r.nome) || []);
 
-        const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase().trim(), m.id]) || []);
-        const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase().trim(), a.id]) || []);
-        const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase().trim().replace(/\s+/g, ' '), r.id]) || []);
+        // Criar maps normalizados para busca eficiente
+        const municipeMap = new Map();
+        existingMunicipes.data?.forEach(m => {
+          const normalized = m.nome.toLowerCase().trim().replace(/\s+/g, ' ');
+          municipeMap.set(normalized, m.id);
+          // Também adicionar variações sem acentos
+          const withoutAccents = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          municipeMap.set(withoutAccents, m.id);
+        });
+
+        const areaMap = new Map();
+        existingAreas.data?.forEach(a => {
+          const normalized = a.nome.toLowerCase().trim().replace(/\s+/g, ' ');
+          areaMap.set(normalized, a.id);
+        });
+
+        const responsavelMap = new Map();
+        existingResponsaveis.data?.forEach(r => {
+          const normalized = r.nome.toLowerCase().trim().replace(/\s+/g, ' ');
+          responsavelMap.set(normalized, r.id);
+          // Também adicionar variações sem acentos
+          const withoutAccents = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          responsavelMap.set(withoutAccents, r.id);
+        });
 
         // Processar dados
         console.log(`🔄 Iniciando processamento: ${lines.length - 1} linhas de dados (excluindo header)`);
@@ -692,11 +714,17 @@ export default function Demandas() {
                   // Ignorar datas inválidas
                 }
               } else if (key === 'municipe_nome') {
-                const municipeId = municipeMap.get(value.toLowerCase().trim());
+                // Tentar múltiplas variações do nome do munícipe
+                const searchValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
+                const withoutAccents = searchValue.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                
+                const municipeId = municipeMap.get(searchValue) || municipeMap.get(withoutAccents);
                 if (municipeId) {
                   demanda.municipeId = municipeId;
+                  demanda.municipe_nome = value; // Preservar nome original
                 } else {
                   demanda.municipeError = `Munícipe "${value}" não encontrado`;
+                  demanda.municipe_nome = value; // Preservar para debug
                 }
               } else if (key === 'area_nome') {
                 const areaId = areaMap.get(value.toLowerCase().trim());
@@ -704,25 +732,43 @@ export default function Demandas() {
                   demanda.areaId = areaId;
                 }
                } else if (key === 'responsavel_nome') {
-                const normalizedValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
-                console.log('👤 Processando responsável do CSV:', JSON.stringify({ 
-                  value, 
-                  normalizedValue,
-                  found: responsavelMap.has(normalizedValue)
-                }));
-                const responsavelId = responsavelMap.get(normalizedValue);
+                // Tentar múltiplas variações do nome do responsável
+                const searchValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
+                const withoutAccents = searchValue.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                
+                const responsavelId = responsavelMap.get(searchValue) || responsavelMap.get(withoutAccents);
                 if (responsavelId) {
                   demanda.responsavelId = responsavelId;
+                  demanda.responsavel_nome = value; // Preservar nome original
                 } else {
-                  demanda.responsavelError = `Responsável "${value}" não encontrado`;
+                  // Não é erro crítico se responsável não for encontrado
+                  demanda.responsavel_nome = value; // Preservar para debug
+                  console.log(`⚠️ Responsável "${value}" não encontrado - continuando sem responsável`);
                 }
-              } else if (key === 'status') {
-                console.log('📋 Processando status do CSV:', JSON.stringify({ key, value, original: value, type: typeof value }));
-                demanda[key] = value;
-              } else if (key === 'prioridade') {
-                console.log('📋 Processando prioridade do CSV:', JSON.stringify({ key, value, original: value, type: typeof value }));
-                demanda[key] = value;
-              } else {
+               } else if (key === 'status') {
+                // Normalizar status para os valores aceitos pelo sistema
+                const statusMap = {
+                  'aberta': 'aberta',
+                  'em andamento': 'em_andamento',
+                  'em_andamento': 'em_andamento',
+                  'resolvida': 'resolvida',
+                  'cancelada': 'cancelada'
+                };
+                const normalizedStatus = statusMap[value.toLowerCase().trim()] || 'aberta';
+                demanda.status = normalizedStatus;
+                console.log(`📋 Status normalizado: "${value}" → "${normalizedStatus}"`);
+               } else if (key === 'prioridade') {
+                // Normalizar prioridade para os valores aceitos pelo sistema
+                const prioridadeMap = {
+                  'baixa': 'baixa',
+                  'media': 'media',
+                  'média': 'media',
+                  'alta': 'alta'
+                };
+                const normalizedPrioridade = prioridadeMap[value.toLowerCase().trim()] || 'media';
+                demanda.prioridade = normalizedPrioridade;
+                console.log(`📋 Prioridade normalizada: "${value}" → "${normalizedPrioridade}"`);
+               } else {
                 demanda[key] = value;
               }
             }
@@ -733,33 +779,58 @@ export default function Demandas() {
 
         console.log(`📊 Total de linhas processadas: ${demandas.length}`);
         
-        // Analisar problemas antes de filtrar
-        const problemAnalysis = demandas.map((d, index) => {
+        // Analisar problemas CRÍTICOS (apenas título e munícipe obrigatórios)
+        const criticalProblems = demandas.map((d, index) => {
           const problems = [];
           if (!d.titulo || d.titulo.trim() === '') problems.push('título vazio');
-          if (!d.descricao || d.descricao.trim() === '') problems.push('descrição vazia');
           if (!d.municipeId) problems.push(d.municipeError || 'munícipe não encontrado');
-          if (d.responsavelError) problems.push(d.responsavelError);
           return { 
             index: index + 2, 
             problems,
             titulo: d.titulo,
+            descricao: d.descricao ? d.descricao.substring(0, 50) + '...' : 'SEM DESCRIÇÃO',
             municipe: d.municipe_nome,
             responsavel: d.responsavel_nome
           }; // +2 porque linha 1 é header
         }).filter(p => p.problems.length > 0);
         
-        console.log(`❌ Demandas com problemas: ${problemAnalysis.length}`);
-        problemAnalysis.slice(0, 10).forEach(p => {
-          console.log(`   Linha ${p.index} (${p.titulo}): ${p.problems.join(', ')}`);
+        console.log(`❌ Demandas com problemas CRÍTICOS: ${criticalProblems.length}`);
+        criticalProblems.slice(0, 20).forEach(p => {
+          console.log(`   Linha ${p.index}: ${p.titulo} - ${p.problems.join(', ')}`);
         });
         
-        const demandasValidas = demandas.filter(d => d.titulo && d.titulo.trim() !== '' && d.descricao && d.descricao.trim() !== '' && d.municipeId);
+        // FILTRO MAIS PERMISSIVO: só exige título e munícipe válido
+        const demandasValidas = demandas.filter(d => {
+          const temTitulo = d.titulo && d.titulo.trim() !== '';
+          const temMunicipe = d.municipeId;
+          
+          // Se não tem descrição, usar o título como descrição
+          if (temTitulo && !d.descricao) {
+            d.descricao = d.titulo;
+          }
+          
+          return temTitulo && temMunicipe;
+        });
         
         console.log(`✅ Demandas válidas para importação: ${demandasValidas.length}`);
+        console.log(`📊 Resumo estatístico:`);
+        console.log(`   - Total de linhas no CSV: ${demandas.length}`);
+        console.log(`   - Linhas com título válido: ${demandas.filter(d => d.titulo && d.titulo.trim()).length}`);
+        console.log(`   - Linhas com munícipe encontrado: ${demandas.filter(d => d.municipeId).length}`);
+        console.log(`   - Linhas com descrição: ${demandas.filter(d => d.descricao && d.descricao.trim()).length}`);
+        console.log(`   - Linhas com responsável encontrado: ${demandas.filter(d => d.responsavelId).length}`);
+        
+        // Log de amostra das demandas válidas
+        console.log(`📝 Primeiras 5 demandas válidas:`, demandasValidas.slice(0, 5).map(d => ({
+          titulo: d.titulo,
+          municipe: d.municipe_nome,
+          responsavel: d.responsavel_nome,
+          status: d.status,
+          prioridade: d.prioridade
+        })));
 
         if (demandasValidas.length === 0) {
-          toast.error("Nenhuma demanda válida encontrada. Verifique os campos obrigatórios: título, descrição e munícipe.");
+          toast.error("Nenhuma demanda válida encontrada. Verifique se há título e munícipe válidos nas linhas.");
           return;
         }
 
