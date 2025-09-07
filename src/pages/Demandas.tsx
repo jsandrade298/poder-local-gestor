@@ -585,6 +585,7 @@ export default function Demandas() {
 
   // Função para processar arquivo CSV
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🚀 Iniciando importação de CSV...');
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -598,6 +599,8 @@ export default function Demandas() {
       try {
         const csv = e.target?.result as string;
         const lines = csv.split('\n').filter(line => line.trim());
+        
+        console.log(`📁 Arquivo CSV processado: ${lines.length} linhas totais (incluindo header)`);
         
         if (lines.length < 2) {
           toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
@@ -639,6 +642,7 @@ export default function Demandas() {
         const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase(), r.id]) || []);
 
         // Processar dados
+        console.log(`🔄 Iniciando processamento: ${lines.length - 1} linhas de dados (excluindo header)`);
         const demandas = lines.slice(1).map(line => {
           const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
           const demanda: any = {};
