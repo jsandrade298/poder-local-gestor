@@ -15,6 +15,7 @@ import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
+import { ValidarMunicipesDialog } from "@/components/forms/ValidarMunicipesDialog";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
@@ -685,8 +686,8 @@ export default function Demandas() {
           responsavelMap.set(normalized, r.id);
         });
 
-        // Coletar munícipes únicos para criar
-        const municipesParaCriar = new Map();
+        // Coletar munícipes únicos para criar e analisar
+        const municipesNaoEncontrados = new Map();
         const demandasComDados = [];
         
         // Primeira passada: identificar dados e munícipes novos
@@ -726,9 +727,18 @@ export default function Demandas() {
                 if (municipeId) {
                   demanda.municipeId = municipeId;
                 } else if (value.trim()) {
-                  // Marcar para criar
-                  municipesParaCriar.set(normalized, value);
-                  demanda.municipe_para_criar = normalized;
+                  // Marcar para validação
+                  demanda.municipe_nao_encontrado = value;
+                  if (!municipesNaoEncontrados.has(value)) {
+                    municipesNaoEncontrados.set(value, {
+                      nome: value,
+                      demandasCount: 0,
+                      demandas: []
+                    });
+                  }
+                  const info = municipesNaoEncontrados.get(value);
+                  info.demandasCount++;
+                  info.demandas.push(demanda.titulo || `Linha ${i + 1}`);
                 }
               } else if (key === 'area_nome') {
                 const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -779,90 +789,147 @@ export default function Demandas() {
         }
 
         console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
-        console.log(`👥 ${municipesParaCriar.size} novos munícipes para criar`);
+        console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
 
-        // Criar novos munícipes em lote
-        if (municipesParaCriar.size > 0) {
-          console.log('👥 Criando novos munícipes...');
-          
-          const municipesArray = Array.from(municipesParaCriar.entries()).map(([_, nome]) => ({
-            nome: nome.trim()
-          }));
-          
-          // Criar em lotes de 50
-          const BATCH_SIZE = 50;
-          for (let i = 0; i < municipesArray.length; i += BATCH_SIZE) {
-            const batch = municipesArray.slice(i, i + BATCH_SIZE);
-            
-            const { data: novosMunicipes, error } = await supabase
-              .from('municipes')
-              .insert(batch)
-              .select();
-            
-            if (novosMunicipes) {
-              novosMunicipes.forEach(m => {
-                const normalized = m.nome.toLowerCase().trim().replace(/\s+/g, ' ');
-                municipeMap.set(normalized, m.id);
-              });
-              console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${novosMunicipes.length} munícipes criados`);
-            } else if (error) {
-              console.error('Erro ao criar munícipes:', error);
-            }
-          }
-        }
-
-        // Atualizar IDs dos munícipes criados
-        demandasComDados.forEach(demanda => {
-          if (demanda.municipe_para_criar && !demanda.municipeId) {
-            demanda.municipeId = municipeMap.get(demanda.municipe_para_criar);
-          }
-        });
-
-        // Filtrar apenas demandas com dados mínimos
-        const demandasValidas = demandasComDados.filter(d => 
-          d.titulo && d.municipeId
-        );
-
-        console.log(`✅ ${demandasValidas.length} demandas prontas para importação`);
-
-        if (demandasValidas.length === 0) {
-          toast.error("Nenhuma demanda válida encontrada. Verifique se há título e munícipe.");
+        // Se há munícipes não encontrados, mostrar modal de validação
+        if (municipesNaoEncontrados.size > 0) {
+          // Armazenar dados temporariamente para usar após validação
+          setTempImportData({
+            demandasComDados,
+            municipeMap,
+            municipesNaoEncontrados: Array.from(municipesNaoEncontrados.values()),
+            municipesExistentes: existingMunicipes.data || []
+          });
+          setShowValidacaoModal(true);
           return;
         }
 
-        // Preparar demandas para importação
-        const demandasParaImportar = demandasValidas.map(d => ({
-          titulo: d.titulo,
-          descricao: d.descricao || d.titulo,
-          municipeId: d.municipeId,
-          areaId: d.areaId || null,
-          responsavelId: d.responsavelId || null,
-          status: d.status || 'aberta',
-          prioridade: d.prioridade || 'media',
-          logradouro: d.logradouro || null,
-          numero: d.numero || null,
-          bairro: d.bairro || null,
-          cidade: d.cidade || 'Santo André',
-          cep: d.cep || null,
-          complemento: d.complemento || null,
-          data_prazo: d.data_prazo || null,
-          observacoes: d.observacoes || null
-        }));
-
-        // Limpar resultados anteriores e importar
-        setImportResults([]);
-        importDemandas.mutate(demandasParaImportar);
+        // Se não há munícipes não encontrados, prosseguir diretamente
+        await finalizarImportacao(demandasComDados, municipeMap, []);
+        
       } catch (error) {
-        toast.error("Erro ao processar arquivo CSV. Verifique se o formato está correto.");
+        console.error('Erro ao processar CSV:', error);
+        toast.error("Erro ao processar arquivo CSV. Verifique o formato.");
       }
     };
     
     reader.readAsText(file, 'UTF-8');
     
-    // Limpar input para permitir re-upload do mesmo arquivo
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // Estados para modal de validação
+  const [showValidacaoModal, setShowValidacaoModal] = useState(false);
+  const [tempImportData, setTempImportData] = useState<any>(null);
+
+  // Função para finalizar importação após validação
+  const finalizarImportacao = async (demandasComDados: any[], municipeMap: Map<string, string>, decisoes: any[]) => {
+    try {
+      // Criar novos munícipes baseados nas decisões
+      const novosMunicipes = decisoes.filter(d => d.tipo === 'novo');
+      
+      if (novosMunicipes.length > 0) {
+        console.log('👥 Criando novos munícipes...');
+        
+        const municipesArray = novosMunicipes.map(d => ({
+          nome: d.novoNome.trim()
+        }));
+        
+        // Criar em lotes de 50
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < municipesArray.length; i += BATCH_SIZE) {
+          const batch = municipesArray.slice(i, i + BATCH_SIZE);
+          
+          const { data: novosMunicipesCriados, error } = await supabase
+            .from('municipes')
+            .insert(batch)
+            .select();
+          
+          if (novosMunicipesCriados) {
+            novosMunicipesCriados.forEach((m, index) => {
+              const decisaoIndex = i + index;
+              const decisao = novosMunicipes[decisaoIndex];
+              municipeMap.set(decisao.nomeOriginal, m.id);
+            });
+            console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${novosMunicipesCriados.length} munícipes criados`);
+          } else if (error) {
+            console.error('Erro ao criar munícipes:', error);
+          }
+        }
+      }
+
+      // Aplicar decisões de munícipes existentes
+      const municipesExistentes = decisoes.filter(d => d.tipo === 'existente');
+      municipesExistentes.forEach(decisao => {
+        municipeMap.set(decisao.nomeOriginal, decisao.municipeId);
+      });
+
+      // Atualizar IDs dos munícipes nas demandas
+      demandasComDados.forEach(demanda => {
+        if (demanda.municipe_nao_encontrado) {
+          const municipeId = municipeMap.get(demanda.municipe_nao_encontrado);
+          if (municipeId) {
+            demanda.municipeId = municipeId;
+          }
+        }
+      });
+
+      // Filtrar apenas demandas com dados mínimos
+      const demandasValidas = demandasComDados.filter(d => 
+        d.titulo && d.municipeId
+      );
+
+      console.log(`✅ ${demandasValidas.length} demandas prontas para importação`);
+
+      if (demandasValidas.length === 0) {
+        toast.error("Nenhuma demanda válida encontrada. Verifique se há título e munícipe.");
+        return;
+      }
+
+      // Preparar demandas para importação
+      const demandasParaImportar = demandasValidas.map(d => ({
+        titulo: d.titulo,
+        descricao: d.descricao || d.titulo,
+        municipeId: d.municipeId,
+        areaId: d.areaId || null,
+        responsavelId: d.responsavelId || null,
+        status: d.status || 'aberta',
+        prioridade: d.prioridade || 'media',
+        logradouro: d.logradouro || null,
+        numero: d.numero || null,
+        bairro: d.bairro || null,
+        cidade: d.cidade || 'Santo André',
+        cep: d.cep || null,
+        complemento: d.complemento || null,
+        data_prazo: d.data_prazo || null,
+        observacoes: d.observacoes || null
+      }));
+
+      // Limpar resultados anteriores e importar
+      setImportResults([]);
+      importDemandas.mutate(demandasParaImportar);
+      
+    } catch (error) {
+      console.error('Erro ao finalizar importação:', error);
+      toast.error("Erro ao finalizar importação.");
+    }
+  };
+
+  // Handler para receber as decisões do modal
+  const handleValidacaoDecisoes = async (decisoes: any[]) => {
+    setShowValidacaoModal(false);
+    
+    if (tempImportData) {
+      await finalizarImportacao(
+        tempImportData.demandasComDados,
+        tempImportData.municipeMap,
+        decisoes
+      );
+    }
+    
+    setTempImportData(null);
   };
 
   if (isLoading) {
@@ -1329,6 +1396,15 @@ export default function Demandas() {
           open={isEditDialogOpen} 
           onOpenChange={setIsEditDialogOpen} 
           demanda={selectedDemanda}
+        />
+
+        {/* Modal de Validação de Munícipes */}
+        <ValidarMunicipesDialog
+          open={showValidacaoModal}
+          onOpenChange={setShowValidacaoModal}
+          municipesNaoEncontrados={tempImportData?.municipesNaoEncontrados || []}
+          municipesExistentes={tempImportData?.municipesExistentes || []}
+          onDecisoes={handleValidacaoDecisoes}
         />
       </div>
     </div>
