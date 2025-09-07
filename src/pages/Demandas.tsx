@@ -611,6 +611,11 @@ export default function Demandas() {
         const separator = csv.includes(';') ? ';' : ',';
         const headers = lines[0].split(separator).map(h => h.replace(/"/g, '').trim().toLowerCase());
         
+        console.log(`📋 Headers CSV encontrados (${headers.length} colunas):`, headers);
+        console.log(`📋 Separador detectado: "${separator}"`);
+        console.log(`📋 Primeira linha completa:`, lines[0]);
+        console.log(`📋 Segunda linha como exemplo:`, lines[1]);
+        
         // Mapear colunas esperadas
         const expectedColumns = {
           titulo: ['titulo', 'title'],
@@ -645,9 +650,9 @@ export default function Demandas() {
 
         console.log(`👥 Responsáveis disponíveis:`, existingResponsaveis.data?.map(r => r.nome) || []);
 
-        const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase(), m.id]) || []);
-        const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase(), a.id]) || []);
-        const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase(), r.id]) || []);
+        const municipeMap = new Map(existingMunicipes.data?.map(m => [m.nome.toLowerCase().trim(), m.id]) || []);
+        const areaMap = new Map(existingAreas.data?.map(a => [a.nome.toLowerCase().trim(), a.id]) || []);
+        const responsavelMap = new Map(existingResponsaveis.data?.map(r => [r.nome.toLowerCase().trim().replace(/\s+/g, ' '), r.id]) || []);
 
         // Processar dados
         console.log(`🔄 Iniciando processamento: ${lines.length - 1} linhas de dados (excluindo header)`);
@@ -684,12 +689,13 @@ export default function Demandas() {
                   demanda.areaId = areaId;
                 }
                } else if (key === 'responsavel_nome') {
+                const normalizedValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
                 console.log('👤 Processando responsável do CSV:', JSON.stringify({ 
                   value, 
-                  valueLower: value.toLowerCase().trim(),
-                  found: responsavelMap.has(value.toLowerCase().trim())
+                  normalizedValue,
+                  found: responsavelMap.has(normalizedValue)
                 }));
-                const responsavelId = responsavelMap.get(value.toLowerCase().trim());
+                const responsavelId = responsavelMap.get(normalizedValue);
                 if (responsavelId) {
                   demanda.responsavelId = responsavelId;
                 } else {
