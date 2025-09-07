@@ -598,67 +598,79 @@ export default function Demandas() {
     reader.onload = async (e) => {
       try {
         const csv = e.target?.result as string;
-        const lines = csv.split('\n').filter(line => line.trim());
         
-        console.log(`📁 Arquivo CSV processado: ${lines.length} linhas totais (incluindo header)`);
+        // Processar linhas e remover vazias
+        const allLines = csv.split(/\r?\n/);
+        const lines = [];
+        
+        for (const line of allLines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            // Verificar se a linha tem conteúdo real (não apenas separadores)
+            const testSplit = trimmed.split(/[;,]/);
+            const hasContent = testSplit.some(cell => cell.replace(/"/g, '').trim());
+            if (hasContent) {
+              lines.push(trimmed);
+            }
+          }
+        }
+        
+        console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
         
         if (lines.length < 2) {
           toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
           return;
         }
 
-        // Processar header
-        const separator = csv.includes(';') ? ';' : ',';
-        const headers = lines[0].split(separator).map(h => h.replace(/"/g, '').trim().toLowerCase());
+        // Detectar separador
+        const firstLine = lines[0];
+        const separator = firstLine.includes(';') ? ';' : ',';
+        const headers = firstLine.split(separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
         
-        console.log(`📋 Headers CSV encontrados (${headers.length} colunas):`, headers);
+        console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
         console.log(`📋 Separador detectado: "${separator}"`);
-        console.log(`📋 Primeira linha completa:`, lines[0]);
-        console.log(`📋 Segunda linha como exemplo:`, lines[1]);
-        
-        // Mapear colunas esperadas
+
+        // Mapear colunas
         const expectedColumns = {
           titulo: ['titulo', 'title'],
-          descricao: ['descricao', 'description'],
-          municipe_nome: ['municipe_nome', 'municipe', 'citizen'],
-          area_nome: ['area_nome', 'area'],
-          responsavel_nome: ['responsavel_nome', 'responsavel', 'responsible'],
+          descricao: ['descricao', 'description', 'descrição'],
+          municipe_nome: ['municipe_nome', 'municipe', 'munícipe', 'citizen', 'nome_municipe'],
+          area_nome: ['area_nome', 'area', 'área'],
+          responsavel_nome: ['responsavel_nome', 'responsavel', 'responsável', 'responsible'],
           status: ['status'],
           prioridade: ['prioridade', 'priority'],
           logradouro: ['logradouro', 'endereco', 'endereço', 'address', 'rua'],
-          numero: ['numero', 'número', 'number'],
+          numero: ['numero', 'número', 'number', 'num'],
           bairro: ['bairro', 'neighborhood'],
           cidade: ['cidade', 'city'],
           cep: ['cep', 'zip'],
           complemento: ['complemento', 'complement'],
           data_prazo: ['data_prazo', 'prazo', 'deadline'],
-          observacoes: ['observacoes', 'observações', 'notes']
+          observacoes: ['observacoes', 'observações', 'obs', 'notes']
         };
 
-        // Buscar TODOS os dados necessários para mapeamento SEM LIMITAÇÕES
-        console.log('🔍 Buscando todos os dados do sistema...');
+        // Buscar dados existentes
+        console.log('🔍 Carregando dados do sistema...');
         const [existingMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
-          supabase.from('municipes').select('id, nome').order('nome'),
-          supabase.from('areas').select('id, nome').order('nome'),
-          supabase.from('profiles').select('id, nome').order('nome')
+          supabase.from('municipes').select('id, nome'),
+          supabase.from('areas').select('id, nome'),
+          supabase.from('profiles').select('id, nome')
         ]);
 
-        console.log(`📊 Total de dados carregados:`, {
-          municipes: existingMunicipes.data?.length || 0,
-          areas: existingAreas.data?.length || 0,
-          responsaveis: existingResponsaveis.data?.length || 0
-        });
+        console.log(`📊 Dados carregados: ${existingMunicipes.data?.length || 0} munícipes, ${existingAreas.data?.length || 0} áreas, ${existingResponsaveis.data?.length || 0} responsáveis`);
 
-        console.log(`👥 Responsáveis disponíveis:`, existingResponsaveis.data?.map(r => r.nome) || []);
-
-        // Criar maps normalizados para busca eficiente
+        // Criar maps normalizados
         const municipeMap = new Map();
         existingMunicipes.data?.forEach(m => {
+          // Normalizar removendo espaços extras e convertendo para minúsculas
           const normalized = m.nome.toLowerCase().trim().replace(/\s+/g, ' ');
           municipeMap.set(normalized, m.id);
-          // Também adicionar variações sem acentos
-          const withoutAccents = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          municipeMap.set(withoutAccents, m.id);
+          
+          // Adicionar versão sem acentos também
+          const semAcentos = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          if (semAcentos !== normalized) {
+            municipeMap.set(semAcentos, m.id);
+          }
         });
 
         const areaMap = new Map();
@@ -671,32 +683,31 @@ export default function Demandas() {
         existingResponsaveis.data?.forEach(r => {
           const normalized = r.nome.toLowerCase().trim().replace(/\s+/g, ' ');
           responsavelMap.set(normalized, r.id);
-          // Também adicionar variações sem acentos
-          const withoutAccents = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          responsavelMap.set(withoutAccents, r.id);
         });
 
-        // Processar dados
-        console.log(`🔄 Iniciando processamento: ${lines.length - 1} linhas de dados (excluindo header)`);
+        // Coletar munícipes únicos para criar
+        const municipesParaCriar = new Map();
+        const demandasComDados = [];
         
-        // Debug do mapeamento de headers
-        console.log('🗂️ Mapeamento de campos CSV:');
-        Object.keys(expectedColumns).forEach(key => {
-          const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
-          const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
-          console.log(`   ${key}: coluna ${headerIndex} (${headerIndex >= 0 ? headers[headerIndex] : 'NÃO ENCONTRADO'})`);
-        });
-        
-        const demandas = lines.slice(1).map((line, lineIndex) => {
-          const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
-          const demanda: any = {};
+        // Primeira passada: identificar dados e munícipes novos
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.trim()) continue;
           
-          // Debug da primeira linha
-          if (lineIndex === 0) {
-            console.log(`🔍 Primeira linha de dados (valores):`, values);
-            console.log(`🔍 Quantidade de valores: ${values.length}, quantidade de headers: ${headers.length}`);
+          const values = line.split(separator).map(v => 
+            v.replace(/^["']|["']$/g, '').trim()
+          );
+          
+          // Verificar se a linha tem dados válidos
+          const tituloIndex = headers.findIndex(h => expectedColumns.titulo?.includes(h));
+          if (tituloIndex === -1 || !values[tituloIndex]) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: sem título`);
+            continue;
           }
-
+          
+          const demanda: any = { linha: i + 1 };
+          
+          // Processar campos
           Object.keys(expectedColumns).forEach(key => {
             const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
             const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
@@ -704,139 +715,143 @@ export default function Demandas() {
             if (headerIndex !== -1 && values[headerIndex]) {
               const value = values[headerIndex];
               
-              if (key === 'data_prazo') {
+              if (key === 'municipe_nome') {
+                demanda.municipe_nome_original = value;
+                const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
+                const semAcentos = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                
+                // Tentar encontrar o munícipe
+                const municipeId = municipeMap.get(normalized) || municipeMap.get(semAcentos);
+                
+                if (municipeId) {
+                  demanda.municipeId = municipeId;
+                } else if (value.trim()) {
+                  // Marcar para criar
+                  municipesParaCriar.set(normalized, value);
+                  demanda.municipe_para_criar = normalized;
+                }
+              } else if (key === 'area_nome') {
+                const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
+                demanda.areaId = areaMap.get(normalized);
+              } else if (key === 'responsavel_nome') {
+                const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
+                demanda.responsavelId = responsavelMap.get(normalized);
+              } else if (key === 'status') {
+                const statusMap: Record<string, string> = {
+                  'aberta': 'aberta',
+                  'em andamento': 'em_andamento',
+                  'em_andamento': 'em_andamento',
+                  'aguardando': 'aguardando',
+                  'resolvida': 'resolvida',
+                  'cancelada': 'cancelada'
+                };
+                demanda.status = statusMap[value.toLowerCase()] || 'aberta';
+              } else if (key === 'prioridade') {
+                const prioridadeMap: Record<string, string> = {
+                  'baixa': 'baixa',
+                  'media': 'media',
+                  'média': 'media',
+                  'alta': 'alta',
+                  'urgente': 'urgente'
+                };
+                demanda.prioridade = prioridadeMap[value.toLowerCase()] || 'media';
+              } else if (key === 'data_prazo' && value) {
                 try {
                   const date = new Date(value);
                   if (!isNaN(date.getTime())) {
-                    demanda[key] = date.toISOString().split('T')[0];
+                    demanda.data_prazo = date.toISOString().split('T')[0];
                   }
                 } catch {
                   // Ignorar datas inválidas
                 }
-              } else if (key === 'municipe_nome') {
-                // Tentar múltiplas variações do nome do munícipe
-                const searchValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
-                const withoutAccents = searchValue.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                
-                const municipeId = municipeMap.get(searchValue) || municipeMap.get(withoutAccents);
-                if (municipeId) {
-                  demanda.municipeId = municipeId;
-                  demanda.municipe_nome = value; // Preservar nome original
-                } else {
-                  demanda.municipeError = `Munícipe "${value}" não encontrado`;
-                  demanda.municipe_nome = value; // Preservar para debug
-                }
-              } else if (key === 'area_nome') {
-                const areaId = areaMap.get(value.toLowerCase().trim());
-                if (areaId) {
-                  demanda.areaId = areaId;
-                }
-               } else if (key === 'responsavel_nome') {
-                // Tentar múltiplas variações do nome do responsável
-                const searchValue = value.toLowerCase().trim().replace(/\s+/g, ' ');
-                const withoutAccents = searchValue.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                
-                const responsavelId = responsavelMap.get(searchValue) || responsavelMap.get(withoutAccents);
-                if (responsavelId) {
-                  demanda.responsavelId = responsavelId;
-                  demanda.responsavel_nome = value; // Preservar nome original
-                } else {
-                  // Não é erro crítico se responsável não for encontrado
-                  demanda.responsavel_nome = value; // Preservar para debug
-                  console.log(`⚠️ Responsável "${value}" não encontrado - continuando sem responsável`);
-                }
-               } else if (key === 'status') {
-                // Normalizar status para os valores aceitos pelo sistema
-                const statusMap = {
-                  'aberta': 'aberta',
-                  'em andamento': 'em_andamento',
-                  'em_andamento': 'em_andamento',
-                  'resolvida': 'resolvida',
-                  'cancelada': 'cancelada'
-                };
-                const normalizedStatus = statusMap[value.toLowerCase().trim()] || 'aberta';
-                demanda.status = normalizedStatus;
-                console.log(`📋 Status normalizado: "${value}" → "${normalizedStatus}"`);
-               } else if (key === 'prioridade') {
-                // Normalizar prioridade para os valores aceitos pelo sistema
-                const prioridadeMap = {
-                  'baixa': 'baixa',
-                  'media': 'media',
-                  'média': 'media',
-                  'alta': 'alta'
-                };
-                const normalizedPrioridade = prioridadeMap[value.toLowerCase().trim()] || 'media';
-                demanda.prioridade = normalizedPrioridade;
-                console.log(`📋 Prioridade normalizada: "${value}" → "${normalizedPrioridade}"`);
-               } else {
+              } else {
                 demanda[key] = value;
               }
             }
           });
-
-          return demanda;
-        });
-
-        console.log(`📊 Total de linhas processadas: ${demandas.length}`);
-        
-        // Analisar problemas CRÍTICOS (apenas título e munícipe obrigatórios)
-        const criticalProblems = demandas.map((d, index) => {
-          const problems = [];
-          if (!d.titulo || d.titulo.trim() === '') problems.push('título vazio');
-          if (!d.municipeId) problems.push(d.municipeError || 'munícipe não encontrado');
-          return { 
-            index: index + 2, 
-            problems,
-            titulo: d.titulo,
-            descricao: d.descricao ? d.descricao.substring(0, 50) + '...' : 'SEM DESCRIÇÃO',
-            municipe: d.municipe_nome,
-            responsavel: d.responsavel_nome
-          }; // +2 porque linha 1 é header
-        }).filter(p => p.problems.length > 0);
-        
-        console.log(`❌ Demandas com problemas CRÍTICOS: ${criticalProblems.length}`);
-        criticalProblems.slice(0, 20).forEach(p => {
-          console.log(`   Linha ${p.index}: ${p.titulo} - ${p.problems.join(', ')}`);
-        });
-        
-        // FILTRO MAIS PERMISSIVO: só exige título e munícipe válido
-        const demandasValidas = demandas.filter(d => {
-          const temTitulo = d.titulo && d.titulo.trim() !== '';
-          const temMunicipe = d.municipeId;
           
-          // Se não tem descrição, usar o título como descrição
-          if (temTitulo && !d.descricao) {
-            d.descricao = d.titulo;
+          // Adicionar descrição padrão se não existir
+          if (!demanda.descricao && demanda.titulo) {
+            demanda.descricao = demanda.titulo;
           }
           
-          return temTitulo && temMunicipe;
+          demandasComDados.push(demanda);
+        }
+
+        console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
+        console.log(`👥 ${municipesParaCriar.size} novos munícipes para criar`);
+
+        // Criar novos munícipes em lote
+        if (municipesParaCriar.size > 0) {
+          console.log('👥 Criando novos munícipes...');
+          
+          const municipesArray = Array.from(municipesParaCriar.entries()).map(([_, nome]) => ({
+            nome: nome.trim()
+          }));
+          
+          // Criar em lotes de 50
+          const BATCH_SIZE = 50;
+          for (let i = 0; i < municipesArray.length; i += BATCH_SIZE) {
+            const batch = municipesArray.slice(i, i + BATCH_SIZE);
+            
+            const { data: novosMunicipes, error } = await supabase
+              .from('municipes')
+              .insert(batch)
+              .select();
+            
+            if (novosMunicipes) {
+              novosMunicipes.forEach(m => {
+                const normalized = m.nome.toLowerCase().trim().replace(/\s+/g, ' ');
+                municipeMap.set(normalized, m.id);
+              });
+              console.log(`✅ Lote ${Math.floor(i/BATCH_SIZE) + 1}: ${novosMunicipes.length} munícipes criados`);
+            } else if (error) {
+              console.error('Erro ao criar munícipes:', error);
+            }
+          }
+        }
+
+        // Atualizar IDs dos munícipes criados
+        demandasComDados.forEach(demanda => {
+          if (demanda.municipe_para_criar && !demanda.municipeId) {
+            demanda.municipeId = municipeMap.get(demanda.municipe_para_criar);
+          }
         });
-        
-        console.log(`✅ Demandas válidas para importação: ${demandasValidas.length}`);
-        console.log(`📊 Resumo estatístico:`);
-        console.log(`   - Total de linhas no CSV: ${demandas.length}`);
-        console.log(`   - Linhas com título válido: ${demandas.filter(d => d.titulo && d.titulo.trim()).length}`);
-        console.log(`   - Linhas com munícipe encontrado: ${demandas.filter(d => d.municipeId).length}`);
-        console.log(`   - Linhas com descrição: ${demandas.filter(d => d.descricao && d.descricao.trim()).length}`);
-        console.log(`   - Linhas com responsável encontrado: ${demandas.filter(d => d.responsavelId).length}`);
-        
-        // Log de amostra das demandas válidas
-        console.log(`📝 Primeiras 5 demandas válidas:`, demandasValidas.slice(0, 5).map(d => ({
-          titulo: d.titulo,
-          municipe: d.municipe_nome,
-          responsavel: d.responsavel_nome,
-          status: d.status,
-          prioridade: d.prioridade
-        })));
+
+        // Filtrar apenas demandas com dados mínimos
+        const demandasValidas = demandasComDados.filter(d => 
+          d.titulo && d.municipeId
+        );
+
+        console.log(`✅ ${demandasValidas.length} demandas prontas para importação`);
 
         if (demandasValidas.length === 0) {
-          toast.error("Nenhuma demanda válida encontrada. Verifique se há título e munícipe válidos nas linhas.");
+          toast.error("Nenhuma demanda válida encontrada. Verifique se há título e munícipe.");
           return;
         }
 
-        // Limpar resultados anteriores antes de nova importação
+        // Preparar demandas para importação
+        const demandasParaImportar = demandasValidas.map(d => ({
+          titulo: d.titulo,
+          descricao: d.descricao || d.titulo,
+          municipeId: d.municipeId,
+          areaId: d.areaId || null,
+          responsavelId: d.responsavelId || null,
+          status: d.status || 'aberta',
+          prioridade: d.prioridade || 'media',
+          logradouro: d.logradouro || null,
+          numero: d.numero || null,
+          bairro: d.bairro || null,
+          cidade: d.cidade || 'Santo André',
+          cep: d.cep || null,
+          complemento: d.complemento || null,
+          data_prazo: d.data_prazo || null,
+          observacoes: d.observacoes || null
+        }));
+
+        // Limpar resultados anteriores e importar
         setImportResults([]);
-        importDemandas.mutate(demandasValidas);
+        importDemandas.mutate(demandasParaImportar);
       } catch (error) {
         toast.error("Erro ao processar arquivo CSV. Verifique se o formato está correto.");
       }
