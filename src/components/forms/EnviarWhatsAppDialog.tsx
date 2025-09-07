@@ -500,7 +500,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                 }}
               />
               <Label htmlFor="todos">
-                Enviar para todos os munícipes ({municipes?.length || 0})
+                Enviar para todos os munícipes com telefone ({municipes?.length || 0})
               </Label>
             </div>
 
