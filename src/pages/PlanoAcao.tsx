@@ -1119,15 +1119,10 @@ export default function PlanoAcao() {
               maxHeight: `${tableHeight}px`,
               minHeight: `${tableHeight}px`
             }}
-            onLoad={() => {
-              console.log('📊 Container planilha carregado:', {
-                altura: tableHeight,
-                acoes: filteredActions.length,
-                containerElement: document.querySelector('.planilha-container')
-              });
-            }}
           >
-            <PlanoAcaoTable
+            {/* Garantir overflow vertical adicionando altura extra */}
+            <div style={{ minHeight: `${tableHeight + 100}px` }}>
+              <PlanoAcaoTable
               filteredActions={filteredActions}
               isLoading={isLoading}
               columnWidths={columnWidths}
@@ -1152,7 +1147,8 @@ export default function PlanoAcao() {
               updateAction={updateAction}
               handleResizeStart={handleResizeStart}
               isMaximized={false}
-            />
+                />
+            </div>
           </div>
         </CardContent>
       </Card>
