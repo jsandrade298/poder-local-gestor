@@ -329,13 +329,13 @@ export function PlanoAcaoTable({
                                     {action.temas_acao?.nome || 'Selecionar tema'}
                                   </Badge>
                                 </SelectTrigger>
-                                <SelectContent>
-                                  {temas.map((tema) => (
-                                    <SelectItem key={tema.id} value={tema.id}>
-                                      {tema.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
+                                 <SelectContent>
+                                   {temas.map((tema) => (
+                                     <SelectItem key={tema.id} value={tema.id}>
+                                       {tema.nome}
+                                     </SelectItem>
+                                   ))}
+                                 </SelectContent>
                               </Select>
                             </TableCell>
 

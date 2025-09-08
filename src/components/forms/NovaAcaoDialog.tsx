@@ -76,8 +76,8 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
     }
   });
 
-  // Filtrar temas pelo eixo selecionado
-  const temasFiltrados = temas.filter(tema => !eixoId || tema.eixo_id === eixoId);
+  // Temas independentes (sem filtro por eixo)
+  const temasFiltrados = temas;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,10 +130,7 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="eixo">Eixo</Label>
-              <Select value={eixoId} onValueChange={(value) => {
-                setEixoId(value);
-                setTemaId(""); // Reset tema when eixo changes
-              }}>
+              <Select value={eixoId} onValueChange={setEixoId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um eixo" />
                 </SelectTrigger>
@@ -149,7 +146,7 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
 
             <div className="space-y-2">
               <Label htmlFor="tema">Tema</Label>
-              <Select value={temaId} onValueChange={setTemaId} disabled={!eixoId}>
+              <Select value={temaId} onValueChange={setTemaId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um tema" />
                 </SelectTrigger>
