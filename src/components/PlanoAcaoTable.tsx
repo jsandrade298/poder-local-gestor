@@ -362,27 +362,28 @@ export function PlanoAcaoTable({
                               )}
                             </TableCell>
 
-                            {/* Responsável */}
-                            <TableCell style={{ width: columnWidths.responsavel }}>
-                              <Select 
-                                value={action.responsavel_id || "none"} 
-                                onValueChange={(value) => handleQuickEdit(action, 'responsavel_id', value)}
-                              >
-                                <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                  <Badge variant="secondary">
-                                    {action.responsavel?.nome || 'Selecionar responsável'}
-                                  </Badge>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">Sem responsável</SelectItem>
-                                  {usuarios.map((usuario) => (
-                                    <SelectItem key={usuario.id} value={usuario.id}>
-                                      {usuario.nome}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
+                             {/* Responsável */}
+                             <TableCell style={{ width: columnWidths.responsavel }}>
+                               {editingCell?.actionId === action.id && editingCell?.field === 'responsavel' ? (
+                                 <AutoResizeTextarea
+                                   value={editingValue}
+                                   onChange={(e) => setEditingValue(e.target.value)}
+                                   onSave={handleCellSave}
+                                   onCancel={handleCellCancel}
+                                   width={columnWidths.responsavel}
+                                   placeholder="Digite o responsável..."
+                                 />
+                               ) : (
+                                 <div 
+                                   className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
+                                   style={{ maxWidth: columnWidths.responsavel - 20 }}
+                                   onClick={() => handleCellEdit(action.id, 'responsavel', action.responsavel || '')}
+                                   title={action.responsavel}
+                                 >
+                                   {action.responsavel || 'Clique para editar'}
+                                 </div>
+                               )}
+                             </TableCell>
 
                             {/* Apoio */}
                             <TableCell style={{ width: columnWidths.apoio }}>

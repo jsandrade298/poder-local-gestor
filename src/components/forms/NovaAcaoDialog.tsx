@@ -25,7 +25,7 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
   const [temaId, setTemaId] = useState("");
   const [prioridadeId, setPrioridadeId] = useState("");
   const [statusId, setStatusId] = useState("");
-  const [responsavelId, setResponsavelId] = useState("");
+  const [responsavel, setResponsavel] = useState("");
   const [apoio, setApoio] = useState("");
   const [prazo, setPrazo] = useState<Date>();
   const [atualizacao, setAtualizacao] = useState("");
@@ -67,14 +67,6 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
     }
   });
 
-  const { data: usuarios = [] } = useQuery({
-    queryKey: ['usuarios-plano'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('id, nome').order('nome');
-      if (error) throw error;
-      return data;
-    }
-  });
 
   // Temas independentes (sem filtro por eixo)
   const temasFiltrados = temas;
@@ -92,7 +84,7 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
       tema_id: temaId || null,
       prioridade_id: prioridadeId || null,
       status_id: statusId || null,
-      responsavel_id: responsavelId || null,
+      responsavel: responsavel.trim() || null,
       apoio: apoio.trim() || null,
       prazo: prazo ? format(prazo, 'yyyy-MM-dd') : null,
       atualizacao: atualizacao.trim() || null,
@@ -108,7 +100,7 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
     setTemaId("");
     setPrioridadeId("");
     setStatusId("");
-    setResponsavelId("");
+    setResponsavel("");
     setApoio("");
     setPrazo(undefined);
     setAtualizacao("");
@@ -194,18 +186,12 @@ export function NovaAcaoDialog({ open, onOpenChange, onSubmit }: NovaAcaoDialogP
 
             <div className="space-y-2">
               <Label htmlFor="responsavel">Responsável</Label>
-              <Select value={responsavelId} onValueChange={setResponsavelId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  {usuarios.map((usuario) => (
-                    <SelectItem key={usuario.id} value={usuario.id}>
-                      {usuario.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="responsavel"
+                value={responsavel}
+                onChange={(e) => setResponsavel(e.target.value)}
+                placeholder="Nome do responsável"
+              />
             </div>
 
             <div className="space-y-2">

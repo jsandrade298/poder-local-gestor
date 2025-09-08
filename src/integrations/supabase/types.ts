@@ -769,6 +769,7 @@ export type Database = {
           id: string
           prazo: string | null
           prioridade_id: string | null
+          responsavel: string | null
           responsavel_id: string | null
           status_id: string | null
           tema_id: string | null
@@ -785,6 +786,7 @@ export type Database = {
           id?: string
           prazo?: string | null
           prioridade_id?: string | null
+          responsavel?: string | null
           responsavel_id?: string | null
           status_id?: string | null
           tema_id?: string | null
@@ -801,6 +803,7 @@ export type Database = {
           id?: string
           prazo?: string | null
           prioridade_id?: string | null
+          responsavel?: string | null
           responsavel_id?: string | null
           status_id?: string | null
           tema_id?: string | null
