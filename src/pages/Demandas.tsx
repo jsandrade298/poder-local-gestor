@@ -709,28 +709,71 @@ export default function Demandas() {
         console.log(`📋 Separador detectado: "${separator}"`);
         console.log(`📋 Total de colunas no header: ${headers.length}`);
         
-        // Verificar se temos a estrutura básica esperada
-        if (headers.length < 3) {
-          toast.error("CSV deve ter pelo menos 3 colunas (Título, Descrição, Munícipe)");
+        // Mapear headers para suas posições dinâmicas
+        const headerMap: Record<string, string> = {
+          'titulo': 'titulo',
+          'título': 'titulo',
+          'title': 'titulo',
+          'descricao': 'descricao',
+          'descrição': 'descricao',
+          'description': 'descricao',
+          'municipe_nome': 'municipe_nome',
+          'munícipe_nome': 'municipe_nome',
+          'municipe': 'municipe_nome',
+          'munícipe': 'municipe_nome',
+          'citizen': 'municipe_nome',
+          'area_nome': 'area_nome',
+          'área_nome': 'area_nome',
+          'area': 'area_nome',
+          'área': 'area_nome',
+          'responsavel_nome': 'responsavel_nome',
+          'responsável_nome': 'responsavel_nome',
+          'responsavel': 'responsavel_nome',
+          'responsável': 'responsavel_nome',
+          'status': 'status',
+          'prioridade': 'prioridade',
+          'priority': 'prioridade',
+          'logradouro': 'logradouro',
+          'endereco': 'logradouro',
+          'endereço': 'logradouro',
+          'numero': 'numero',
+          'número': 'numero',
+          'number': 'numero',
+          'bairro': 'bairro',
+          'neighborhood': 'bairro',
+          'cidade': 'cidade',
+          'city': 'cidade',
+          'cep': 'cep',
+          'complemento': 'complemento',
+          'data_prazo': 'data_prazo',
+          'prazo': 'data_prazo',
+          'deadline': 'data_prazo',
+          'observacoes': 'observacoes',
+          'observações': 'observacoes',
+          'notes': 'observacoes'
+        };
+
+        // Criar mapeamento dinâmico de posições baseado nos headers
+        const columnPositions: Record<string, number> = {};
+        headers.forEach((header, index) => {
+          const normalizedHeader = header.replace(/[\s_-]/g, '').toLowerCase();
+          const mappedField = headerMap[header] || headerMap[normalizedHeader];
+          if (mappedField) {
+            columnPositions[mappedField] = index;
+          }
+        });
+
+        console.log('🗂️ Mapeamento de colunas detectado:', columnPositions);
+
+        // Verificar se temos pelo menos título e munícipe
+        if (columnPositions.titulo === undefined) {
+          toast.error("Coluna 'titulo' não encontrada no CSV. Verifique o cabeçalho.");
           return;
         }
-        const columnPositions = {
-          titulo: 0,        // Coluna A
-          descricao: 1,     // Coluna B  
-          municipe_nome: 2, // Coluna C
-          area_nome: 3,     // Coluna D
-          responsavel_nome: 4, // Coluna E
-          status: 5,        // Coluna F
-          prioridade: 6,    // Coluna G
-          logradouro: 7,    // Coluna H
-          numero: 8,        // Coluna I
-          bairro: 9,        // Coluna J
-          cidade: 10,       // Coluna K
-          cep: 11,          // Coluna L
-          complemento: 12,  // Coluna M
-          data_prazo: 13,   // Coluna N
-          observacoes: 14   // Coluna O
-        };
+        if (columnPositions.municipe_nome === undefined) {
+          toast.error("Coluna 'municipe_nome' não encontrada no CSV. Verifique o cabeçalho.");
+          return;
+        }
 
         // Buscar dados existentes usando carregamento em lotes
         console.log('🔍 Carregando dados do sistema...');
@@ -826,49 +869,35 @@ export default function Demandas() {
             raw_line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
           });
           
-          // Verificar se há colunas suficientes
-          if (values.length < 15) {
-            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, esperado 15. Adicionando colunas vazias.`);
-            // Preencher com valores vazios até ter 15 colunas
-            while (values.length < 15) {
+          // Verificar se há colunas suficientes para os campos obrigatórios
+          const maxColumnIndex = Math.max(...Object.values(columnPositions));
+          if (values.length <= maxColumnIndex) {
+            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, mas a maior posição esperada é ${maxColumnIndex}. Adicionando colunas vazias.`);
+            // Preencher com valores vazios até cobrir todas as posições necessárias
+            while (values.length <= maxColumnIndex) {
               values.push('');
             }
           }
           
-          // Auto-detecção de deslocamento de colunas quando título está vazio
-          let adjustedPositions = { ...columnPositions };
+          // Verificar campos obrigatórios na posição correta
+          const titulo = values[columnPositions.titulo]?.trim();
+          const municipeNome = values[columnPositions.municipe_nome]?.trim();
           
-          if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
-            // Verificar se a descrição parece ser um nome (indicativo de deslocamento)
-            const possibleName = values[columnPositions.descricao]?.trim();
-            const possibleDesc = values[columnPositions.municipe_nome]?.trim();
-            
-            if (possibleName && possibleName.includes(' ') && possibleName.length < 100) {
-              console.warn(`🔄 Linha ${i + 1}: Detectado deslocamento - ajustando posições das colunas`);
-              console.log(`   Original: titulo="${values[0]}" | desc="${values[1]}" | municipe="${values[2]}"`);
-              
-              // Ajustar todas as posições uma coluna para frente
-              Object.keys(adjustedPositions).forEach(key => {
-                if (adjustedPositions[key] < values.length - 1) {
-                  adjustedPositions[key] += 1;
-                }
-              });
-              
-              console.log(`   Ajustado: titulo="${values[adjustedPositions.titulo]}" | desc="${values[adjustedPositions.descricao]}" | municipe="${values[adjustedPositions.municipe_nome]}"`);
-            } else {
-              console.log(`⚠️ Linha ${i + 1} ignorada: sem título válido - valor: "${values[columnPositions.titulo] || ''}"`, {
-                linha_completa: line,
-                valores_separados: values
-              });
-              continue;
-            }
+          if (!titulo) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: campo 'titulo' vazio na posição ${columnPositions.titulo}`);
+            continue;
+          }
+          
+          if (!municipeNome) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: campo 'municipe_nome' vazio na posição ${columnPositions.municipe_nome}`);
+            continue;
           }
           
           const demanda: any = { linha: i + 1 };
           
-          // Processar campos usando posições ajustadas
-          Object.keys(adjustedPositions).forEach(key => {
-            const columnIndex = adjustedPositions[key as keyof typeof adjustedPositions];
+          // Processar campos usando posições mapeadas
+          Object.keys(columnPositions).forEach(key => {
+            const columnIndex = columnPositions[key];
             const value = values[columnIndex];
             
             // Debug específico para título e descrição
@@ -952,6 +981,7 @@ export default function Demandas() {
           // Adicionar descrição padrão se não existir
           if (!demanda.descricao && demanda.titulo) {
             demanda.descricao = demanda.titulo;
+            console.log(`📝 Linha ${i + 1}: Usando título como descrição padrão`);
           }
           
           demandasComDados.push(demanda);
