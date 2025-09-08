@@ -20,7 +20,7 @@ interface AdicionarDemandasKanbanDialogProps {
 
 export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarDemandasKanbanDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("aguardando");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
   const [municipeFilter, setMunicipeFilter] = useState("all");
   const [prioridadeFilter, setPrioridadeFilter] = useState("all");
@@ -238,8 +238,11 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="aberta">Aberta</SelectItem>
+                <SelectItem value="em_andamento">Em Andamento</SelectItem>
                 <SelectItem value="aguardando">Aguardando</SelectItem>
+                <SelectItem value="resolvida">Resolvida</SelectItem>
                 <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
@@ -276,7 +279,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
               size="sm"
               onClick={() => {
                 setSearchTerm("");
-                setStatusFilter("aguardando");
+                setStatusFilter("all");
                 setAreaFilter("all");
                 setMunicipeFilter("all");
                 setPrioridadeFilter("all");
