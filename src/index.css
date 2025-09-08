@@ -139,10 +139,10 @@
 /* Firefox */
 .planilha-container {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
+  scrollbar-color: hsl(var(--foreground) / 0.6) hsl(var(--muted));
 }
 
-/* WebKit (Chrome, Safari, Edge) - Scrollbars sempre visíveis */
+/* WebKit (Chrome, Safari, Edge) - Scrollbars sempre visíveis com cores mais escuras */
 .planilha-container::-webkit-scrollbar {
   width: 16px !important;
   height: 16px !important;
@@ -156,7 +156,7 @@
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: hsl(var(--foreground) / 0.4);
   border-radius: 8px;
   border: 3px solid hsl(var(--muted));
   min-height: 40px;
@@ -164,7 +164,7 @@
 }
 
 .planilha-container::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--foreground) / 0.5);
+  background: hsl(var(--foreground) / 0.6);
 }
 
 .planilha-container::-webkit-scrollbar-corner {
