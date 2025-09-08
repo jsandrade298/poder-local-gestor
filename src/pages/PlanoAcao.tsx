@@ -250,56 +250,166 @@ export default function PlanoAcao() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error("Por favor, selecione um arquivo CSV.");
+      return;
+    }
+
     setIsImporting(true);
     setImportResults([]);
 
-    try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length < 2) {
-        toast.error('Arquivo CSV vazio ou inválido');
-        setIsImporting(false);
-        return;
-      }
-
-      const headers = lines[0].split(';').map(h => h.trim().replace(/"/g, ''));
-      const expectedHeaders = ['acao', 'eixo', 'prioridade', 'tema', 'responsavel', 'apoio', 'status', 'prazo', 'atualizacao'];
-      
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        toast.error(`Headers obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
-        setIsImporting(false);
-        return;
-      }
-
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
-        toast.error('Usuário não autenticado');
-        setIsImporting(false);
-        return;
-      }
-
-      const results = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(';').map(v => v.trim().replace(/"/g, ''));
-        const row: any = {};
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const csv = e.target?.result as string;
         
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-
-        if (!row.acao?.trim()) {
-          results.push({
-            success: false,
-            acao: row.acao || `Linha ${i + 1}`,
-            error: 'Campo "acao" é obrigatório'
-          });
-          continue;
+        // Parser CSV mais robusto para lidar com aspas e quebras de linha
+        function parseCSVLine(line: string, separator: string): string[] {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          let quoteChar = '';
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+            
+            if (!inQuotes && (char === '"' || char === "'")) {
+              inQuotes = true;
+              quoteChar = char;
+            } else if (inQuotes && char === quoteChar) {
+              if (nextChar === quoteChar) {
+                current += char;
+                i++; // Skip next quote
+              } else {
+                inQuotes = false;
+                quoteChar = '';
+              }
+            } else if (!inQuotes && char === separator) {
+              result.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          
+          result.push(current.trim());
+          return result;
         }
 
-        try {
+        // Primeiro passo: dividir linhas respeitando aspas
+        const rawLines = [];
+        let currentLine = '';
+        let insideQuotes = false;
+        let quoteChar = '';
+        
+        for (let i = 0; i < csv.length; i++) {
+          const char = csv[i];
+          const nextChar = csv[i + 1];
+          
+          if ((char === '"' || char === "'") && !insideQuotes) {
+            insideQuotes = true;
+            quoteChar = char;
+            currentLine += char;
+          } else if (char === quoteChar && insideQuotes) {
+            if (nextChar === quoteChar) {
+              currentLine += char + nextChar;
+              i++;
+            } else {
+              insideQuotes = false;
+              quoteChar = '';
+              currentLine += char;
+            }
+          } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+            if (currentLine.trim()) {
+              rawLines.push(currentLine.trim());
+            }
+            currentLine = '';
+            if (char === '\r' && nextChar === '\n') {
+              i++;
+            }
+          } else {
+            currentLine += char;
+          }
+        }
+        
+        if (currentLine.trim()) {
+          rawLines.push(currentLine.trim());
+        }
+
+        // Filtrar linhas vazias ou inválidas
+        const lines = rawLines.filter(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return false;
+          
+          // Verificar se tem pelo menos um separador válido
+          const hasSeparator = trimmed.includes(';') || trimmed.includes(',');
+          if (!hasSeparator) {
+            console.warn(`⚠️ Linha descartada (sem separador): "${trimmed.substring(0, 50)}..."`);
+            return false;
+          }
+          
+          return true;
+        });
+        
+        console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
+        
+        if (lines.length < 2) {
+          toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
+          setIsImporting(false);
+          return;
+        }
+
+        // Detectar separador mais preciso
+        const firstLine = lines[0];
+        const semicolonCount = (firstLine.match(/;/g) || []).length;
+        const commaCount = (firstLine.match(/,/g) || []).length;
+        const separator = semicolonCount >= commaCount ? ';' : ',';
+        
+        // Usar parser robusto para o header
+        const headers = parseCSVLine(firstLine, separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+        
+        console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
+        console.log(`📋 Separador detectado: "${separator}"`);
+        console.log(`📋 Total de colunas no header: ${headers.length}`);
+        
+        const expectedHeaders = ['acao', 'eixo', 'prioridade', 'tema', 'responsavel', 'apoio', 'status', 'prazo', 'atualizacao'];
+        const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+        
+        if (missingHeaders.length > 0) {
+          toast.error(`Headers obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
+          setIsImporting(false);
+          return;
+        }
+
+        const { data: user } = await supabase.auth.getUser();
+        if (!user.user) {
+          toast.error('Usuário não autenticado');
+          setIsImporting(false);
+          return;
+        }
+
+        const results = [];
+        
+        // Processar cada linha usando o parser robusto
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i], separator).map(v => v.replace(/^["']|["']$/g, '').trim());
+          const row: any = {};
+          
+          headers.forEach((header, index) => {
+            row[header] = values[index] || '';
+          });
+
+          if (!row.acao?.trim()) {
+            results.push({
+              success: false,
+              acao: row.acao || `Linha ${i + 1}`,
+              error: 'Campo "acao" é obrigatório'
+            });
+            continue;
+          }
+
+          try {
           // Buscar IDs das referências
           let eixo_id = null;
           if (row.eixo?.trim()) {
@@ -384,25 +494,28 @@ export default function PlanoAcao() {
         }
       }
 
-      setImportResults(results);
-      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      
-      const successCount = results.filter(r => r.success).length;
-      const errorCount = results.filter(r => !r.success).length;
-      
-      if (errorCount === 0) {
-        toast.success(`${successCount} ações importadas com sucesso!`);
-      } else if (successCount > 0) {
-        toast.warning(`${successCount} ações importadas. ${errorCount} erros encontrados.`);
-      } else {
-        toast.error("Nenhuma ação foi importada devido a erros.");
+        setImportResults(results);
+        queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
+        
+        const successCount = results.filter(r => r.success).length;
+        const errorCount = results.filter(r => !r.success).length;
+        
+        if (errorCount === 0) {
+          toast.success(`${successCount} ações importadas com sucesso!`);
+        } else if (successCount > 0) {
+          toast.warning(`${successCount} ações importadas. ${errorCount} erros encontrados.`);
+        } else {
+          toast.error("Nenhuma ação foi importada devido a erros.");
+        }
+      } catch (error) {
+        toast.error(`Erro na importação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        console.error('Erro na importação:', error);
+      } finally {
+        setIsImporting(false);
       }
-    } catch (error) {
-      toast.error(`Erro na importação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      console.error('Erro na importação:', error);
-    }
-    
-    setIsImporting(false);
+    };
+
+    reader.readAsText(file, 'UTF-8');
   };
 
   // Função para reorganizar ações
