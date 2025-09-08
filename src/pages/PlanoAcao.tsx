@@ -642,22 +642,24 @@ export default function PlanoAcao() {
                     <Target className="h-6 w-6" />
                     Plano de Ação - Visualização Maximizada
                   </DialogTitle>
-                  <Button
-                    onClick={saveLayout}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Layout
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={saveLayout}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar Layout
+                    </Button>
+                  </div>
                 </div>
               </DialogHeader>
               <div className="flex-1 overflow-hidden">
                 <div 
                   className="h-full w-full overflow-auto"
                   style={{
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'hsl(var(--border)) transparent'
+                    scrollbarWidth: "thin",
+                    scrollbarColor: "hsl(var(--border)) transparent"
                   }}
                 >
                   <div className="p-6 pt-4">

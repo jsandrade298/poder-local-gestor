@@ -480,7 +480,7 @@ export function PlanoAcaoTable({
                                 />
                               ) : (
                                 <div 
-                                  className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
+                                  className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden whitespace-pre-wrap"
                                   style={{ maxWidth: columnWidths.atualizacao - 20 }}
                                   onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
                                   title={action.atualizacao}
