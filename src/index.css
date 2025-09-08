@@ -125,64 +125,52 @@
   background: rgb(243 244 246);
 }
 
-/* Container de planilha com scroll SEMPRE VISÍVEL - análise e correção completa */
+/* Container de planilha com scroll SEMPRE VISÍVEL - tamanho sutil mas thumb visível */
 .planilha-container {
-  /* Força scrollbars sempre visíveis para ambas as direções */
+  /* Força scrollbars sempre visíveis */
   overflow: scroll !important;
-  overflow-x: scroll !important;
-  overflow-y: scroll !important;
   /* Reserva espaço para scrollbars */
   scrollbar-gutter: stable both-edges;
   /* Performance */
   will-change: scroll-position;
   backface-visibility: hidden;
-  /* Força layout */
-  position: relative;
-  display: block;
 }
 
-/* Firefox - configuração específica para thumb visível */
+/* Firefox - scroll sutil */
 .planilha-container {
-  scrollbar-width: auto !important;
-  scrollbar-color: #6b7280 #f3f4f6 !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #9ca3af #f9fafb !important;
 }
 
-/* WebKit (Chrome, Safari, Edge) - configuração completa e robusta */
+/* WebKit (Chrome, Safari, Edge) - tamanho sutil mas thumb bem visível */
 .planilha-container::-webkit-scrollbar {
-  width: 14px !important;
-  height: 14px !important;
-  background-color: #f3f4f6 !important;
-  border-radius: 0 !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: #f9fafb !important;
 }
 
 .planilha-container::-webkit-scrollbar-track {
-  background-color: #f3f4f6 !important;
-  border-radius: 0 !important;
-  border: none !important;
+  background: #f9fafb !important;
+  border-radius: 6px;
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
-  background-color: #6b7280 !important;
-  border-radius: 7px !important;
-  border: 2px solid #f3f4f6 !important;
-  min-height: 40px !important;
-  min-width: 40px !important;
-  /* Força visibilidade */
+  background: #9ca3af !important;
+  border-radius: 6px;
+  border: 2px solid #f9fafb !important;
+  min-height: 30px !important;
+  min-width: 30px !important;
+  /* Força visibilidade do thumb */
   opacity: 1 !important;
   visibility: visible !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb:hover {
-  background-color: #4b5563 !important;
-  border: 2px solid #f3f4f6 !important;
-}
-
-.planilha-container::-webkit-scrollbar-thumb:active {
-  background-color: #374151 !important;
+  background: #6b7280 !important;
 }
 
 .planilha-container::-webkit-scrollbar-corner {
-  background-color: #f3f4f6 !important;
+  background: #f9fafb !important;
 }
 
   .dark {
