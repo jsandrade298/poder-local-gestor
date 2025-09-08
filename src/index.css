@@ -125,35 +125,81 @@
   background: rgb(243 244 246);
 }
 
-/* Scroll customizado mais performático */
+/* Scroll customizado mais performático - SEMPRE VISÍVEL */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-gutter: stable both-edges;
   /* Performance otimizada */
   will-change: scroll-position;
   transform: translateZ(0);
   backface-visibility: hidden;
   contain: layout style paint;
+  /* Força scroll sempre visível */
+  overflow-y: scroll !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
+  /* Sempre visível */
+  display: block !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(var(--muted));
+  border-radius: 6px;
+  /* Sempre visível */
+  opacity: 1 !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border));
-  border-radius: 4px;
-  border: 1px solid transparent;
+  border-radius: 6px;
+  border: 2px solid hsl(var(--muted));
+  min-height: 20px;
+  /* Sempre visível */
+  opacity: 1 !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--foreground) / 0.4);
+}
+
+/* Classe específica para planilha com scroll sempre visível */
+.planilha-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
+  scrollbar-gutter: stable both-edges;
+  overflow-y: scroll !important;
+  overflow-x: auto !important;
+}
+
+.planilha-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  display: block !important;
+}
+
+.planilha-scroll::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.planilha-scroll::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border));
-  opacity: 0.8;
+  border-radius: 6px;
+  border: 2px solid hsl(var(--muted));
+  min-height: 30px;
+}
+
+.planilha-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--foreground) / 0.4);
+}
+
+.planilha-scroll::-webkit-scrollbar-corner {
+  background: hsl(var(--muted));
 }
 
   .dark {

@@ -888,7 +888,7 @@ export default function PlanoAcao() {
                 </div>
                 
                 <div 
-                  className="h-full w-full overflow-auto custom-scrollbar"
+                  className="h-full w-full planilha-scroll"
                   style={{
                     scrollBehavior: 'auto',
                     overscrollBehavior: 'contain'
@@ -1118,10 +1118,8 @@ export default function PlanoAcao() {
             style={{ height: tableHeight }}
           >
             <div 
-              className="h-full custom-scrollbar"
+              className="h-full planilha-scroll"
               style={{ 
-                overflowY: 'scroll',
-                overflowX: 'auto',
                 scrollBehavior: 'auto',
                 overscrollBehavior: 'contain'
               }}
