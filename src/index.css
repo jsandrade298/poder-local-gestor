@@ -142,22 +142,23 @@
   scrollbar-color: #9ca3af #f9fafb !important;
 }
 
-/* WebKit (Chrome, Safari, Edge) - tamanho sutil mas thumb bem visível */
+/* WebKit (Chrome, Safari, Edge) - thumb bem visível sem bordas */
 .planilha-container::-webkit-scrollbar {
   width: 12px !important;
   height: 12px !important;
-  background: #f9fafb !important;
+  background: #f3f4f6 !important;
 }
 
 .planilha-container::-webkit-scrollbar-track {
-  background: #f9fafb !important;
+  background: #f3f4f6 !important;
   border-radius: 6px;
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
-  background: #9ca3af !important;
+  background: #6b7280 !important;
   border-radius: 6px;
-  border: 2px solid #f9fafb !important;
+  /* Sem borda para não esconder o thumb */
+  border: none !important;
   min-height: 30px !important;
   min-width: 30px !important;
   /* Força visibilidade do thumb */
