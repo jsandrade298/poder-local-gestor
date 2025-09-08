@@ -94,10 +94,11 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
   );
 
   return (
-    <Table 
-      className="relative w-full" 
-      style={{ minWidth: tableMinWidth, contain: 'layout style paint' }}
-    >
+    <div style={{ minHeight: 'calc(100% + 200px)' }}>
+      <Table 
+        className="relative w-full" 
+        style={{ minWidth: tableMinWidth, contain: 'layout style paint' }}
+      >
       {/* Header fixo com backdrop blur */}
       <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
         <TableRow>
@@ -535,5 +536,6 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
         </Droppable>
       </DragDropContext>
     </Table>
+    </div>
   );
 });

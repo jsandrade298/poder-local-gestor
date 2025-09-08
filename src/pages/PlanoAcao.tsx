@@ -1116,7 +1116,15 @@ export default function PlanoAcao() {
             className="planilha-container bg-background border rounded-lg"
             style={{ 
               height: `${tableHeight}px`,
-              maxHeight: `${tableHeight}px`
+              maxHeight: `${tableHeight}px`,
+              minHeight: `${tableHeight}px`
+            }}
+            onLoad={() => {
+              console.log('📊 Container planilha carregado:', {
+                altura: tableHeight,
+                acoes: filteredActions.length,
+                containerElement: document.querySelector('.planilha-container')
+              });
             }}
           >
             <PlanoAcaoTable

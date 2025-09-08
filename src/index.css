@@ -125,50 +125,64 @@
   background: rgb(243 244 246);
 }
 
-/* Container de planilha com scroll SEMPRE VISÍVEL - usando mesmo padrão das outras páginas */
+/* Container de planilha com scroll SEMPRE VISÍVEL - debug e refinado */
 .planilha-container {
   /* Força scrollbars sempre visíveis */
   overflow: scroll !important;
+  overflow-x: auto !important;
+  overflow-y: scroll !important;
   /* Reserva espaço para scrollbars */
   scrollbar-gutter: stable both-edges;
   /* Performance */
   will-change: scroll-position;
   backface-visibility: hidden;
+  /* Debug */
+  position: relative;
 }
 
-/* Firefox - mesma cor das outras páginas */
+/* Firefox - scroll mais sutil */
 .planilha-container {
-  scrollbar-width: auto !important;
-  scrollbar-color: rgb(156 163 175) rgb(243 244 246) !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgb(156 163 175) rgb(249 250 251) !important;
 }
 
-/* WebKit (Chrome, Safari, Edge) - mesmo padrão visual das outras páginas */
+/* WebKit (Chrome, Safari, Edge) - scroll mais sutil mas sempre visível */
 .planilha-container::-webkit-scrollbar {
-  width: 16px !important;
-  height: 16px !important;
-  background: rgb(243 244 246) !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: rgb(249 250 251) !important;
+  /* Debug - forçar visibilidade */
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .planilha-container::-webkit-scrollbar-track {
-  background: rgb(243 244 246) !important;
+  background: rgb(249 250 251) !important;
   border-radius: 6px;
-  border: 1px solid rgb(229 231 235);
+  border: 1px solid rgb(243 244 246);
+  /* Debug */
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
   background: rgb(156 163 175) !important;
   border-radius: 6px;
-  border: 2px solid rgb(243 244 246);
-  min-height: 40px !important;
-  min-width: 40px !important;
-  /* Garantir visibilidade */
+  border: 1px solid rgb(249 250 251);
+  min-height: 30px !important;
+  min-width: 30px !important;
+  /* Debug - garantir que aparece */
   opacity: 1 !important;
   visibility: visible !important;
   display: block !important;
+  /* Força aparição */
+  background-clip: padding-box !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb:hover {
   background: rgb(107 114 128) !important;
+  border: 1px solid rgb(243 244 246);
 }
 
 .planilha-container::-webkit-scrollbar-thumb:active {
@@ -176,15 +190,20 @@
 }
 
 .planilha-container::-webkit-scrollbar-corner {
-  background: rgb(243 244 246) !important;
+  background: rgb(249 250 251) !important;
+  border: 1px solid rgb(243 244 246);
 }
 
-/* Remove scrolls internos da tabela */
-.planilha-container .table-container {
-  overflow: visible !important;
+/* Garantir que o conteúdo dentro force scroll quando necessário */
+.planilha-container > * {
+  min-height: calc(100% + 1px) !important;
 }
 
-.planilha-container table {
+/* Remove scrolls internos da tabela para evitar conflitos */
+.planilha-container .table-container,
+.planilha-container table,
+.planilha-container .overflow-auto,
+.planilha-container .overflow-scroll {
   overflow: visible !important;
 }
 
