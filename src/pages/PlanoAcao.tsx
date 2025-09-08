@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload, Save, Maximize } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload, Save, Maximize, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -768,6 +768,104 @@ export default function PlanoAcao() {
                 </div>
               </DialogHeader>
               <div className="flex-1 overflow-hidden">
+                {/* Filtros no modal maximizado */}
+                <div className="px-6 py-4 border-b bg-muted/30">
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar ações..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-64"
+                      />
+                    </div>
+
+                    <Select value={eixoFilter} onValueChange={setEixoFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por eixo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os eixos</SelectItem>
+                        {eixos.map((eixo) => (
+                          <SelectItem key={eixo.id} value={eixo.id}>
+                            {eixo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os status</SelectItem>
+                        {statusAcao.map((status) => (
+                          <SelectItem key={status.id} value={status.id}>
+                            {status.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por responsável" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os responsáveis</SelectItem>
+                        {usuarios.map((usuario) => (
+                          <SelectItem key={usuario.id} value={usuario.id}>
+                            {usuario.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as prioridades</SelectItem>
+                        {prioridades.map((prioridade) => (
+                          <SelectItem key={prioridade.id} value={prioridade.id}>
+                            {prioridade.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por situação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="true">Concluídas</SelectItem>
+                        <SelectItem value="false">Pendentes</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setSearchTerm('');
+                        setEixoFilter('all');
+                        setStatusFilter('all');
+                        setResponsavelFilter('all');
+                        setPrioridadeFilter('all');
+                        setConcluidaFilter('all');
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Limpar Filtros
+                    </Button>
+                  </div>
+                </div>
+                
                 <div 
                   className="h-full w-full overflow-auto"
                   style={{
