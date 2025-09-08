@@ -100,75 +100,83 @@ export default function PlanoAcao() {
 
   const queryClient = useQueryClient();
 
-  // Queries para dados
-  const { data: planosAcao = [], isLoading, error } = useQuery({
-    queryKey: ['planos-acao'],
+  // Fetch functions
+  const { data: acoes = [], isLoading } = useQuery({
+    queryKey: ["acoes"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('planos_acao')
-          .select(`
-            *,
-            eixos(nome, cor),
-            prioridades_acao(nome, nivel, cor),
-            temas_acao(nome),
-            status_acao(nome, cor),
-            responsavel:profiles!responsavel_id(nome),
-            criador:profiles!created_by(nome)
-          `)
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        return data || [];
-      } catch (err) {
-        console.error('Erro ao carregar planos:', err);
-        throw err;
-      }
-    },
-    retry: 1,
-    staleTime: 30000
-  });
-
-  const { data: eixos = [] } = useQuery({
-    queryKey: ['eixos'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('eixos').select('*').order('nome');
+      const { data, error } = await supabase
+        .from("acoes")
+        .select(`
+          *,
+          eixos(id, nome, cor),
+          prioridades_acao(id, nome, cor),
+          temas_acao(id, nome),
+          status_acao(id, nome, cor),
+          responsavel:usuarios!acoes_responsavel_id_fkey(id, nome),
+          apoio:usuarios!acoes_apoio_id_fkey(id, nome)
+        `)
+        .order("ordem");
+      
       if (error) throw error;
       return data || [];
     }
   });
 
-  const { data: temas = [] } = useQuery({
-    queryKey: ['temas-acao'],
+  const { data: eixos = [] } = useQuery({
+    queryKey: ["eixos"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('temas_acao').select('*, eixos(nome)').order('nome');
+      const { data, error } = await supabase
+        .from("eixos")
+        .select("*")
+        .order("nome");
       if (error) throw error;
       return data || [];
     }
   });
 
   const { data: prioridades = [] } = useQuery({
-    queryKey: ['prioridades-acao'],
+    queryKey: ["prioridades-acao"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('prioridades_acao').select('*').order('nivel');
+      const { data, error } = await supabase
+        .from("prioridades_acao")
+        .select("*")
+        .order("nome");
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const { data: temas = [] } = useQuery({
+    queryKey: ["temas-acao"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("temas_acao")
+        .select("*")
+        .order("nome");
       if (error) throw error;
       return data || [];
     }
   });
 
   const { data: statusAcao = [] } = useQuery({
-    queryKey: ['status-acao'],
+    queryKey: ["status-acao"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('status_acao').select('*').order('nome');
+      const { data, error } = await supabase
+        .from("status_acao")
+        .select("*")
+        .order("nome");
       if (error) throw error;
       return data || [];
     }
   });
 
   const { data: usuarios = [] } = useQuery({
-    queryKey: ['usuarios-plano'],
+    queryKey: ["usuarios"],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('id, nome').order('nome');
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("id, nome")
+        .order("nome");
       if (error) throw error;
       return data || [];
     }
@@ -176,292 +184,117 @@ export default function PlanoAcao() {
 
   // Mutations
   const createAction = useMutation({
-    mutationFn: async (newAction: any) => {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Usuário não autenticado');
-
-      const { data, error } = await supabase
-        .from('planos_acao')
-        .insert({
-          ...newAction,
-          created_by: user.user.id
-        })
+    mutationFn: async (data: any) => {
+      const maxOrder = Math.max(...acoes.map(a => a.ordem || 0), 0);
+      const { data: newAction, error } = await supabase
+        .from("acoes")
+        .insert({ ...data, ordem: maxOrder + 1 })
         .select()
         .single();
-
+      
       if (error) throw error;
-      return data;
+      return newAction;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      toast.success('Ação criada com sucesso!');
-      setIsNewActionDialogOpen(false);
-      setInsertPosition(null);
+      queryClient.invalidateQueries({ queryKey: ["acoes"] });
+      toast.success("Ação criada com sucesso!");
     },
     onError: (error) => {
-      toast.error('Erro ao criar ação');
-      console.error('Erro:', error);
+      toast.error("Erro ao criar ação: " + error.message);
     }
   });
 
   const updateAction = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       const { data, error } = await supabase
-        .from('planos_acao')
+        .from("acoes")
         .update(updates)
-        .eq('id', id)
+        .eq("id", id)
         .select()
         .single();
-
+      
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      toast.success('Ação atualizada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ["acoes"] });
+      toast.success("Ação atualizada com sucesso!");
     },
     onError: (error) => {
-      toast.error('Erro ao atualizar ação');
-      console.error('Erro:', error);
+      toast.error("Erro ao atualizar ação: " + error.message);
     }
   });
 
   const deleteAction = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('planos_acao')
+        .from("acoes")
         .delete()
-        .eq('id', id);
-
+        .eq("id", id);
+      
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      toast.success('Ação excluída com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ["acoes"] });
+      toast.success("Ação excluída com sucesso!");
     },
     onError: (error) => {
-      toast.error('Erro ao excluir ação');
-      console.error('Erro:', error);
+      toast.error("Erro ao excluir ação: " + error.message);
     }
   });
 
-  // Função para importação CSV
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    setImportResults([]);
-
-    try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length < 2) {
-        toast.error('Arquivo CSV vazio ou inválido');
-        setIsImporting(false);
-        return;
-      }
-
-      const headers = lines[0].split(';').map(h => h.trim().replace(/"/g, ''));
-      const expectedHeaders = ['acao', 'eixo', 'prioridade', 'tema', 'responsavel', 'apoio', 'status', 'prazo', 'atualizacao'];
-      
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
-      if (missingHeaders.length > 0) {
-        toast.error(`Headers obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
-        setIsImporting(false);
-        return;
-      }
-
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) {
-        toast.error('Usuário não autenticado');
-        setIsImporting(false);
-        return;
-      }
-
-      const results = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(';').map(v => v.trim().replace(/"/g, ''));
-        const row: any = {};
-        
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-
-        if (!row.acao?.trim()) {
-          results.push({
-            success: false,
-            acao: row.acao || `Linha ${i + 1}`,
-            error: 'Campo "acao" é obrigatório'
-          });
-          continue;
-        }
-
-        try {
-          // Buscar IDs das referências
-          let eixo_id = null;
-          if (row.eixo?.trim()) {
-            const eixo = eixos.find(e => e.nome.toLowerCase() === row.eixo.toLowerCase().trim());
-            eixo_id = eixo?.id || null;
-          }
-
-          let prioridade_id = null;
-          if (row.prioridade?.trim()) {
-            const prioridade = prioridades.find(p => p.nome.toLowerCase() === row.prioridade.toLowerCase().trim());
-            prioridade_id = prioridade?.id || null;
-          }
-
-          let tema_id = null;
-          if (row.tema?.trim()) {
-            const tema = temas.find(t => t.nome.toLowerCase() === row.tema.toLowerCase().trim());
-            tema_id = tema?.id || null;
-          }
-
-          let status_id = null;
-          if (row.status?.trim()) {
-            const status = statusAcao.find(s => s.nome.toLowerCase() === row.status.toLowerCase().trim());
-            status_id = status?.id || null;
-          }
-
-          let responsavel_id = null;
-          if (row.responsavel?.trim()) {
-            const responsavel = usuarios.find(u => u.nome.toLowerCase() === row.responsavel.toLowerCase().trim());
-            responsavel_id = responsavel?.id || null;
-          }
-
-          // Processar data
-          let prazoDate = null;
-          if (row.prazo?.trim()) {
-            const dateFormats = [
-              /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
-              /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-            ];
-            
-            if (dateFormats[0].test(row.prazo)) {
-              const [day, month, year] = row.prazo.split('/');
-              prazoDate = `${year}-${month}-${day}`;
-            } else if (dateFormats[1].test(row.prazo)) {
-              prazoDate = row.prazo;
-            }
-          }
-
-          const { error } = await supabase
-            .from('planos_acao')
-            .insert({
-              acao: row.acao.trim(),
-              eixo_id,
-              prioridade_id,
-              tema_id,
-              responsavel_id,
-              apoio: row.apoio?.trim() || null,
-              status_id,
-              prazo: prazoDate,
-              atualizacao: row.atualizacao?.trim() || null,
-              concluida: false,
-              created_by: user.user.id
-            });
-
-          if (error) {
-            results.push({
-              success: false,
-              acao: row.acao,
-              error: error.message
-            });
-          } else {
-            results.push({
-              success: true,
-              acao: row.acao
-            });
-          }
-        } catch (err) {
-          results.push({
-            success: false,
-            acao: row.acao,
-            error: err instanceof Error ? err.message : 'Erro inesperado'
-          });
-        }
-      }
-
-      setImportResults(results);
-      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      
-      const successCount = results.filter(r => r.success).length;
-      const errorCount = results.filter(r => !r.success).length;
-      
-      if (errorCount === 0) {
-        toast.success(`${successCount} ações importadas com sucesso!`);
-      } else if (successCount > 0) {
-        toast.warning(`${successCount} ações importadas. ${errorCount} erros encontrados.`);
-      } else {
-        toast.error("Nenhuma ação foi importada devido a erros.");
-      }
-    } catch (error) {
-      toast.error(`Erro na importação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      console.error('Erro na importação:', error);
-    }
-    
-    setIsImporting(false);
-  };
-
-  // Função para reorganizar ações
-  const handleDragEnd = (result: any) => {
+  const handleDragEnd = useCallback((result: any) => {
     if (!result.destination) return;
-    // Lógica de reorganização pode ser implementada aqui
-  };
 
-  // Função para inserir nova ação em posição específica
-  const handleInsertAction = (position: number) => {
-    setInsertPosition(position);
-    setIsNewActionDialogOpen(true);
-  };
+    const items = Array.from(filteredActions);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
 
-  // Componente para inserção entre linhas
-  const InsertRow = ({ index }: { index: number }) => (
-    <tr 
-      className="group cursor-pointer hover:bg-muted/50 transition-colors"
-      onMouseEnter={() => setHoveredRowIndex(index)}
-      onMouseLeave={() => setHoveredRowIndex(null)}
-      onClick={() => handleInsertAction(index)}
-    >
-      <td colSpan={12} className="p-2 text-center">
-        <div className={cn(
-          "flex items-center justify-center gap-2 text-muted-foreground transition-all duration-200",
-          hoveredRowIndex === index ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        )}>
-          <Plus className="h-4 w-4" />
-          <span className="text-sm font-medium">Adicionar nova ação aqui</span>
-        </div>
-      </td>
-    </tr>
-  );
+    const updatedItems = items.map((item, index) => ({
+      ...item,
+      ordem: index + 1
+    }));
 
-  // Filtros aplicados
-  const filteredActions = planosAcao?.filter((action) => {
-    const matchesSearch = !searchTerm || 
-      action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.temas_acao?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.apoio?.toLowerCase().includes(searchTerm.toLowerCase());
+    // Update all items with new order
+    Promise.all(
+      updatedItems.map(item =>
+        supabase
+          .from("acoes")
+          .update({ ordem: item.ordem })
+          .eq("id", item.id)
+      )
+    ).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["acoes"] });
+    });
+  }, [queryClient]);
+
+  // Filters
+  const filteredActions = acoes.filter(action => {
+    const matchesSearch = action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         action.temas_acao?.nome?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesEixo = eixoFilter === "all" || action.eixo_id === eixoFilter;
     const matchesStatus = statusFilter === "all" || action.status_id === statusFilter;
     const matchesResponsavel = responsavelFilter === "all" || action.responsavel_id === responsavelFilter;
     const matchesPrioridade = prioridadeFilter === "all" || action.prioridade_id === prioridadeFilter;
     const matchesConcluida = concluidaFilter === "all" || 
-      (concluidaFilter === "true" && action.concluida) || 
-      (concluidaFilter === "false" && !action.concluida);
+                            (concluidaFilter === "true" && action.concluida) ||
+                            (concluidaFilter === "false" && !action.concluida);
 
     return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesConcluida;
-  }) || [];
+  });
 
-  // Calcular estatísticas
-  const totalAcoes = filteredActions.length;
-  const acoesConcluidas = filteredActions.filter(a => a.concluida).length;
-  const percentualConcluido = totalAcoes > 0 ? Math.round((acoesConcluidas / totalAcoes) * 100) : 0;
+  // Statistics
+  const totalAcoes = acoes.length;
+  const acoesCompletas = acoes.filter(action => action.concluida).length;
+  const acoesAtrasadas = acoes.filter(action => {
+    if (!action.prazo_conclusao || action.concluida) return false;
+    return new Date(action.prazo_conclusao) < new Date();
+  }).length;
+  const progressoPercentual = totalAcoes > 0 ? Math.round((acoesCompletas / totalAcoes) * 100) : 0;
 
-  // Funções auxiliares
+  // Handlers
   const handleToggleConcluida = (action: any) => {
     updateAction.mutate({
       id: action.id,
@@ -470,151 +303,240 @@ export default function PlanoAcao() {
   };
 
   const handleQuickEdit = (action: any, field: string, value: any) => {
-    const finalValue = field === 'responsavel_id' && value === 'none' ? null : value;
-    
     updateAction.mutate({
       id: action.id,
-      updates: { [field]: finalValue }
+      updates: { [field]: value }
     });
   };
 
   const handleCellEdit = (actionId: string, field: string, currentValue: string) => {
     setEditingCell({ actionId, field });
-    setEditingValue(currentValue || '');
+    setEditingValue(currentValue || "");
   };
 
   const handleCellSave = () => {
     if (editingCell) {
-      const action = filteredActions.find(a => a.id === editingCell.actionId);
-      if (action) {
-        handleQuickEdit(action, editingCell.field, editingValue);
-      }
-      setEditingCell(null);
-      setEditingValue('');
+      updateAction.mutate({
+        id: editingCell.actionId,
+        updates: { [editingCell.field]: editingValue }
+      });
     }
+    setEditingCell(null);
+    setEditingValue("");
   };
 
   const handleCellCancel = () => {
     setEditingCell(null);
-    setEditingValue('');
+    setEditingValue("");
   };
 
-  // Funções para redimensionamento de colunas
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    e.preventDefault();
-    const deltaX = e.clientX - startX;
-    const newWidth = Math.max(50, Math.min(800, startWidth + deltaX)); // Min 50px, Max 800px
-    
-    setColumnWidths(prev => ({
-      ...prev,
-      [isResizing]: newWidth
-    }));
-  }, [isResizing, startX, startWidth]);
+  const handleInsertAction = async (position: number) => {
+    try {
+      // Encontrar a ordem da posição
+      const targetOrder = position === 0 ? 0.5 : 
+                         position >= filteredActions.length ? filteredActions[filteredActions.length - 1].ordem + 1 :
+                         (filteredActions[position - 1].ordem + filteredActions[position].ordem) / 2;
 
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(null);
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, [handleResizeMove]);
+      const { data: newAction, error } = await supabase
+        .from("acoes")
+        .insert({
+          acao: "Nova ação",
+          ordem: targetOrder
+        })
+        .select()
+        .single();
 
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["acoes"] });
+      toast.success("Nova ação inserida!");
+      
+      // Editar imediatamente
+      setTimeout(() => {
+        handleCellEdit(newAction.id, 'acao', newAction.acao);
+      }, 100);
+    } catch (error: any) {
+      toast.error("Erro ao inserir ação: " + error.message);
+    }
+  };
+
+  // Resize handling
   const handleResizeStart = (columnName: string, e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    
     setIsResizing(columnName);
     setStartX(e.clientX);
     setStartWidth(columnWidths[columnName as keyof typeof columnWidths]);
-    
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    
-    document.addEventListener('mousemove', handleResizeMove);
-    document.addEventListener('mouseup', handleResizeEnd);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const diff = e.clientX - startX;
+      const newWidth = Math.max(80, startWidth + diff);
+      
+      setColumnWidths(prev => ({
+        ...prev,
+        [columnName]: newWidth
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Cleanup dos event listeners
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleResizeMove);
-      document.removeEventListener('mouseup', handleResizeEnd);
-    };
-  }, [handleResizeMove, handleResizeEnd]);
-
+  // Export to CSV
   const exportToCSV = () => {
     const headers = [
-      'Eixo', 'Prioridade', 'Tema', 'Ação', 'Responsável', 
-      'Apoio', 'Status', 'Prazo', 'Atualização', 'Concluída'
+      "Eixo", "Prioridade", "Tema", "Ação", "Responsável", "Apoio", 
+      "Status", "Prazo", "Atualização", "Concluída"
     ];
-
+    
     const csvData = filteredActions.map(action => [
-      action.eixos?.nome || '',
-      action.prioridades_acao?.nome || '',
-      action.temas_acao?.nome || '',
-      action.acao || '',
-      action.responsavel?.nome || '',
-      action.apoio || '',
-      action.status_acao?.nome || '',
-      action.prazo ? format(new Date(action.prazo), 'dd/MM/yyyy') : '',
-      action.atualizacao || '',
-      action.concluida ? 'Sim' : 'Não'
+      action.eixos?.nome || "",
+      action.prioridades_acao?.nome || "",
+      action.temas_acao?.nome || "",
+      action.acao || "",
+      action.responsavel?.nome || "",
+      action.apoio?.nome || "",
+      action.status_acao?.nome || "",
+      action.prazo_conclusao ? format(new Date(action.prazo_conclusao), "dd/MM/yyyy") : "",
+      action.atualizacao || "",
+      action.concluida ? "Sim" : "Não"
     ]);
 
-    const csvContent = [headers, ...csvData]
-      .map(row => row.map(field => `"${field}"`).join(','))
-      .join('\n');
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `plano_acao_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    
-    toast.success('Arquivo CSV exportado com sucesso!');
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `plano-acao-${format(new Date(), "dd-MM-yyyy")}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast.success("Arquivo CSV exportado com sucesso!");
   };
-
-  // Se há erro, mostrar mensagem de erro
-  if (error) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <h2 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar dados</h2>
-            <p className="text-muted-foreground mb-4">{(error as Error)?.message || 'Erro desconhecido'}</p>
-            <Button onClick={() => window.location.reload()}>
-              Recarregar Página
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Target className="h-8 w-8" />
-            Plano de Ação
-          </h1>
-          <p className="text-muted-foreground">
-            Gerencie e acompanhe as ações estratégicas do gabinete
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Plano de Ação</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowEixosManager(true)}>
+              Gerenciar Eixos
+            </Button>
+            <Button variant="outline" onClick={() => setShowTemasManager(true)}>
+              Gerenciar Temas
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowEixosManager(true)}>
-            Gerenciar Eixos
-          </Button>
-          <Button variant="outline" onClick={() => setShowTemasManager(true)}>
-            Gerenciar Temas
-          </Button>
+
+        {/* Filtros */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar ações..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <Select value={eixoFilter} onValueChange={setEixoFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os eixos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os eixos</SelectItem>
+                  {eixos.map((eixo) => (
+                    <SelectItem key={eixo.id} value={eixo.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: eixo.cor }} />
+                        {eixo.nome}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as prioridades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as prioridades</SelectItem>
+                  {prioridades.map((prioridade) => (
+                    <SelectItem key={prioridade.id} value={prioridade.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: prioridade.cor }} />
+                        {prioridade.nome}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  {statusAcao.map((status) => (
+                    <SelectItem key={status.id} value={status.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.cor }} />
+                        {status.nome}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os responsáveis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os responsáveis</SelectItem>
+                  {usuarios.map((usuario) => (
+                    <SelectItem key={usuario.id} value={usuario.id}>
+                      {usuario.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as ações" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as ações</SelectItem>
+                  <SelectItem value="true">Concluídas</SelectItem>
+                  <SelectItem value="false">Em andamento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ações */}
+        <div className="flex flex-wrap gap-2">
           <ImportCSVDialogPlanoAcao
-            onFileSelect={handleFileSelect}
+            onFileSelect={() => {}}
             isImporting={isImporting}
             fileInputRef={fileInputRef}
             importResults={importResults}
@@ -628,72 +550,6 @@ export default function PlanoAcao() {
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
-          <Dialog open={isMaximized} onOpenChange={setIsMaximized}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Maximize className="h-4 w-4 mr-2" />
-                Maximizar Planilha
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
-              <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
-                <div className="flex items-start justify-between">
-                  <DialogTitle className="flex items-center gap-2">
-                    <Target className="h-6 w-6" />
-                    Plano de Ação - Visualização Maximizada
-                  </DialogTitle>
-                  <div className="mt-1 mr-8">
-                    <Button
-                      onClick={saveLayout}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar Layout
-                    </Button>
-                  </div>
-                </div>
-              </DialogHeader>
-              <div className="flex-1 overflow-hidden">
-                <div 
-                  className="h-full w-full overflow-auto"
-                  style={{
-                    scrollbarWidth: "thin",
-                    scrollbarColor: "hsl(var(--border)) transparent"
-                  }}
-                >
-                  <div className="p-6 pt-4">
-                    <PlanoAcaoTable
-                      filteredActions={filteredActions}
-                      isLoading={isLoading}
-                      columnWidths={columnWidths}
-                      editingCell={editingCell}
-                      editingValue={editingValue}
-                      hoveredRowIndex={hoveredRowIndex}
-                      eixos={eixos}
-                      prioridades={prioridades}
-                      temas={temas}
-                      statusAcao={statusAcao}
-                      usuarios={usuarios}
-                      handleDragEnd={handleDragEnd}
-                      handleToggleConcluida={handleToggleConcluida}
-                      handleQuickEdit={handleQuickEdit}
-                      handleCellEdit={handleCellEdit}
-                      handleCellSave={handleCellSave}
-                      handleCellCancel={handleCellCancel}
-                      setEditingValue={setEditingValue}
-                      setHoveredRowIndex={setHoveredRowIndex}
-                      handleInsertAction={handleInsertAction}
-                      deleteAction={deleteAction}
-                      updateAction={updateAction}
-                      handleResizeStart={handleResizeStart}
-                      isMaximized={true}
-                    />
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
           <Button onClick={() => setIsNewActionDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Ação
@@ -719,8 +575,8 @@ export default function PlanoAcao() {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Concluídas</p>
-                <p className="text-2xl font-bold text-green-600">{acoesConcluidas}</p>
+                <p className="text-sm font-medium text-muted-foreground">Ações Completas</p>
+                <p className="text-2xl font-bold text-green-600">{acoesCompletas}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
@@ -731,10 +587,10 @@ export default function PlanoAcao() {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Em Andamento</p>
-                <p className="text-2xl font-bold text-blue-600">{totalAcoes - acoesConcluidas}</p>
+                <p className="text-sm font-medium text-muted-foreground">Ações Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">{acoesAtrasadas}</p>
               </div>
-              <Target className="h-8 w-8 text-blue-600" />
+              <CalendarIcon className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -743,72 +599,16 @@ export default function PlanoAcao() {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">% Progresso</p>
-                <p className="text-2xl font-bold text-primary">{percentualConcluido}%</p>
+                <p className="text-sm font-medium text-muted-foreground">Progresso</p>
+                <p className="text-2xl font-bold">{progressoPercentual}%</p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary">{percentualConcluido}</span>
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <span className="text-xs font-bold">{progressoPercentual}%</span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar ações..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
-              />
-            </div>
-
-            <Select value={eixoFilter} onValueChange={setEixoFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por eixo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os eixos</SelectItem>
-                {eixos.map((eixo) => (
-                  <SelectItem key={eixo.id} value={eixo.id}>
-                    {eixo.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {statusAcao.map((status) => (
-                  <SelectItem key={status.id} value={status.id}>
-                    {status.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por situação" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="true">Concluídas</SelectItem>
-                <SelectItem value="false">Pendentes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Tabela com Scroll contido no Card */}
       <Card>
@@ -826,16 +626,83 @@ export default function PlanoAcao() {
             />
             <span className="text-sm text-muted-foreground">{tableHeight}px</span>
             
-            {/* Botão Salvar Layout */}
-            <Button
-              onClick={saveLayout}
-              variant="outline"
-              size="sm"
-              className="ml-4"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Salvar Layout
-            </Button>
+            {/* Botões Salvar Layout e Maximizar */}
+            <div className="flex items-center gap-2 ml-4">
+              <Button
+                onClick={saveLayout}
+                variant="outline"
+                size="sm"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Layout
+              </Button>
+              <Dialog open={isMaximized} onOpenChange={setIsMaximized}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Maximize className="h-4 w-4 mr-2" />
+                    Maximizar Planilha
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
+                  <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
+                    <div className="flex items-start justify-between">
+                      <DialogTitle className="flex items-center gap-2">
+                        <Target className="h-6 w-6" />
+                        Plano de Ação - Visualização Maximizada
+                      </DialogTitle>
+                      <div className="mt-1 mr-8">
+                        <Button
+                          onClick={saveLayout}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          Salvar Layout
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-hidden">
+                    <div 
+                      className="h-full w-full overflow-auto"
+                      style={{
+                        scrollbarWidth: "thin",
+                        scrollbarColor: "hsl(var(--border)) transparent"
+                      }}
+                    >
+                      <div className="p-6 pt-4">
+                        <PlanoAcaoTable
+                          filteredActions={filteredActions}
+                          isLoading={isLoading}
+                          columnWidths={columnWidths}
+                          editingCell={editingCell}
+                          editingValue={editingValue}
+                          hoveredRowIndex={hoveredRowIndex}
+                          eixos={eixos}
+                          prioridades={prioridades}
+                          temas={temas}
+                          statusAcao={statusAcao}
+                          usuarios={usuarios}
+                          handleDragEnd={handleDragEnd}
+                          handleToggleConcluida={handleToggleConcluida}
+                          handleQuickEdit={handleQuickEdit}
+                          handleCellEdit={handleCellEdit}
+                          handleCellSave={handleCellSave}
+                          handleCellCancel={handleCellCancel}
+                          setEditingValue={setEditingValue}
+                          setHoveredRowIndex={setHoveredRowIndex}
+                          handleInsertAction={handleInsertAction}
+                          deleteAction={deleteAction}
+                          updateAction={updateAction}
+                          handleResizeStart={handleResizeStart}
+                          isMaximized={true}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           
           {/* Container com scroll vertical sempre visível */}
