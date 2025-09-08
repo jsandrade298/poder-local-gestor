@@ -887,15 +887,16 @@ export default function PlanoAcao() {
                   </div>
                 </div>
                 
+                {/* Container do modal com scroll sempre visível */}
                 <div 
-                  className="h-full w-full planilha-scroll"
+                  className="flex-1 planilha-scroll"
                   style={{
                     scrollBehavior: 'auto',
-                    overscrollBehavior: 'contain'
+                    overscrollBehavior: 'contain',
+                    padding: '24px 24px 16px'
                   }}
                 >
-                  <div className="p-6 pt-4">
-                    <PlanoAcaoTable
+                  <PlanoAcaoTable
                       filteredActions={filteredActions}
                       isLoading={isLoading}
                       columnWidths={columnWidths}
@@ -921,7 +922,6 @@ export default function PlanoAcao() {
                       handleResizeStart={handleResizeStart}
                       isMaximized={true}
                     />
-                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -1114,17 +1114,14 @@ export default function PlanoAcao() {
           
           {/* Container com scroll vertical sempre visível */}
           <div 
-            className="relative bg-background border rounded-lg"
-            style={{ height: tableHeight }}
+            className="relative bg-background border rounded-lg planilha-scroll"
+            style={{ 
+              height: tableHeight,
+              scrollBehavior: 'auto',
+              overscrollBehavior: 'contain'
+            }}
           >
-            <div 
-              className="h-full planilha-scroll"
-              style={{ 
-                scrollBehavior: 'auto',
-                overscrollBehavior: 'contain'
-              }}
-            >
-              <PlanoAcaoTable
+            <PlanoAcaoTable
                 filteredActions={filteredActions}
                 isLoading={isLoading}
                 columnWidths={columnWidths}
@@ -1150,7 +1147,6 @@ export default function PlanoAcao() {
                 handleResizeStart={handleResizeStart}
                 isMaximized={false}
               />
-            </div>
           </div>
         </CardContent>
       </Card>
