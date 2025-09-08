@@ -630,6 +630,7 @@ export default function Demandas() {
         
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
         console.log(`📋 Separador detectado: "${separator}"`);
+        console.log(`📋 Total de colunas no header: ${headers.length}`);
 
         // Mapear colunas por posição fixa (A=0, B=1, C=2, etc.)
         const columnPositions = {
@@ -736,9 +737,25 @@ export default function Demandas() {
             v.replace(/^["']|["']$/g, '').trim()
           );
           
+          console.log(`🔍 Processando linha ${i + 1}:`, {
+            totalColunas: values.length,
+            titulo: values[0] || '(vazio)',
+            descricao: values[1] || '(vazio)',
+            municipe: values[2] || '(vazio)'
+          });
+          
+          // Verificar se há colunas suficientes
+          if (values.length < 15) {
+            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, esperado 15. Adicionando colunas vazias.`);
+            // Preencher com valores vazios até ter 15 colunas
+            while (values.length < 15) {
+              values.push('');
+            }
+          }
+          
           // Verificar se a linha tem dados válidos (título na coluna A)
-          if (!values[columnPositions.titulo]) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A`);
+          if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A - valor: "${values[columnPositions.titulo] || ''}"`);
             continue;
           }
           
@@ -748,6 +765,11 @@ export default function Demandas() {
           Object.keys(columnPositions).forEach(key => {
             const columnIndex = columnPositions[key as keyof typeof columnPositions];
             const value = values[columnIndex];
+            
+            // Debug específico para título e descrição
+            if (key === 'titulo' || key === 'descricao') {
+              console.log(`📝 Linha ${i + 1} - ${key} (col ${columnIndex}): "${value || '(vazio)'}"`);
+            }
             
             if (value && value.trim()) {
               
