@@ -600,8 +600,42 @@ export default function Demandas() {
       try {
         const csv = e.target?.result as string;
         
-        // Processar CSV respeitando quebras de linha dentro de aspas
-        const lines = [];
+        // Parser CSV mais robusto para lidar com aspas e quebras de linha
+        function parseCSVLine(line: string, separator: string): string[] {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          let quoteChar = '';
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+            
+            if (!inQuotes && (char === '"' || char === "'")) {
+              inQuotes = true;
+              quoteChar = char;
+            } else if (inQuotes && char === quoteChar) {
+              if (nextChar === quoteChar) {
+                current += char;
+                i++; // Skip next quote
+              } else {
+                inQuotes = false;
+                quoteChar = '';
+              }
+            } else if (!inQuotes && char === separator) {
+              result.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          
+          result.push(current.trim());
+          return result;
+        }
+
+        // Primeiro passo: dividir linhas respeitando aspas
+        const rawLines = [];
         let currentLine = '';
         let insideQuotes = false;
         let quoteChar = '';
@@ -615,10 +649,9 @@ export default function Demandas() {
             quoteChar = char;
             currentLine += char;
           } else if (char === quoteChar && insideQuotes) {
-            // Verificar se é uma aspas de escape (duas aspas seguidas)
             if (nextChar === quoteChar) {
               currentLine += char + nextChar;
-              i++; // Pular a próxima aspas
+              i++;
             } else {
               insideQuotes = false;
               quoteChar = '';
@@ -626,10 +659,9 @@ export default function Demandas() {
             }
           } else if ((char === '\n' || char === '\r') && !insideQuotes) {
             if (currentLine.trim()) {
-              lines.push(currentLine.trim());
+              rawLines.push(currentLine.trim());
             }
             currentLine = '';
-            // Pular \r\n se for Windows line ending
             if (char === '\r' && nextChar === '\n') {
               i++;
             }
@@ -638,10 +670,24 @@ export default function Demandas() {
           }
         }
         
-        // Adicionar última linha se houver
         if (currentLine.trim()) {
-          lines.push(currentLine.trim());
+          rawLines.push(currentLine.trim());
         }
+
+        // Filtrar linhas vazias ou inválidas
+        const lines = rawLines.filter(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return false;
+          
+          // Verificar se tem pelo menos um separador válido
+          const hasSeparator = trimmed.includes(';') || trimmed.includes(',');
+          if (!hasSeparator) {
+            console.warn(`⚠️ Linha descartada (sem separador): "${trimmed.substring(0, 50)}..."`);
+            return false;
+          }
+          
+          return true;
+        });
         
         console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
         
@@ -650,10 +696,14 @@ export default function Demandas() {
           return;
         }
 
-        // Detectar separador
+        // Detectar separador mais preciso
         const firstLine = lines[0];
-        const separator = firstLine.includes(';') ? ';' : ',';
-        const headers = firstLine.split(separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+        const semicolonCount = (firstLine.match(/;/g) || []).length;
+        const commaCount = (firstLine.match(/,/g) || []).length;
+        const separator = semicolonCount >= commaCount ? ';' : ',';
+        
+        // Usar parser robusto para o header
+        const headers = parseCSVLine(firstLine, separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
         
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
         console.log(`📋 Separador detectado: "${separator}"`);
@@ -764,7 +814,7 @@ export default function Demandas() {
           const line = lines[i];
           if (!line.trim()) continue;
           
-          const values = line.split(separator).map(v => 
+          const values = parseCSVLine(line, separator).map(v => 
             v.replace(/^["']|["']$/g, '').trim()
           );
           
