@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ interface PlanoAcaoTableProps {
   isMaximized?: boolean;
 }
 
-export function PlanoAcaoTable({
+export const PlanoAcaoTable = memo(function PlanoAcaoTable({
   filteredActions,
   isLoading,
   columnWidths,
@@ -67,17 +67,17 @@ export function PlanoAcaoTable({
   isMaximized = false
 }: PlanoAcaoTableProps) {
   
-  // Componente para inserção entre linhas
-  const InsertRow = ({ index }: { index: number }) => (
+  // Memoizar componente para inserção entre linhas
+  const InsertRow = memo(({ index }: { index: number }) => (
     <tr 
-      className="group cursor-pointer hover:bg-muted/50 transition-colors"
+      className="group cursor-pointer hover:bg-muted/50 transition-none"
       onMouseEnter={() => setHoveredRowIndex(index)}
       onMouseLeave={() => setHoveredRowIndex(null)}
       onClick={() => handleInsertAction(index)}
     >
       <td colSpan={12} className="p-2 text-center">
         <div className={cn(
-          "flex items-center justify-center gap-2 text-muted-foreground transition-all duration-200",
+          "flex items-center justify-center gap-2 text-muted-foreground",
           hoveredRowIndex === index ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         )}>
           <Plus className="h-4 w-4" />
@@ -85,12 +85,18 @@ export function PlanoAcaoTable({
         </div>
       </td>
     </tr>
+  ));
+
+  // Memoizar cálculos pesados
+  const tableMinWidth = useMemo(() => 
+    Object.values(columnWidths).reduce((a, b) => a + b, 80), 
+    [columnWidths]
   );
 
   return (
     <Table 
       className="relative w-full" 
-      style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}
+      style={{ minWidth: tableMinWidth, contain: 'layout style paint' }}
     >
       {/* Header fixo com backdrop blur */}
       <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
@@ -530,4 +536,4 @@ export function PlanoAcaoTable({
       </DragDropContext>
     </Table>
   );
-}
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -551,54 +551,58 @@ export default function PlanoAcao() {
     </tr>
   );
 
-  // Filtros aplicados
-  const filteredActions = planosAcao?.filter((action) => {
-    const matchesSearch = !searchTerm || 
-      action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.temas_acao?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      action.apoio?.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filtros aplicados com memoização para performance
+  const filteredActions = useMemo(() => {
+    if (!planosAcao) return [];
     
-    const matchesEixo = eixoFilter === "all" || action.eixo_id === eixoFilter;
-    const matchesStatus = statusFilter === "all" || action.status_id === statusFilter;
-    const matchesResponsavel = responsavelFilter === "all" || action.responsavel_id === responsavelFilter;
-    const matchesPrioridade = prioridadeFilter === "all" || action.prioridade_id === prioridadeFilter;
-    const matchesTema = temaFilter === "all" || action.tema_id === temaFilter;
-    const matchesConcluida = concluidaFilter === "all" || 
-      (concluidaFilter === "true" && action.concluida) || 
-      (concluidaFilter === "false" && !action.concluida);
+    return planosAcao.filter((action) => {
+      const matchesSearch = !searchTerm || 
+        action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        action.temas_acao?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        action.apoio?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesEixo = eixoFilter === "all" || action.eixo_id === eixoFilter;
+      const matchesStatus = statusFilter === "all" || action.status_id === statusFilter;
+      const matchesResponsavel = responsavelFilter === "all" || action.responsavel_id === responsavelFilter;
+      const matchesPrioridade = prioridadeFilter === "all" || action.prioridade_id === prioridadeFilter;
+      const matchesTema = temaFilter === "all" || action.tema_id === temaFilter;
+      const matchesConcluida = concluidaFilter === "all" || 
+        (concluidaFilter === "true" && action.concluida) || 
+        (concluidaFilter === "false" && !action.concluida);
 
-    return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesTema && matchesConcluida;
-  }) || [];
+      return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesTema && matchesConcluida;
+    });
+  }, [planosAcao, searchTerm, eixoFilter, statusFilter, responsavelFilter, prioridadeFilter, temaFilter, concluidaFilter]);
 
   // Calcular estatísticas
   const totalAcoes = filteredActions.length;
   const acoesConcluidas = filteredActions.filter(a => a.concluida).length;
   const percentualConcluido = totalAcoes > 0 ? Math.round((acoesConcluidas / totalAcoes) * 100) : 0;
 
-  // Funções auxiliares
-  const handleToggleConcluida = (action: any) => {
+  // Funções auxiliares otimizadas com useCallback
+  const handleToggleConcluida = useCallback((action: any) => {
     updateAction.mutate({
       id: action.id,
       updates: { concluida: !action.concluida }
     });
-  };
+  }, [updateAction]);
 
-  const handleQuickEdit = (action: any, field: string, value: any) => {
+  const handleQuickEdit = useCallback((action: any, field: string, value: any) => {
     const finalValue = field === 'responsavel_id' && value === 'none' ? null : value;
     
     updateAction.mutate({
       id: action.id,
       updates: { [field]: finalValue }
     });
-  };
+  }, [updateAction]);
 
-  const handleCellEdit = (actionId: string, field: string, currentValue: string) => {
+  const handleCellEdit = useCallback((actionId: string, field: string, currentValue: string) => {
     setEditingCell({ actionId, field });
     setEditingValue(currentValue || '');
-  };
+  }, []);
 
-  const handleCellSave = () => {
+  const handleCellSave = useCallback(() => {
     if (editingCell) {
       const action = filteredActions.find(a => a.id === editingCell.actionId);
       if (action) {
@@ -607,12 +611,12 @@ export default function PlanoAcao() {
       setEditingCell(null);
       setEditingValue('');
     }
-  };
+  }, [editingCell, editingValue, filteredActions, handleQuickEdit]);
 
-  const handleCellCancel = () => {
+  const handleCellCancel = useCallback(() => {
     setEditingCell(null);
     setEditingValue('');
-  };
+  }, []);
 
   // Funções para redimensionamento de colunas
   const handleResizeMove = useCallback((e: MouseEvent) => {
@@ -884,10 +888,10 @@ export default function PlanoAcao() {
                 </div>
                 
                 <div 
-                  className="h-full w-full overflow-auto"
+                  className="h-full w-full overflow-auto custom-scrollbar"
                   style={{
-                    scrollbarWidth: "thin",
-                    scrollbarColor: "hsl(var(--border)) transparent"
+                    scrollBehavior: 'auto',
+                    overscrollBehavior: 'contain'
                   }}
                 >
                   <div className="p-6 pt-4">
@@ -1117,7 +1121,9 @@ export default function PlanoAcao() {
               className="h-full custom-scrollbar"
               style={{ 
                 overflowY: 'scroll',
-                overflowX: 'auto'
+                overflowX: 'auto',
+                scrollBehavior: 'auto',
+                overscrollBehavior: 'contain'
               }}
             >
               <PlanoAcaoTable
