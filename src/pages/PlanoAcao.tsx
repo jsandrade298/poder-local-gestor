@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload, Save } from "lucide-react";
+import { Search, Trash2, Download, Plus, Calendar as CalendarIcon, CheckCircle, Target, GripVertical, GripHorizontal, Upload, Save, Maximize } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ export default function PlanoAcao() {
   });
   
   const [tableHeight, setTableHeight] = useState(600);
+  const [isMaximized, setIsMaximized] = useState(false);
   
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [startX, setStartX] = useState(0);
@@ -625,6 +627,182 @@ export default function PlanoAcao() {
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
+          <Dialog open={isMaximized} onOpenChange={setIsMaximized}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Maximize className="h-4 w-4 mr-2" />
+                Maximizar Planilha
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] w-[95vw] p-0">
+              <DialogHeader className="p-6 pb-0">
+                <DialogTitle className="flex items-center gap-2">
+                  <Target className="h-6 w-6" />
+                  Plano de Ação - Visualização Maximizada
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 p-6 pt-4">
+                {/* ... keep existing code (table content will be rendered here) */}
+                <div 
+                  className="relative bg-background border rounded-lg h-full"
+                  style={{ height: 'calc(100% - 2rem)' }}
+                >
+                  <div 
+                    className="h-full custom-scrollbar"
+                    style={{ 
+                      overflowY: 'scroll',
+                      overflowX: 'auto'
+                    }}
+                  >
+                    <Table 
+                      className="relative w-full" 
+                      style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}
+                    >
+                      {/* Header fixo com backdrop blur */}
+                      <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </TableHead>
+                        <TableHead className="w-12">
+                          <Checkbox />
+                        </TableHead>
+                        <TableHead style={{ width: columnWidths.eixo }}>Eixo</TableHead>
+                        <TableHead style={{ width: columnWidths.prioridade }}>Prioridade</TableHead>
+                        <TableHead style={{ width: columnWidths.tema }}>Tema</TableHead>
+                        <TableHead style={{ width: columnWidths.acao }}>Ação</TableHead>
+                        <TableHead style={{ width: columnWidths.responsavel }}>Responsável</TableHead>
+                        <TableHead style={{ width: columnWidths.apoio }}>Apoio</TableHead>
+                        <TableHead style={{ width: columnWidths.status }}>Status</TableHead>
+                        <TableHead style={{ width: columnWidths.prazo }}>Prazo</TableHead>
+                        <TableHead style={{ width: columnWidths.atualizacao }}>Atualização</TableHead>
+                        <TableHead style={{ width: columnWidths.excluir }}>Excluir</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={12} className="text-center py-8">
+                            Carregando...
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredActions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={12} className="text-center py-8">
+                            Nenhuma ação encontrada
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredActions.map((action, index) => (
+                          <TableRow 
+                            key={action.id}
+                            className={cn(action.concluida ? "opacity-60" : "")}
+                          >
+                            <TableCell className="w-12 p-2">
+                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                            </TableCell>
+                            <TableCell className="w-12 p-2">
+                              <Checkbox 
+                                checked={action.concluida}
+                                onCheckedChange={() => handleToggleConcluida(action)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {action.eixos && (
+                                <Badge 
+                                  variant="outline" 
+                                  style={{ 
+                                    backgroundColor: `${action.eixos.cor}15`,
+                                    borderColor: action.eixos.cor 
+                                  }}
+                                >
+                                  {action.eixos.nome}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {action.prioridades_acao && (
+                                <Badge 
+                                  variant="outline" 
+                                  style={{ 
+                                    backgroundColor: `${action.prioridades_acao.cor}15`,
+                                    borderColor: action.prioridades_acao.cor 
+                                  }}
+                                >
+                                  {action.prioridades_acao.nome}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {action.temas_acao?.nome}
+                            </TableCell>
+                            <TableCell className="max-w-[300px]">
+                              <div className="truncate" title={action.acao}>
+                                {action.acao}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {action.responsavel?.nome}
+                            </TableCell>
+                            <TableCell className="max-w-[200px]">
+                              <div className="truncate" title={action.apoio}>
+                                {action.apoio}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {action.status_acao && (
+                                <Badge 
+                                  variant="outline" 
+                                  style={{ 
+                                    backgroundColor: `${action.status_acao.cor}15`,
+                                    borderColor: action.status_acao.cor 
+                                  }}
+                                >
+                                  {action.status_acao.nome}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {action.prazo && format(new Date(action.prazo), 'dd/MM/yyyy')}
+                            </TableCell>
+                            <TableCell className="max-w-[300px]">
+                              <div className="truncate" title={action.atualizacao}>
+                                {action.atualizacao}
+                              </div>
+                            </TableCell>
+                            <TableCell className="w-20">
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button onClick={() => setIsNewActionDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Ação
