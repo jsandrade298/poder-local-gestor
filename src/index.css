@@ -125,10 +125,10 @@
   background: rgb(243 244 246);
 }
 
-/* Scroll customizado mais performático - SEMPRE VISÍVEL */
+/* Scroll customizado - SEMPRE FIXO E VISÍVEL */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
   scrollbar-gutter: stable both-edges;
   /* Performance otimizada */
   will-change: scroll-position;
@@ -136,28 +136,29 @@
   backface-visibility: hidden;
   contain: layout style paint;
   /* Força scroll sempre visível */
-  overflow-y: scroll !important;
+  overflow: auto !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-  /* Sempre visível */
+  width: 14px;
+  height: 14px;
+  /* Sempre visível e fixo */
   display: block !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
   background: hsl(var(--muted));
-  border-radius: 6px;
+  border-radius: 7px;
   /* Sempre visível */
   opacity: 1 !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border));
-  border-radius: 6px;
+  border-radius: 7px;
   border: 2px solid hsl(var(--muted));
-  min-height: 20px;
+  min-height: 30px;
+  min-width: 30px;
   /* Sempre visível */
   opacity: 1 !important;
 }
@@ -166,40 +167,70 @@
   background-color: hsl(var(--foreground) / 0.4);
 }
 
-/* Classe específica para planilha com scroll sempre visível */
-.planilha-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
-  scrollbar-gutter: stable both-edges;
-  overflow-y: scroll !important;
-  overflow-x: auto !important;
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: hsl(var(--muted));
 }
 
+/* Classe específica para planilha - SCROLL SEMPRE FIXO */
+.planilha-scroll {
+  /* Força overflow sempre ativo */
+  overflow-y: scroll !important;
+  overflow-x: auto !important;
+  /* Reserva espaço para scrollbar */
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
+  /* Performance */
+  will-change: scroll-position;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Firefox - força scrollbar sempre visível */
+@-moz-document url-prefix() {
+  .planilha-scroll {
+    scrollbar-width: thin !important;
+    overflow-y: scroll !important;
+  }
+}
+
+/* WebKit - força scrollbar sempre visível e fixa */
 .planilha-scroll::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 14px !important;
+  height: 14px !important;
+  /* Força exibição */
   display: block !important;
+  visibility: visible !important;
 }
 
 .planilha-scroll::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 6px;
-  margin: 4px;
+  background: hsl(var(--muted)) !important;
+  border-radius: 7px;
+  margin: 2px;
+  /* Força visibilidade */
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .planilha-scroll::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--border));
-  border-radius: 6px;
+  background-color: hsl(var(--border)) !important;
+  border-radius: 7px;
   border: 2px solid hsl(var(--muted));
-  min-height: 30px;
+  min-height: 40px !important;
+  min-width: 40px !important;
+  /* Força visibilidade */
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .planilha-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--foreground) / 0.4);
+  background-color: hsl(var(--foreground) / 0.5) !important;
 }
 
 .planilha-scroll::-webkit-scrollbar-corner {
-  background: hsl(var(--muted));
+  background: hsl(var(--muted)) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
   .dark {
