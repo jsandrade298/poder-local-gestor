@@ -600,27 +600,24 @@ export default function Demandas() {
       try {
         const csv = e.target?.result as string;
         
-        // Parser CSV mais robusto para lidar com aspas e quebras de linha
+        // Parser CSV robusto para lidar com campos multi-linha
         function parseCSVLine(line: string, separator: string): string[] {
           const result: string[] = [];
           let current = '';
           let inQuotes = false;
-          let quoteChar = '';
           
           for (let i = 0; i < line.length; i++) {
             const char = line[i];
             const nextChar = line[i + 1];
             
-            if (!inQuotes && (char === '"' || char === "'")) {
+            if (!inQuotes && char === '"') {
               inQuotes = true;
-              quoteChar = char;
-            } else if (inQuotes && char === quoteChar) {
-              if (nextChar === quoteChar) {
-                current += char;
+            } else if (inQuotes && char === '"') {
+              if (nextChar === '"') {
+                current += '"';
                 i++; // Skip next quote
               } else {
                 inQuotes = false;
-                quoteChar = '';
               }
             } else if (!inQuotes && char === separator) {
               result.push(current.trim());
@@ -630,7 +627,14 @@ export default function Demandas() {
             }
           }
           
+          // Adicionar último campo
           result.push(current.trim());
+          
+          // Garantir que temos pelo menos 15 campos
+          while (result.length < 15) {
+            result.push('');
+          }
+          
           return result;
         }
 
@@ -835,40 +839,34 @@ export default function Demandas() {
             }
           }
           
-          // Auto-detecção de deslocamento de colunas quando título está vazio
-          let adjustedPositions = { ...columnPositions };
-          
-          if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
-            // Verificar se a descrição parece ser um nome (indicativo de deslocamento)
-            const possibleName = values[columnPositions.descricao]?.trim();
-            const possibleDesc = values[columnPositions.municipe_nome]?.trim();
-            
-            if (possibleName && possibleName.includes(' ') && possibleName.length < 100) {
-              console.warn(`🔄 Linha ${i + 1}: Detectado deslocamento - ajustando posições das colunas`);
-              console.log(`   Original: titulo="${values[0]}" | desc="${values[1]}" | municipe="${values[2]}"`);
-              
-              // Ajustar todas as posições uma coluna para frente
-              Object.keys(adjustedPositions).forEach(key => {
-                if (adjustedPositions[key] < values.length - 1) {
-                  adjustedPositions[key] += 1;
-                }
-              });
-              
-              console.log(`   Ajustado: titulo="${values[adjustedPositions.titulo]}" | desc="${values[adjustedPositions.descricao]}" | municipe="${values[adjustedPositions.municipe_nome]}"`);
-            } else {
-              console.log(`⚠️ Linha ${i + 1} ignorada: sem título válido - valor: "${values[columnPositions.titulo] || ''}"`, {
-                linha_completa: line,
-                valores_separados: values
-              });
-              continue;
-            }
+          // Validar se a linha tem dados mínimos válidos
+          const titulo = values[columnPositions.titulo]?.trim();
+          const descricao = values[columnPositions.descricao]?.trim();
+          const municipe = values[columnPositions.municipe_nome]?.trim();
+
+          // Pular linhas que parecem ser cabeçalhos repetidos ou dados mal formatados
+          if (!titulo || titulo.length > 500) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: título inválido ou muito longo`);
+            continue;
+          }
+
+          // Se não tem descrição, usar o título como descrição
+          if (!descricao) {
+            values[columnPositions.descricao] = titulo;
+          }
+
+          // Detectar se a linha tem múltiplas demandas concatenadas (presença de múltiplos ";")
+          const semicolonCount = line.split(';').length - 1;
+          if (semicolonCount > 20) {
+            console.warn(`⚠️ Linha ${i + 1} parece ter múltiplas demandas concatenadas. Ignorando.`);
+            continue;
           }
           
           const demanda: any = { linha: i + 1 };
           
-          // Processar campos usando posições ajustadas
-          Object.keys(adjustedPositions).forEach(key => {
-            const columnIndex = adjustedPositions[key as keyof typeof adjustedPositions];
+          // Processar campos usando posições das colunas
+          Object.keys(columnPositions).forEach(key => {
+            const columnIndex = columnPositions[key as keyof typeof columnPositions];
             const value = values[columnIndex];
             
             // Debug específico para título e descrição
@@ -877,7 +875,6 @@ export default function Demandas() {
             }
             
             if (value && value.trim()) {
-              
               if (key === 'municipe_nome') {
                 demanda.municipe_nome_original = value;
                 const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -939,6 +936,11 @@ export default function Demandas() {
               } else {
                 demanda[key] = value;
               }
+            } else {
+              // Usar null para valores vazios
+              if (key !== 'titulo' && key !== 'descricao' && key !== 'municipe_nome') {
+                demanda[key] = null;
+              }
             }
           });
           
@@ -955,6 +957,20 @@ export default function Demandas() {
           }
           
           demandasComDados.push(demanda);
+        }
+
+        // Adicionar log de diagnóstico melhorado
+        console.log(`📊 Resumo do processamento CSV:`);
+        console.log(`   Total de linhas no arquivo: ${lines.length}`);
+        console.log(`   Linhas válidas processadas: ${demandasComDados.length}`);
+        console.log(`   Linhas ignoradas: ${lines.length - demandasComDados.length - 1}`); // -1 para o header
+        console.log(`   Munícipes não encontrados: ${municipesNaoEncontrados.size}`);
+
+        // Mostrar exemplos de linhas ignoradas
+        if (lines.length - demandasComDados.length > 10) {
+          console.warn(`⚠️ Muitas linhas foram ignoradas. Verifique se o CSV está no formato correto.`);
+          console.warn(`   Formato esperado: 15 colunas separadas por ponto-vírgula`);
+          console.warn(`   Colunas: titulo;descricao;municipe_nome;area_nome;responsavel_nome;status;prioridade;logradouro;numero;bairro;cidade;cep;complemento;data_prazo;observacoes`);
         }
 
         console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
