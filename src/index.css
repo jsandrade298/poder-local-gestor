@@ -136,39 +136,52 @@
   backface-visibility: hidden;
 }
 
-/* Firefox */
+/* Firefox - thumb bem visível */
 .planilha-container {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--foreground) / 0.6) hsl(var(--muted));
+  scrollbar-width: auto !important;
+  scrollbar-color: hsl(var(--foreground) / 0.7) hsl(var(--muted)) !important;
 }
 
-/* WebKit (Chrome, Safari, Edge) - Scrollbars sempre visíveis com cores mais escuras */
+/* WebKit (Chrome, Safari, Edge) - Thumb SEMPRE VISÍVEL e bem destacado */
 .planilha-container::-webkit-scrollbar {
-  width: 16px !important;
-  height: 16px !important;
-  background: hsl(var(--muted));
+  width: 18px !important;
+  height: 18px !important;
+  background: hsl(var(--muted)) !important;
 }
 
 .planilha-container::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 8px;
-  border: 2px solid hsl(var(--background));
+  background: hsl(var(--muted)) !important;
+  border-radius: 9px;
+  border: 1px solid hsl(var(--border));
+  box-shadow: inset 0 0 3px hsl(var(--border));
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
-  background: hsl(var(--foreground) / 0.4);
-  border-radius: 8px;
-  border: 3px solid hsl(var(--muted));
-  min-height: 40px;
-  min-width: 40px;
+  background: hsl(var(--foreground) / 0.6) !important;
+  border-radius: 9px;
+  border: 2px solid hsl(var(--muted));
+  min-height: 50px !important;
+  min-width: 50px !important;
+  /* Força visibilidade com sombra */
+  box-shadow: 0 0 4px hsl(var(--foreground) / 0.3);
+  /* Sempre visível */
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--foreground) / 0.6);
+  background: hsl(var(--foreground) / 0.8) !important;
+  box-shadow: 0 0 6px hsl(var(--foreground) / 0.4);
+}
+
+.planilha-container::-webkit-scrollbar-thumb:active {
+  background: hsl(var(--foreground) / 0.9) !important;
 }
 
 .planilha-container::-webkit-scrollbar-corner {
-  background: hsl(var(--muted));
+  background: hsl(var(--muted)) !important;
+  border: 1px solid hsl(var(--border));
 }
 
 /* Remove scrolls internos da tabela */
