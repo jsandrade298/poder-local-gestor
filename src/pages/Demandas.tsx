@@ -835,20 +835,40 @@ export default function Demandas() {
             }
           }
           
-          // Verificar se a linha tem dados válidos (título na coluna A)
+          // Auto-detecção de deslocamento de colunas quando título está vazio
+          let adjustedPositions = { ...columnPositions };
+          
           if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A - valor: "${values[columnPositions.titulo] || ''}"`, {
-              linha_completa: line,
-              valores_separados: values
-            });
-            continue;
+            // Verificar se a descrição parece ser um nome (indicativo de deslocamento)
+            const possibleName = values[columnPositions.descricao]?.trim();
+            const possibleDesc = values[columnPositions.municipe_nome]?.trim();
+            
+            if (possibleName && possibleName.includes(' ') && possibleName.length < 100) {
+              console.warn(`🔄 Linha ${i + 1}: Detectado deslocamento - ajustando posições das colunas`);
+              console.log(`   Original: titulo="${values[0]}" | desc="${values[1]}" | municipe="${values[2]}"`);
+              
+              // Ajustar todas as posições uma coluna para frente
+              Object.keys(adjustedPositions).forEach(key => {
+                if (adjustedPositions[key] < values.length - 1) {
+                  adjustedPositions[key] += 1;
+                }
+              });
+              
+              console.log(`   Ajustado: titulo="${values[adjustedPositions.titulo]}" | desc="${values[adjustedPositions.descricao]}" | municipe="${values[adjustedPositions.municipe_nome]}"`);
+            } else {
+              console.log(`⚠️ Linha ${i + 1} ignorada: sem título válido - valor: "${values[columnPositions.titulo] || ''}"`, {
+                linha_completa: line,
+                valores_separados: values
+              });
+              continue;
+            }
           }
           
           const demanda: any = { linha: i + 1 };
           
-          // Processar campos usando posições fixas
-          Object.keys(columnPositions).forEach(key => {
-            const columnIndex = columnPositions[key as keyof typeof columnPositions];
+          // Processar campos usando posições ajustadas
+          Object.keys(adjustedPositions).forEach(key => {
+            const columnIndex = adjustedPositions[key as keyof typeof adjustedPositions];
             const value = values[columnIndex];
             
             // Debug específico para título e descrição
