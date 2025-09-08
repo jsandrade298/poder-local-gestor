@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Save, Building, Users, Settings } from "lucide-react";
+import { Save, Building, Users, Settings, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import { ConfigurarEvolutionDialog } from "@/components/forms/ConfigurarEvolutionDialog";
+import { ConfiguracoesAvancadasDialog } from "@/components/forms/ConfiguracoesAvancadasDialog";
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -179,10 +180,19 @@ export default function Configuracoes() {
           </p>
         </div>
         
-        <Button onClick={handleSave} disabled={saveConfigMutation.isPending || isLoadingConfigs}>
-          <Save className="h-4 w-4 mr-2" />
-          {saveConfigMutation.isPending ? "Salvando..." : "Salvar Configurações"}
-        </Button>
+        <div className="flex gap-2">
+          <ConfiguracoesAvancadasDialog>
+            <Button variant="outline">
+              <Shield className="h-4 w-4 mr-2" />
+              Configurações Avançadas
+            </Button>
+          </ConfiguracoesAvancadasDialog>
+          
+          <Button onClick={handleSave} disabled={saveConfigMutation.isPending || isLoadingConfigs}>
+            <Save className="h-4 w-4 mr-2" />
+            {saveConfigMutation.isPending ? "Salvando..." : "Salvar Configurações"}
+          </Button>
+        </div>
       </div>
 
       {/* Status do Sistema */}
