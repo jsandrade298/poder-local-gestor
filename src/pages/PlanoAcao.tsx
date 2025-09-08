@@ -887,17 +887,19 @@ export default function PlanoAcao() {
                   </div>
                 </div>
                 
-                {/* Container do modal com scroll sempre visível e fixo */}
+                {/* Container do modal com scroll FIXO na borda */}
                 <div 
                   className="planilha-scroll"
                   style={{
                     flex: 1,
                     minHeight: 0,
-                    maxHeight: 'calc(98vh - 200px)',
-                    padding: '24px'
+                    overflow: 'auto',
+                    position: 'relative'
                   }}
                 >
-                  <PlanoAcaoTable
+                  {/* Conteúdo da tabela SEM scroll próprio */}
+                  <div className="p-6">
+                    <PlanoAcaoTable
                       filteredActions={filteredActions}
                       isLoading={isLoading}
                       columnWidths={columnWidths}
@@ -922,7 +924,8 @@ export default function PlanoAcao() {
                       updateAction={updateAction}
                       handleResizeStart={handleResizeStart}
                       isMaximized={true}
-                    />
+                      />
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -1113,17 +1116,19 @@ export default function PlanoAcao() {
             </Button>
           </div>
           
-          {/* Container com scroll vertical sempre visível */}
+          {/* Container com scroll vertical FIXO na borda */}
           <div 
             className="planilha-scroll bg-background border rounded-lg"
             style={{ 
               height: `${tableHeight}px`,
               maxHeight: `${tableHeight}px`,
-              minHeight: `${tableHeight}px`,
-              position: 'relative'
+              position: 'relative',
+              overflow: 'auto'
             }}
           >
-            <PlanoAcaoTable
+            {/* Conteúdo da tabela SEM scroll próprio */}
+            <div className="w-full h-auto">
+              <PlanoAcaoTable
                 filteredActions={filteredActions}
                 isLoading={isLoading}
                 columnWidths={columnWidths}
@@ -1148,7 +1153,8 @@ export default function PlanoAcao() {
                 updateAction={updateAction}
                 handleResizeStart={handleResizeStart}
                 isMaximized={false}
-              />
+                />
+            </div>
           </div>
         </CardContent>
       </Card>
