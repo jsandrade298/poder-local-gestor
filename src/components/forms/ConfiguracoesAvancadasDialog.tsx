@@ -32,7 +32,15 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
       anon_key: "",
       service_role_key: ""
     },
-    evolution: {
+    evolution_1: {
+      api_url: "",
+      api_key: ""
+    },
+    evolution_2: {
+      api_url: "",
+      api_key: ""
+    },
+    evolution_3: {
       api_url: "",
       api_key: ""
     },
@@ -50,7 +58,9 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
         .select('*')
         .in('chave', [
           'supabase.url', 'supabase.anon_key', 'supabase.service_role_key',
-          'evolution.api_url', 'evolution.api_key',
+          'evolution_1.api_url', 'evolution_1.api_key',
+          'evolution_2.api_url', 'evolution_2.api_key',
+          'evolution_3.api_url', 'evolution_3.api_key',
           'openai.api_key'
         ]);
       
@@ -135,9 +145,17 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
         anon_key: "Chave pública do Supabase (anon)",
         service_role_key: "Chave de serviço do Supabase (service_role)"
       },
-      evolution: {
-        api_url: "URL da API Evolution",
-        api_key: "Chave da API Evolution"
+      evolution_1: {
+        api_url: "URL da API Evolution - Instância 1 (gabinete-whats-1)",
+        api_key: "Chave da API Evolution - Instância 1"
+      },
+      evolution_2: {
+        api_url: "URL da API Evolution - Instância 2 (gabinete-whats-2)",
+        api_key: "Chave da API Evolution - Instância 2"
+      },
+      evolution_3: {
+        api_url: "URL da API Evolution - Instância 3 (gabinete-whats-3)",
+        api_key: "Chave da API Evolution - Instância 3"
       },
       openai: {
         api_key: "Chave da API OpenAI/ChatGPT"
@@ -224,35 +242,105 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
             </CardContent>
           </Card>
 
-          {/* Configurações Evolution API */}
+          {/* Configurações Evolution API - Instância 1 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <MessageSquare className="h-5 w-5" />
-                Evolution API (WhatsApp)
+                Evolution API - Instância 1 (gabinete-whats-1)
               </CardTitle>
               <CardDescription>
-                Configure a conexão com a API Evolution para WhatsApp independente
+                Configure a conexão com a API Evolution para a primeira instância do WhatsApp
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="evolution_url">URL da API</Label>
+                <Label htmlFor="evolution_1_url">URL da API</Label>
                 <Input
-                  id="evolution_url"
-                  value={config.evolution.api_url}
-                  onChange={(e) => handleInputChange('evolution', 'api_url', e.target.value)}
+                  id="evolution_1_url"
+                  value={config.evolution_1.api_url}
+                  onChange={(e) => handleInputChange('evolution_1', 'api_url', e.target.value)}
                   placeholder="https://evolution-api.exemplo.com"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="evolution_key">Chave da API</Label>
+                <Label htmlFor="evolution_1_key">Chave da API</Label>
                 <Input
-                  id="evolution_key"
+                  id="evolution_1_key"
                   type="password"
-                  value={config.evolution.api_key}
-                  onChange={(e) => handleInputChange('evolution', 'api_key', e.target.value)}
+                  value={config.evolution_1.api_key}
+                  onChange={(e) => handleInputChange('evolution_1', 'api_key', e.target.value)}
+                  placeholder="sua-chave-da-evolution-api"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Configurações Evolution API - Instância 2 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageSquare className="h-5 w-5" />
+                Evolution API - Instância 2 (gabinete-whats-2)
+              </CardTitle>
+              <CardDescription>
+                Configure a conexão com a API Evolution para a segunda instância do WhatsApp
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="evolution_2_url">URL da API</Label>
+                <Input
+                  id="evolution_2_url"
+                  value={config.evolution_2.api_url}
+                  onChange={(e) => handleInputChange('evolution_2', 'api_url', e.target.value)}
+                  placeholder="https://evolution-api.exemplo.com"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="evolution_2_key">Chave da API</Label>
+                <Input
+                  id="evolution_2_key"
+                  type="password"
+                  value={config.evolution_2.api_key}
+                  onChange={(e) => handleInputChange('evolution_2', 'api_key', e.target.value)}
+                  placeholder="sua-chave-da-evolution-api"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Configurações Evolution API - Instância 3 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageSquare className="h-5 w-5" />
+                Evolution API - Instância 3 (gabinete-whats-3)
+              </CardTitle>
+              <CardDescription>
+                Configure a conexão com a API Evolution para a terceira instância do WhatsApp
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="evolution_3_url">URL da API</Label>
+                <Input
+                  id="evolution_3_url"
+                  value={config.evolution_3.api_url}
+                  onChange={(e) => handleInputChange('evolution_3', 'api_url', e.target.value)}
+                  placeholder="https://evolution-api.exemplo.com"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="evolution_3_key">Chave da API</Label>
+                <Input
+                  id="evolution_3_key"
+                  type="password"
+                  value={config.evolution_3.api_key}
+                  onChange={(e) => handleInputChange('evolution_3', 'api_key', e.target.value)}
                   placeholder="sua-chave-da-evolution-api"
                 />
               </div>
