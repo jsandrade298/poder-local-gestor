@@ -5,12 +5,18 @@ import { createClient } from '@supabase/supabase-js';
 const DEFAULT_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Cliente inicial para buscar configurações
-const initialClient = createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_PUBLISHABLE_KEY);
-
 // Cache das configurações
 let configCache: { url?: string; key?: string } | null = null;
 let dynamicClient: any = null;
+
+// Cliente inicial para buscar configurações (usando configurações padrão)
+const initialClient = createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 
 // Função para buscar configurações do banco
 async function getConfig() {
@@ -54,36 +60,43 @@ async function getDynamicClient() {
   
   const config = await getConfig();
   
-  dynamicClient = createClient(config.url!, config.key!, {
-    auth: {
-      storage: localStorage,
-      persistSession: true,
-      autoRefreshToken: true,
-    }
-  });
+  // Se as configurações são diferentes das padrão, criar novo cliente
+  if (config.url !== DEFAULT_SUPABASE_URL || config.key !== DEFAULT_SUPABASE_PUBLISHABLE_KEY) {
+    dynamicClient = createClient(config.url!, config.key!, {
+      auth: {
+        storage: localStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+      }
+    });
+  } else {
+    // Usar cliente inicial se configurações são padrão
+    dynamicClient = initialClient;
+  }
   
   return dynamicClient;
 }
 
-// Proxy para o cliente Supabase que usa configurações dinâmicas
-export const supabase = new Proxy({} as any, {
-  get(target, prop) {
-    if (typeof prop === 'string') {
-      return async (...args: any[]) => {
-        const client = await getDynamicClient();
-        const method = client[prop];
-        if (typeof method === 'function') {
-          return method.apply(client, args);
-        }
-        return method;
-      };
-    }
-    return undefined;
+// Exportar cliente - inicialmente usa o padrão, mas pode ser atualizado
+export let supabase = initialClient;
+
+// Função para inicializar o cliente com configurações dinâmicas
+export const initializeSupabaseClient = async () => {
+  try {
+    const client = await getDynamicClient();
+    // @ts-ignore - Substituindo a referência do cliente
+    supabase = client;
+    return client;
+  } catch (error) {
+    console.log('Erro ao inicializar cliente dinâmico, usando padrão');
+    return initialClient;
   }
-});
+};
 
 // Função para resetar o cache (útil quando configurações são atualizadas)
 export const resetSupabaseConfig = () => {
   configCache = null;
   dynamicClient = null;
+  // Reinicializar cliente
+  initializeSupabaseClient();
 };
