@@ -105,11 +105,16 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['configuracoes-avancadas'] });
+      
+      // Reset do cache do cliente Supabase para usar novas configurações
+      const { resetSupabaseConfig } = await import("@/integrations/supabase/client");
+      resetSupabaseConfig();
+      
       toast({
         title: "Configurações salvas",
-        description: "As configurações avançadas foram atualizadas com sucesso.",
+        description: "As configurações foram atualizadas. Recarregue a página para aplicar as mudanças.",
       });
       setOpen(false);
     },
