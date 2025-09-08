@@ -631,8 +631,12 @@ export default function Demandas() {
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
         console.log(`📋 Separador detectado: "${separator}"`);
         console.log(`📋 Total de colunas no header: ${headers.length}`);
-
-        // Mapear colunas por posição fixa (A=0, B=1, C=2, etc.)
+        
+        // Verificar se temos a estrutura básica esperada
+        if (headers.length < 3) {
+          toast.error("CSV deve ter pelo menos 3 colunas (Título, Descrição, Munícipe)");
+          return;
+        }
         const columnPositions = {
           titulo: 0,        // Coluna A
           descricao: 1,     // Coluna B  
@@ -741,7 +745,8 @@ export default function Demandas() {
             totalColunas: values.length,
             titulo: values[0] || '(vazio)',
             descricao: values[1] || '(vazio)',
-            municipe: values[2] || '(vazio)'
+            municipe: values[2] || '(vazio)',
+            raw_line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
           });
           
           // Verificar se há colunas suficientes
@@ -755,7 +760,10 @@ export default function Demandas() {
           
           // Verificar se a linha tem dados válidos (título na coluna A)
           if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A - valor: "${values[columnPositions.titulo] || ''}"`);
+            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A - valor: "${values[columnPositions.titulo] || ''}"`, {
+              linha_completa: line,
+              valores_separados: values
+            });
             continue;
           }
           
@@ -835,6 +843,13 @@ export default function Demandas() {
                 demanda[key] = value;
               }
             }
+          });
+          
+          // Validação final antes de adicionar
+          console.log(`✅ Linha ${i + 1} processada:`, {
+            titulo: demanda.titulo,
+            descricao: demanda.descricao,
+            municipe: demanda.municipe_nome_original
           });
           
           // Adicionar descrição padrão se não existir
