@@ -879,6 +879,13 @@ export default function Demandas() {
             }
           }
           
+          // Debug específico das posições dos campos
+          console.log(`🗺️ Linha ${i + 1} - Mapeamento de colunas:`, {
+            titulo: `posição ${columnPositions.titulo} = "${values[columnPositions.titulo] || '(vazio)'}"`,
+            municipe_nome: `posição ${columnPositions.municipe_nome} = "${values[columnPositions.municipe_nome] || '(vazio)'}"`,
+            descricao: `posição ${columnPositions.descricao || -1} = "${values[columnPositions.descricao] || '(vazio)'}"`
+          });
+          
           // Verificar campos obrigatórios na posição correta
           const titulo = values[columnPositions.titulo]?.trim();
           const municipeNome = values[columnPositions.municipe_nome]?.trim();
