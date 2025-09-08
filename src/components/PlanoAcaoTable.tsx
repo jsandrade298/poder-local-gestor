@@ -374,14 +374,14 @@ export function PlanoAcaoTable({
                                    placeholder="Digite o responsável..."
                                  />
                                ) : (
-                                 <div 
-                                   className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
-                                   style={{ maxWidth: columnWidths.responsavel - 20 }}
-                                   onClick={() => handleCellEdit(action.id, 'responsavel', action.responsavel || '')}
-                                   title={action.responsavel}
-                                 >
-                                   {action.responsavel || 'Clique para editar'}
-                                 </div>
+                                  <div 
+                                    className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
+                                    style={{ maxWidth: columnWidths.responsavel - 20 }}
+                                    onClick={() => handleCellEdit(action.id, 'responsavel', action.responsavel?.nome || '')}
+                                    title={action.responsavel?.nome}
+                                  >
+                                    {action.responsavel?.nome || 'Clique para editar'}
+                                  </div>
                                )}
                              </TableCell>
 
