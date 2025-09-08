@@ -83,11 +83,11 @@ export default function Kanban() {
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
-      const demandasIds = demandas.map(d => d.id);
+      // Limpa TODAS as demandas do kanban, não apenas as que estão visíveis
       const { error } = await supabase
         .from('demandas')
         .update({ kanban_position: 'a_fazer' })
-        .in('id', demandasIds);
+        .in('kanban_position', ['em_progresso', 'feito']); // Move apenas as que estão em progresso ou feitas
       
       if (error) throw error;
     },
