@@ -23,6 +23,7 @@ import { EixosManagerDialog } from "@/components/forms/EixosManagerDialog";
 import { TemasManagerDialog } from "@/components/forms/TemasManagerDialog";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { ImportCSVDialogPlanoAcao } from "@/components/forms/ImportCSVDialogPlanoAcao";
+import { PlanoAcaoTable } from "@/components/PlanoAcaoTable";
 
 export default function PlanoAcao() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -634,170 +635,45 @@ export default function PlanoAcao() {
                 Maximizar Planilha
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] w-[95vw] p-0">
-              <DialogHeader className="p-6 pb-0">
+            <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
+              <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="flex items-center gap-2">
                   <Target className="h-6 w-6" />
                   Plano de Ação - Visualização Maximizada
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 p-6 pt-4">
-                {/* ... keep existing code (table content will be rendered here) */}
+              <div className="flex-1 overflow-hidden p-6 pt-0">
                 <div 
-                  className="relative bg-background border rounded-lg h-full"
-                  style={{ height: 'calc(100% - 2rem)' }}
+                  className="relative bg-background border rounded-lg h-full overflow-hidden"
                 >
                   <div 
-                    className="h-full custom-scrollbar"
-                    style={{ 
-                      overflowY: 'scroll',
-                      overflowX: 'auto'
-                    }}
+                    className="h-full overflow-auto"
                   >
-                    <Table 
-                      className="relative w-full" 
-                      style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}
-                    >
-                      {/* Header fixo com backdrop blur */}
-                      <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
-                        </TableHead>
-                        <TableHead className="w-12">
-                          <Checkbox />
-                        </TableHead>
-                        <TableHead style={{ width: columnWidths.eixo }}>Eixo</TableHead>
-                        <TableHead style={{ width: columnWidths.prioridade }}>Prioridade</TableHead>
-                        <TableHead style={{ width: columnWidths.tema }}>Tema</TableHead>
-                        <TableHead style={{ width: columnWidths.acao }}>Ação</TableHead>
-                        <TableHead style={{ width: columnWidths.responsavel }}>Responsável</TableHead>
-                        <TableHead style={{ width: columnWidths.apoio }}>Apoio</TableHead>
-                        <TableHead style={{ width: columnWidths.status }}>Status</TableHead>
-                        <TableHead style={{ width: columnWidths.prazo }}>Prazo</TableHead>
-                        <TableHead style={{ width: columnWidths.atualizacao }}>Atualização</TableHead>
-                        <TableHead style={{ width: columnWidths.excluir }}>Excluir</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={12} className="text-center py-8">
-                            Carregando...
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredActions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={12} className="text-center py-8">
-                            Nenhuma ação encontrada
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredActions.map((action, index) => (
-                          <TableRow 
-                            key={action.id}
-                            className={cn(action.concluida ? "opacity-60" : "")}
-                          >
-                            <TableCell className="w-12 p-2">
-                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                            </TableCell>
-                            <TableCell className="w-12 p-2">
-                              <Checkbox 
-                                checked={action.concluida}
-                                onCheckedChange={() => handleToggleConcluida(action)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {action.eixos && (
-                                <Badge 
-                                  variant="outline" 
-                                  style={{ 
-                                    backgroundColor: `${action.eixos.cor}15`,
-                                    borderColor: action.eixos.cor 
-                                  }}
-                                >
-                                  {action.eixos.nome}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {action.prioridades_acao && (
-                                <Badge 
-                                  variant="outline" 
-                                  style={{ 
-                                    backgroundColor: `${action.prioridades_acao.cor}15`,
-                                    borderColor: action.prioridades_acao.cor 
-                                  }}
-                                >
-                                  {action.prioridades_acao.nome}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {action.temas_acao?.nome}
-                            </TableCell>
-                            <TableCell className="max-w-[300px]">
-                              <div className="truncate" title={action.acao}>
-                                {action.acao}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {action.responsavel?.nome}
-                            </TableCell>
-                            <TableCell className="max-w-[200px]">
-                              <div className="truncate" title={action.apoio}>
-                                {action.apoio}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {action.status_acao && (
-                                <Badge 
-                                  variant="outline" 
-                                  style={{ 
-                                    backgroundColor: `${action.status_acao.cor}15`,
-                                    borderColor: action.status_acao.cor 
-                                  }}
-                                >
-                                  {action.status_acao.nome}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {action.prazo && format(new Date(action.prazo), 'dd/MM/yyyy')}
-                            </TableCell>
-                            <TableCell className="max-w-[300px]">
-                              <div className="truncate" title={action.atualizacao}>
-                                {action.atualizacao}
-                              </div>
-                            </TableCell>
-                            <TableCell className="w-20">
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                    </Table>
+                    <PlanoAcaoTable
+                      filteredActions={filteredActions}
+                      isLoading={isLoading}
+                      columnWidths={columnWidths}
+                      editingCell={editingCell}
+                      editingValue={editingValue}
+                      hoveredRowIndex={hoveredRowIndex}
+                      eixos={eixos}
+                      prioridades={prioridades}
+                      temas={temas}
+                      statusAcao={statusAcao}
+                      usuarios={usuarios}
+                      handleDragEnd={handleDragEnd}
+                      handleToggleConcluida={handleToggleConcluida}
+                      handleQuickEdit={handleQuickEdit}
+                      handleCellEdit={handleCellEdit}
+                      handleCellSave={handleCellSave}
+                      handleCellCancel={handleCellCancel}
+                      setEditingValue={setEditingValue}
+                      setHoveredRowIndex={setHoveredRowIndex}
+                      handleInsertAction={handleInsertAction}
+                      deleteAction={deleteAction}
+                      updateAction={updateAction}
+                      isMaximized={true}
+                    />
                   </div>
                 </div>
               </div>
@@ -959,481 +835,69 @@ export default function PlanoAcao() {
                 overflowX: 'auto'
               }}
             >
-              <Table 
-                className="relative w-full" 
-                style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 80) }}
-              >
-                {/* Header fixo com backdrop blur */}
-                <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
-                <TableRow>
-                  <TableHead className="w-12">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                  </TableHead>
-                  <TableHead className="w-12">
-                    <Checkbox />
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.eixo }} className="relative">
-                    Eixo
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('eixo', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.prioridade }} className="relative">
-                    Prioridade
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('prioridade', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.tema }} className="relative">
-                    Tema
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('tema', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.acao }} className="relative">
-                    Ação
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('acao', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.responsavel }} className="relative">
-                    Responsável
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('responsavel', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.apoio }} className="relative">
-                    Apoio
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('apoio', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.status }} className="relative">
-                    Status
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('status', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.prazo }} className="relative">
-                    Prazo
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('prazo', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.atualizacao }} className="relative">
-                    Atualização
-                    <div 
-                      className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
-                      onMouseDown={(e) => handleResizeStart('atualizacao', e)}
-                    >
-                      <GripHorizontal className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
-                    </div>
-                  </TableHead>
-                  <TableHead style={{ width: columnWidths.excluir }}>
-                    Excluir
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="actions-table">
-                  {(provided) => (
-                    <TableBody {...provided.droppableProps} ref={provided.innerRef}>
-                      {isLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={12} className="text-center py-8">
-                            Carregando...
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredActions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={12} className="text-center py-8">
-                            Nenhuma ação encontrada
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          <InsertRow index={0} />
-                          {filteredActions.map((action, index) => (
-                            <React.Fragment key={action.id}>
-                              <Draggable draggableId={action.id} index={index}>
-                                {(provided, snapshot) => (
-                                  <TableRow 
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    className={cn(
-                                      action.concluida ? "opacity-60" : "",
-                                      snapshot.isDragging && "shadow-lg bg-background"
-                                    )}
-                                  >
-                                     {/* Handle de drag */}
-                                     <TableCell className="w-12 p-2">
-                                       <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                                         <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                       </div>
-                                     </TableCell>
-                                     
-                                     {/* Checkbox */}
-                                     <TableCell className="w-12">
-                                       <Checkbox
-                                         checked={action.concluida}
-                                         onCheckedChange={() => handleToggleConcluida(action)}
-                                       />
-                                     </TableCell>
-
-                                    {/* Eixo */}
-                                    <TableCell style={{ width: columnWidths.eixo }}>
-                                      <Select 
-                                        value={action.eixo_id || ""} 
-                                        onValueChange={(value) => handleQuickEdit(action, 'eixo_id', value)}
-                                      >
-                                        <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                          <Badge 
-                                            variant="outline" 
-                                            style={{ 
-                                              borderColor: action.eixos?.cor, 
-                                              color: action.eixos?.cor 
-                                            }}
-                                          >
-                                            {action.eixos?.nome || 'Selecionar eixo'}
-                                          </Badge>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {eixos.map((eixo) => (
-                                            <SelectItem key={eixo.id} value={eixo.id}>
-                                              <div className="flex items-center gap-2">
-                                                <div 
-                                                  className="w-3 h-3 rounded-full" 
-                                                  style={{ backgroundColor: eixo.cor }}
-                                                />
-                                                {eixo.nome}
-                                              </div>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-
-                                    {/* Prioridade */}
-                                    <TableCell style={{ width: columnWidths.prioridade }}>
-                                      <Select 
-                                        value={action.prioridade_id || ""} 
-                                        onValueChange={(value) => handleQuickEdit(action, 'prioridade_id', value)}
-                                      >
-                                        <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                          <Badge 
-                                            variant="outline"
-                                            style={{ 
-                                              borderColor: action.prioridades_acao?.cor, 
-                                              color: action.prioridades_acao?.cor 
-                                            }}
-                                          >
-                                            {action.prioridades_acao?.nome || 'Selecionar prioridade'}
-                                          </Badge>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {prioridades.map((prioridade) => (
-                                            <SelectItem key={prioridade.id} value={prioridade.id}>
-                                              <div className="flex items-center gap-2">
-                                                <div 
-                                                  className="w-3 h-3 rounded-full" 
-                                                  style={{ backgroundColor: prioridade.cor }}
-                                                />
-                                                {prioridade.nome}
-                                              </div>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-
-                                    {/* Tema */}
-                                    <TableCell style={{ width: columnWidths.tema }}>
-                                      <Select 
-                                        value={action.tema_id || ""} 
-                                        onValueChange={(value) => handleQuickEdit(action, 'tema_id', value)}
-                                      >
-                                        <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                          <Badge variant="secondary">
-                                            {action.temas_acao?.nome || 'Selecionar tema'}
-                                          </Badge>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {temas.map((tema) => (
-                                            <SelectItem key={tema.id} value={tema.id}>
-                                              {tema.nome}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-
-                                    {/* Ação */}
-                                    <TableCell style={{ width: columnWidths.acao }}>
-                                      {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
-                                        <div className="flex gap-2 items-start">
-                                          <Textarea
-                                            value={editingValue}
-                                            onChange={(e) => setEditingValue(e.target.value)}
-                                            style={{ width: Math.max(columnWidths.acao - 100, 200) }}
-                                            className="min-h-[60px]"
-                                            autoFocus
-                                          />
-                                          <div className="flex flex-col gap-1">
-                                            <Button size="sm" onClick={handleCellSave}>
-                                              Salvar
-                                            </Button>
-                                            <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                                              Cancelar
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div 
-                                          className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
-                                          style={{ maxWidth: columnWidths.acao - 20 }}
-                                          onClick={() => handleCellEdit(action.id, 'acao', action.acao)}
-                                          title={action.acao}
-                                        >
-                                          {action.acao || 'Clique para editar'}
-                                        </div>
-                                      )}
-                                    </TableCell>
-
-                                    {/* Responsável */}
-                                    <TableCell style={{ width: columnWidths.responsavel }}>
-                                      <Select 
-                                        value={action.responsavel_id || "none"} 
-                                        onValueChange={(value) => handleQuickEdit(action, 'responsavel_id', value)}
-                                      >
-                                        <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                          <div className="text-left truncate">
-                                            {action.responsavel?.nome || 'Selecionar responsável'}
-                                          </div>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="none">Sem responsável</SelectItem>
-                                          {usuarios.map((usuario) => (
-                                            <SelectItem key={usuario.id} value={usuario.id}>
-                                              {usuario.nome}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-
-                                    {/* Apoio */}
-                                    <TableCell style={{ width: columnWidths.apoio }}>
-                                      <div className="truncate" title={action.apoio}>
-                                        {action.apoio || '-'}
-                                      </div>
-                                    </TableCell>
-
-                                    {/* Status */}
-                                    <TableCell style={{ width: columnWidths.status }}>
-                                      <Select 
-                                        value={action.status_id || ""} 
-                                        onValueChange={(value) => handleQuickEdit(action, 'status_id', value)}
-                                      >
-                                        <SelectTrigger className="border-0 h-auto p-0 hover:bg-muted">
-                                          <Badge 
-                                            variant="outline"
-                                            style={{ 
-                                              borderColor: action.status_acao?.cor, 
-                                              color: action.status_acao?.cor 
-                                            }}
-                                          >
-                                            {action.status_acao?.nome || 'Selecionar status'}
-                                          </Badge>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {statusAcao.map((status) => (
-                                            <SelectItem key={status.id} value={status.id}>
-                                              <div className="flex items-center gap-2">
-                                                <div 
-                                                  className="w-3 h-3 rounded-full" 
-                                                  style={{ backgroundColor: status.cor }}
-                                                />
-                                                {status.nome}
-                                              </div>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-
-                                    {/* Prazo */}
-                                    <TableCell style={{ width: columnWidths.prazo }}>
-                                      <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button 
-                                            variant="outline" 
-                                            className={cn(
-                                              "w-full justify-start text-left font-normal border-0 hover:bg-muted",
-                                              !action.prazo && "text-muted-foreground"
-                                            )}
-                                          >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {action.prazo ? (
-                                              format(new Date(action.prazo), 'dd/MM/yyyy')
-                                            ) : (
-                                              "Selecionar"
-                                            )}
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                          <Calendar
-                                            mode="single"
-                                            selected={action.prazo ? new Date(action.prazo) : undefined}
-                                            onSelect={(date) => {
-                                              if (date) {
-                                                handleQuickEdit(action, 'prazo', date.toISOString().split('T')[0]);
-                                              }
-                                            }}
-                                            initialFocus
-                                          />
-                                        </PopoverContent>
-                                      </Popover>
-                                    </TableCell>
-
-                                    {/* Atualização */}
-                                    <TableCell style={{ width: columnWidths.atualizacao }}>
-                                      {editingCell?.actionId === action.id && editingCell?.field === 'atualizacao' ? (
-                                        <div className="flex gap-2 items-start">
-                                           <Textarea
-                                             value={editingValue}
-                                             onChange={(e) => setEditingValue(e.target.value)}
-                                             style={{ 
-                                               width: Math.max(columnWidths.atualizacao - 100, 200),
-                                               whiteSpace: 'pre-wrap'
-                                             }}
-                                             className="min-h-[60px] whitespace-pre-wrap"
-                                             autoFocus
-                                           />
-                                          <div className="flex flex-col gap-1">
-                                            <Button size="sm" onClick={handleCellSave}>
-                                              Salvar
-                                            </Button>
-                                            <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                                              Cancelar
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                         <div 
-                                           className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] whitespace-pre-wrap"
-                                           style={{ 
-                                             maxWidth: columnWidths.atualizacao - 20,
-                                             wordBreak: 'break-word',
-                                             whiteSpace: 'pre-wrap'
-                                           }}
-                                           onClick={() => handleCellEdit(action.id, 'atualizacao', action.atualizacao)}
-                                           title={action.atualizacao}
-                                         >
-                                           {action.atualizacao || 'Clique para editar'}
-                                         </div>
-                                      )}
-                                    </TableCell>
-
-                                     {/* Botão de exclusão */}
-                                     <TableCell style={{ width: columnWidths.excluir }}>
-                                       <AlertDialog>
-                                         <AlertDialogTrigger asChild>
-                                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                             <Trash2 className="h-4 w-4" />
-                                           </Button>
-                                         </AlertDialogTrigger>
-                                         <AlertDialogContent>
-                                           <AlertDialogHeader>
-                                             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                             <AlertDialogDescription>
-                                               Tem certeza que deseja excluir esta ação? Esta ação não pode ser desfeita.
-                                             </AlertDialogDescription>
-                                           </AlertDialogHeader>
-                                           <AlertDialogFooter>
-                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                             <AlertDialogAction onClick={() => deleteAction.mutate(action.id)}>
-                                               Excluir
-                                             </AlertDialogAction>
-                                           </AlertDialogFooter>
-                                         </AlertDialogContent>
-                                       </AlertDialog>
-                                     </TableCell>
-                                  </TableRow>
-                                )}
-                              </Draggable>
-                              <InsertRow index={index + 1} />
-                            </React.Fragment>
-                          ))}
-                        </>
-                      )}
-                      {provided.placeholder}
-                    </TableBody>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              </Table>
+              <PlanoAcaoTable
+                filteredActions={filteredActions}
+                isLoading={isLoading}
+                columnWidths={columnWidths}
+                editingCell={editingCell}
+                editingValue={editingValue}
+                hoveredRowIndex={hoveredRowIndex}
+                eixos={eixos}
+                prioridades={prioridades}
+                temas={temas}
+                statusAcao={statusAcao}
+                usuarios={usuarios}
+                handleDragEnd={handleDragEnd}
+                handleToggleConcluida={handleToggleConcluida}
+                handleQuickEdit={handleQuickEdit}
+                handleCellEdit={handleCellEdit}
+                handleCellSave={handleCellSave}
+                handleCellCancel={handleCellCancel}
+                setEditingValue={setEditingValue}
+                setHoveredRowIndex={setHoveredRowIndex}
+                handleInsertAction={handleInsertAction}
+                deleteAction={deleteAction}
+                updateAction={updateAction}
+                handleResizeStart={handleResizeStart}
+                isMaximized={false}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Modais */}
-      <NovaAcaoDialog 
-        open={isNewActionDialogOpen} 
+      {/* Dialogs */}
+      <NovaAcaoDialog
+        open={isNewActionDialogOpen}
         onOpenChange={setIsNewActionDialogOpen}
-        onSubmit={(actionData) => {
-          createAction.mutate(actionData);
+        onSubmit={(data) => {
+          createAction.mutate(data);
         }}
       />
 
       <EditAcaoDialog
-        action={editingAction}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        onSubmit={(actionData) => {
+        action={editingAction}
+        onSubmit={(data) => {
           if (editingAction) {
             updateAction.mutate({
               id: editingAction.id,
-              updates: actionData
+              updates: data
             });
           }
           setIsEditDialogOpen(false);
-          setEditingAction(null);
         }}
       />
 
-      <EixosManagerDialog 
-        open={showEixosManager} 
-        onOpenChange={setShowEixosManager} 
+      <EixosManagerDialog
+        open={showEixosManager}
+        onOpenChange={setShowEixosManager}
       />
 
-      <TemasManagerDialog 
-        open={showTemasManager} 
-        onOpenChange={setShowTemasManager} 
+      <TemasManagerDialog
+        open={showTemasManager}
+        onOpenChange={setShowTemasManager}
       />
     </div>
   );
