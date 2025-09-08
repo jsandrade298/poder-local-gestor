@@ -600,20 +600,47 @@ export default function Demandas() {
       try {
         const csv = e.target?.result as string;
         
-        // Processar linhas e remover vazias
-        const allLines = csv.split(/\r?\n/);
+        // Processar CSV respeitando quebras de linha dentro de aspas
         const lines = [];
+        let currentLine = '';
+        let insideQuotes = false;
+        let quoteChar = '';
         
-        for (const line of allLines) {
-          const trimmed = line.trim();
-          if (trimmed) {
-            // Verificar se a linha tem conteúdo real (não apenas separadores)
-            const testSplit = trimmed.split(/[;,]/);
-            const hasContent = testSplit.some(cell => cell.replace(/"/g, '').trim());
-            if (hasContent) {
-              lines.push(trimmed);
+        for (let i = 0; i < csv.length; i++) {
+          const char = csv[i];
+          const nextChar = csv[i + 1];
+          
+          if ((char === '"' || char === "'") && !insideQuotes) {
+            insideQuotes = true;
+            quoteChar = char;
+            currentLine += char;
+          } else if (char === quoteChar && insideQuotes) {
+            // Verificar se é uma aspas de escape (duas aspas seguidas)
+            if (nextChar === quoteChar) {
+              currentLine += char + nextChar;
+              i++; // Pular a próxima aspas
+            } else {
+              insideQuotes = false;
+              quoteChar = '';
+              currentLine += char;
             }
+          } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+            if (currentLine.trim()) {
+              lines.push(currentLine.trim());
+            }
+            currentLine = '';
+            // Pular \r\n se for Windows line ending
+            if (char === '\r' && nextChar === '\n') {
+              i++;
+            }
+          } else {
+            currentLine += char;
           }
+        }
+        
+        // Adicionar última linha se houver
+        if (currentLine.trim()) {
+          lines.push(currentLine.trim());
         }
         
         console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
