@@ -39,7 +39,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
           areas(nome),
           municipes(nome)
         `)
-        .not('status', 'in', '(aberta,em_andamento,resolvida)')
+        .is('kanban_position', null)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -91,7 +91,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     mutationFn: async (demandaIds: string[]) => {
       const { error } = await supabase
         .from('demandas')
-        .update({ status: 'aberta' })
+        .update({ kanban_position: 'a_fazer' })
         .in('id', demandaIds);
       
       if (error) throw error;

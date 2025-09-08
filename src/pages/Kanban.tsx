@@ -52,6 +52,7 @@ export default function Kanban() {
           areas(nome),
           municipes(nome)
         `)
+        .not('kanban_position', 'is', null)
         .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
         .order('created_at', { ascending: false });
       
@@ -85,33 +86,33 @@ export default function Kanban() {
     mutationFn: async () => {
       console.log("🔄 Iniciando limpeza do kanban...");
       
-      // Buscar todas as demandas que não estão em 'a_fazer'
-      const { data: demandasParaLimpar, error: fetchError } = await supabase
+      // Buscar todas as demandas que estão no kanban
+      const { data: demandasParaRemover, error: fetchError } = await supabase
         .from('demandas')
         .select('id, titulo, kanban_position')
-        .not('kanban_position', 'eq', 'a_fazer')
-        .in('kanban_position', ['em_progresso', 'feito']);
+        .not('kanban_position', 'is', null)
+        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito']);
       
       if (fetchError) {
-        console.error("❌ Erro ao buscar demandas para limpar:", fetchError);
+        console.error("❌ Erro ao buscar demandas para remover:", fetchError);
         throw fetchError;
       }
       
-      console.log(`📋 Encontradas ${demandasParaLimpar?.length || 0} demandas para mover para 'A Fazer'`);
+      console.log(`📋 Encontradas ${demandasParaRemover?.length || 0} demandas para remover do kanban`);
       
-      if (!demandasParaLimpar || demandasParaLimpar.length === 0) {
-        console.log("ℹ️ Nenhuma demanda precisa ser movida");
+      if (!demandasParaRemover || demandasParaRemover.length === 0) {
+        console.log("ℹ️ Nenhuma demanda no kanban para ser removida");
         return;
       }
       
-      // Mover todas as demandas para 'a_fazer'
+      // Remover todas as demandas do kanban (definir kanban_position como null)
       const { error } = await supabase
         .from('demandas')
-        .update({ kanban_position: 'a_fazer' })
-        .in('id', demandasParaLimpar.map(d => d.id));
+        .update({ kanban_position: null })
+        .in('id', demandasParaRemover.map(d => d.id));
       
       if (error) {
-        console.error("❌ Erro ao atualizar posições:", error);
+        console.error("❌ Erro ao remover demandas do kanban:", error);
         throw error;
       }
       
@@ -132,18 +133,18 @@ export default function Kanban() {
     mutationFn: async (demandaId: string) => {
       const { error } = await supabase
         .from('demandas')
-        .update({ kanban_position: 'a_fazer' })
+        .update({ kanban_position: null })
         .eq('id', demandaId);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
-      toast.success("Demanda movida para 'A Fazer'!");
+      toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
       console.error('Erro ao remover demanda:', error);
-      toast.error("Erro ao mover demanda");
+      toast.error("Erro ao remover demanda");
     }
   });
 
@@ -262,14 +263,18 @@ export default function Kanban() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Isso moverá todas as demandas em "Em Progresso" e "Feito" de volta para "A Fazer". 
+                    Isso removerá todas as demandas do kanban. As demandas voltarão para a lista geral e poderão ser adicionadas novamente quando necessário.
                     Esta ação não pode ser desfeita.
                     <br /><br />
-                    <strong>Demandas afetadas:</strong>
+                    <strong>Demandas que serão removidas:</strong>
+                    <br />
+                    • A Fazer: {getDemandsByStatus('a_fazer').length} demandas
                     <br />
                     • Em Progresso: {getDemandsByStatus('em_progresso').length} demandas
                     <br />
                     • Feito: {getDemandsByStatus('feito').length} demandas
+                    <br />
+                    • <strong>Total: {demandas.length} demandas</strong>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
