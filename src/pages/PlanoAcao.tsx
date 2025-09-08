@@ -31,6 +31,7 @@ export default function PlanoAcao() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [prioridadeFilter, setPrioridadeFilter] = useState("all");
+  const [temaFilter, setTemaFilter] = useState("all");
   const [concluidaFilter, setConcluidaFilter] = useState("all");
   const [isNewActionDialogOpen, setIsNewActionDialogOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<any>(null);
@@ -562,11 +563,12 @@ export default function PlanoAcao() {
     const matchesStatus = statusFilter === "all" || action.status_id === statusFilter;
     const matchesResponsavel = responsavelFilter === "all" || action.responsavel_id === responsavelFilter;
     const matchesPrioridade = prioridadeFilter === "all" || action.prioridade_id === prioridadeFilter;
+    const matchesTema = temaFilter === "all" || action.tema_id === temaFilter;
     const matchesConcluida = concluidaFilter === "all" || 
       (concluidaFilter === "true" && action.concluida) || 
       (concluidaFilter === "false" && !action.concluida);
 
-    return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesConcluida;
+    return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesTema && matchesConcluida;
   }) || [];
 
   // Calcular estatísticas
@@ -837,6 +839,20 @@ export default function PlanoAcao() {
                       </SelectContent>
                     </Select>
 
+                    <Select value={temaFilter} onValueChange={setTemaFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por tema" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os temas</SelectItem>
+                        {temas.map((tema) => (
+                          <SelectItem key={tema.id} value={tema.id}>
+                            {tema.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
                       <SelectTrigger className="w-48">
                         <SelectValue placeholder="Filtrar por situação" />
@@ -857,6 +873,7 @@ export default function PlanoAcao() {
                         setStatusFilter('all');
                         setResponsavelFilter('all');
                         setPrioridadeFilter('all');
+                        setTemaFilter('all');
                         setConcluidaFilter('all');
                       }}
                     >
@@ -1002,6 +1019,48 @@ export default function PlanoAcao() {
                 {statusAcao.map((status) => (
                   <SelectItem key={status.id} value={status.id}>
                     {status.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filtrar por responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os responsáveis</SelectItem>
+                {usuarios.map((usuario) => (
+                  <SelectItem key={usuario.id} value={usuario.id}>
+                    {usuario.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filtrar por prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as prioridades</SelectItem>
+                {prioridades.map((prioridade) => (
+                  <SelectItem key={prioridade.id} value={prioridade.id}>
+                    {prioridade.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={temaFilter} onValueChange={setTemaFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filtrar por tema" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os temas</SelectItem>
+                {temas.map((tema) => (
+                  <SelectItem key={tema.id} value={tema.id}>
+                    {tema.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
