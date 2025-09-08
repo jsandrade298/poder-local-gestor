@@ -83,21 +83,47 @@ export default function Kanban() {
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
-      // Limpa TODAS as demandas do kanban, não apenas as que estão visíveis
+      console.log("🔄 Iniciando limpeza do kanban...");
+      
+      // Buscar todas as demandas que não estão em 'a_fazer'
+      const { data: demandasParaLimpar, error: fetchError } = await supabase
+        .from('demandas')
+        .select('id, titulo, kanban_position')
+        .not('kanban_position', 'eq', 'a_fazer')
+        .in('kanban_position', ['em_progresso', 'feito']);
+      
+      if (fetchError) {
+        console.error("❌ Erro ao buscar demandas para limpar:", fetchError);
+        throw fetchError;
+      }
+      
+      console.log(`📋 Encontradas ${demandasParaLimpar?.length || 0} demandas para mover para 'A Fazer'`);
+      
+      if (!demandasParaLimpar || demandasParaLimpar.length === 0) {
+        console.log("ℹ️ Nenhuma demanda precisa ser movida");
+        return;
+      }
+      
+      // Mover todas as demandas para 'a_fazer'
       const { error } = await supabase
         .from('demandas')
         .update({ kanban_position: 'a_fazer' })
-        .in('kanban_position', ['em_progresso', 'feito']); // Move apenas as que estão em progresso ou feitas
+        .in('id', demandasParaLimpar.map(d => d.id));
       
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao atualizar posições:", error);
+        throw error;
+      }
+      
+      console.log("✅ Kanban limpo com sucesso!");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
-      console.error('Erro ao limpar kanban:', error);
-      toast.error("Erro ao limpar kanban");
+      console.error('❌ Erro ao limpar kanban:', error);
+      toast.error(`Erro ao limpar kanban: ${error.message}`);
     }
   });
 
@@ -226,18 +252,24 @@ export default function Kanban() {
                 <Button 
                   variant="outline" 
                   className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  disabled={demandas.length === 0}
+                  disabled={limparKanbanMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Limpar Kanban
+                  {limparKanbanMutation.isPending ? 'Limpando...' : 'Limpar Kanban'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Isso moverá todas as {demandas.length} demandas para a coluna "A Fazer". 
+                    Isso moverá todas as demandas em "Em Progresso" e "Feito" de volta para "A Fazer". 
                     Esta ação não pode ser desfeita.
+                    <br /><br />
+                    <strong>Demandas afetadas:</strong>
+                    <br />
+                    • Em Progresso: {getDemandsByStatus('em_progresso').length} demandas
+                    <br />
+                    • Feito: {getDemandsByStatus('feito').length} demandas
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
