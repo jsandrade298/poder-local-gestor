@@ -674,6 +674,7 @@ export default function PlanoAcao() {
                       handleInsertAction={handleInsertAction}
                       deleteAction={deleteAction}
                       updateAction={updateAction}
+                      handleResizeStart={handleResizeStart}
                       isMaximized={true}
                     />
                   </div>
