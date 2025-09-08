@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Building } from "lucide-react";
+import { LogIn, Building, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +104,18 @@ export default function Login() {
                 {isLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
+            
+            {/* Admin Access Button */}
+            <div className="mt-6 pt-6 border-t border-border">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => navigate("/admin")}
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Acesso Administrativo
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
