@@ -863,10 +863,11 @@ export default function Demandas() {
           
           console.log(`🔍 Processando linha ${i + 1}:`, {
             totalColunas: values.length,
-            titulo: values[0] || '(vazio)',
-            descricao: values[1] || '(vazio)',
-            municipe: values[2] || '(vazio)',
-            raw_line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
+            linhaRaw: `"${line.substring(0, 150)}${line.length > 150 ? '...' : ''}"`,
+            primeirasColunas: values.slice(0, 5).map((val, idx) => `[${idx}]="${val.substring(0, 30)}${val.length > 30 ? '...' : ''}"`),
+            ultimasColunas: values.slice(-3).map((val, idx) => `[${values.length - 3 + idx}]="${val.substring(0, 30)}${val.length > 30 ? '...' : ''}"`),
+            temSeparador: line.includes(separator),
+            contadorSeparadores: (line.match(new RegExp(`\\${separator}`, 'g')) || []).length
           });
           
           // Verificar se há colunas suficientes para os campos obrigatórios
@@ -883,12 +884,15 @@ export default function Demandas() {
           console.log(`🗺️ Linha ${i + 1} - Mapeamento de colunas:`, {
             titulo: `posição ${columnPositions.titulo} = "${values[columnPositions.titulo] || '(vazio)'}"`,
             municipe_nome: `posição ${columnPositions.municipe_nome} = "${values[columnPositions.municipe_nome] || '(vazio)'}"`,
-            descricao: `posição ${columnPositions.descricao || -1} = "${values[columnPositions.descricao] || '(vazio)'}"`
+            descricao: `posição ${columnPositions.descricao || -1} = "${values[columnPositions.descricao] || '(vazio)'}"`,
+            mapeamento: columnPositions
           });
           
           // Verificar campos obrigatórios na posição correta
           const titulo = values[columnPositions.titulo]?.trim();
           const municipeNome = values[columnPositions.municipe_nome]?.trim();
+          
+          console.log(`🔍 Campos extraídos - Título: "${titulo}", Munícipe: "${municipeNome}"`);
           
           if (!titulo) {
             console.log(`⚠️ Linha ${i + 1} ignorada: campo 'titulo' vazio na posição ${columnPositions.titulo}`);
