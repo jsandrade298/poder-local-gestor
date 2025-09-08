@@ -754,7 +754,7 @@ export default function PlanoAcao() {
                 Maximizar Planilha
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
+            <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0 flex flex-col">
               <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
                 <div className="flex items-start justify-between">
                   <DialogTitle className="flex items-center gap-2">
@@ -773,156 +773,155 @@ export default function PlanoAcao() {
                   </div>
                 </div>
               </DialogHeader>
-              <div className="flex-1 overflow-hidden">
-                {/* Filtros no modal maximizado */}
-                <div className="px-6 py-4 border-b bg-muted/30">
-                  <div className="flex flex-wrap gap-4 items-center">
-                    <div className="flex items-center gap-2">
-                      <Search className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar ações..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-64"
-                      />
-                    </div>
-
-                    <Select value={eixoFilter} onValueChange={setEixoFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por eixo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os eixos</SelectItem>
-                        {eixos.map((eixo) => (
-                          <SelectItem key={eixo.id} value={eixo.id}>
-                            {eixo.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os status</SelectItem>
-                        {statusAcao.map((status) => (
-                          <SelectItem key={status.id} value={status.id}>
-                            {status.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por responsável" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os responsáveis</SelectItem>
-                        {usuarios.map((usuario) => (
-                          <SelectItem key={usuario.id} value={usuario.id}>
-                            {usuario.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por prioridade" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas as prioridades</SelectItem>
-                        {prioridades.map((prioridade) => (
-                          <SelectItem key={prioridade.id} value={prioridade.id}>
-                            {prioridade.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={temaFilter} onValueChange={setTemaFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por tema" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os temas</SelectItem>
-                        {temas.map((tema) => (
-                          <SelectItem key={tema.id} value={tema.id}>
-                            {tema.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Filtrar por situação" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="true">Concluídas</SelectItem>
-                        <SelectItem value="false">Pendentes</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setSearchTerm('');
-                        setEixoFilter('all');
-                        setStatusFilter('all');
-                        setResponsavelFilter('all');
-                        setPrioridadeFilter('all');
-                        setTemaFilter('all');
-                        setConcluidaFilter('all');
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Limpar Filtros
-                    </Button>
+              
+              {/* Filtros no modal maximizado */}
+              <div className="px-6 py-4 border-b bg-muted/30 flex-shrink-0">
+                <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex items-center gap-2">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar ações..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-64"
+                    />
                   </div>
+
+                  <Select value={eixoFilter} onValueChange={setEixoFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por eixo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os eixos</SelectItem>
+                      {eixos.map((eixo) => (
+                        <SelectItem key={eixo.id} value={eixo.id}>
+                          {eixo.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      {statusAcao.map((status) => (
+                        <SelectItem key={status.id} value={status.id}>
+                          {status.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os responsáveis</SelectItem>
+                      {usuarios.map((usuario) => (
+                        <SelectItem key={usuario.id} value={usuario.id}>
+                          {usuario.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as prioridades</SelectItem>
+                      {prioridades.map((prioridade) => (
+                        <SelectItem key={prioridade.id} value={prioridade.id}>
+                          {prioridade.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={temaFilter} onValueChange={setTemaFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por tema" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os temas</SelectItem>
+                      {temas.map((tema) => (
+                        <SelectItem key={tema.id} value={tema.id}>
+                          {tema.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={concluidaFilter} onValueChange={setConcluidaFilter}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por situação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="true">Concluídas</SelectItem>
+                      <SelectItem value="false">Pendentes</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setEixoFilter('all');
+                      setStatusFilter('all');
+                      setResponsavelFilter('all');
+                      setPrioridadeFilter('all');
+                      setTemaFilter('all');
+                      setConcluidaFilter('all');
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Limpar Filtros
+                  </Button>
                 </div>
-                
-                {/* Container do modal com scroll SEMPRE nas bordas */}
-                <div 
-                  className="planilha-container"
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    margin: '16px'
-                  }}
-                >
-                  <PlanoAcaoTable
-                    filteredActions={filteredActions}
-                    isLoading={isLoading}
-                    columnWidths={columnWidths}
-                    editingCell={editingCell}
-                    editingValue={editingValue}
-                    hoveredRowIndex={hoveredRowIndex}
-                    eixos={eixos}
-                    prioridades={prioridades}
-                    temas={temas}
-                    statusAcao={statusAcao}
-                    usuarios={usuarios}
-                    handleDragEnd={handleDragEnd}
-                    handleToggleConcluida={handleToggleConcluida}
-                    handleQuickEdit={handleQuickEdit}
-                    handleCellEdit={handleCellEdit}
-                    handleCellSave={handleCellSave}
-                    handleCellCancel={handleCellCancel}
-                    setEditingValue={setEditingValue}
-                    setHoveredRowIndex={setHoveredRowIndex}
-                    handleInsertAction={handleInsertAction}
-                    deleteAction={deleteAction}
-                    updateAction={updateAction}
-                    handleResizeStart={handleResizeStart}
-                    isMaximized={true}
-                  />
-                </div>
+              </div>
+              
+              {/* Container principal da planilha no modal - mesma estrutura da planilha normal */}
+              <div 
+                className="planilha-container"
+                style={{ 
+                  flexGrow: 1,
+                  height: 'calc(98vh - 200px)',
+                  margin: '16px'
+                }}
+              >
+                <PlanoAcaoTable
+                  filteredActions={filteredActions}
+                  isLoading={isLoading}
+                  columnWidths={columnWidths}
+                  editingCell={editingCell}
+                  editingValue={editingValue}
+                  hoveredRowIndex={hoveredRowIndex}
+                  eixos={eixos}
+                  prioridades={prioridades}
+                  temas={temas}
+                  statusAcao={statusAcao}
+                  usuarios={usuarios}
+                  handleDragEnd={handleDragEnd}
+                  handleToggleConcluida={handleToggleConcluida}
+                  handleQuickEdit={handleQuickEdit}
+                  handleCellEdit={handleCellEdit}
+                  handleCellSave={handleCellSave}
+                  handleCellCancel={handleCellCancel}
+                  setEditingValue={setEditingValue}
+                  setHoveredRowIndex={setHoveredRowIndex}
+                  handleInsertAction={handleInsertAction}
+                  deleteAction={deleteAction}
+                  updateAction={updateAction}
+                  handleResizeStart={handleResizeStart}
+                  isMaximized={true}
+                />
               </div>
             </DialogContent>
           </Dialog>
