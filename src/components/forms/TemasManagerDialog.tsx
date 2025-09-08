@@ -17,9 +17,9 @@ interface TemasManagerDialogProps {
 
 export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingValues, setEditingValues] = useState({ nome: '' });
+  const [editingValues, setEditingValues] = useState({ nome: '', descricao: '' });
   const [isCreating, setIsCreating] = useState(false);
-  const [newTema, setNewTema] = useState({ nome: '' });
+  const [newTema, setNewTema] = useState({ nome: '', descricao: '' });
 
   const queryClient = useQueryClient();
 
@@ -37,7 +37,7 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
 
 
   const createTema = useMutation({
-    mutationFn: async (tema: { nome: string }) => {
+    mutationFn: async (tema: { nome: string; descricao: string }) => {
       const { data, error } = await supabase.from('temas_acao').insert([tema]).select().single();
       if (error) throw error;
       return data;
@@ -46,7 +46,7 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
       queryClient.invalidateQueries({ queryKey: ['temas-manager'] });
       queryClient.invalidateQueries({ queryKey: ['temas-acao'] });
       setIsCreating(false);
-      setNewTema({ nome: '' });
+      setNewTema({ nome: '', descricao: '' });
       toast.success('Tema criado com sucesso!');
     }
   });
@@ -92,7 +92,8 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
   const handleEdit = (tema: any) => {
     setEditingId(tema.id);
     setEditingValues({
-      nome: tema.nome
+      nome: tema.nome,
+      descricao: tema.descricao || ''
     });
   };
 
@@ -104,7 +105,7 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
 
   const handleCancel = () => {
     setEditingId(null);
-    setEditingValues({ nome: '' });
+    setEditingValues({ nome: '', descricao: '' });
   };
 
   const handleCreate = () => {
@@ -136,7 +137,7 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
                   Adicionar Tema
                 </Button>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="novo-nome">Nome</Label>
                     <Input
@@ -144,6 +145,15 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
                       value={newTema.nome}
                       onChange={(e) => setNewTema({ ...newTema, nome: e.target.value })}
                       placeholder="Nome do tema"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="novo-descricao">Descrição</Label>
+                    <Input
+                      id="novo-descricao"
+                      value={newTema.descricao}
+                      onChange={(e) => setNewTema({ ...newTema, descricao: e.target.value })}
+                      placeholder="Descrição do tema"
                     />
                   </div>
                   <div className="flex items-end gap-2">
@@ -171,19 +181,20 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
+                    <TableHead>Descrição</TableHead>
                     <TableHead className="w-24">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center">
+                      <TableCell colSpan={3} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : temas.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-center">
+                      <TableCell colSpan={3} className="text-center">
                         Nenhum tema encontrado
                       </TableCell>
                     </TableRow>
@@ -199,6 +210,17 @@ export function TemasManagerDialog({ open, onOpenChange }: TemasManagerDialogPro
                             />
                           ) : (
                             tema.nome
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingId === tema.id ? (
+                            <Input
+                              value={editingValues.descricao}
+                              onChange={(e) => setEditingValues({ ...editingValues, descricao: e.target.value })}
+                              className="h-8"
+                            />
+                          ) : (
+                            tema.descricao || '-'
                           )}
                         </TableCell>
                         <TableCell>
