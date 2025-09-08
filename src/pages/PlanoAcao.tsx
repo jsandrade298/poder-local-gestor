@@ -637,10 +637,20 @@ export default function PlanoAcao() {
             </DialogTrigger>
             <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
               <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
-                <DialogTitle className="flex items-center gap-2">
-                  <Target className="h-6 w-6" />
-                  Plano de Ação - Visualização Maximizada
-                </DialogTitle>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="flex items-center gap-2">
+                    <Target className="h-6 w-6" />
+                    Plano de Ação - Visualização Maximizada
+                  </DialogTitle>
+                  <Button
+                    onClick={saveLayout}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Layout
+                  </Button>
+                </div>
               </DialogHeader>
               <div className="flex-1 overflow-hidden">
                 <div 
