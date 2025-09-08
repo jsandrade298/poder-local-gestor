@@ -953,6 +953,7 @@ export type Database = {
       temas_acao: {
         Row: {
           created_at: string
+          descricao: string | null
           eixo_id: string | null
           id: string
           nome: string
@@ -960,6 +961,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          descricao?: string | null
           eixo_id?: string | null
           id?: string
           nome: string
@@ -967,6 +969,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          descricao?: string | null
           eixo_id?: string | null
           id?: string
           nome?: string
