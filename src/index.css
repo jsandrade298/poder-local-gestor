@@ -125,49 +125,64 @@
   background: rgb(243 244 246);
 }
 
-/* Container de planilha com scroll SEMPRE VISÍVEL - versão simplificada e funcional */
+/* Container de planilha com scroll SEMPRE VISÍVEL - análise e correção completa */
 .planilha-container {
-  /* Força scrollbars sempre visíveis */
+  /* Força scrollbars sempre visíveis para ambas as direções */
   overflow: scroll !important;
+  overflow-x: scroll !important;
+  overflow-y: scroll !important;
   /* Reserva espaço para scrollbars */
   scrollbar-gutter: stable both-edges;
   /* Performance */
   will-change: scroll-position;
   backface-visibility: hidden;
+  /* Força layout */
+  position: relative;
+  display: block;
 }
 
-/* Firefox - scroll sutil */
+/* Firefox - configuração específica para thumb visível */
 .planilha-container {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgb(156 163 175) rgb(249 250 251) !important;
+  scrollbar-width: auto !important;
+  scrollbar-color: #6b7280 #f3f4f6 !important;
 }
 
-/* WebKit (Chrome, Safari, Edge) - scroll sutil mas sempre visível */
+/* WebKit (Chrome, Safari, Edge) - configuração completa e robusta */
 .planilha-container::-webkit-scrollbar {
-  width: 12px !important;
-  height: 12px !important;
-  background: rgb(249 250 251) !important;
+  width: 14px !important;
+  height: 14px !important;
+  background-color: #f3f4f6 !important;
+  border-radius: 0 !important;
 }
 
 .planilha-container::-webkit-scrollbar-track {
-  background: rgb(249 250 251) !important;
-  border-radius: 6px;
+  background-color: #f3f4f6 !important;
+  border-radius: 0 !important;
+  border: none !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb {
-  background: rgb(156 163 175) !important;
-  border-radius: 6px;
-  border: 1px solid rgb(249 250 251);
-  min-height: 30px !important;
-  min-width: 30px !important;
+  background-color: #6b7280 !important;
+  border-radius: 7px !important;
+  border: 2px solid #f3f4f6 !important;
+  min-height: 40px !important;
+  min-width: 40px !important;
+  /* Força visibilidade */
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .planilha-container::-webkit-scrollbar-thumb:hover {
-  background: rgb(107 114 128) !important;
+  background-color: #4b5563 !important;
+  border: 2px solid #f3f4f6 !important;
+}
+
+.planilha-container::-webkit-scrollbar-thumb:active {
+  background-color: #374151 !important;
 }
 
 .planilha-container::-webkit-scrollbar-corner {
-  background: rgb(249 250 251) !important;
+  background-color: #f3f4f6 !important;
 }
 
   .dark {
