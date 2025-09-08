@@ -24,21 +24,21 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
 
   const downloadTemplate = () => {
     const headers = [
-      'titulo',
-      'descricao',
-      'municipe_nome',
-      'area_nome',
-      'responsavel_nome',
-      'status',
-      'prioridade',
-      'logradouro',
-      'numero',
-      'bairro',
-      'cidade',
-      'cep',
-      'complemento',
-      'data_prazo',
-      'observacoes'
+      'titulo',           // Coluna A
+      'descricao',        // Coluna B
+      'municipe_nome',    // Coluna C
+      'area_nome',        // Coluna D
+      'responsavel_nome', // Coluna E
+      'status',           // Coluna F
+      'prioridade',       // Coluna G
+      'logradouro',       // Coluna H
+      'numero',           // Coluna I
+      'bairro',           // Coluna J
+      'cidade',           // Coluna K
+      'cep',              // Coluna L
+      'complemento',      // Coluna M
+      'data_prazo',       // Coluna N
+      'observacoes'       // Coluna O
     ];
 
     const exampleData = [
@@ -289,7 +289,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                           <h4 className="font-medium">Preencha seus dados</h4>
                           <p className="text-sm text-muted-foreground mt-1">
                             Abra o arquivo no Excel, Google Sheets ou similar. Substitua os dados de exemplo pelos seus dados reais.
-                            Mantenha os cabeçalhos da primeira linha.
+                            <strong>Importante:</strong> As colunas devem estar na ordem exata (A=Título, B=Descrição, C=Munícipe, etc.).
                           </p>
                         </div>
                       </div>
@@ -332,69 +332,87 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
 
               {/* Informações sobre os campos */}
               <div className="space-y-3">
-                <h3 className="text-lg font-semibold">Campos Disponíveis</h3>
+                <h3 className="text-lg font-semibold">Ordem das Colunas (OBRIGATÓRIA)</h3>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                      <strong>Atenção:</strong> As colunas devem estar exatamente nesta ordem. Não altere a sequência!
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
                       <div className="flex items-center gap-2">
+                        <div className="bg-primary text-primary-foreground rounded w-6 h-6 flex items-center justify-center text-xs font-bold">A</div>
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span><strong>titulo</strong> (obrigatório)</span>
+                        <span><strong>Título</strong> (obrigatório)</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-primary text-primary-foreground rounded w-6 h-6 flex items-center justify-center text-xs font-bold">B</div>
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span><strong>descricao</strong> (obrigatório)</span>
+                        <span><strong>Descrição</strong> (obrigatório)</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-primary text-primary-foreground rounded w-6 h-6 flex items-center justify-center text-xs font-bold">C</div>
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span><strong>municipe_nome</strong> (obrigatório)</span>
+                        <span><strong>Munícipe_nome</strong> (obrigatório)</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">D</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>area_nome</span>
+                        <span>Área</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">E</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>responsavel_nome</span>
+                        <span>Responsável</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">F</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>status</span>
+                        <span>Status</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">G</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>prioridade</span>
+                        <span>Prioridade</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">H</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>logradouro</span>
+                        <span>Logradouro</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">I</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>numero</span>
+                        <span>Número</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">J</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>bairro</span>
+                        <span>Bairro</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">K</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>cidade</span>
+                        <span>Cidade</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">L</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>cep</span>
+                        <span>CEP</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">M</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>complemento</span>
+                        <span>Complemento</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">N</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>data_prazo (AAAA-MM-DD)</span>
+                        <span>Prazo da demanda (AAAA-MM-DD)</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">O</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>observacoes</span>
+                        <span>Observações</span>
                       </div>
                     </div>
                   </CardContent>

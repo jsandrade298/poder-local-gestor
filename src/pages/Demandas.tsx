@@ -631,23 +631,23 @@ export default function Demandas() {
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
         console.log(`📋 Separador detectado: "${separator}"`);
 
-        // Mapear colunas
-        const expectedColumns = {
-          titulo: ['titulo', 'title'],
-          descricao: ['descricao', 'description', 'descrição'],
-          municipe_nome: ['municipe_nome', 'municipe', 'munícipe', 'citizen', 'nome_municipe'],
-          area_nome: ['area_nome', 'area', 'área'],
-          responsavel_nome: ['responsavel_nome', 'responsavel', 'responsável', 'responsible'],
-          status: ['status'],
-          prioridade: ['prioridade', 'priority'],
-          logradouro: ['logradouro', 'endereco', 'endereço', 'address', 'rua'],
-          numero: ['numero', 'número', 'number', 'num'],
-          bairro: ['bairro', 'neighborhood'],
-          cidade: ['cidade', 'city'],
-          cep: ['cep', 'zip'],
-          complemento: ['complemento', 'complement'],
-          data_prazo: ['data_prazo', 'prazo', 'deadline'],
-          observacoes: ['observacoes', 'observações', 'obs', 'notes']
+        // Mapear colunas por posição fixa (A=0, B=1, C=2, etc.)
+        const columnPositions = {
+          titulo: 0,        // Coluna A
+          descricao: 1,     // Coluna B  
+          municipe_nome: 2, // Coluna C
+          area_nome: 3,     // Coluna D
+          responsavel_nome: 4, // Coluna E
+          status: 5,        // Coluna F
+          prioridade: 6,    // Coluna G
+          logradouro: 7,    // Coluna H
+          numero: 8,        // Coluna I
+          bairro: 9,        // Coluna J
+          cidade: 10,       // Coluna K
+          cep: 11,          // Coluna L
+          complemento: 12,  // Coluna M
+          data_prazo: 13,   // Coluna N
+          observacoes: 14   // Coluna O
         };
 
         // Buscar dados existentes usando carregamento em lotes
@@ -736,22 +736,20 @@ export default function Demandas() {
             v.replace(/^["']|["']$/g, '').trim()
           );
           
-          // Verificar se a linha tem dados válidos
-          const tituloIndex = headers.findIndex(h => expectedColumns.titulo?.includes(h));
-          if (tituloIndex === -1 || !values[tituloIndex]) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: sem título`);
+          // Verificar se a linha tem dados válidos (título na coluna A)
+          if (!values[columnPositions.titulo]) {
+            console.log(`⚠️ Linha ${i + 1} ignorada: sem título na coluna A`);
             continue;
           }
           
           const demanda: any = { linha: i + 1 };
           
-          // Processar campos
-          Object.keys(expectedColumns).forEach(key => {
-            const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
-            const headerIndex = headers.findIndex(h => possibleHeaders.includes(h));
+          // Processar campos usando posições fixas
+          Object.keys(columnPositions).forEach(key => {
+            const columnIndex = columnPositions[key as keyof typeof columnPositions];
+            const value = values[columnIndex];
             
-            if (headerIndex !== -1 && values[headerIndex]) {
-              const value = values[headerIndex];
+            if (value && value.trim()) {
               
               if (key === 'municipe_nome') {
                 demanda.municipe_nome_original = value;
