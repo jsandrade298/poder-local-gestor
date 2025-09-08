@@ -887,45 +887,41 @@ export default function PlanoAcao() {
                   </div>
                 </div>
                 
-                {/* Container do modal com scroll FIXO na borda */}
+                {/* Container do modal com scroll SEMPRE nas bordas */}
                 <div 
-                  className="planilha-scroll"
+                  className="planilha-container"
                   style={{
                     flex: 1,
                     minHeight: 0,
-                    overflow: 'auto',
-                    position: 'relative'
+                    margin: '16px'
                   }}
                 >
-                  {/* Conteúdo da tabela SEM scroll próprio */}
-                  <div className="p-6">
-                    <PlanoAcaoTable
-                      filteredActions={filteredActions}
-                      isLoading={isLoading}
-                      columnWidths={columnWidths}
-                      editingCell={editingCell}
-                      editingValue={editingValue}
-                      hoveredRowIndex={hoveredRowIndex}
-                      eixos={eixos}
-                      prioridades={prioridades}
-                      temas={temas}
-                      statusAcao={statusAcao}
-                      usuarios={usuarios}
-                      handleDragEnd={handleDragEnd}
-                      handleToggleConcluida={handleToggleConcluida}
-                      handleQuickEdit={handleQuickEdit}
-                      handleCellEdit={handleCellEdit}
-                      handleCellSave={handleCellSave}
-                      handleCellCancel={handleCellCancel}
-                      setEditingValue={setEditingValue}
-                      setHoveredRowIndex={setHoveredRowIndex}
-                      handleInsertAction={handleInsertAction}
-                      deleteAction={deleteAction}
-                      updateAction={updateAction}
-                      handleResizeStart={handleResizeStart}
-                      isMaximized={true}
-                      />
-                  </div>
+                  <PlanoAcaoTable
+                    filteredActions={filteredActions}
+                    isLoading={isLoading}
+                    columnWidths={columnWidths}
+                    editingCell={editingCell}
+                    editingValue={editingValue}
+                    hoveredRowIndex={hoveredRowIndex}
+                    eixos={eixos}
+                    prioridades={prioridades}
+                    temas={temas}
+                    statusAcao={statusAcao}
+                    usuarios={usuarios}
+                    handleDragEnd={handleDragEnd}
+                    handleToggleConcluida={handleToggleConcluida}
+                    handleQuickEdit={handleQuickEdit}
+                    handleCellEdit={handleCellEdit}
+                    handleCellSave={handleCellSave}
+                    handleCellCancel={handleCellCancel}
+                    setEditingValue={setEditingValue}
+                    setHoveredRowIndex={setHoveredRowIndex}
+                    handleInsertAction={handleInsertAction}
+                    deleteAction={deleteAction}
+                    updateAction={updateAction}
+                    handleResizeStart={handleResizeStart}
+                    isMaximized={true}
+                  />
                 </div>
               </div>
             </DialogContent>
@@ -1116,45 +1112,40 @@ export default function PlanoAcao() {
             </Button>
           </div>
           
-          {/* Container com scroll vertical FIXO na borda */}
+          {/* Container principal com scroll SEMPRE nas bordas */}
           <div 
-            className="planilha-scroll bg-background border rounded-lg"
+            className="planilha-container bg-background border rounded-lg"
             style={{ 
               height: `${tableHeight}px`,
-              maxHeight: `${tableHeight}px`,
-              position: 'relative',
-              overflow: 'auto'
+              maxHeight: `${tableHeight}px`
             }}
           >
-            {/* Conteúdo da tabela SEM scroll próprio */}
-            <div className="w-full h-auto">
-              <PlanoAcaoTable
-                filteredActions={filteredActions}
-                isLoading={isLoading}
-                columnWidths={columnWidths}
-                editingCell={editingCell}
-                editingValue={editingValue}
-                hoveredRowIndex={hoveredRowIndex}
-                eixos={eixos}
-                prioridades={prioridades}
-                temas={temas}
-                statusAcao={statusAcao}
-                usuarios={usuarios}
-                handleDragEnd={handleDragEnd}
-                handleToggleConcluida={handleToggleConcluida}
-                handleQuickEdit={handleQuickEdit}
-                handleCellEdit={handleCellEdit}
-                handleCellSave={handleCellSave}
-                handleCellCancel={handleCellCancel}
-                setEditingValue={setEditingValue}
-                setHoveredRowIndex={setHoveredRowIndex}
-                handleInsertAction={handleInsertAction}
-                deleteAction={deleteAction}
-                updateAction={updateAction}
-                handleResizeStart={handleResizeStart}
-                isMaximized={false}
-                />
-            </div>
+            <PlanoAcaoTable
+              filteredActions={filteredActions}
+              isLoading={isLoading}
+              columnWidths={columnWidths}
+              editingCell={editingCell}
+              editingValue={editingValue}
+              hoveredRowIndex={hoveredRowIndex}
+              eixos={eixos}
+              prioridades={prioridades}
+              temas={temas}
+              statusAcao={statusAcao}
+              usuarios={usuarios}
+              handleDragEnd={handleDragEnd}
+              handleToggleConcluida={handleToggleConcluida}
+              handleQuickEdit={handleQuickEdit}
+              handleCellEdit={handleCellEdit}
+              handleCellSave={handleCellSave}
+              handleCellCancel={handleCellCancel}
+              setEditingValue={setEditingValue}
+              setHoveredRowIndex={setHoveredRowIndex}
+              handleInsertAction={handleInsertAction}
+              deleteAction={deleteAction}
+              updateAction={updateAction}
+              handleResizeStart={handleResizeStart}
+              isMaximized={false}
+            />
           </div>
         </CardContent>
       </Card>
