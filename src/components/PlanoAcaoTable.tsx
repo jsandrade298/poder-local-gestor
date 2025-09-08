@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea";
 import { GripVertical, GripHorizontal, CalendarIcon, Trash2, Plus } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { format } from "date-fns";
@@ -101,9 +101,9 @@ export function PlanoAcaoTable({
           <TableHead className="w-12">
             <Checkbox />
           </TableHead>
-          <TableHead style={{ width: columnWidths.eixo }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.eixo }} className={!isMaximized ? "relative" : "relative"}>
             Eixo
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('eixo', e)}
@@ -112,9 +112,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.prioridade }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.prioridade }} className={!isMaximized ? "relative" : "relative"}>
             Prioridade
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('prioridade', e)}
@@ -123,9 +123,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.tema }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.tema }} className={!isMaximized ? "relative" : "relative"}>
             Tema
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('tema', e)}
@@ -134,9 +134,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.acao }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.acao }} className={!isMaximized ? "relative" : "relative"}>
             Ação
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('acao', e)}
@@ -145,9 +145,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.responsavel }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.responsavel }} className={!isMaximized ? "relative" : "relative"}>
             Responsável
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('responsavel', e)}
@@ -156,9 +156,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.apoio }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.apoio }} className={!isMaximized ? "relative" : "relative"}>
             Apoio
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('apoio', e)}
@@ -167,9 +167,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.status }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.status }} className={!isMaximized ? "relative" : "relative"}>
             Status
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('status', e)}
@@ -178,9 +178,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.prazo }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.prazo }} className={!isMaximized ? "relative" : "relative"}>
             Prazo
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('prazo', e)}
@@ -189,9 +189,9 @@ export function PlanoAcaoTable({
               </div>
             )}
           </TableHead>
-          <TableHead style={{ width: columnWidths.atualizacao }} className={!isMaximized ? "relative" : ""}>
+          <TableHead style={{ width: columnWidths.atualizacao }} className={!isMaximized ? "relative" : "relative"}>
             Atualização
-            {!isMaximized && handleResizeStart && (
+            {handleResizeStart && (
               <div 
                 className="absolute right-0 top-0 h-full w-6 cursor-col-resize hover:bg-primary/30 flex items-center justify-center group"
                 onMouseDown={(e) => handleResizeStart('atualizacao', e)}
@@ -342,23 +342,14 @@ export function PlanoAcaoTable({
                             {/* Ação */}
                             <TableCell style={{ width: columnWidths.acao }}>
                               {editingCell?.actionId === action.id && editingCell?.field === 'acao' ? (
-                                <div className="flex gap-2 items-start">
-                                  <Textarea
-                                    value={editingValue}
-                                    onChange={(e) => setEditingValue(e.target.value)}
-                                    style={{ width: Math.max(columnWidths.acao - 100, 200) }}
-                                    className="min-h-[60px]"
-                                    autoFocus
-                                  />
-                                  <div className="flex flex-col gap-1">
-                                    <Button size="sm" onClick={handleCellSave}>
-                                      Salvar
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
+                                <AutoResizeTextarea
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  onSave={handleCellSave}
+                                  onCancel={handleCellCancel}
+                                  width={columnWidths.acao}
+                                  placeholder="Digite a ação..."
+                                />
                               ) : (
                                 <div 
                                   className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
@@ -396,23 +387,14 @@ export function PlanoAcaoTable({
                             {/* Apoio */}
                             <TableCell style={{ width: columnWidths.apoio }}>
                               {editingCell?.actionId === action.id && editingCell?.field === 'apoio' ? (
-                                <div className="flex gap-2 items-start">
-                                  <Textarea
-                                    value={editingValue}
-                                    onChange={(e) => setEditingValue(e.target.value)}
-                                    style={{ width: Math.max(columnWidths.apoio - 100, 150) }}
-                                    className="min-h-[60px]"
-                                    autoFocus
-                                  />
-                                  <div className="flex flex-col gap-1">
-                                    <Button size="sm" onClick={handleCellSave}>
-                                      Salvar
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
+                                <AutoResizeTextarea
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  onSave={handleCellSave}
+                                  onCancel={handleCellCancel}
+                                  width={columnWidths.apoio}
+                                  placeholder="Digite o apoio..."
+                                />
                               ) : (
                                 <div 
                                   className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"
@@ -488,23 +470,14 @@ export function PlanoAcaoTable({
                             {/* Atualização */}
                             <TableCell style={{ width: columnWidths.atualizacao }}>
                               {editingCell?.actionId === action.id && editingCell?.field === 'atualizacao' ? (
-                                <div className="flex gap-2 items-start">
-                                  <Textarea
-                                    value={editingValue}
-                                    onChange={(e) => setEditingValue(e.target.value)}
-                                    style={{ width: Math.max(columnWidths.atualizacao - 100, 200) }}
-                                    className="min-h-[60px]"
-                                    autoFocus
-                                  />
-                                  <div className="flex flex-col gap-1">
-                                    <Button size="sm" onClick={handleCellSave}>
-                                      Salvar
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
+                                <AutoResizeTextarea
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  onSave={handleCellSave}
+                                  onCancel={handleCellCancel}
+                                  width={columnWidths.atualizacao}
+                                  placeholder="Digite a atualização..."
+                                />
                               ) : (
                                 <div 
                                   className="cursor-pointer p-2 hover:bg-muted rounded min-h-[40px] overflow-hidden text-ellipsis"

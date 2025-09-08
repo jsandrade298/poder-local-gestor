@@ -636,19 +636,21 @@ export default function PlanoAcao() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] w-[98vw] p-0">
-              <DialogHeader className="p-6 pb-2 border-b">
+              <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
                 <DialogTitle className="flex items-center gap-2">
                   <Target className="h-6 w-6" />
                   Plano de Ação - Visualização Maximizada
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-hidden p-6 pt-0">
+              <div className="flex-1 overflow-hidden">
                 <div 
-                  className="relative bg-background border rounded-lg h-full overflow-hidden"
+                  className="h-full w-full overflow-auto"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'hsl(var(--border)) transparent'
+                  }}
                 >
-                  <div 
-                    className="h-full overflow-auto"
-                  >
+                  <div className="p-6 pt-4">
                     <PlanoAcaoTable
                       filteredActions={filteredActions}
                       isLoading={isLoading}
