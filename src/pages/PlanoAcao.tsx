@@ -908,7 +908,6 @@ export default function PlanoAcao() {
                   temas={temas}
                   statusAcao={statusAcao}
                   usuarios={usuarios}
-                  handleDragEnd={handleDragEnd}
                   handleToggleConcluida={handleToggleConcluida}
                   handleQuickEdit={handleQuickEdit}
                   handleCellEdit={handleCellEdit}
@@ -1134,7 +1133,7 @@ export default function PlanoAcao() {
               temas={temas}
               statusAcao={statusAcao}
               usuarios={usuarios}
-              handleDragEnd={handleDragEnd}
+              
               handleToggleConcluida={handleToggleConcluida}
               handleQuickEdit={handleQuickEdit}
               handleCellEdit={handleCellEdit}

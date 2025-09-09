@@ -4,9 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, GripVertical } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
@@ -35,8 +34,9 @@ interface Demanda {
   areas?: { nome: string };
   municipes?: { nome: string };
   responsavel_id?: string;
-  tipo?: 'demanda' | 'tarefa'; // Novo campo para diferenciar
-  tarefa_responsavel_id?: string; // Campo específico para responsável da tarefa
+  tipo?: 'demanda' | 'tarefa';
+  tarefa_responsavel_id?: string;
+  eixo_id?: string;
 }
 
 interface Tarefa {
@@ -66,9 +66,9 @@ export default function Kanban() {
   const [isViewTarefaDialogOpen, setIsViewTarefaDialogOpen] = useState(false);
   const [isEditTarefaDialogOpen, setIsEditTarefaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
+  const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
+  const [orderByEixo, setOrderByEixo] = useState<string>("");
   const queryClient = useQueryClient();
-
 
   // Buscar demandas e tarefas do kanban
   const { data: demandas = [], isLoading } = useQuery({
@@ -116,10 +116,9 @@ export default function Kanban() {
         }) || [];
       }
       
-      // Buscar tarefas do kanban - incluir tarefas do usuário E tarefas atribuídas a ele
+      // Buscar tarefas do kanban
       let tarefasData: any[] = [];
       
-      // Buscar tarefas com colaboradores
       const { data, error } = await supabase
         .from('tarefas')
         .select(`
@@ -137,19 +136,15 @@ export default function Kanban() {
       
       // Filtrar tarefas baseado no usuário selecionado
       if (selectedUser === "producao-legislativa") {
-        // Para produção legislativa, mostrar tarefas deste tipo
         tarefasData = data?.filter(tarefa => tarefa.kanban_type === selectedUser) || [];
       } else {
-         // Para usuários específicos, incluir tarefas onde:
-         // 1. Ele é colaborador OU
-         // 2. O kanban_type é dele (compatibilidade com tarefas antigas)
-         tarefasData = data?.filter(tarefa => 
-           tarefa.kanban_type === selectedUser ||
-           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
-         ) || [];
+        tarefasData = data?.filter(tarefa => 
+          tarefa.kanban_type === selectedUser ||
+          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
+        ) || [];
       }
       
-      // Combinar tarefas formatadas para o mesmo padrão das demandas
+      // Combinar tarefas formatadas
       const tarefasFormatadas = tarefasData?.map(tarefa => ({
         id: tarefa.id,
         titulo: tarefa.titulo,
@@ -166,7 +161,6 @@ export default function Kanban() {
         colaboradores: tarefa.tarefa_colaboradores?.map((tc: any) => tc.colaborador) || []
       })) || [];
       
-      // Combinar demandas e tarefas
       return [...demandasCompletas, ...tarefasFormatadas];
     }
   });
@@ -188,6 +182,23 @@ export default function Kanban() {
     }
   });
 
+  // Buscar eixos para ordenação
+  const { data: eixos = [] } = useQuery({
+    queryKey: ['eixos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('eixos')
+        .select('id, nome, cor')
+        .order('nome');
+      
+      if (error) {
+        console.error('Erro ao buscar eixos:', error);
+        throw error;
+      }
+      return data || [];
+    }
+  });
+
   // Detectar parâmetro de tarefa na URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -198,27 +209,20 @@ export default function Kanban() {
       if (tarefa) {
         setSelectedTarefa(tarefa);
         setIsViewTarefaDialogOpen(true);
-        // Limpar parâmetro da URL
         window.history.replaceState({}, '', window.location.pathname);
       }
     }
   }, [demandas]);
 
-  // Mutation para limpar kanban (demandas e tarefas)
+  // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
-      console.log("🔄 Iniciando limpeza do kanban...");
-      
-      // Remover todas as entradas do kanban selecionado
       const { data: kanbanEntries, error: fetchError } = await supabase
         .from('demanda_kanbans')
         .select('id')
         .eq('kanban_type', selectedUser);
       
-      if (fetchError) {
-        console.error("❌ Erro ao buscar entradas do kanban:", fetchError);
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
       
       if (kanbanEntries && kanbanEntries.length > 0) {
         const { error } = await supabase
@@ -226,29 +230,21 @@ export default function Kanban() {
           .delete()
           .eq('kanban_type', selectedUser);
         
-        if (error) {
-          console.error("❌ Erro ao remover entradas do kanban:", error);
-          throw error;
-        }
+        if (error) throw error;
       }
       
-      // Remover todas as tarefas do kanban selecionado
+      // Remover tarefas
       let tarefasEntries: any[] = [];
       
       if (selectedUser === "producao-legislativa") {
-        // Para produção legislativa, remover apenas tarefas deste tipo
         const { data, error } = await supabase
           .from('tarefas')
           .select('id')
           .eq('kanban_type', selectedUser);
         
-        if (error) {
-          console.error("❌ Erro ao buscar tarefas de produção legislativa:", error);
-          throw error;
-        }
+        if (error) throw error;
         tarefasEntries = data || [];
       } else {
-        // Para usuários específicos, buscar tarefas onde ele é criador, colaborador ou o kanban_type é dele
         const { data, error } = await supabase
           .from('tarefas')
           .select(`
@@ -258,12 +254,8 @@ export default function Kanban() {
             tarefa_colaboradores(colaborador_id)
           `);
         
-        if (error) {
-          console.error("❌ Erro ao buscar tarefas do usuário:", error);
-          throw error;
-        }
+        if (error) throw error;
         
-        // Filtrar tarefas que pertencem ao usuário
         tarefasEntries = data?.filter(tarefa => 
           tarefa.kanban_type === selectedUser ||
           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador_id === selectedUser)
@@ -271,27 +263,21 @@ export default function Kanban() {
       }
       
       if (tarefasEntries && tarefasEntries.length > 0) {
-        // Deletar as tarefas encontradas
         const tarefaIds = tarefasEntries.map(t => t.id);
         const { error } = await supabase
           .from('tarefas')
           .delete()
           .in('id', tarefaIds);
         
-        if (error) {
-          console.error("❌ Erro ao remover tarefas:", error);
-          throw error;
-        }
+        if (error) throw error;
       }
-      
-      console.log("✅ Kanban limpo com sucesso!");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
-      console.error('❌ Erro ao limpar kanban:', error);
+      console.error('Erro ao limpar kanban:', error);
       toast.error(`Erro ao limpar kanban: ${error.message}`);
     }
   });
@@ -337,79 +323,6 @@ export default function Kanban() {
     }
   });
 
-  // Mutation para atualizar posição no kanban (demandas e tarefas)
-  const updateKanbanPositionMutation = useMutation({
-    mutationFn: async ({ itemId, newPosition, tipo }: { itemId: string; newPosition: string; tipo: 'demanda' | 'tarefa' }) => {
-      console.log('🔄 Updating position:', { itemId, newPosition, tipo });
-      
-      if (tipo === 'tarefa') {
-        const { error } = await supabase
-          .from('tarefas')
-          .update({ kanban_position: newPosition })
-          .eq('id', itemId);
-        
-        if (error) {
-          console.error('❌ Error updating tarefa position:', error);
-          throw error;
-        }
-        console.log('✅ Tarefa position updated successfully');
-      } else {
-        const { error } = await supabase
-          .from('demanda_kanbans')
-          .update({ kanban_position: newPosition })
-          .eq('demanda_id', itemId)
-          .eq('kanban_type', selectedUser);
-        
-        if (error) {
-          console.error('❌ Error updating demanda position:', error);
-          throw error;
-        }
-        console.log('✅ Demanda position updated successfully');
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      toast.success("Posição atualizada com sucesso!");
-    },
-    onError: (error) => {
-      console.error('❌ Erro ao atualizar posição:', error);
-      toast.error("Erro ao atualizar posição: " + error.message);
-    }
-  });
-
-  const handleDragEnd = (result: any) => {
-    console.log('🎯 Drag ended:', result);
-    
-    if (!result.destination) {
-      console.log('❌ No destination found');
-      return;
-    }
-
-    const itemId = result.draggableId;
-    const sourcePosition = result.source.droppableId;
-    const destinationPosition = result.destination.droppableId;
-
-    console.log('📦 Item ID:', itemId);
-    console.log('📍 Source:', sourcePosition, '➡️ Destination:', destinationPosition);
-
-    if (sourcePosition === destinationPosition) {
-      console.log('⏹️ Same position, skipping');
-      return;
-    }
-
-    // Descobrir se é demanda ou tarefa
-    const item = demandas.find(d => d.id === itemId);
-    const tipo = item?.tipo || 'demanda';
-
-    console.log('🏷️ Item type:', tipo);
-
-    updateKanbanPositionMutation.mutate({ 
-      itemId, 
-      newPosition: destinationPosition,
-      tipo
-    });
-  };
-
   const getPrioridadeColor = (prioridade: string) => {
     switch (prioridade) {
       case 'baixa': return 'hsl(var(--chart-4))';
@@ -444,7 +357,22 @@ export default function Kanban() {
   };
 
   const getDemandsByStatus = (kanbanPosition: string) => {
-    return demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
+    let items = demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
+    
+    // Aplicar ordenação por eixo se selecionado
+    if (orderByEixo) {
+      items = items.sort((a, b) => {
+        const aHasEixo = a.eixo_id === orderByEixo;
+        const bHasEixo = b.eixo_id === orderByEixo;
+        
+        if (aHasEixo && !bHasEixo) return -1;
+        if (!aHasEixo && bHasEixo) return 1;
+        
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    }
+    
+    return items;
   };
 
   const handleEditDemanda = (demanda: any) => {
@@ -478,354 +406,282 @@ export default function Kanban() {
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold text-foreground">Kanban</h1>
               
-              {/* Dropdown de seleção de usuário */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="min-w-[200px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
-                    {selectedUser === "producao-legislativa" 
-                      ? "Produção Legislativa" 
-                      : responsaveis.find(r => r.id === selectedUser)?.nome || "Selecionar usuário"
-                    }
-                    <ChevronDown className="h-4 w-4 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[200px] bg-background/95 backdrop-blur border shadow-lg">
-                  <DropdownMenuItem 
-                    onClick={() => setSelectedUser("producao-legislativa")}
-                    className={selectedUser === "producao-legislativa" ? "bg-accent text-accent-foreground" : ""}
-                  >
-                    Produção Legislativa
-                  </DropdownMenuItem>
-                  {responsaveis.map((user) => (
+              <div className="flex items-center gap-3">
+                {/* Dropdown de seleção de usuário */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="min-w-[200px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
+                      {selectedUser === "producao-legislativa" 
+                        ? "Produção Legislativa" 
+                        : responsaveis.find(r => r.id === selectedUser)?.nome || "Selecionar usuário"
+                      }
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[200px] bg-background/95 backdrop-blur border shadow-lg">
                     <DropdownMenuItem 
-                      key={user.id}
-                      onClick={() => setSelectedUser(user.id)}
-                      className={selectedUser === user.id ? "bg-accent text-accent-foreground" : ""}
+                      onClick={() => setSelectedUser("producao-legislativa")}
+                      className={selectedUser === "producao-legislativa" ? "bg-accent" : ""}
                     >
-                      {user.nome}
+                      Produção Legislativa
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {responsaveis.map((responsavel) => (
+                      <DropdownMenuItem 
+                        key={responsavel.id}
+                        onClick={() => setSelectedUser(responsavel.id)}
+                        className={selectedUser === responsavel.id ? "bg-accent" : ""}
+                      >
+                        {responsavel.nome}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Dropdown de ordenação por eixo */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="min-w-[180px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
+                      {orderByEixo 
+                        ? eixos.find(e => e.id === orderByEixo)?.nome || "Selecionar eixo"
+                        : "Ordenar por eixo"
+                      }
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[180px] bg-background/95 backdrop-blur border shadow-lg">
+                    <DropdownMenuItem 
+                      onClick={() => setOrderByEixo("")}
+                      className={!orderByEixo ? "bg-accent" : ""}
+                    >
+                      Sem ordenação
+                    </DropdownMenuItem>
+                    {eixos.map((eixo) => (
+                      <DropdownMenuItem 
+                        key={eixo.id}
+                        onClick={() => setOrderByEixo(eixo.id)}
+                        className={orderByEixo === eixo.id ? "bg-accent" : ""}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: eixo.cor }}
+                          />
+                          {eixo.nome}
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-            
             <p className="text-muted-foreground">
-              {selectedUser === "producao-legislativa" 
-                ? "Organize o fluxo das demandas na produção legislativa (independente do status real)"
-                : `Kanban pessoal de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
-              }
+              Visualize e gerencie as tarefas e demandas em formato kanban
             </p>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-3">
+            <AdicionarTarefaDialog 
+              kanbanType={selectedUser}
+            />
+            
+            <AdicionarDemandasKanbanDialog 
+              open={isAdicionarDialogOpen}
+              onOpenChange={setIsAdicionarDialogOpen}
+            />
+
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  disabled={limparKanbanMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {limparKanbanMutation.isPending ? 'Limpando...' : 'Limpar Kanban'}
+                <Button variant="destructive" size="sm" className="gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Limpar Kanban
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Confirmar limpeza do kanban{" "}
-                    {selectedUser === "producao-legislativa" 
-                      ? "de Produção Legislativa"
-                      : `de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
-                    }
-                  </AlertDialogTitle>
+                  <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Isso removerá todas as demandas do kanban{" "}
-                    <strong>
-                      {selectedUser === "producao-legislativa" 
-                        ? "de Produção Legislativa"
-                        : `pessoal de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
-                      }
-                    </strong>. 
-                    <br />
-                    As demandas voltarão para a lista geral e poderão ser adicionadas novamente quando necessário.
-                    Esta ação não pode ser desfeita.
-                    <br /><br />
-                    <strong>Demandas que serão removidas deste kanban:</strong>
-                    <br />
-                    • A Fazer: {getDemandsByStatus('a_fazer').length} demandas
-                    <br />
-                    • Em Progresso: {getDemandsByStatus('em_progresso').length} demandas
-                    <br />
-                    • Feito: {getDemandsByStatus('feito').length} demandas
-                    <br />
-                    • <strong>Total: {demandas.length} demandas</strong>
-                    <br /><br />
-                    <em>Outros kanbans não serão afetados.</em>
+                    Esta ação irá remover todas as demandas e tarefas deste kanban. Esta ação não pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
+                  <AlertDialogAction 
                     onClick={() => limparKanbanMutation.mutate()}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={limparKanbanMutation.isPending}
                   >
-                    {limparKanbanMutation.isPending ? 'Limpando...' : 'Limpar Kanban'}
+                    Confirmar
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <AdicionarTarefaDialog kanbanType={selectedUser} />
-            <Button onClick={() => setIsAdicionarDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Demanda
-            </Button>
           </div>
         </div>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {statusColumns.map((column) => {
-              const columnDemandas = getDemandsByStatus(column.id);
-              
-              return (
-                <div key={column.id} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 
-                      className="text-lg font-semibold text-foreground flex items-center gap-2"
-                      style={{ borderLeftColor: column.color, borderLeftWidth: '4px', paddingLeft: '12px' }}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {statusColumns.map((column) => {
+            const columnDemandas = getDemandsByStatus(column.id);
+            
+            return (
+              <div key={column.id} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: column.color }}
+                    />
+                    {column.title}
+                    <Badge variant="secondary" className="ml-2">
+                      {columnDemandas.length}
+                    </Badge>
+                  </h2>
+                </div>
+
+                <div className="min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                  {columnDemandas.map((demanda) => (
+                    <Card
+                      key={demanda.id}
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4"
+                      style={{
+                        borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))'
+                      }}
+                      onClick={() => {
+                        if (demanda.tipo === 'tarefa') {
+                          setSelectedTarefa(demanda);
+                          setIsViewTarefaDialogOpen(true);
+                        } else {
+                          setSelectedDemanda(demanda);
+                          setIsViewDialogOpen(true);
+                        }
+                      }}
                     >
-                      {column.title}
-                      <Badge variant="secondary" className="text-xs">
-                        {columnDemandas.length}
-                      </Badge>
-                    </h2>
-                  </div>
-
-                  <Droppable droppableId={column.id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
-                          snapshot.isDraggingOver ? 'border-primary bg-accent/30' : 'border-muted-foreground/20'
-                        }`}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (demanda.tipo === 'tarefa') {
+                            removerTarefaMutation.mutate(demanda.id);
+                          } else {
+                            removerDemandaMutation.mutate(demanda.id);
+                          }
+                        }}
                       >
-                        {columnDemandas.map((demanda, index) => (
-                          <Draggable
-                            key={demanda.id}
-                            draggableId={demanda.id}
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
-                                  snapshot.isDragging ? 'shadow-xl rotate-1 scale-105 z-50' : ''
-                                }`}
-                                style={{
-                                  borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))',
-                                  ...provided.draggableProps.style,
-                                  zIndex: snapshot.isDragging ? 9999 : 'auto'
-                                }}
-                                onClick={(e) => {
-                                  // Prevenir click durante drag
-                                  if (snapshot.isDragging) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    return;
-                                  }
-                                  
-                                  if (demanda.tipo === 'tarefa') {
-                                    setSelectedTarefa(demanda);
-                                    setIsViewTarefaDialogOpen(true);
-                                  } else {
-                                    setSelectedDemanda(demanda);
-                                    setIsViewDialogOpen(true);
-                                  }
-                                }}
-                              >
-                                {/* Drag handle visual indicator */}
-                                <div 
-                                  {...provided.dragHandleProps}
-                                  className="absolute top-1 left-1 opacity-0 group-hover:opacity-70 transition-opacity cursor-grab active:cursor-grabbing"
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                >
-                                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (demanda.tipo === 'tarefa') {
-                                      removerTarefaMutation.mutate(demanda.id);
-                                    } else {
-                                      removerDemandaMutation.mutate(demanda.id);
-                                    }
-                                  }}
-                                  disabled={removerDemandaMutation.isPending || removerTarefaMutation.isPending}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                                
-                                <CardHeader className="pb-2">
-                                   <div className="flex items-start justify-between gap-2">
-                                     <div className="flex items-center gap-2 flex-1">
-                                       <CardTitle className="text-sm font-medium line-clamp-2">
-                                         {demanda.titulo}
-                                       </CardTitle>
-                                       {demanda.tipo === 'tarefa' && (
-                                         <Badge variant="secondary" className="text-xs shrink-0 bg-blue-100 text-blue-700">
-                                           Tarefa
-                                         </Badge>
-                                       )}
-                                     </div>
-                                     <Badge variant="outline" className="text-xs shrink-0">
-                                       #{demanda.protocolo}
-                                     </Badge>
-                                   </div>
-                                </CardHeader>
-                                
-                                <CardContent className="pt-0 space-y-2">
-                                  <p className="text-xs text-muted-foreground line-clamp-2">
-                                    {demanda.descricao}
-                                  </p>
-                                  
-                                  <div className="flex items-center justify-between">
-                                    <Badge 
-                                      variant="outline" 
-                                      className="text-xs"
-                                      style={{ 
-                                        borderColor: getPrioridadeColor(demanda.prioridade),
-                                        color: getPrioridadeColor(demanda.prioridade)
-                                      }}
-                                    >
-                                      {getPrioridadeLabel(demanda.prioridade)}
-                                    </Badge>
-                                    
-                                    {isOverdue(demanda.data_prazo) && (
-                                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    {demanda.areas?.nome && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <MapPin className="h-3 w-3" />
-                                        <span className="truncate">{demanda.areas.nome}</span>
-                                      </div>
-                                    )}
-                                    
-                                    {demanda.municipes?.nome && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span className="truncate">{demanda.municipes.nome}</span>
-                                      </div>
-                                    )}
-
-                                    {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span className="truncate">
-                                          Colaboradores: {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {demanda.tipo !== 'tarefa' && demanda.responsavel_id && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3 w-3" />
-                                        <span className="truncate">
-                                          Resp: {getResponsavelNome(demanda.responsavel_id)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    
-                                    {demanda.data_prazo && (
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="h-3 w-3" />
-                                        <span>Prazo: {formatDateTime(demanda.data_prazo).split(' ')[0]}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
+                        <X className="h-3 w-3" />
+                      </Button>
+                      
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1 flex-1">
+                            <CardTitle className="text-sm font-medium leading-tight">
+                              {demanda.titulo}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">
+                              {demanda.protocolo}
+                            </p>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="pt-0 space-y-2">
+                        {demanda.descricao && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {demanda.descricao}
+                          </p>
+                        )}
                         
-                        {columnDemandas.length === 0 && (
-                          <div className="flex items-center justify-center h-32 text-muted-foreground">
-                            <p className="text-sm">Nenhuma demanda nesta coluna</p>
+                        <div className="flex items-center justify-between">
+                          <Badge 
+                            variant="outline" 
+                            style={{ 
+                              borderColor: getPrioridadeColor(demanda.prioridade),
+                              color: getPrioridadeColor(demanda.prioridade)
+                            }}
+                            className="text-xs"
+                          >
+                            {getPrioridadeLabel(demanda.prioridade)}
+                          </Badge>
+                          
+                          {demanda.data_prazo && (
+                            <div className={`flex items-center gap-1 text-xs ${
+                              isOverdue(demanda.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
+                            }`}>
+                              <Calendar className="h-3 w-3" />
+                              {formatDateTime(demanda.data_prazo)}
+                              {isOverdue(demanda.data_prazo) && (
+                                <AlertTriangle className="h-3 w-3 ml-1" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          {demanda.areas?.nome && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {demanda.areas.nome}
+                            </div>
+                          )}
+                          
+                          {demanda.municipes?.nome && (
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {demanda.municipes.nome}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id) && (
+                          <div className="text-xs text-muted-foreground">
+                            <strong>Responsável:</strong> {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id)}
                           </div>
                         )}
-                      </div>
-                    )}
-                  </Droppable>
+                        
+                        {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            <strong>Colaboradores:</strong> {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {columnDemandas.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                      Nenhum item nesta coluna
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </DragDropContext>
+              </div>
+            );
+          })}
+        </div>
 
         {/* Dialogs */}
-        {selectedDemanda && (
-          <ViewDemandaDialog
-            demanda={selectedDemanda}
-            open={isViewDialogOpen}
-            onOpenChange={setIsViewDialogOpen}
-            onEdit={handleEditDemanda}
-          />
-        )}
+        <ViewDemandaDialog
+          demanda={selectedDemanda}
+          open={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          onEdit={() => handleEditDemanda(selectedDemanda!)}
+        />
 
-        {selectedDemanda && (
-          <EditDemandaDialog
-            demanda={selectedDemanda}
-            open={isEditDialogOpen}
-            onOpenChange={(open) => {
-              setIsEditDialogOpen(open);
-              if (!open) {
-                queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-              }
-            }}
-          />
-        )}
+        <EditDemandaDialog
+          demanda={selectedDemanda}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+        />
 
-        {/* Dialogs de Tarefa */}
-        {selectedTarefa && (
-          <ViewTarefaDialog
-            tarefa={selectedTarefa}
-            open={isViewTarefaDialogOpen}
-            onOpenChange={setIsViewTarefaDialogOpen}
-            onEdit={handleEditTarefa}
-          />
-        )}
+        <ViewTarefaDialog
+          tarefa={selectedTarefa}
+          open={isViewTarefaDialogOpen}
+          onOpenChange={setIsViewTarefaDialogOpen}
+          onEdit={() => handleEditTarefa(selectedTarefa!)}
+        />
 
-        {selectedTarefa && (
-          <EditTarefaDialog
-            tarefa={selectedTarefa}
-            open={isEditTarefaDialogOpen}
-            onOpenChange={(open) => {
-              setIsEditTarefaDialogOpen(open);
-              if (!open) {
-                queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-              }
-            }}
-          />
-        )}
-
-        <AdicionarDemandasKanbanDialog
-          open={isAdicionarDialogOpen}
-          selectedUser={selectedUser}
-          onOpenChange={(open) => {
-            setIsAdicionarDialogOpen(open);
-            if (!open) {
-              queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-            }
-          }}
+        <EditTarefaDialog
+          tarefa={selectedTarefa}
+          open={isEditTarefaDialogOpen}
+          onOpenChange={setIsEditTarefaDialogOpen}
         />
       </div>
     </div>

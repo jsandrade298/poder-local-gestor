@@ -8,8 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AutoResizeTextarea } from "@/components/ui/AutoResizeTextarea";
-import { GripVertical, GripHorizontal, CalendarIcon, Trash2, Plus } from "lucide-react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { GripHorizontal, CalendarIcon, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +24,7 @@ interface PlanoAcaoTableProps {
   temas: any[];
   statusAcao: any[];
   usuarios: any[];
-  handleDragEnd: (result: any) => void;
+  
   handleToggleConcluida: (action: any) => void;
   handleQuickEdit: (action: any, field: string, value: any) => void;
   handleCellEdit: (actionId: string, field: string, currentValue: string) => void;
@@ -52,7 +51,7 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
   temas,
   statusAcao,
   usuarios,
-  handleDragEnd,
+  
   handleToggleConcluida,
   handleQuickEdit,
   handleCellEdit,
@@ -101,9 +100,6 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
       {/* Header fixo com backdrop blur */}
       <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm border-b shadow-sm z-10">
         <TableRow>
-          <TableHead className="w-12">
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </TableHead>
           <TableHead className="w-12">
             <Checkbox />
           </TableHead>
@@ -212,16 +208,7 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
         </TableRow>
       </TableHeader>
       
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="actions-table">
-          {(provided, snapshot) => (
-            <TableBody 
-              {...provided.droppableProps} 
-              ref={provided.innerRef}
-              className={cn(
-                snapshot.isDraggingOver && "bg-accent/30"
-              )}
-            >
+      <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={12} className="text-center py-8">
@@ -236,41 +223,15 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
                 </TableRow>
               ) : (
                 <>
-                  <InsertRow index={0} />
-                  {filteredActions.map((action, index) => (
-                    <React.Fragment key={action.id}>
-                      <Draggable 
-                        draggableId={action.id} 
-                        index={index}
-                      >
-                        {(provided, snapshot) => (
-                          <TableRow 
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className={cn(
-                              action.concluida ? "opacity-60" : "",
-                              snapshot.isDragging && "shadow-xl bg-background z-50 border-2 border-primary/50",
-                              "relative"
-                            )}
-                            style={{
-                              ...provided.draggableProps.style,
-                              // Garantir que o item em drag tenha z-index alto
-                              zIndex: snapshot.isDragging ? 9999 : 'auto'
-                            }}
-                          >
-                            {/* Handle de drag */}
-                            <TableCell className="w-12 p-2">
-                              <div 
-                                {...provided.dragHandleProps} 
-                                className="cursor-grab active:cursor-grabbing hover:bg-accent/50 p-1 rounded"
-                                onMouseDown={(e) => {
-                                  // Garantir que outros eventos não interfiram
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            </TableCell>
+                <InsertRow index={0} />
+                {filteredActions.map((action, index) => (
+                  <React.Fragment key={action.id}>
+                    <TableRow 
+                      className={cn(
+                        action.concluida ? "opacity-60" : "",
+                        "relative"
+                      )}
+                    >
                             
                             {/* Checkbox */}
                             <TableCell className="w-12">
@@ -543,19 +504,13 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
                                 </AlertDialogContent>
                               </AlertDialog>
                             </TableCell>
-                          </TableRow>
-                        )}
-                      </Draggable>
-                      <InsertRow index={index + 1} />
-                    </React.Fragment>
-                  ))}
-                </>
-              )}
-              {provided.placeholder}
-            </TableBody>
-          )}
-        </Droppable>
-      </DragDropContext>
+                    </TableRow>
+                    <InsertRow index={index + 1} />
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </TableBody>
     </Table>
   );
 });
