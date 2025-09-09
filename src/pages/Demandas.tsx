@@ -1352,13 +1352,6 @@ export default function Demandas() {
               </Button>
               
               <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  {isLoading ? 'Carregando...' : 
-                    pageSize === "all" ? 
-                      `${filteredDemandas.length} demandas` :
-                      `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
-                  }
-                </span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Mostrar:</span>
                   <Select 
@@ -1368,7 +1361,7 @@ export default function Demandas() {
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1379,6 +1372,13 @@ export default function Demandas() {
                     </SelectContent>
                   </Select>
                 </div>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {isLoading ? 'Carregando...' : 
+                    pageSize === "all" ? 
+                      `${filteredDemandas.length} demandas` :
+                      `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
+                  }
+                </span>
               </div>
             </div>
           </CardContent>
