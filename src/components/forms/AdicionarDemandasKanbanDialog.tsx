@@ -37,20 +37,37 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-disponiveis'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select(`
-          *,
-          areas(nome),
-          municipes(nome)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Erro ao buscar demandas:', error);
-        throw error;
+      let allDemandas: any[] = [];
+      let start = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('demandas')
+          .select(`
+            *,
+            areas(nome),
+            municipes(nome)
+          `)
+          .range(start, start + batchSize - 1)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Erro ao buscar demandas:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          allDemandas = [...allDemandas, ...data];
+          start += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
-      return data || [];
+      
+      return allDemandas;
     },
     enabled: open
   });
@@ -58,16 +75,33 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('areas')
-        .select('id, nome')
-        .order('nome');
-      
-      if (error) {
-        console.error('Erro ao buscar áreas:', error);
-        throw error;
+      let allAreas: any[] = [];
+      let start = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('areas')
+          .select('id, nome')
+          .range(start, start + batchSize - 1)
+          .order('nome');
+        
+        if (error) {
+          console.error('Erro ao buscar áreas:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          allAreas = [...allAreas, ...data];
+          start += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
-      return data || [];
+      
+      return allAreas;
     },
     enabled: open
   });
@@ -75,16 +109,33 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const { data: responsaveis = [] } = useQuery({
     queryKey: ['responsaveis'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, nome')
-        .order('nome');
-      
-      if (error) {
-        console.error('Erro ao buscar responsáveis:', error);
-        throw error;
+      let allResponsaveis: any[] = [];
+      let start = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, nome')
+          .range(start, start + batchSize - 1)
+          .order('nome');
+        
+        if (error) {
+          console.error('Erro ao buscar responsáveis:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          allResponsaveis = [...allResponsaveis, ...data];
+          start += batchSize;
+          hasMore = data.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
-      return data || [];
+      
+      return allResponsaveis;
     },
     enabled: open
   });
@@ -401,7 +452,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                   onCheckedChange={handleSelectAll}
                 />
                 <label htmlFor="select-all" className="text-sm font-medium">
-                  Selecionar todas ({filteredDemandas.length})
+                  Selecionar todas ({filteredDemandas.length} de {demandas.length} total)
                 </label>
               </div>
               <Badge variant="secondary">
@@ -409,7 +460,8 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {filteredDemandas.length} demanda(s) disponível(is)
+              {filteredDemandas.length} de {demandas.length} demanda(s) disponível(is)
+              {demandas.length > 1000 && " (carregadas em lotes)"}
             </p>
           </div>
 
@@ -418,12 +470,15 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-2">Carregando demandas...</span>
+                <span className="ml-2">Carregando todas as demandas em lotes...</span>
+                <div className="ml-2 text-xs text-muted-foreground">
+                  Isso pode levar alguns segundos para grandes volumes de dados
+                </div>
               </div>
             ) : filteredDemandas.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Nenhuma demanda encontrada com os filtros selecionados.</p>
-                <p className="text-xs mt-1">Todas as demandas já estão no kanban ou foram canceladas.</p>
+                <p className="text-xs mt-1">Ajuste os filtros para ver mais demandas.</p>
               </div>
             ) : (
               <Table>
