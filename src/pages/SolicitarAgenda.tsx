@@ -1266,13 +1266,27 @@ const SolicitarAgenda = () => {
         }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo || "Agenda"}
-                  {/* Debug: {JSON.stringify({titulo: selectedAgenda?.titulo, desc: selectedAgenda?.descricao_objetivo})} */}
-                </DialogTitle>
-                {/* Botão de editar no modal - verificar se usuário pode editar */}
+              <DialogTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo || "Agenda"}
+                {/* Debug: {JSON.stringify({titulo: selectedAgenda?.titulo, desc: selectedAgenda?.descricao_objetivo})} */}
+              </DialogTitle>
+            </DialogHeader>
+
+            <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden" onValueChange={(value) => {
+              // Quando trocar para aba mensagens, fazer scroll para o final
+              if (value === "mensagens" && mensagens && mensagens.length > 0) {
+                setTimeout(scrollToBottom, 100);
+              }
+            }}>
+              <div className="flex items-center justify-between mb-4">
+                <TabsList className="grid grid-cols-3 w-auto">
+                  <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+                  <TabsTrigger value="participantes">Participantes</TabsTrigger>
+                  <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
+                </TabsList>
+                
+                {/* Botão de editar posicionado ao lado das abas */}
                 {user && selectedAgenda && (
                   selectedAgenda.solicitante_id === user.id ||
                   selectedAgenda.validador_id === user.id ||
@@ -1292,19 +1306,6 @@ const SolicitarAgenda = () => {
                   </Button>
                 )}
               </div>
-            </DialogHeader>
-
-            <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden" onValueChange={(value) => {
-              // Quando trocar para aba mensagens, fazer scroll para o final
-              if (value === "mensagens" && mensagens && mensagens.length > 0) {
-                setTimeout(scrollToBottom, 100);
-              }
-            }}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-                <TabsTrigger value="participantes">Participantes</TabsTrigger>
-                <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
-              </TabsList>
 
               <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
                 <Card>
