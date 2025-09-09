@@ -127,7 +127,9 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
     const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
     const matchesMunicipe = municipeFilter === "all" || demanda.municipe_id === municipeFilter;
     const matchesPrioridade = prioridadeFilter === "all" || demanda.prioridade === prioridadeFilter;
-    const matchesResponsavel = responsavelFilter === "all" || demanda.responsavel_id === responsavelFilter;
+    const matchesResponsavel = responsavelFilter === "all" || 
+                            (responsavelFilter === "undefined" && !demanda.responsavel_id) ||
+                            demanda.responsavel_id === responsavelFilter;
 
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesPrioridade && matchesResponsavel;
   });
@@ -289,6 +291,35 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                 <SelectItem value="media">Média</SelectItem>
                 <SelectItem value="alta">Alta</SelectItem>
                 <SelectItem value="urgente">Urgente</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Munícipe" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                <SelectItem value="all">Todos os Munícipes</SelectItem>
+                {municipes.map((municipe) => (
+                  <SelectItem key={municipe.id} value={municipe.id}>
+                    {municipe.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                <SelectItem value="undefined">Sem Responsável</SelectItem>
+                {responsaveis.map((responsavel) => (
+                  <SelectItem key={responsavel.id} value={responsavel.id}>
+                    {responsavel.nome}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
