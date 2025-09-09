@@ -275,10 +275,10 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           Biblioteca de Documentos
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Library className="h-5 w-5" />
+      <DialogContent className="max-w-5xl w-full max-h-[95vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0 border-b pb-4">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Library className="h-6 w-6" />
             Biblioteca de Documentos Modelo
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -286,25 +286,30 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </p>
         </DialogHeader>
 
-        <div className="flex flex-col min-h-0 flex-1 space-y-4">
+        <div className="flex flex-col min-h-0 flex-1 space-y-6 py-4">
           {/* Upload */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Adicionar Novos Documentos</CardTitle>
+          <Card className="border-2 border-dashed border-muted">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Adicionar Novos Documentos
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <Button 
                   onClick={handleFileSelect}
                   disabled={uploadProgress}
-                  className="gap-2"
+                  className="gap-2 min-w-fit"
+                  size="lg"
                 >
                   <Upload className="h-4 w-4" />
                   {uploadProgress ? 'Enviando...' : 'Selecionar Arquivos'}
                 </Button>
-                <span className="text-sm text-muted-foreground self-center">
-                  PDF, DOC, DOCX, TXT
-                </span>
+                <div className="text-sm text-muted-foreground">
+                  <p>Formatos aceitos: PDF, DOC, DOCX, TXT</p>
+                  <p className="text-xs">Múltiplos arquivos podem ser selecionados</p>
+                </div>
               </div>
               <input
                 ref={fileInputRef}
@@ -319,75 +324,91 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
 
           {/* Lista de Documentos */}
           <Card className="flex flex-col min-h-0 flex-1">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle className="text-lg">
-                Selecionar Documentos para Contexto
+            <CardHeader className="flex-shrink-0 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Selecionar Documentos para Contexto
+                </CardTitle>
                 {documentosSelecionados.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="px-3 py-1">
                     {documentosSelecionados.length} selecionado(s)
                   </Badge>
                 )}
-              </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="pb-2">
-              <div className="max-h-[400px] overflow-y-auto pr-2">{/* Usando div com overflow simples */}
-                {loading ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    Carregando documentos...
-                  </div>
-                ) : Object.keys(agruparPorCategoria(documentos)).length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhum documento encontrado.</p>
-                    <p className="text-sm">Faça upload dos primeiros documentos modelo.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(agruparPorCategoria(documentos)).map(([categoria, docs]) => (
-                      <div key={categoria}>
-                        <h4 className="font-medium text-sm text-muted-foreground mb-2">
-                          {categoria}
-                        </h4>
-                        <div className="space-y-2 ml-2">
-                          {docs.map((doc) => (
-                            <div key={doc.id} className="flex items-center justify-between p-2 border rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <Checkbox
-                                  checked={documentosSelecionados.includes(doc.id)}
-                                  onCheckedChange={() => handleDocumentoToggle(doc.id)}
-                                />
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <div>
-                                  <p className="font-medium text-sm">{doc.nome}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatarTamanho(doc.tamanho_arquivo)} • {new Date(doc.created_at).toLocaleDateString()}
-                                  </p>
+            <CardContent className="flex-1 min-h-0 pb-2">
+              <ScrollArea className="h-[450px] w-full rounded-md border">
+                <div className="p-4">
+                  {loading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                      Carregando documentos...
+                    </div>
+                  ) : Object.keys(agruparPorCategoria(documentos)).length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <FileText className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                      <p className="text-lg font-medium mb-2">Nenhum documento encontrado</p>
+                      <p className="text-sm">Faça upload dos primeiros documentos modelo para começar</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {Object.entries(agruparPorCategoria(documentos)).map(([categoria, docs]) => (
+                        <div key={categoria} className="space-y-3">
+                          <h4 className="font-semibold text-base text-foreground flex items-center gap-2 pb-2 border-b border-muted">
+                            <Badge variant="outline" className="text-xs">
+                              {docs.length}
+                            </Badge>
+                            {categoria}
+                          </h4>
+                          <div className="grid gap-3">
+                            {docs.map((doc) => (
+                              <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                  <Checkbox
+                                    checked={documentosSelecionados.includes(doc.id)}
+                                    onCheckedChange={() => handleDocumentoToggle(doc.id)}
+                                    className="flex-shrink-0"
+                                  />
+                                  <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm text-foreground truncate" title={doc.nome}>
+                                      {doc.nome}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatarTamanho(doc.tamanho_arquivo)} • {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 flex-shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(doc.url_arquivo, '_blank')}
+                                    className="h-8 w-8 p-0"
+                                    title="Visualizar documento"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoverDocumento(doc.id)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                    title="Remover documento"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(doc.url_arquivo, '_blank')}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoverDocumento(doc.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
 
