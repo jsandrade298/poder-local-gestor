@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
   const [municipeFilter, setMunicipeFilter] = useState("all");
@@ -44,9 +45,18 @@ export default function Demandas() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
+  // Debounce do termo de busca
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms de delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, searchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter],
+    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter],
     queryFn: async () => {
       // Se "Todas", buscar todas as demandas em lotes
       if (pageSize === "all") {
@@ -274,10 +284,12 @@ export default function Demandas() {
     }
   };
 
-  const filteredDemandas = demandas.filter(demanda => {
-    const matchesSearch = demanda.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         demanda.protocolo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         demanda.municipes?.nome?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredDemandas = useMemo(() => {
+    return demandas.filter(demanda => {
+      const matchesSearch = debouncedSearchTerm === "" || 
+                           demanda.titulo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                           demanda.protocolo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                           demanda.municipes?.nome?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
     const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
@@ -310,8 +322,9 @@ export default function Demandas() {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
-  });
+      return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
+    });
+  }, [demandas, debouncedSearchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
 
   // Paginação para dados filtrados (quando pageSize !== "all")
   const paginatedDemandas = pageSize === "all" 
@@ -321,10 +334,10 @@ export default function Demandas() {
   // Calcular total de páginas
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
 
-  // Resetar página quando mudar filtros
+  // Resetar página quando mudar filtros (exceto search)
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
+  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
 
 
   // Mutação para excluir demanda
@@ -391,6 +404,7 @@ export default function Demandas() {
 
   const clearFilters = () => {
     setSearchTerm("");
+    setDebouncedSearchTerm("");
     setStatusFilter("all");
     setAreaFilter("all");
     setMunicipeFilter("all");
