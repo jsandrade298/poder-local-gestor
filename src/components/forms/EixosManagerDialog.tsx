@@ -268,16 +268,10 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    ...(snapshot.isDragging && {
-                                      zIndex: 9999,
-                                      transform: provided.draggableProps.style?.transform
-                                    })
-                                  }}
+                                  style={provided.draggableProps.style}
                                   className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border ${
                                     snapshot.isDragging 
-                                      ? "shadow-xl bg-accent border-primary" 
+                                      ? "shadow-xl bg-accent border-primary opacity-90" 
                                       : "hover:bg-accent/50"
                                   }`}
                                 >
