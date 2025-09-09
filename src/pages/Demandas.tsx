@@ -693,25 +693,25 @@ export default function Demandas() {
         console.log('🔄 Usando parser CSV simplificado...');
         
         // Detectar separador primeiro
-        const firstLine = csv.split('\n')[0];
+        const csvFirstLine = csv.split('\n')[0];
         const separatorCounts = {
-          ',': (firstLine.match(/,/g) || []).length,
-          ';': (firstLine.match(/;/g) || []).length,
-          '\t': (firstLine.match(/\t/g) || []).length
+          ',': (csvFirstLine.match(/,/g) || []).length,
+          ';': (csvFirstLine.match(/;/g) || []).length,
+          '\t': (csvFirstLine.match(/\t/g) || []).length
         };
         
-        let separator = ','; // padrão
+        let csvSeparator = ','; // padrão
         let maxCount = separatorCounts[','];
         
         if (separatorCounts[';'] > maxCount) {
-          separator = ';';
+          csvSeparator = ';';
           maxCount = separatorCounts[';'];
         }
         if (separatorCounts['\t'] > maxCount) {
-          separator = '\t';
+          csvSeparator = '\t';
         }
         
-        console.log(`🔍 Separador detectado: "${separator}" (${maxCount} ocorrências na primeira linha)`);
+        console.log(`🔍 Separador detectado: "${csvSeparator}" (${maxCount} ocorrências na primeira linha)`);
         
         // Dividir em linhas simples
         const rawLines = csv.split(/\r?\n/).filter(line => line.trim().length > 0);
@@ -732,7 +732,7 @@ export default function Demandas() {
           const line = rawLines[i];
           
           // Split simples primeiro
-          let fields = line.split(separator);
+          let fields = line.split(csvSeparator);
           
           // Limpar campos
           fields = fields.map(field => {
@@ -775,8 +775,8 @@ export default function Demandas() {
         }
 
         // Detectar separador com mais precisão
-        const firstLine = lines[0];
-        let separator = ';'; // Default
+        const headerLine = lines[0];
+        let detectedSeparator = ';'; // Default
 
         // Testar cada possível separador
         const possibleSeparators = [',', ';', '\t', '|'];
@@ -784,7 +784,7 @@ export default function Demandas() {
         let bestSeparator = ';';
 
         for (const sep of possibleSeparators) {
-          const testFields = parseCSVLine(firstLine, sep);
+          const testFields = parseCSVLine(headerLine, sep);
           // Verificar se tem campos esperados (titulo, descricao, etc)
           const hasExpectedFields = testFields.some(field => 
             field.toLowerCase().includes('titulo') || 
@@ -797,14 +797,14 @@ export default function Demandas() {
           }
         }
 
-        separator = bestSeparator;
-        console.log(`📋 Separador detectado: "${separator}" com ${maxFields} campos`);
+        detectedSeparator = bestSeparator;
+        console.log(`📋 Separador detectado: "${detectedSeparator}" com ${maxFields} campos`);
         
         // Usar parser robusto para o header
-        const headers = parseCSVLine(firstLine, separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+        const headers = parseCSVLine(headerLine, detectedSeparator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
         
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
-        console.log(`📋 Separador detectado: "${separator}"`);
+        console.log(`📋 Separador detectado: "${detectedSeparator}"`);
         console.log(`📋 Total de colunas no header: ${headers.length}`);
         
         // Mapear headers para suas posições dinâmicas
@@ -956,7 +956,7 @@ export default function Demandas() {
           if (!line.trim()) continue;
           
           // Usar a função parseCSVLine melhorada
-          const values = parseCSVLine(line, separator);
+          const values = parseCSVLine(line, detectedSeparator);
           
           // Remover aspas extras dos valores
           const cleanedValues = values.map(v => {
@@ -973,8 +973,8 @@ export default function Demandas() {
           console.log(`🔍 Linha ${i + 1}: ${cleanedValues.length} campos detectados`, {
             linhaRaw: `"${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`,
             primeirasColunas: cleanedValues.slice(0, 3).map((val, idx) => `[${idx}]="${val.substring(0, 20)}${val.length > 20 ? '...' : ''}"`),
-            temSeparador: line.includes(separator),
-            contadorSeparadores: (line.match(new RegExp(`\\${separator}`, 'g')) || []).length
+            temSeparador: line.includes(detectedSeparator),
+            contadorSeparadores: (line.match(new RegExp(`\\${detectedSeparator}`, 'g')) || []).length
           });
           
           // Verificar se há colunas suficientes para os campos obrigatórios
@@ -1107,7 +1107,7 @@ export default function Demandas() {
         console.log('📊 Resumo da importação:');
         console.log(`   📄 Arquivo: ${file.name}`);
         console.log(`   📏 Tamanho: ${file.size} bytes`);
-        console.log(`   🔗 Separador usado: "${separator}"`);
+        console.log(`   🔗 Separador usado: "${detectedSeparator}"`);
         console.log(`   📋 Total de linhas no arquivo: ${lines.length}`);
         console.log(`   📊 Linhas de dados esperadas: ${lines.length - 1}`);
         console.log(`   ✅ Demandas processadas: ${demandasComDados.length}`);
