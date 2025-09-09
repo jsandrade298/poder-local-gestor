@@ -1343,39 +1343,41 @@ export default function Demandas() {
                 </Select>
               </div>
 
-              <div className="flex items-center justify-between w-full">
-                <Button variant="outline" onClick={clearFilters}>
-                  Limpar Filtros
-                </Button>
-                
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {isLoading ? 'Carregando...' : 
-                      pageSize === "all" ? 
-                        `${filteredDemandas.length} demandas` :
-                        `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
-                    }
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Mostrar:</span>
-                    <Select 
-                      value={pageSize.toString()} 
-                      onValueChange={(value) => {
-                        setPageSize(value === "all" ? "all" : parseInt(value));
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="10">10 por página</SelectItem>
-                        <SelectItem value="50">50 por página</SelectItem>
-                        <SelectItem value="100">100 por página</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            </div>
+            
+            {/* Linha separada para controles inferiores */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button variant="outline" onClick={clearFilters}>
+                Limpar Filtros
+              </Button>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {isLoading ? 'Carregando...' : 
+                    pageSize === "all" ? 
+                      `${filteredDemandas.length} demandas` :
+                      `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
+                  }
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Mostrar:</span>
+                  <Select 
+                    value={pageSize.toString()} 
+                    onValueChange={(value) => {
+                      setPageSize(value === "all" ? "all" : parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="10">10 por página</SelectItem>
+                      <SelectItem value="50">50 por página</SelectItem>
+                      <SelectItem value="100">100 por página</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
