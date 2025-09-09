@@ -1157,57 +1157,28 @@ export default function Demandas() {
                   </span>
                 )}
               </div>
-              <span className="text-sm font-normal text-muted-foreground">
-                {isLoading ? 'Carregando...' : 
-                  pageSize === "all" ? 
-                    `${filteredDemandas.length} demandas` :
-                    `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
-                }
-              </span>
             </CardTitle>
             <p className="text-base text-muted-foreground lg:text-lg">
               Acompanhe e gerencie todas as demandas do gabinete
             </p>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ImportCSVDialogDemandas 
-                  onFileSelect={handleFileImport}
-                  isImporting={importDemandas.isPending}
-                  fileInputRef={fileInputRef}
-                  importResults={importResults}
-                />
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={exportToCSV}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar CSV
-                </Button>
-                <NovaDemandaDialog />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Mostrar:</span>
-                <Select 
-                  value={pageSize.toString()} 
-                  onValueChange={(value) => {
-                    setPageSize(value === "all" ? "all" : parseInt(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="10">10 por página</SelectItem>
-                    <SelectItem value="50">50 por página</SelectItem>
-                    <SelectItem value="100">100 por página</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex items-center gap-2">
+              <ImportCSVDialogDemandas 
+                onFileSelect={handleFileImport}
+                isImporting={importDemandas.isPending}
+                fileInputRef={fileInputRef}
+                importResults={importResults}
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={exportToCSV}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
+              <NovaDemandaDialog />
             </div>
           </CardContent>
         </Card>
@@ -1372,10 +1343,40 @@ export default function Demandas() {
                 </Select>
               </div>
 
-              <div className="flex items-end gap-2">
+              <div className="flex items-end justify-between gap-2 w-full">
                 <Button variant="outline" onClick={clearFilters}>
                   Limpar Filtros
                 </Button>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Mostrar:</span>
+                    <Select 
+                      value={pageSize.toString()} 
+                      onValueChange={(value) => {
+                        setPageSize(value === "all" ? "all" : parseInt(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="10">10 por página</SelectItem>
+                        <SelectItem value="50">50 por página</SelectItem>
+                        <SelectItem value="100">100 por página</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {isLoading ? 'Carregando...' : 
+                      pageSize === "all" ? 
+                        `${filteredDemandas.length} demandas` :
+                        `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
+                    }
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>
