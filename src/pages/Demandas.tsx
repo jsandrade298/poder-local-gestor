@@ -1157,29 +1157,29 @@ export default function Demandas() {
                   </span>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                <ImportCSVDialogDemandas 
+                  onFileSelect={handleFileImport}
+                  isImporting={importDemandas.isPending}
+                  fileInputRef={fileInputRef}
+                  importResults={importResults}
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={exportToCSV}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+                <NovaDemandaDialog />
+              </div>
             </CardTitle>
             <p className="text-base text-muted-foreground lg:text-lg">
               Acompanhe e gerencie todas as demandas do gabinete
             </p>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="flex items-center gap-2">
-              <ImportCSVDialogDemandas 
-                onFileSelect={handleFileImport}
-                isImporting={importDemandas.isPending}
-                fileInputRef={fileInputRef}
-                importResults={importResults}
-              />
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={exportToCSV}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar CSV
-              </Button>
-              <NovaDemandaDialog />
-            </div>
           </CardContent>
         </Card>
 
