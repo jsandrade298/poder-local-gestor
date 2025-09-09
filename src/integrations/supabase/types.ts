@@ -991,10 +991,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tarefa_colaboradores: {
+        Row: {
+          colaborador_id: string
+          created_at: string | null
+          id: string
+          tarefa_id: string
+        }
+        Insert: {
+          colaborador_id: string
+          created_at?: string | null
+          id?: string
+          tarefa_id: string
+        }
+        Update: {
+          colaborador_id?: string
+          created_at?: string | null
+          id?: string
+          tarefa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_colaboradores_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefa_colaboradores_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tarefas: {
         Row: {
           completed: boolean
           completed_at: string | null
+          cor: string | null
           created_at: string
           created_by: string
           descricao: string | null
@@ -1009,6 +1046,7 @@ export type Database = {
         Insert: {
           completed?: boolean
           completed_at?: string | null
+          cor?: string | null
           created_at?: string
           created_by: string
           descricao?: string | null
@@ -1023,6 +1061,7 @@ export type Database = {
         Update: {
           completed?: boolean
           completed_at?: string | null
+          cor?: string | null
           created_at?: string
           created_by?: string
           descricao?: string | null

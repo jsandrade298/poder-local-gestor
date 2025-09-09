@@ -7,28 +7,41 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Palette } from "lucide-react";
 import { toast } from "sonner";
 
 interface AdicionarTarefaDialogProps {
   kanbanType: string;
 }
 
+const cores = [
+  { nome: "Azul", valor: "#3B82F6" },
+  { nome: "Verde", valor: "#10B981" },
+  { nome: "Amarelo", valor: "#F59E0B" },
+  { nome: "Vermelho", valor: "#EF4444" },
+  { nome: "Roxo", valor: "#8B5CF6" },
+  { nome: "Rosa", valor: "#EC4899" },
+  { nome: "Laranja", valor: "#F97316" },
+  { nome: "Cinza", valor: "#6B7280" }
+];
+
 export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
   const [open, setOpen] = useState(false);
+  const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
     prioridade: "media",
     posicao: "a_fazer",
-    responsavel_id: ""
+    cor: "#3B82F6"
   });
 
   const queryClient = useQueryClient();
 
-  // Buscar colaboradores/responsáveis
-  const { data: responsaveis = [] } = useQuery({
-    queryKey: ['responsaveis'],
+  // Buscar colaboradores
+  const { data: colaboradores = [] } = useQuery({
+    queryKey: ['colaboradores'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
@@ -50,8 +63,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           descricao: tarefa.descricao,
           prioridade: tarefa.prioridade,
           kanban_position: tarefa.posicao,
-          kanban_type: kanbanType, // ID do usuário ou tipo do kanban
-          responsavel_id: tarefa.responsavel_id || null,
+          kanban_type: kanbanType,
+          cor: tarefa.cor,
           created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
@@ -59,18 +72,33 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
 
       if (tarefaError) throw tarefaError;
 
+      // Adicionar colaboradores se houver algum selecionado
+      if (colaboradoresSelecionados.length > 0) {
+        const colaboradoresData = colaboradoresSelecionados.map(colaboradorId => ({
+          tarefa_id: novaTarefa.id,
+          colaborador_id: colaboradorId
+        }));
+
+        const { error: colaboradoresError } = await supabase
+          .from('tarefa_colaboradores')
+          .insert(colaboradoresData);
+
+        if (colaboradoresError) throw colaboradoresError;
+      }
+
       return novaTarefa;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] }); // Invalidar todas as queries do kanban
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
       toast.success("Tarefa criada com sucesso!");
       setFormData({
         titulo: "",
         descricao: "",
         prioridade: "media",
         posicao: "a_fazer",
-        responsavel_id: ""
+        cor: "#3B82F6"
       });
+      setColaboradoresSelecionados([]);
       setOpen(false);
     },
     onError: (error) => {
@@ -78,6 +106,14 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
       toast.error("Erro ao criar tarefa");
     }
   });
+
+  const handleColaboradorToggle = (colaboradorId: string) => {
+    setColaboradoresSelecionados(prev => 
+      prev.includes(colaboradorId) 
+        ? prev.filter(id => id !== colaboradorId)
+        : [...prev, colaboradorId]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,26 +159,34 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="responsavel">Responsável (Opcional)</Label>
-              <Select
-                value={formData.responsavel_id}
-                onValueChange={(value) => setFormData({ ...formData, responsavel_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar responsável..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {responsaveis.map((responsavel) => (
-                    <SelectItem key={responsavel.id} value={responsavel.id}>
-                      {responsavel.nome}
-                    </SelectItem>
+          <div className="space-y-2">
+            <Label>Colaboradores (Opcional)</Label>
+            <div className="border rounded-md p-3 max-h-32 overflow-y-auto">
+              {colaboradores.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum colaborador disponível</p>
+              ) : (
+                <div className="space-y-2">
+                  {colaboradores.map((colaborador) => (
+                    <div key={colaborador.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`colaborador-${colaborador.id}`}
+                        checked={colaboradoresSelecionados.includes(colaborador.id)}
+                        onCheckedChange={() => handleColaboradorToggle(colaborador.id)}
+                      />
+                      <Label 
+                        htmlFor={`colaborador-${colaborador.id}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {colaborador.nome}
+                      </Label>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="prioridade">Prioridade</Label>
               <Select
@@ -160,9 +204,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="posicao">Posição Inicial</Label>
               <Select
@@ -178,6 +220,27 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
                   <SelectItem value="feito">Feito</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Cor do Card
+            </Label>
+            <div className="grid grid-cols-4 gap-2">
+              {cores.map((cor) => (
+                <button
+                  key={cor.valor}
+                  type="button"
+                  className={`h-10 rounded-md border-2 transition-all hover:scale-105 ${
+                    formData.cor === cor.valor ? 'border-foreground' : 'border-muted'
+                  }`}
+                  style={{ backgroundColor: cor.valor }}
+                  onClick={() => setFormData({ ...formData, cor: cor.valor })}
+                  title={cor.nome}
+                />
+              ))}
             </div>
           </div>
 

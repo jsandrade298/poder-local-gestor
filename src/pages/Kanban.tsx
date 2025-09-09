@@ -113,32 +113,32 @@ export default function Kanban() {
       // Buscar tarefas do kanban - incluir tarefas do usuário E tarefas atribuídas a ele
       let tarefasData: any[] = [];
       
+      // Buscar tarefas com colaboradores
+      const { data, error } = await supabase
+        .from('tarefas')
+        .select(`
+          *,
+          tarefa_colaboradores(
+            colaborador:profiles(id, nome)
+          )
+        `)
+        .eq('kanban_type', selectedUser)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao buscar tarefas:', error);
+        throw error;
+      }
+      
+      // Filtrar tarefas baseado no usuário selecionado
       if (selectedUser === "producao-legislativa") {
-        // Para produção legislativa, buscar todas as tarefas deste tipo
-        const { data, error } = await supabase
-          .from('tarefas')
-          .select('*')
-          .eq('kanban_type', selectedUser)
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          console.error('Erro ao buscar tarefas de produção legislativa:', error);
-          throw error;
-        }
         tarefasData = data || [];
       } else {
-        // Para usuários específicos, buscar tarefas criadas POR ele OU atribuídas A ele
-        const { data, error } = await supabase
-          .from('tarefas')
-          .select('*')
-          .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`)
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          console.error('Erro ao buscar tarefas do usuário:', error);
-          throw error;
-        }
-        tarefasData = data || [];
+        // Para usuários específicos, incluir tarefas que ele criou OU que ele é colaborador
+        tarefasData = data?.filter(tarefa => 
+          tarefa.created_by === selectedUser || 
+          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
+        ) || [];
       }
       
       // Combinar tarefas formatadas para o mesmo padrão das demandas
@@ -154,7 +154,8 @@ export default function Kanban() {
         created_at: tarefa.created_at,
         responsavel_id: tarefa.responsavel_id || tarefa.created_by,
         tipo: 'tarefa' as const,
-        tarefa_responsavel_id: tarefa.responsavel_id // Campo adicional para identificar responsável específico da tarefa
+        cor: tarefa.cor || '#3B82F6',
+        colaboradores: tarefa.tarefa_colaboradores?.map((tc: any) => tc.colaborador) || []
       })) || [];
       
       // Combinar demandas e tarefas
@@ -572,9 +573,13 @@ export default function Kanban() {
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group ${
+                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
                                   snapshot.isDragging ? 'shadow-lg rotate-2 scale-105' : ''
                                 }`}
+                                style={{
+                                  borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))',
+                                  ...provided.draggableProps.style
+                                }}
                                 onClick={() => {
                                   setSelectedDemanda(demanda);
                                   setIsViewDialogOpen(true);
@@ -652,14 +657,20 @@ export default function Kanban() {
                                       </div>
                                     )}
 
-                                    {(demanda.responsavel_id || demanda.tarefa_responsavel_id) && (
+                                    {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <User className="h-3 w-3" />
                                         <span className="truncate">
-                                          {demanda.tipo === 'tarefa' && demanda.tarefa_responsavel_id 
-                                            ? `Responsável: ${getResponsavelNome(demanda.tarefa_responsavel_id)}`
-                                            : `Resp: ${getResponsavelNome(demanda.responsavel_id)}`
-                                          }
+                                          Colaboradores: {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {demanda.tipo !== 'tarefa' && demanda.responsavel_id && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <User className="h-3 w-3" />
+                                        <span className="truncate">
+                                          Resp: {getResponsavelNome(demanda.responsavel_id)}
                                         </span>
                                       </div>
                                     )}
