@@ -689,48 +689,75 @@ export default function Demandas() {
           return result;
         }
 
-        // Primeiro passo: dividir linhas respeitando aspas
-        const rawLines = [];
-        let currentLine = '';
-        let insideQuotes = false;
-        let quoteChar = '';
+        // Parser CSV simples e eficaz
+        console.log('🔄 Usando parser CSV simplificado...');
         
-        for (let i = 0; i < csv.length; i++) {
-          const char = csv[i];
-          const nextChar = csv[i + 1];
+        // Detectar separador primeiro
+        const firstLine = csv.split('\n')[0];
+        const separatorCounts = {
+          ',': (firstLine.match(/,/g) || []).length,
+          ';': (firstLine.match(/;/g) || []).length,
+          '\t': (firstLine.match(/\t/g) || []).length
+        };
+        
+        let separator = ','; // padrão
+        let maxCount = separatorCounts[','];
+        
+        if (separatorCounts[';'] > maxCount) {
+          separator = ';';
+          maxCount = separatorCounts[';'];
+        }
+        if (separatorCounts['\t'] > maxCount) {
+          separator = '\t';
+        }
+        
+        console.log(`🔍 Separador detectado: "${separator}" (${maxCount} ocorrências na primeira linha)`);
+        
+        // Dividir em linhas simples
+        const rawLines = csv.split(/\r?\n/).filter(line => line.trim().length > 0);
+        console.log(`📊 Total de linhas: ${rawLines.length}`);
+        
+        // Verificar se é o número esperado de linhas (43)
+        if (rawLines.length !== 43) {
+          console.warn(`⚠️ Número de linhas inesperado: ${rawLines.length} (esperado: 43)`);
+          console.log(`📋 Primeiras 5 linhas:`);
+          rawLines.slice(0, 5).forEach((line, idx) => {
+            console.log(`   ${idx + 1}: "${line.substring(0, 100)}..."`);
+          });
+        }
+        
+        // Processar cada linha de forma simples
+        const parsedRows: string[][] = [];
+        for (let i = 0; i < rawLines.length; i++) {
+          const line = rawLines[i];
           
-          if ((char === '"' || char === "'") && !insideQuotes) {
-            insideQuotes = true;
-            quoteChar = char;
-            currentLine += char;
-          } else if (char === quoteChar && insideQuotes) {
-            if (nextChar === quoteChar) {
-              currentLine += char + nextChar;
-              i++;
-            } else {
-              insideQuotes = false;
-              quoteChar = '';
-              currentLine += char;
+          // Split simples primeiro
+          let fields = line.split(separator);
+          
+          // Limpar campos
+          fields = fields.map(field => {
+            let clean = field.trim();
+            // Remover aspas no início e fim
+            if ((clean.startsWith('"') && clean.endsWith('"')) || 
+                (clean.startsWith("'") && clean.endsWith("'"))) {
+              clean = clean.slice(1, -1);
             }
-          } else if ((char === '\n' || char === '\r') && !insideQuotes) {
-            if (currentLine.trim()) {
-              rawLines.push(currentLine.trim());
-            }
-            currentLine = '';
-            if (char === '\r' && nextChar === '\n') {
-              i++;
-            }
-          } else {
-            currentLine += char;
+            return clean;
+          });
+          
+          if (i < 3) {
+            console.log(`📝 Linha ${i + 1}: ${fields.length} campos - ${JSON.stringify(fields.slice(0, 3))}`);
           }
+          
+          parsedRows.push(fields);
         }
         
-        if (currentLine.trim()) {
-          rawLines.push(currentLine.trim());
-        }
-
-        // Filtrar apenas linhas completamente vazias
-        const lines = rawLines.filter(line => line.trim().length > 0);
+        console.log(`✅ Parser processou ${parsedRows.length} linhas`);
+        console.log(`📊 Header tem ${parsedRows[0]?.length || 0} campos`);
+        console.log(`📊 Primeira linha de dados tem ${parsedRows[1]?.length || 0} campos`);
+        
+        // Converter de volta para o formato esperado pelo código existente
+        const lines = parsedRows.map(row => row.join(';'));
         
         console.log(`📁 Total de linhas processadas: ${lines.length}`);
         console.log(`📁 Primeira linha (header): "${lines[0]?.substring(0, 100)}..."`);
