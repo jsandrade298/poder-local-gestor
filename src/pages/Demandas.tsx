@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
 import { useLocation, useSearchParams } from "react-router-dom";
+import { useFileImport } from '@/hooks/useFileImport';
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -584,24 +585,52 @@ export default function Demandas() {
     }
   });
 
-  // Função para processar arquivo CSV
+  // Função para processar arquivo CSV/XLSX
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('🚀 Iniciando importação de CSV...');
+    console.log('🚀 Iniciando importação de arquivo...');
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error("Por favor, selecione um arquivo CSV.");
+    const fileName = file.name.toLowerCase();
+    const isCSV = fileName.endsWith('.csv');
+    const isXLSX = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+    if (!isCSV && !isXLSX) {
+      toast.error("Por favor, selecione um arquivo CSV ou XLSX.");
       return;
     }
+
+    console.log(`📁 Arquivo detectado: ${isXLSX ? 'XLSX' : 'CSV'} - ${file.name}`);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const csv = e.target?.result as string;
+        let processedData: string[][];
         
-        // Parser CSV melhorado para lidar com vírgulas, aspas e quebras de linha
-        function parseCSVToLines(text: string): string[] {
+        if (isXLSX) {
+          console.log('📊 Processando arquivo XLSX...');
+          // Processar arquivo XLSX
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // Converter para array de arrays
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+            header: 1, 
+            defval: '', 
+            blankrows: false 
+          }) as string[][];
+          
+          console.log(`✅ XLSX processado: ${jsonData.length} linhas detectadas`);
+          processedData = jsonData;
+        } else {
+          console.log('📄 Processando arquivo CSV...');
+          // Processar arquivo CSV
+          const csv = e.target?.result as string;
+          
+          // Parser CSV melhorado para lidar com vírgulas, aspas e quebras de linha
+          function parseCSVToLines(text: string): string[] {
           const lines: string[] = [];
           let currentLine = '';
           let inQuotes = false;
@@ -1152,15 +1181,19 @@ export default function Demandas() {
 
         // Se não há munícipes não encontrados, prosseguir diretamente
         await finalizarImportacao(demandasComDados, municipeMap, []);
-        
       } catch (error) {
-        console.error('Erro ao processar CSV:', error);
-        toast.error("Erro ao processar arquivo CSV. Verifique o formato.");
+        console.error('Erro ao processar arquivo:', error);
+        toast.error("Erro ao processar arquivo. Verifique o formato.");
       }
     };
     
-    reader.readAsText(file, 'UTF-8');
-    
+    // Determinar como ler o arquivo
+    if (isXLSX) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file, 'UTF-8');
+    }
+     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
