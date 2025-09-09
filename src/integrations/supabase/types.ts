@@ -1002,6 +1002,7 @@ export type Database = {
           kanban_position: string
           kanban_type: string
           prioridade: string
+          responsavel_id: string | null
           titulo: string
           updated_at: string
         }
@@ -1015,6 +1016,7 @@ export type Database = {
           kanban_position?: string
           kanban_type: string
           prioridade?: string
+          responsavel_id?: string | null
           titulo: string
           updated_at?: string
         }
@@ -1028,6 +1030,7 @@ export type Database = {
           kanban_position?: string
           kanban_type?: string
           prioridade?: string
+          responsavel_id?: string | null
           titulo?: string
           updated_at?: string
         }

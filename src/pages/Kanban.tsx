@@ -34,6 +34,7 @@ interface Demanda {
   municipes?: { nome: string };
   responsavel_id?: string;
   tipo?: 'demanda' | 'tarefa'; // Novo campo para diferenciar
+  tarefa_responsavel_id?: string; // Campo específico para responsável da tarefa
 }
 
 interface Tarefa {
@@ -109,16 +110,35 @@ export default function Kanban() {
         }) || [];
       }
       
-      // Buscar tarefas do kanban
-      const { data: tarefasData, error: tarefasError } = await supabase
-        .from('tarefas')
-        .select('*')
-        .eq('kanban_type', selectedUser)
-        .order('created_at', { ascending: false });
+      // Buscar tarefas do kanban - incluir tarefas do usuário E tarefas atribuídas a ele
+      let tarefasData: any[] = [];
       
-      if (tarefasError) {
-        console.error('Erro ao buscar tarefas:', tarefasError);
-        throw tarefasError;
+      if (selectedUser === "producao-legislativa") {
+        // Para produção legislativa, buscar todas as tarefas deste tipo
+        const { data, error } = await supabase
+          .from('tarefas')
+          .select('*')
+          .eq('kanban_type', selectedUser)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Erro ao buscar tarefas de produção legislativa:', error);
+          throw error;
+        }
+        tarefasData = data || [];
+      } else {
+        // Para usuários específicos, buscar tarefas criadas POR ele OU atribuídas A ele
+        const { data, error } = await supabase
+          .from('tarefas')
+          .select('*')
+          .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Erro ao buscar tarefas do usuário:', error);
+          throw error;
+        }
+        tarefasData = data || [];
       }
       
       // Combinar tarefas formatadas para o mesmo padrão das demandas
@@ -132,8 +152,9 @@ export default function Kanban() {
         prioridade: tarefa.prioridade,
         data_prazo: null,
         created_at: tarefa.created_at,
-        responsavel_id: tarefa.created_by,
-        tipo: 'tarefa' as const
+        responsavel_id: tarefa.responsavel_id || tarefa.created_by,
+        tipo: 'tarefa' as const,
+        tarefa_responsavel_id: tarefa.responsavel_id // Campo adicional para identificar responsável específico da tarefa
       })) || [];
       
       // Combinar demandas e tarefas
@@ -187,25 +208,57 @@ export default function Kanban() {
       }
       
       // Remover todas as tarefas do kanban selecionado
-      const { data: tarefasEntries, error: tarefasFetchError } = await supabase
-        .from('tarefas')
-        .select('id')
-        .eq('kanban_type', selectedUser);
+      let tarefasEntries: any[] = [];
       
-      if (tarefasFetchError) {
-        console.error("❌ Erro ao buscar tarefas do kanban:", tarefasFetchError);
-        throw tarefasFetchError;
-      }
-      
-      if (tarefasEntries && tarefasEntries.length > 0) {
-        const { error } = await supabase
+      if (selectedUser === "producao-legislativa") {
+        // Para produção legislativa, remover apenas tarefas deste tipo
+        const { data, error } = await supabase
           .from('tarefas')
-          .delete()
+          .select('id')
           .eq('kanban_type', selectedUser);
         
         if (error) {
-          console.error("❌ Erro ao remover tarefas do kanban:", error);
+          console.error("❌ Erro ao buscar tarefas de produção legislativa:", error);
           throw error;
+        }
+        tarefasEntries = data || [];
+      } else {
+        // Para usuários específicos, remover tarefas criadas POR ele OU atribuídas A ele
+        const { data, error } = await supabase
+          .from('tarefas')
+          .select('id')
+          .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`);
+        
+        if (error) {
+          console.error("❌ Erro ao buscar tarefas do usuário:", error);
+          throw error;
+        }
+        tarefasEntries = data || [];
+      }
+      
+      if (tarefasEntries && tarefasEntries.length > 0) {
+        // Para produção legislativa, deletar diretamente
+        if (selectedUser === "producao-legislativa") {
+          const { error } = await supabase
+            .from('tarefas')
+            .delete()
+            .eq('kanban_type', selectedUser);
+          
+          if (error) {
+            console.error("❌ Erro ao remover tarefas de produção legislativa:", error);
+            throw error;
+          }
+        } else {
+          // Para usuários específicos, deletar usando a query complexa
+          const { error } = await supabase
+            .from('tarefas')
+            .delete()
+            .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`);
+          
+          if (error) {
+            console.error("❌ Erro ao remover tarefas do usuário:", error);
+            throw error;
+          }
         }
       }
       
@@ -599,11 +652,14 @@ export default function Kanban() {
                                       </div>
                                     )}
 
-                                    {demanda.responsavel_id && (
+                                    {(demanda.responsavel_id || demanda.tarefa_responsavel_id) && (
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <User className="h-3 w-3" />
                                         <span className="truncate">
-                                          Resp: {getResponsavelNome(demanda.responsavel_id)}
+                                          {demanda.tipo === 'tarefa' && demanda.tarefa_responsavel_id 
+                                            ? `Responsável: ${getResponsavelNome(demanda.tarefa_responsavel_id)}`
+                                            : `Resp: ${getResponsavelNome(demanda.responsavel_id)}`
+                                          }
                                         </span>
                                       </div>
                                     )}

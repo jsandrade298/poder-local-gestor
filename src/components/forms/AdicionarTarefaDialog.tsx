@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,25 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
     titulo: "",
     descricao: "",
     prioridade: "media",
-    posicao: "a_fazer"
+    posicao: "a_fazer",
+    responsavel_id: ""
   });
 
   const queryClient = useQueryClient();
+
+  // Buscar colaboradores/responsáveis
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ['responsaveis'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .order('nome');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const createTarefaMutation = useMutation({
     mutationFn: async (tarefa: typeof formData) => {
@@ -36,6 +51,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           prioridade: tarefa.prioridade,
           kanban_position: tarefa.posicao,
           kanban_type: kanbanType, // ID do usuário ou tipo do kanban
+          responsavel_id: tarefa.responsavel_id || null,
           created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
@@ -46,13 +62,14 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
       return novaTarefa;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tarefas-kanban', kanbanType] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] }); // Invalidar todas as queries do kanban
       toast.success("Tarefa criada com sucesso!");
       setFormData({
         titulo: "",
         descricao: "",
         prioridade: "media",
-        posicao: "a_fazer"
+        posicao: "a_fazer",
+        responsavel_id: ""
       });
       setOpen(false);
     },
@@ -108,6 +125,26 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="responsavel">Responsável (Opcional)</Label>
+              <Select
+                value={formData.responsavel_id}
+                onValueChange={(value) => setFormData({ ...formData, responsavel_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar responsável..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem responsável</SelectItem>
+                  {responsaveis.map((responsavel) => (
+                    <SelectItem key={responsavel.id} value={responsavel.id}>
+                      {responsavel.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="prioridade">Prioridade</Label>
               <Select
                 value={formData.prioridade}
@@ -124,7 +161,9 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="posicao">Posição Inicial</Label>
               <Select
