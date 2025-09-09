@@ -317,6 +317,41 @@ export type Database = {
           },
         ]
       }
+      demanda_kanbans: {
+        Row: {
+          created_at: string
+          demanda_id: string
+          id: string
+          kanban_position: string
+          kanban_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          demanda_id: string
+          id?: string
+          kanban_position: string
+          kanban_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          demanda_id?: string
+          id?: string
+          kanban_position?: string
+          kanban_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_kanbans_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demanda_notifications: {
         Row: {
           countdown: number | null

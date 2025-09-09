@@ -89,13 +89,19 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
 
   const adicionarKanbanMutation = useMutation({
     mutationFn: async (demandaIds: string[]) => {
+      // Inserir na tabela de relacionamento (usar ON CONFLICT para evitar duplicatas)
+      const kanbanEntries = demandaIds.map(demandaId => ({
+        demanda_id: demandaId,
+        kanban_type: selectedUser || 'producao-legislativa',
+        kanban_position: 'a_fazer'
+      }));
+
       const { error } = await supabase
-        .from('demandas')
-        .update({ 
-          kanban_position: 'a_fazer',
-          kanban_type: selectedUser || 'producao-legislativa'
-        })
-        .in('id', demandaIds);
+        .from('demanda_kanbans')
+        .upsert(kanbanEntries, { 
+          onConflict: 'demanda_id,kanban_type',
+          ignoreDuplicates: false 
+        });
       
       if (error) throw error;
     },

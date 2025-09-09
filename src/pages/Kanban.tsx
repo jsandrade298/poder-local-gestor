@@ -48,27 +48,50 @@ export default function Kanban() {
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
   const queryClient = useQueryClient();
 
-  // Buscar demandas do kanban
+  // Buscar demandas do kanban usando a nova tabela de relacionamento
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-kanban', selectedUser],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Primeiro buscar as IDs das demandas no kanban
+      const { data: kanbanData, error: kanbanError } = await supabase
+        .from('demanda_kanbans')
+        .select('demanda_id, kanban_position')
+        .eq('kanban_type', selectedUser);
+      
+      if (kanbanError) {
+        console.error('Erro ao buscar kanban:', kanbanError);
+        throw kanbanError;
+      }
+      
+      if (!kanbanData || kanbanData.length === 0) {
+        return [];
+      }
+      
+      // Buscar as demandas completas
+      const demandaIds = kanbanData.map(k => k.demanda_id);
+      const { data: demandasData, error: demandasError } = await supabase
         .from('demandas')
         .select(`
           *,
           areas(nome),
           municipes(nome)
         `)
-        .not('kanban_position', 'is', null)
-        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
-        .eq('kanban_type', selectedUser)
+        .in('id', demandaIds)
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Erro ao buscar demandas:', error);
-        throw error;
+      if (demandasError) {
+        console.error('Erro ao buscar demandas:', demandasError);
+        throw demandasError;
       }
-      return data || [];
+      
+      // Combinar os dados
+      return demandasData?.map(demanda => {
+        const kanbanInfo = kanbanData.find(k => k.demanda_id === demanda.id);
+        return {
+          ...demanda,
+          kanban_position: kanbanInfo?.kanban_position || 'a_fazer'
+        };
+      }) || [];
     }
   });
 
@@ -94,34 +117,29 @@ export default function Kanban() {
     mutationFn: async () => {
       console.log("🔄 Iniciando limpeza do kanban...");
       
-      // Buscar demandas baseado no kanban selecionado
-      const { data: demandasParaRemover, error: fetchError } = await supabase
-        .from('demandas')
-        .select('id, titulo, kanban_position')
-        .not('kanban_position', 'is', null)
-        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
+      // Buscar e remover todas as entradas do kanban selecionado
+      const { data: kanbanEntries, error: fetchError } = await supabase
+        .from('demanda_kanbans')
+        .select('id')
         .eq('kanban_type', selectedUser);
       
       if (fetchError) {
-        console.error("❌ Erro ao buscar demandas para remover:", fetchError);
+        console.error("❌ Erro ao buscar entradas do kanban:", fetchError);
         throw fetchError;
       }
       
-      console.log(`📋 Encontradas ${demandasParaRemover?.length || 0} demandas para remover do kanban`);
-      
-      if (!demandasParaRemover || demandasParaRemover.length === 0) {
+      if (!kanbanEntries || kanbanEntries.length === 0) {
         console.log("ℹ️ Nenhuma demanda no kanban para ser removida");
         return;
       }
       
-      // Remover todas as demandas do kanban (definir kanban_position como null)
       const { error } = await supabase
-        .from('demandas')
-        .update({ kanban_position: null })
-        .in('id', demandasParaRemover.map(d => d.id));
+        .from('demanda_kanbans')
+        .delete()
+        .eq('kanban_type', selectedUser);
       
       if (error) {
-        console.error("❌ Erro ao remover demandas do kanban:", error);
+        console.error("❌ Erro ao remover entradas do kanban:", error);
         throw error;
       }
       
@@ -141,9 +159,10 @@ export default function Kanban() {
   const removerDemandaMutation = useMutation({
     mutationFn: async (demandaId: string) => {
       const { error } = await supabase
-        .from('demandas')
-        .update({ kanban_position: null })
-        .eq('id', demandaId);
+        .from('demanda_kanbans')
+        .delete()
+        .eq('demanda_id', demandaId)
+        .eq('kanban_type', selectedUser);
       
       if (error) throw error;
     },
@@ -161,12 +180,10 @@ export default function Kanban() {
   const updateKanbanPositionMutation = useMutation({
     mutationFn: async ({ demandaId, newPosition }: { demandaId: string; newPosition: string }) => {
       const { error } = await supabase
-        .from('demandas')
-        .update({ 
-          kanban_position: newPosition,
-          kanban_type: selectedUser
-        })
-        .eq('id', demandaId);
+        .from('demanda_kanbans')
+        .update({ kanban_position: newPosition })
+        .eq('demanda_id', demandaId)
+        .eq('kanban_type', selectedUser);
       
       if (error) throw error;
     },
