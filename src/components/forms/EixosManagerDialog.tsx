@@ -268,10 +268,14 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                   style={{
                                     ...provided.draggableProps.style,
                                     ...(snapshot.isDragging && {
-                                      zIndex: 9999
+                                      zIndex: 99999,
+                                      opacity: 1,
+                                      backgroundColor: 'hsl(var(--accent))',
+                                      border: '2px solid hsl(var(--primary))',
+                                      borderRadius: '8px'
                                     })
                                   }}
-                                  className={snapshot.isDragging ? 'bg-accent shadow-lg' : ''}
+                                  className={snapshot.isDragging ? 'shadow-2xl' : ''}
                                 >
                                   <TableCell>
                                     <div 
