@@ -329,8 +329,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col min-h-0 flex-1 pb-2">
-              <ScrollArea className="flex-1 pr-4" style={{ maxHeight: '400px' }}>
+            <CardContent className="pb-2">
+              <div className="max-h-[400px] overflow-y-auto pr-2">{/* Usando div com overflow simples */}
                 {loading ? (
                   <div className="text-center py-4 text-muted-foreground">
                     Carregando documentos...
@@ -387,7 +387,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                     ))}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
 
