@@ -102,16 +102,16 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
   // Função para reordenar eixos
   const reorderEixos = useMutation({
-    mutationFn: async (updates: { eixoId: string; newPosition: number }[]) => {
-      // Fazer todas as atualizações em paralelo
-      const promises = updates.map(({ eixoId, newPosition }) =>
+    mutationFn: async (reorderedEixos: typeof eixos) => {
+      // Atualizar todos os eixos com sua nova posição
+      const updates = reorderedEixos.map((eixo, index) => 
         supabase
           .from('eixos')
-          .update({ ordem: newPosition })
-          .eq('id', eixoId)
+          .update({ ordem: index + 1 })
+          .eq('id', eixo.id)
       );
       
-      const results = await Promise.all(promises);
+      const results = await Promise.all(updates);
       const errors = results.filter(result => result.error);
       if (errors.length > 0) throw errors[0].error;
     },
@@ -119,7 +119,6 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
       queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
       queryClient.invalidateQueries({ queryKey: ['eixos'] });
       queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
-      toast.success('Ordem dos eixos atualizada!');
     }
   });
 
@@ -131,23 +130,13 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
     if (sourceIndex === destinationIndex) return;
 
-    // Reorganizar a lista localmente
+    // Criar nova lista reordenada
     const newEixos = Array.from(eixos);
     const [reorderedItem] = newEixos.splice(sourceIndex, 1);
     newEixos.splice(destinationIndex, 0, reorderedItem);
 
-    // Preparar todas as atualizações necessárias
-    const updates = newEixos
-      .map((eixo, index) => ({
-        eixoId: eixo.id,
-        newPosition: index + 1
-      }))
-      .filter((update, index) => eixos[index]?.ordem !== update.newPosition);
-
-    // Fazer uma única atualização com todos os changes
-    if (updates.length > 0) {
-      reorderEixos.mutate(updates);
-    }
+    // Atualizar no banco
+    reorderEixos.mutate(newEixos);
   };
 
   const handleEdit = (eixo: any) => {
@@ -279,22 +268,17 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border transition-all ${
+                                  style={provided.draggableProps.style}
+                                  className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border ${
                                     snapshot.isDragging 
-                                      ? "shadow-lg bg-accent border-primary scale-105 z-50" 
+                                      ? "shadow-xl bg-accent border-primary" 
                                       : "hover:bg-accent/50"
                                   }`}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    transform: snapshot.isDragging 
-                                      ? `${provided.draggableProps.style?.transform} rotate(2deg)`
-                                      : provided.draggableProps.style?.transform,
-                                  }}
                                 >
                                   <div className="flex items-center gap-2">
                                     <div 
                                       {...provided.dragHandleProps} 
-                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded"
+                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded flex-shrink-0"
                                     >
                                       <GripVertical className="h-4 w-4 text-muted-foreground" />
                                     </div>
