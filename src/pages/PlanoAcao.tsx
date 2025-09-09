@@ -110,7 +110,7 @@ export default function PlanoAcao() {
           .from('planos_acao')
           .select(`
             *,
-            eixos(nome, cor),
+            eixos(nome, cor, ordem),
             prioridades_acao(nome, nivel, cor),
             temas_acao(nome),
             status_acao(nome, cor),
@@ -133,7 +133,7 @@ export default function PlanoAcao() {
   const { data: eixos = [] } = useQuery({
     queryKey: ['eixos'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('eixos').select('*').order('nome');
+      const { data, error } = await supabase.from('eixos').select('*').order('ordem');
       if (error) throw error;
       return data || [];
     }
@@ -555,7 +555,7 @@ export default function PlanoAcao() {
   const filteredActions = useMemo(() => {
     if (!planosAcao) return [];
     
-    return planosAcao.filter((action) => {
+    let filtered = planosAcao.filter((action) => {
       const matchesSearch = !searchTerm || 
         action.acao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         action.eixos?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -573,6 +573,22 @@ export default function PlanoAcao() {
 
       return matchesSearch && matchesEixo && matchesStatus && matchesResponsavel && matchesPrioridade && matchesTema && matchesConcluida;
     });
+
+    // Ordenar por ordem do eixo primeiro, depois por data de criação
+    filtered.sort((a, b) => {
+      // Primeiro, ordenar por ordem do eixo
+      const ordemA = a.eixos?.ordem || 999;
+      const ordemB = b.eixos?.ordem || 999;
+      
+      if (ordemA !== ordemB) {
+        return ordemA - ordemB;
+      }
+      
+      // Se a ordem do eixo for igual, ordenar por data de criação (mais recente primeiro)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return filtered;
   }, [planosAcao, searchTerm, eixoFilter, statusFilter, responsavelFilter, prioridadeFilter, temaFilter, concluidaFilter]);
 
   // Calcular estatísticas

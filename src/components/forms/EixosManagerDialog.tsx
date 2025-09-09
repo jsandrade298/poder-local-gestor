@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit2, Trash2, Save, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Save, X, GripVertical } from "lucide-react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 
 interface EixosManagerDialogProps {
@@ -26,7 +27,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
   const { data: eixos = [], isLoading } = useQuery({
     queryKey: ['eixos-manager'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('eixos').select('*').order('nome');
+      const { data, error } = await supabase.from('eixos').select('*').order('ordem');
       if (error) throw error;
       return data;
     }
@@ -34,13 +35,25 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
   const createEixo = useMutation({
     mutationFn: async (eixo: { nome: string; descricao: string; cor: string }) => {
-      const { data, error } = await supabase.from('eixos').insert([eixo]).select().single();
+      // Buscar próximo número de ordem
+      const { data: maxEixo } = await supabase
+        .from('eixos')
+        .select('ordem')
+        .order('ordem', { ascending: false })
+        .limit(1);
+      
+      const novaOrdem = (maxEixo && maxEixo[0]?.ordem) ? maxEixo[0].ordem + 1 : 1;
+      
+      const { data, error } = await supabase.from('eixos').insert([
+        { ...eixo, ordem: novaOrdem }
+      ]).select().single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
       queryClient.invalidateQueries({ queryKey: ['eixos'] });
+      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
       setIsCreating(false);
       setNewEixo({ nome: '', descricao: '', cor: '#3B82F6' });
       toast.success('Eixo criado com sucesso!');
@@ -61,6 +74,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
       queryClient.invalidateQueries({ queryKey: ['eixos'] });
+      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
       setEditingId(null);
       toast.success('Eixo atualizado com sucesso!');
     }
@@ -74,6 +88,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
       queryClient.invalidateQueries({ queryKey: ['eixos'] });
+      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
       toast.success('Eixo excluído com sucesso!');
     },
     onError: (error: any) => {
@@ -84,6 +99,44 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
       }
     }
   });
+
+  // Função para reordenar eixos
+  const reorderEixos = useMutation({
+    mutationFn: async ({ eixoId, newPosition }: { eixoId: string; newPosition: number }) => {
+      const { error } = await supabase
+        .from('eixos')
+        .update({ ordem: newPosition })
+        .eq('id', eixoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
+      queryClient.invalidateQueries({ queryKey: ['eixos'] });
+      queryClient.invalidateQueries({ queryKey: ['planos-acao'] });
+      toast.success('Ordem dos eixos atualizada!');
+    }
+  });
+
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+
+    if (sourceIndex === destinationIndex) return;
+
+    // Reorganizar a lista localmente
+    const newEixos = Array.from(eixos);
+    const [reorderedItem] = newEixos.splice(sourceIndex, 1);
+    newEixos.splice(destinationIndex, 0, reorderedItem);
+
+    // Atualizar a ordem de todos os eixos afetados
+    newEixos.forEach((eixo, index) => {
+      if (eixo.ordem !== index + 1) {
+        reorderEixos.mutate({ eixoId: eixo.id, newPosition: index + 1 });
+      }
+    });
+  };
 
   const handleEdit = (eixo: any) => {
     setEditingId(eixo.id);
@@ -180,105 +233,124 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
           {/* Lista de eixos */}
           <Card>
             <CardHeader>
-              <CardTitle>Eixos Existentes</CardTitle>
+              <CardTitle>Eixos Existentes (Arraste para reordenar)</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Cor</TableHead>
-                    <TableHead className="w-24">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        Carregando...
-                      </TableCell>
+                      <TableHead className="w-12">Ordem</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Cor</TableHead>
+                      <TableHead className="w-24">Ações</TableHead>
                     </TableRow>
-                  ) : eixos.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        Nenhum eixo encontrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    eixos.map((eixo) => (
-                      <TableRow key={eixo.id}>
-                        <TableCell>
-                          {editingId === eixo.id ? (
-                            <Input
-                              value={editingValues.nome}
-                              onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
-                              className="h-8"
-                            />
-                          ) : (
-                            eixo.nome
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingId === eixo.id ? (
-                            <Input
-                              value={editingValues.descricao}
-                              onChange={(e) => setEditingValues({ ...editingValues, descricao: e.target.value })}
-                              className="h-8"
-                            />
-                          ) : (
-                            eixo.descricao || '-'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingId === eixo.id ? (
-                            <Input
-                              type="color"
-                              value={editingValues.cor}
-                              onChange={(e) => setEditingValues({ ...editingValues, cor: e.target.value })}
-                              className="h-8 w-16"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-4 h-4 rounded border"
-                                style={{ backgroundColor: eixo.cor }}
-                              />
-                              {eixo.cor}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingId === eixo.id ? (
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={handleSave}>
-                                <Save className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={handleCancel}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => handleEdit(eixo)}>
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => deleteEixo.mutate(eixo.id)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <Droppable droppableId="eixos-list">
+                    {(provided) => (
+                      <TableBody {...provided.droppableProps} ref={provided.innerRef}>
+                        {isLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center">
+                              Carregando...
+                            </TableCell>
+                          </TableRow>
+                        ) : eixos.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center">
+                              Nenhum eixo encontrado
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          eixos.map((eixo, index) => (
+                            <Draggable key={eixo.id} draggableId={eixo.id} index={index}>
+                              {(provided, snapshot) => (
+                                <TableRow 
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={snapshot.isDragging ? "bg-accent" : ""}
+                                >
+                                  <TableCell {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell>
+                                    {editingId === eixo.id ? (
+                                      <Input
+                                        value={editingValues.nome}
+                                        onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
+                                        className="h-8"
+                                      />
+                                    ) : (
+                                      eixo.nome
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {editingId === eixo.id ? (
+                                      <Input
+                                        value={editingValues.descricao}
+                                        onChange={(e) => setEditingValues({ ...editingValues, descricao: e.target.value })}
+                                        className="h-8"
+                                      />
+                                    ) : (
+                                      eixo.descricao || '-'
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {editingId === eixo.id ? (
+                                      <Input
+                                        type="color"
+                                        value={editingValues.cor}
+                                        onChange={(e) => setEditingValues({ ...editingValues, cor: e.target.value })}
+                                        className="h-8 w-16"
+                                      />
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-4 h-4 rounded border"
+                                          style={{ backgroundColor: eixo.cor }}
+                                        />
+                                        {eixo.cor}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {editingId === eixo.id ? (
+                                      <div className="flex gap-1">
+                                        <Button size="sm" variant="ghost" onClick={handleSave}>
+                                          <Save className="h-4 w-4" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" onClick={handleCancel}>
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex gap-1">
+                                        <Button size="sm" variant="ghost" onClick={() => handleEdit(eixo)}>
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button 
+                                          size="sm" 
+                                          variant="ghost" 
+                                          onClick={() => deleteEixo.mutate(eixo.id)}
+                                          className="text-destructive hover:text-destructive"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Draggable>
+                          ))
+                        )}
+                        {provided.placeholder}
+                      </TableBody>
+                    )}
+                  </Droppable>
+                </Table>
+              </DragDropContext>
             </CardContent>
           </Card>
         </div>

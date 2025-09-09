@@ -67,7 +67,6 @@ export default function Kanban() {
   const [isEditTarefaDialogOpen, setIsEditTarefaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
-  const [orderByEixo, setOrderByEixo] = useState<string>("");
   const queryClient = useQueryClient();
 
   // Buscar demandas e tarefas do kanban
@@ -176,23 +175,6 @@ export default function Kanban() {
       
       if (error) {
         console.error('Erro ao buscar responsáveis:', error);
-        throw error;
-      }
-      return data || [];
-    }
-  });
-
-  // Buscar eixos para ordenação
-  const { data: eixos = [] } = useQuery({
-    queryKey: ['eixos'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('eixos')
-        .select('id, nome, cor')
-        .order('nome');
-      
-      if (error) {
-        console.error('Erro ao buscar eixos:', error);
         throw error;
       }
       return data || [];
@@ -357,22 +339,7 @@ export default function Kanban() {
   };
 
   const getDemandsByStatus = (kanbanPosition: string) => {
-    let items = demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
-    
-    // Aplicar ordenação por eixo se selecionado
-    if (orderByEixo) {
-      items = items.sort((a, b) => {
-        const aHasEixo = a.eixo_id === orderByEixo;
-        const bHasEixo = b.eixo_id === orderByEixo;
-        
-        if (aHasEixo && !bHasEixo) return -1;
-        if (!aHasEixo && bHasEixo) return 1;
-        
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-    }
-    
-    return items;
+    return demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
   };
 
   const handleEditDemanda = (demanda: any) => {
@@ -432,42 +399,6 @@ export default function Kanban() {
                         className={selectedUser === responsavel.id ? "bg-accent" : ""}
                       >
                         {responsavel.nome}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Dropdown de ordenação por eixo */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="min-w-[180px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
-                      {orderByEixo 
-                        ? eixos.find(e => e.id === orderByEixo)?.nome || "Selecionar eixo"
-                        : "Ordenar por eixo"
-                      }
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="min-w-[180px] bg-background/95 backdrop-blur border shadow-lg">
-                    <DropdownMenuItem 
-                      onClick={() => setOrderByEixo("")}
-                      className={!orderByEixo ? "bg-accent" : ""}
-                    >
-                      Sem ordenação
-                    </DropdownMenuItem>
-                    {eixos.map((eixo) => (
-                      <DropdownMenuItem 
-                        key={eixo.id}
-                        onClick={() => setOrderByEixo(eixo.id)}
-                        className={orderByEixo === eixo.id ? "bg-accent" : ""}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: eixo.cor }}
-                          />
-                          {eixo.nome}
-                        </div>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
