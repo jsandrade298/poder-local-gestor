@@ -29,9 +29,9 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
-  // Buscar demandas não incluídas no kanban
+  // Buscar todas as demandas (permitindo adicionar a múltiplos kanbans)
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-nao-kanban'],
+    queryKey: ['demandas-disponiveis'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demandas')
@@ -40,7 +40,6 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
           areas(nome),
           municipes(nome)
         `)
-        .is('kanban_position', null)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -102,7 +101,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['demandas-nao-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-disponiveis'] });
       toast.success(`${selectedDemandas.length} demanda(s) adicionada(s) ao kanban!`);
       setSelectedDemandas([]);
       onOpenChange(false);
