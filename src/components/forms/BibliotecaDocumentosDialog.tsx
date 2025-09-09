@@ -275,7 +275,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           Biblioteca de Documentos
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-5xl w-full max-h-[95vh] flex flex-col">
+      <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0 border-b pb-4">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Library className="h-6 w-6" />
@@ -286,9 +286,9 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </p>
         </DialogHeader>
 
-        <div className="flex flex-col min-h-0 flex-1 space-y-6 py-4">
+        <div className="flex flex-col flex-1 overflow-hidden">
           {/* Upload */}
-          <Card className="border-2 border-dashed border-muted">
+          <Card className="border-2 border-dashed border-muted mt-4 flex-shrink-0">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Upload className="h-5 w-5" />
@@ -323,7 +323,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </Card>
 
           {/* Lista de Documentos */}
-          <Card className="flex flex-col min-h-0 flex-1">
+          <Card className="flex flex-col flex-1 mt-4 overflow-hidden">
             <CardHeader className="flex-shrink-0 pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -337,8 +337,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                 )}
               </div>
             </CardHeader>
-            <CardContent className="flex-1 min-h-0 p-0">
-              <ScrollArea className="h-[400px] w-full">
+            <CardContent className="flex-1 overflow-hidden p-0">
+              <ScrollArea className="h-full w-full">
                 <div className="p-4 space-y-6">
                   {loading ? (
                     <div className="text-center py-8 text-muted-foreground">
@@ -413,7 +413,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </Card>
 
           {/* Botões de Ação */}
-          <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
+          <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0 bg-background">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
