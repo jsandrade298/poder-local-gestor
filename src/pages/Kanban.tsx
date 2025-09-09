@@ -122,7 +122,6 @@ export default function Kanban() {
             colaborador:profiles(id, nome)
           )
         `)
-        .eq('kanban_type', selectedUser)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -132,11 +131,16 @@ export default function Kanban() {
       
       // Filtrar tarefas baseado no usuário selecionado
       if (selectedUser === "producao-legislativa") {
-        tarefasData = data || [];
+        // Para produção legislativa, mostrar tarefas deste tipo
+        tarefasData = data?.filter(tarefa => tarefa.kanban_type === selectedUser) || [];
       } else {
-        // Para usuários específicos, incluir tarefas que ele criou OU que ele é colaborador
+        // Para usuários específicos, incluir tarefas onde:
+        // 1. Ele é o criador OU
+        // 2. Ele é colaborador OU
+        // 3. O kanban_type é dele (compatibilidade com tarefas antigas)
         tarefasData = data?.filter(tarefa => 
           tarefa.created_by === selectedUser || 
+          tarefa.kanban_type === selectedUser ||
           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
         ) || [];
       }
@@ -224,42 +228,40 @@ export default function Kanban() {
         }
         tarefasEntries = data || [];
       } else {
-        // Para usuários específicos, remover tarefas criadas POR ele OU atribuídas A ele
+        // Para usuários específicos, buscar tarefas onde ele é criador, colaborador ou o kanban_type é dele
         const { data, error } = await supabase
           .from('tarefas')
-          .select('id')
-          .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`);
+          .select(`
+            id,
+            created_by,
+            kanban_type,
+            tarefa_colaboradores(colaborador_id)
+          `);
         
         if (error) {
           console.error("❌ Erro ao buscar tarefas do usuário:", error);
           throw error;
         }
-        tarefasEntries = data || [];
+        
+        // Filtrar tarefas que pertencem ao usuário
+        tarefasEntries = data?.filter(tarefa => 
+          tarefa.created_by === selectedUser || 
+          tarefa.kanban_type === selectedUser ||
+          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador_id === selectedUser)
+        ) || [];
       }
       
       if (tarefasEntries && tarefasEntries.length > 0) {
-        // Para produção legislativa, deletar diretamente
-        if (selectedUser === "producao-legislativa") {
-          const { error } = await supabase
-            .from('tarefas')
-            .delete()
-            .eq('kanban_type', selectedUser);
-          
-          if (error) {
-            console.error("❌ Erro ao remover tarefas de produção legislativa:", error);
-            throw error;
-          }
-        } else {
-          // Para usuários específicos, deletar usando a query complexa
-          const { error } = await supabase
-            .from('tarefas')
-            .delete()
-            .or(`and(kanban_type.eq.${selectedUser}),and(responsavel_id.eq.${selectedUser})`);
-          
-          if (error) {
-            console.error("❌ Erro ao remover tarefas do usuário:", error);
-            throw error;
-          }
+        // Deletar as tarefas encontradas
+        const tarefaIds = tarefasEntries.map(t => t.id);
+        const { error } = await supabase
+          .from('tarefas')
+          .delete()
+          .in('id', tarefaIds);
+        
+        if (error) {
+          console.error("❌ Erro ao remover tarefas:", error);
+          throw error;
         }
       }
       
