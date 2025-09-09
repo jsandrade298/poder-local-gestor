@@ -5,6 +5,7 @@ import * as z from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { X, Send, Clock, CheckCircle, XCircle, RotateCcw, MessageCircle, Edit, Calendar, MapPin, Users, FileText, User, Clock4, Trash2 } from "lucide-react";
+import { EditAgendaDialog } from "@/components/forms/EditAgendaDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,8 @@ const SolicitarAgenda = () => {
   const [selectedAgenda, setSelectedAgenda] = useState<any>(null);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [newMessage, setNewMessage] = useState("");
+  const [editingAgenda, setEditingAgenda] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Função para fazer scroll para o final das mensagens
@@ -1099,7 +1102,21 @@ const SolicitarAgenda = () => {
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            {getStatusBadge(agenda.status)}
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(agenda.status)}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAgenda(agenda);
+                                  setIsEditDialogOpen(true);
+                                }}
+                                className="text-primary hover:text-primary hover:bg-primary/10"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
                             <div className="text-xs text-muted-foreground">
                               {formatDateTime(agenda.created_at)}
                             </div>
@@ -1171,8 +1188,20 @@ const SolicitarAgenda = () => {
                              </div>
                            </div>
                            <div className="flex flex-col items-end gap-2">
-                             <div className="flex items-center gap-2">
-                               {getStatusBadge(agenda.status)}
+                              <div className="flex items-center gap-2">
+                                {getStatusBadge(agenda.status)}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingAgenda(agenda);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                  className="text-primary hover:text-primary hover:bg-primary/10"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
                                <AlertDialog>
                                  <AlertDialogTrigger asChild>
                                     <Button
@@ -1237,11 +1266,32 @@ const SolicitarAgenda = () => {
         }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo || "Agenda"}
-                {/* Debug: {JSON.stringify({titulo: selectedAgenda?.titulo, desc: selectedAgenda?.descricao_objetivo})} */}
-              </DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  {selectedAgenda?.titulo || selectedAgenda?.descricao_objetivo || "Agenda"}
+                  {/* Debug: {JSON.stringify({titulo: selectedAgenda?.titulo, desc: selectedAgenda?.descricao_objetivo})} */}
+                </DialogTitle>
+                {/* Botão de editar no modal - verificar se usuário pode editar */}
+                {user && selectedAgenda && (
+                  selectedAgenda.solicitante_id === user.id ||
+                  selectedAgenda.validador_id === user.id ||
+                  (selectedAgenda.acompanhantes_nomes && selectedAgenda.acompanhantes_nomes.some((a: any) => a.id === user.id))
+                ) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingAgenda(selectedAgenda);
+                      setIsEditDialogOpen(true);
+                    }}
+                    className="text-primary hover:text-primary hover:bg-primary/10"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
 
             <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden" onValueChange={(value) => {
@@ -1476,6 +1526,13 @@ const SolicitarAgenda = () => {
             </Tabs>
           </DialogContent>
         </Dialog>
+
+        {/* Modal de Edição de Agenda */}
+        <EditAgendaDialog
+          agenda={editingAgenda}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+        />
       </div>
     </div>
   );
