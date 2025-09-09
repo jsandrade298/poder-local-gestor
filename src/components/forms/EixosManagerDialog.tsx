@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Edit2, Trash2, Save, X, GripVertical } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -35,7 +34,6 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
   const createEixo = useMutation({
     mutationFn: async (eixo: { nome: string; descricao: string; cor: string }) => {
-      // Buscar próximo número de ordem
       const { data: maxEixo } = await supabase
         .from('eixos')
         .select('ordem')
@@ -100,10 +98,8 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
     }
   });
 
-  // Função para reordenar eixos
   const reorderEixos = useMutation({
     mutationFn: async (reorderedEixos: typeof eixos) => {
-      // Atualizar todos os eixos com sua nova posição
       const updates = reorderedEixos.map((eixo, index) => 
         supabase
           .from('eixos')
@@ -130,12 +126,10 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
     if (sourceIndex === destinationIndex) return;
 
-    // Criar nova lista reordenada
     const newEixos = Array.from(eixos);
     const [reorderedItem] = newEixos.splice(sourceIndex, 1);
     newEixos.splice(destinationIndex, 0, reorderedItem);
 
-    // Atualizar no banco
     reorderEixos.mutate(newEixos);
   };
 
@@ -237,19 +231,19 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
               <CardTitle>Eixos Existentes (Arraste para reordenar)</CardTitle>
             </CardHeader>
             <CardContent>
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-5 gap-4 p-3 bg-muted rounded-lg font-semibold text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6"></div>
-                      Nome
-                    </div>
-                    <div>Descrição</div>
-                    <div>Cor</div>
-                    <div>Ações</div>
-                    <div></div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-5 gap-4 p-3 bg-muted rounded-lg font-semibold text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6"></div>
+                    Nome
                   </div>
-                  
+                  <div>Descrição</div>
+                  <div>Cor</div>
+                  <div>Ações</div>
+                  <div></div>
+                </div>
+                
+                <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="eixos-list">
                     {(provided) => (
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
@@ -271,22 +265,20 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                   style={{
                                     ...provided.draggableProps.style,
                                     ...(snapshot.isDragging && {
-                                      position: 'fixed' as const,
                                       zIndex: 10000,
-                                      width: '700px',
-                                      pointerEvents: 'none' as const
+                                      transform: provided.draggableProps.style?.transform || 'none',
                                     })
                                   }}
-                                  className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border ${
+                                  className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border transition-all ${
                                     snapshot.isDragging 
-                                      ? "shadow-xl bg-accent border-primary opacity-90" 
+                                      ? "shadow-2xl bg-accent border-primary scale-105 opacity-95" 
                                       : "hover:bg-accent/50"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
                                     <div 
                                       {...provided.dragHandleProps} 
-                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded flex-shrink-0"
+                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded flex-shrink-0 transition-colors"
                                     >
                                       <GripVertical className="h-4 w-4 text-muted-foreground" />
                                     </div>
@@ -369,8 +361,8 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                       </div>
                     )}
                   </Droppable>
-                </div>
-              </DragDropContext>
+                </DragDropContext>
+              </div>
             </CardContent>
           </Card>
         </div>
