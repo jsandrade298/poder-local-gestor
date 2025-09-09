@@ -261,98 +261,110 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                         ) : (
                           eixos.map((eixo, index) => (
                             <Draggable key={eixo.id} draggableId={eixo.id} index={index}>
-                              {(provided, snapshot) => (
-                                <TableRow
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    ...(snapshot.isDragging && {
-                                      zIndex: 99999,
-                                      opacity: 1,
-                                      backgroundColor: 'hsl(var(--accent))',
+                              {(provided, snapshot) => {
+                                // Configuração específica para elementos arrastados em modais
+                                const dragStyle = snapshot.isDragging 
+                                  ? {
+                                      ...provided.draggableProps.style,
+                                      position: 'fixed' as const,
+                                      zIndex: 100000, // Z-index muito alto
+                                      width: 'auto',
+                                      minWidth: '600px',
+                                      maxWidth: '800px',
+                                      backgroundColor: '#ffffff',
                                       border: '2px solid hsl(var(--primary))',
-                                      borderRadius: '8px'
-                                    })
-                                  }}
-                                  className={snapshot.isDragging ? 'shadow-2xl' : ''}
-                                >
-                                  <TableCell>
-                                    <div 
-                                      {...provided.dragHandleProps}
-                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded"
-                                    >
-                                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {editingId === eixo.id ? (
-                                      <Input
-                                        value={editingValues.nome}
-                                        onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
-                                        className="h-8"
-                                      />
-                                    ) : (
-                                      <span className="font-medium">{eixo.nome}</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {editingId === eixo.id ? (
-                                      <Input
-                                        value={editingValues.descricao}
-                                        onChange={(e) => setEditingValues({ ...editingValues, descricao: e.target.value })}
-                                        className="h-8"
-                                      />
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">{eixo.descricao || '-'}</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {editingId === eixo.id ? (
-                                      <Input
-                                        type="color"
-                                        value={editingValues.cor}
-                                        onChange={(e) => setEditingValues({ ...editingValues, cor: e.target.value })}
-                                        className="h-8 w-16"
-                                      />
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <div
-                                          className="w-4 h-4 rounded border"
-                                          style={{ backgroundColor: eixo.cor }}
+                                      borderRadius: '8px',
+                                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                      opacity: 1,
+                                      pointerEvents: 'none' as const,
+                                      transform: provided.draggableProps.style?.transform || 'translate(0px, 0px)',
+                                    }
+                                  : provided.draggableProps.style;
+
+                                return (
+                                  <TableRow
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    style={dragStyle}
+                                    className={snapshot.isDragging ? 'bg-white' : ''}
+                                  >
+                                    <TableCell>
+                                      <div 
+                                        {...provided.dragHandleProps}
+                                        className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded"
+                                      >
+                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      {editingId === eixo.id ? (
+                                        <Input
+                                          value={editingValues.nome}
+                                          onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
+                                          className="h-8"
                                         />
-                                        <span className="text-xs font-mono">{eixo.cor}</span>
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {editingId === eixo.id ? (
-                                      <div className="flex gap-1">
-                                        <Button size="sm" variant="ghost" onClick={handleSave}>
-                                          <Save className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" onClick={handleCancel}>
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex gap-1">
-                                        <Button size="sm" variant="ghost" onClick={() => handleEdit(eixo)}>
-                                          <Edit2 className="h-4 w-4" />
-                                        </Button>
-                                        <Button 
-                                          size="sm" 
-                                          variant="ghost" 
-                                          onClick={() => deleteEixo.mutate(eixo.id)}
-                                          className="text-destructive hover:text-destructive"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              )}
+                                      ) : (
+                                        <span className="font-medium">{eixo.nome}</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {editingId === eixo.id ? (
+                                        <Input
+                                          value={editingValues.descricao}
+                                          onChange={(e) => setEditingValues({ ...editingValues, descricao: e.target.value })}
+                                          className="h-8"
+                                        />
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">{eixo.descricao || '-'}</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {editingId === eixo.id ? (
+                                        <Input
+                                          type="color"
+                                          value={editingValues.cor}
+                                          onChange={(e) => setEditingValues({ ...editingValues, cor: e.target.value })}
+                                          className="h-8 w-16"
+                                        />
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className="w-4 h-4 rounded border"
+                                            style={{ backgroundColor: eixo.cor }}
+                                          />
+                                          <span className="text-xs font-mono">{eixo.cor}</span>
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {editingId === eixo.id ? (
+                                        <div className="flex gap-1">
+                                          <Button size="sm" variant="ghost" onClick={handleSave}>
+                                            <Save className="h-4 w-4" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" onClick={handleCancel}>
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex gap-1">
+                                          <Button size="sm" variant="ghost" onClick={() => handleEdit(eixo)}>
+                                            <Edit2 className="h-4 w-4" />
+                                          </Button>
+                                          <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={() => deleteEixo.mutate(eixo.id)}
+                                            className="text-destructive hover:text-destructive"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }}
                             </Draggable>
                           ))
                         )}
