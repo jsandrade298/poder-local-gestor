@@ -16,9 +16,10 @@ import { formatDateTime } from '@/lib/dateUtils';
 interface AdicionarDemandasKanbanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  selectedUser?: string; // Para filtrar demandas por usuário responsável
 }
 
-export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarDemandasKanbanDialogProps) {
+export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser }: AdicionarDemandasKanbanDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
@@ -30,17 +31,23 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
 
   // Buscar demandas não incluídas no kanban
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-nao-kanban'],
+    queryKey: ['demandas-nao-kanban', selectedUser],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('demandas')
         .select(`
           *,
           areas(nome),
           municipes(nome)
         `)
-        .is('kanban_position', null)
-        .order('created_at', { ascending: false });
+        .is('kanban_position', null);
+
+      // Filtrar por usuário se um usuário específico estiver selecionado
+      if (selectedUser && selectedUser !== "producao-legislativa") {
+        query = query.eq('responsavel_id', selectedUser);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         console.error('Erro ao buscar demandas:', error);
@@ -211,10 +218,19 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange }: AdicionarD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Adicionar Demandas ao Kanban</DialogTitle>
+          <DialogTitle>
+            Adicionar Demandas ao Kanban{" "}
+            {selectedUser === "producao-legislativa" 
+              ? "de Produção Legislativa"
+              : `pessoal de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
+            }
+          </DialogTitle>
           <DialogDescription>
-            Selecione as demandas que deseja adicionar à produção legislativa. 
-            Elas serão adicionadas na coluna "A Fazer".
+            {selectedUser === "producao-legislativa" 
+              ? "Selecione as demandas que deseja adicionar à produção legislativa."
+              : `Selecione as demandas onde ${responsaveis.find(r => r.id === selectedUser)?.nome || "o usuário"} é responsável para adicionar ao kanban pessoal.`
+            }
+            {" "}Elas serão adicionadas na coluna "A Fazer".
           </DialogDescription>
         </DialogHeader>
 

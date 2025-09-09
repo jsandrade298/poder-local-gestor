@@ -534,7 +534,7 @@ export default function Kanban() {
             onOpenChange={(open) => {
               setIsEditDialogOpen(open);
               if (!open) {
-                queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+                queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
               }
             }}
           />
@@ -542,10 +542,11 @@ export default function Kanban() {
 
         <AdicionarDemandasKanbanDialog
           open={isAdicionarDialogOpen}
+          selectedUser={selectedUser}
           onOpenChange={(open) => {
             setIsAdicionarDialogOpen(open);
             if (!open) {
-              queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+              queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
             }
           }}
         />
