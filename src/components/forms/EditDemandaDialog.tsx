@@ -166,14 +166,30 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
   const updateDemanda = useMutation({
     mutationFn: async (data: typeof formData) => {
-      // Buscar status anterior
-      const { data: demandaAnterior } = await supabase
-        .from('demandas')
-        .select('status, municipes(nome, telefone)')
-        .eq('id', demanda.id)
-        .single();
+      // Obter usuário atual
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user.user?.id;
+      
+      if (!userId) throw new Error('Usuário não autenticado');
 
+      // Buscar dados anteriores e do editor
+      const [demandaAnteriorResponse, editorResponse] = await Promise.all([
+        supabase
+          .from('demandas')
+          .select('status, responsavel_id, protocolo, titulo, municipes(nome, telefone)')
+          .eq('id', demanda.id)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('nome')
+          .eq('id', userId)
+          .maybeSingle()
+      ]);
+
+      const demandaAnterior = demandaAnteriorResponse.data;
+      const editor = editorResponse.data;
       const statusAnterior = demandaAnterior?.status;
+      const responsavelAnterior = demandaAnterior?.responsavel_id;
       const municipeData = demandaAnterior?.municipes as any;
       let whatsappEnviado = false;
 
@@ -198,6 +214,28 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         .eq('id', demanda.id);
 
       if (error) throw error;
+
+      // Criar notificação se o responsável mudou
+      if (data.responsavel_id && 
+          data.responsavel_id !== responsavelAnterior && 
+          data.responsavel_id !== userId) {
+        const { error: notificacaoError } = await supabase
+          .from('notificacoes')
+          .insert({
+            remetente_id: userId,
+            destinatario_id: data.responsavel_id,
+            tipo: 'atribuicao',
+            titulo: 'Demanda atribuída a você',
+            mensagem: `${editor?.nome || 'Usuário'} atribuiu você à demanda #${demandaAnterior?.protocolo}: "${demandaAnterior?.titulo}"`,
+            url_destino: `/demandas?id=${demanda.id}`,
+            lida: false
+          });
+
+        if (notificacaoError) {
+          console.error('Erro ao criar notificação de atribuição:', notificacaoError);
+          // Não falha a operação por causa da notificação
+        }
+      }
 
       // Notificar se status mudou
       if (statusAnterior !== data.status && municipeData?.telefone) {

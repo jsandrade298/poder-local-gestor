@@ -126,6 +126,13 @@ export function NovaDemandaDialog() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
 
+      // Buscar dados do usuário criador
+      const { data: criador } = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', user.user.id)
+        .maybeSingle();
+
       // Filtrar campos vazios e converter para null quando necessário
       const cleanData = {
         ...data,
@@ -144,7 +151,7 @@ export function NovaDemandaDialog() {
       const { data: demanda, error } = await supabase
         .from('demandas')
         .insert(cleanData)
-        .select('id')
+        .select('id, protocolo, titulo')
         .single();
 
       if (error) throw error;
@@ -152,6 +159,26 @@ export function NovaDemandaDialog() {
       // Upload dos arquivos se houver
       if (files.length > 0) {
         await uploadFiles(demanda.id);
+      }
+
+      // Criar notificação para o responsável se houver um
+      if (data.responsavel_id && data.responsavel_id !== user.user.id) {
+        const { error: notificacaoError } = await supabase
+          .from('notificacoes')
+          .insert({
+            remetente_id: user.user.id,
+            destinatario_id: data.responsavel_id,
+            tipo: 'atribuicao',
+            titulo: 'Nova demanda atribuída',
+            mensagem: `${criador?.nome || 'Usuário'} atribuiu você à demanda #${demanda.protocolo}: "${demanda.titulo}"`,
+            url_destino: `/demandas?id=${demanda.id}`,
+            lida: false
+          });
+
+        if (notificacaoError) {
+          console.error('Erro ao criar notificação:', notificacaoError);
+          // Não falha a operação por causa da notificação
+        }
       }
 
       return demanda;
