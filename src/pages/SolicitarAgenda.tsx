@@ -1287,11 +1287,16 @@ const SolicitarAgenda = () => {
                 </TabsList>
                 
                 {/* Botão de editar posicionado ao lado das abas */}
-                {user && selectedAgenda && (
-                  selectedAgenda.solicitante_id === user.id ||
-                  selectedAgenda.validador_id === user.id ||
-                  (selectedAgenda.acompanhantes_nomes && selectedAgenda.acompanhantes_nomes.some((a: any) => a.id === user.id))
-                ) && (
+                {user && selectedAgenda && (() => {
+                  const isAcompanhante = agendaDetalhada?.acompanhantes_nomes?.some((a: any) => a.id === user.id) ||
+                                        selectedAgenda.acompanhantes_nomes?.some((a: any) => a.id === user.id);
+                  
+                  const canEdit = selectedAgenda.solicitante_id === user.id ||
+                                selectedAgenda.validador_id === user.id ||
+                                isAcompanhante;
+                  
+                  return canEdit;
+                })() && (
                   <Button
                     variant="outline"
                     size="sm"
