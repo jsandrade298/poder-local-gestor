@@ -950,12 +950,10 @@ export default function Demandas() {
         const municipesNaoEncontrados = new Map();
         const demandasComDados = [];
         
-        // Limitar processamento a no máximo 42 linhas de dados (43 total - 1 header)
-        const maxLinhasProcessar = Math.min(lines.length, 43);
-        console.log(`🎯 Processando no máximo ${maxLinhasProcessar - 1} demandas (linhas 2 a ${maxLinhasProcessar})`);
+        console.log(`🎯 Processando ${lines.length - 1} possíveis demandas (linhas 2 a ${lines.length})`);
         
         // Primeira passada: identificar dados e munícipes novos
-        for (let i = 1; i < maxLinhasProcessar; i++) {
+        for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
           if (!line.trim()) {
             console.log(`⏭️ Linha ${i + 1} vazia, pulando...`);
@@ -1109,13 +1107,7 @@ export default function Demandas() {
           demandasComDados.push(demanda);
         }
 
-        // Limitar a no máximo 42 demandas (número esperado)
-        if (demandasComDados.length > 42) {
-          console.warn(`⚠️ Muitas demandas detectadas (${demandasComDados.length}), limitando a 42`);
-          demandasComDados.splice(42); // Manter apenas as primeiras 42
-        }
-
-        console.log(`📝 ${demandasComDados.length} demandas válidas identificadas (máximo 42)`);
+        console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
         console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
         
         // Log de resumo da importação
