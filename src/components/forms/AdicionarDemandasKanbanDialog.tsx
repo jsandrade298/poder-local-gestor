@@ -294,9 +294,150 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
         </DialogHeader>
 
         <div className="space-y-4 flex-1 min-h-0 flex flex-col">
-          {/* Filtros */}
-          <div className="flex flex-wrap gap-3 p-4 bg-muted/50 rounded-lg">
-            <div className="flex-1 min-w-[250px]">
+          {/* Filtros organizados */}
+          <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+            {/* Grid de filtros com labels */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {/* Status */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos os..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="aberta">Aberta</SelectItem>
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
+                    <SelectItem value="resolvida">Resolvida</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Área */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Área</label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todas as..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Áreas</SelectItem>
+                    {areas.map((area) => (
+                      <SelectItem key={area.id} value={area.id}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Munícipe */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Munícipe</label>
+                <Popover open={municipeOpen} onOpenChange={setMunicipeOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={municipeOpen}
+                      className="w-full justify-between"
+                    >
+                      {municipeFilter === "all" 
+                        ? "Todos os..."
+                        : municipes.find(m => m.id === municipeFilter)?.nome || "Munícipe não encontrado"
+                      }
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-0 bg-background border z-50">
+                    <Command>
+                      <CommandInput placeholder="Buscar munícipe..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum munícipe encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setMunicipeFilter("all");
+                              setMunicipeOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                municipeFilter === "all" ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            Todos os Munícipes
+                          </CommandItem>
+                          {municipes.map((municipe) => (
+                            <CommandItem
+                              key={municipe.id}
+                              value={municipe.nome}
+                              onSelect={() => {
+                                setMunicipeFilter(municipe.id);
+                                setMunicipeOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  municipeFilter === municipe.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {municipe.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Responsável */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Responsável</label>
+                <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos os..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border z-50">
+                    <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                    <SelectItem value="undefined">Sem Responsável</SelectItem>
+                    {responsaveis.map((responsavel) => (
+                      <SelectItem key={responsavel.id} value={responsavel.id}>
+                        {responsavel.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Prioridade */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Prioridade</label>
+                <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todas as..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Campo de busca textual */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Buscar</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -307,139 +448,26 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                 />
               </div>
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="aberta">Aberta</SelectItem>
-                <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                <SelectItem value="aguardando">Aguardando</SelectItem>
-                <SelectItem value="resolvida">Resolvida</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
 
-            <Select value={areaFilter} onValueChange={setAreaFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Área" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Áreas</SelectItem>
-                {areas.map((area) => (
-                  <SelectItem key={area.id} value={area.id}>
-                    {area.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Prioridade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="baixa">Baixa</SelectItem>
-                <SelectItem value="media">Média</SelectItem>
-                <SelectItem value="alta">Alta</SelectItem>
-                <SelectItem value="urgente">Urgente</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Popover open={municipeOpen} onOpenChange={setMunicipeOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={municipeOpen}
-                  className="w-[200px] justify-between"
-                >
-                  {municipeFilter === "all" 
-                    ? "Todos os Munícipes"
-                    : municipes.find(m => m.id === municipeFilter)?.nome || "Munícipe não encontrado"
-                  }
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0 bg-background border z-50">
-                <Command>
-                  <CommandInput placeholder="Buscar munícipe..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum munícipe encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="all"
-                        onSelect={() => {
-                          setMunicipeFilter("all");
-                          setMunicipeOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            municipeFilter === "all" ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        Todos os Munícipes
-                      </CommandItem>
-                      {municipes.map((municipe) => (
-                        <CommandItem
-                          key={municipe.id}
-                          value={municipe.nome}
-                          onSelect={() => {
-                            setMunicipeFilter(municipe.id);
-                            setMunicipeOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              municipeFilter === municipe.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {municipe.nome}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
-            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border z-50">
-                <SelectItem value="all">Todos os Responsáveis</SelectItem>
-                <SelectItem value="undefined">Sem Responsável</SelectItem>
-                {responsaveis.map((responsavel) => (
-                  <SelectItem key={responsavel.id} value={responsavel.id}>
-                    {responsavel.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("all");
-                setAreaFilter("all");
-                setMunicipeFilter("all");
-                setPrioridadeFilter("all");
-                setResponsavelFilter("all");
-                setMunicipeOpen(false);
-              }}
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Limpar
-            </Button>
+            {/* Botão limpar filtros */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setAreaFilter("all");
+                  setMunicipeFilter("all");
+                  setPrioridadeFilter("all");
+                  setResponsavelFilter("all");
+                  setMunicipeOpen(false);
+                }}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            </div>
           </div>
 
           {/* Seleção e estatísticas */}
