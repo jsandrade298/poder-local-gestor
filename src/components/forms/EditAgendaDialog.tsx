@@ -124,7 +124,7 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
   const canEdit = user && agenda && (
     agenda.solicitante_id === user.id ||
     agenda.validador_id === user.id ||
-    acompanhantesAtuais?.includes(user.id)
+    (acompanhantesAtuais && acompanhantesAtuais.includes(user.id))
   );
 
   // Atualizar agenda
@@ -230,7 +230,9 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
     }
   };
 
-  if (!canEdit) {
+  // Só retorna null se temos certeza que o usuário não pode editar
+  // (aguarda carregamento dos acompanhantes)
+  if (acompanhantesAtuais !== undefined && !canEdit) {
     return null;
   }
 
