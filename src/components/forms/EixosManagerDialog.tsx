@@ -232,61 +232,51 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
               <CardTitle>Eixos Existentes (Arraste para reordenar)</CardTitle>
             </CardHeader>
             <CardContent>
-              <DragDropContext onDragEnd={handleDragEnd}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead className="w-24">Cor</TableHead>
-                      <TableHead className="w-24">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <Droppable droppableId="eixos-table">
-                    {(provided) => (
-                      <TableBody {...provided.droppableProps} ref={provided.innerRef}>
-                        {isLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center">
-                              Carregando...
-                            </TableCell>
-                          </TableRow>
-                        ) : eixos.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center">
-                              Nenhum eixo encontrado
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          eixos.map((eixo, index) => (
-                            <Draggable key={eixo.id} draggableId={eixo.id} index={index}>
-                              {(provided, snapshot) => {
-                                // Configuração específica para elementos arrastados em modais
-                                const dragStyle = snapshot.isDragging 
-                                  ? {
-                                      ...provided.draggableProps.style,
-                                      position: 'fixed' as const,
-                                      zIndex: 100000, // Z-index muito alto
-                                      width: 'auto',
-                                      minWidth: '600px',
-                                      maxWidth: '800px',
-                                      backgroundColor: '#ffffff',
-                                      border: '2px solid hsl(var(--primary))',
-                                      borderRadius: '8px',
-                                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                                      opacity: 1,
-                                      pointerEvents: 'none' as const,
-                                      transform: provided.draggableProps.style?.transform || 'translate(0px, 0px)',
-                                    }
-                                  : provided.draggableProps.style;
-
-                                return (
+              <div style={{ overflow: 'visible' }}>
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="w-24">Cor</TableHead>
+                        <TableHead className="w-24">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <Droppable droppableId="eixos-table">
+                      {(provided) => (
+                        <TableBody {...provided.droppableProps} ref={provided.innerRef}>
+                          {isLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center">
+                                Carregando...
+                              </TableCell>
+                            </TableRow>
+                          ) : eixos.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center">
+                                Nenhum eixo encontrado
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            eixos.map((eixo, index) => (
+                              <Draggable key={eixo.id} draggableId={eixo.id} index={index}>
+                                {(provided, snapshot) => (
                                   <TableRow
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
-                                    style={dragStyle}
-                                    className={snapshot.isDragging ? 'bg-white' : ''}
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      visibility: snapshot.isDragging ? 'visible' : 'visible',
+                                      opacity: snapshot.isDragging ? 0.8 : 1,
+                                      zIndex: snapshot.isDragging ? 999999 : 'auto',
+                                      position: snapshot.isDragging ? 'relative' : 'static',
+                                      backgroundColor: snapshot.isDragging ? '#f8f9fa' : 'transparent',
+                                      border: snapshot.isDragging ? '2px solid hsl(var(--primary))' : 'none',
+                                      borderRadius: snapshot.isDragging ? '8px' : '0',
+                                      boxShadow: snapshot.isDragging ? '0 10px 30px rgba(0,0,0,0.3)' : 'none'
+                                    }}
                                   >
                                     <TableCell>
                                       <div 
@@ -363,17 +353,17 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                       )}
                                     </TableCell>
                                   </TableRow>
-                                );
-                              }}
-                            </Draggable>
-                          ))
-                        )}
-                        {provided.placeholder}
-                      </TableBody>
-                    )}
-                  </Droppable>
-                </Table>
-              </DragDropContext>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
+                          {provided.placeholder}
+                        </TableBody>
+                      )}
+                    </Droppable>
+                  </Table>
+                </DragDropContext>
+              </div>
             </CardContent>
           </Card>
         </div>
