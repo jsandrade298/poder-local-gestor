@@ -127,6 +127,17 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
     (acompanhantesAtuais && acompanhantesAtuais.includes(user.id))
   );
 
+  // Debug para entender o problema
+  console.log('EditAgendaDialog - Debug:', {
+    user: user?.email,
+    userId: user?.id,
+    agendaId: agenda?.id,
+    solicitanteId: agenda?.solicitante_id,
+    validadorId: agenda?.validador_id,
+    acompanhantesAtuais,
+    canEdit
+  });
+
   // Atualizar agenda
   const updateAgendaMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -213,6 +224,12 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
   });
 
   const onSubmit = async (data: FormData) => {
+    console.log('onSubmit - Debug:', {
+      user: user?.email,
+      canEdit,
+      data
+    });
+
     if (!canEdit) {
       toast({
         title: "Sem permissão",
