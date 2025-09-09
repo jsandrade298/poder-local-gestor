@@ -102,12 +102,18 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
   // Função para reordenar eixos
   const reorderEixos = useMutation({
-    mutationFn: async ({ eixoId, newPosition }: { eixoId: string; newPosition: number }) => {
-      const { error } = await supabase
-        .from('eixos')
-        .update({ ordem: newPosition })
-        .eq('id', eixoId);
-      if (error) throw error;
+    mutationFn: async (updates: { eixoId: string; newPosition: number }[]) => {
+      // Fazer todas as atualizações em paralelo
+      const promises = updates.map(({ eixoId, newPosition }) =>
+        supabase
+          .from('eixos')
+          .update({ ordem: newPosition })
+          .eq('id', eixoId)
+      );
+      
+      const results = await Promise.all(promises);
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) throw errors[0].error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['eixos-manager'] });
@@ -130,12 +136,18 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
     const [reorderedItem] = newEixos.splice(sourceIndex, 1);
     newEixos.splice(destinationIndex, 0, reorderedItem);
 
-    // Atualizar a ordem de todos os eixos afetados
-    newEixos.forEach((eixo, index) => {
-      if (eixo.ordem !== index + 1) {
-        reorderEixos.mutate({ eixoId: eixo.id, newPosition: index + 1 });
-      }
-    });
+    // Preparar todas as atualizações necessárias
+    const updates = newEixos
+      .map((eixo, index) => ({
+        eixoId: eixo.id,
+        newPosition: index + 1
+      }))
+      .filter((update, index) => eixos[index]?.ordem !== update.newPosition);
+
+    // Fazer uma única atualização com todos os changes
+    if (updates.length > 0) {
+      reorderEixos.mutate(updates);
+    }
   };
 
   const handleEdit = (eixo: any) => {
@@ -269,7 +281,11 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                 <TableRow 
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  className={snapshot.isDragging ? "bg-accent" : ""}
+                                  className={snapshot.isDragging ? "bg-accent border-2 border-primary shadow-lg" : ""}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    transform: snapshot.isDragging ? provided.draggableProps.style?.transform : undefined,
+                                  }}
                                 >
                                   <TableCell {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
