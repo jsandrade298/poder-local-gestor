@@ -267,11 +267,9 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                     ...(snapshot.isDragging && {
                                       position: 'fixed',
                                       zIndex: 10000,
-                                      left: '50%',
-                                      top: '50%',
-                                      transform: 'translate(-50%, -50%)',
                                       width: '600px',
-                                      maxWidth: '90vw'
+                                      maxWidth: '90vw',
+                                      pointerEvents: 'none'
                                     })
                                   }}
                                   className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border transition-all ${
