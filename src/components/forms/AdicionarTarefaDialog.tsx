@@ -58,6 +58,19 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
       console.log("🔄 Criando tarefa - dados:", tarefa);
       console.log("🔄 Colaboradores selecionados:", colaboradoresSelecionados);
       
+      // Obter usuário atual
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user.user?.id;
+      
+      if (!userId) throw new Error('Usuário não autenticado');
+
+      // Buscar dados do usuário criador
+      const { data: criador } = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', userId)
+        .single();
+      
       // Criar uma tarefa na nova tabela
       const { data: novaTarefa, error: tarefaError } = await supabase
         .from('tarefas')
@@ -68,7 +81,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           kanban_position: tarefa.posicao,
           kanban_type: kanbanType,
           cor: tarefa.cor,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: userId
         })
         .select()
         .single();
@@ -87,6 +100,26 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           .insert(colaboradoresData);
 
         if (colaboradoresError) throw colaboradoresError;
+
+        // Criar notificações para os colaboradores
+        const notificacoesData = colaboradoresSelecionados.map(colaboradorId => ({
+          remetente_id: userId,
+          destinatario_id: colaboradorId,
+          tipo: 'tarefa_atribuida',
+          titulo: 'Nova tarefa atribuída',
+          mensagem: `${criador?.nome || 'Usuário'} atribuiu você à tarefa: "${tarefa.titulo}"`,
+          url_destino: `/kanban?tarefa=${novaTarefa.id}`,
+          lida: false
+        }));
+
+        const { error: notificacoesError } = await supabase
+          .from('notificacoes')
+          .insert(notificacoesData);
+
+        if (notificacoesError) {
+          console.error('Erro ao criar notificações:', notificacoesError);
+          // Não falha a operação por causa das notificações
+        }
       }
 
       return novaTarefa;

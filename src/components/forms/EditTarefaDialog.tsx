@@ -74,6 +74,27 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
 
   const updateTarefaMutation = useMutation({
     mutationFn: async (tarefaData: typeof formData) => {
+      // Obter usuário atual
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user.user?.id;
+      
+      if (!userId) throw new Error('Usuário não autenticado');
+
+      // Buscar dados do usuário editor
+      const { data: editor } = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', userId)
+        .single();
+
+      // Buscar colaboradores anteriores
+      const { data: colaboradoresAntigos } = await supabase
+        .from('tarefa_colaboradores')
+        .select('colaborador_id')
+        .eq('tarefa_id', tarefa.id);
+
+      const colaboradoresAntigosIds = colaboradoresAntigos?.map(c => c.colaborador_id) || [];
+
       // Atualizar tarefa
       const { error: tarefaError } = await supabase
         .from('tarefas')
@@ -111,6 +132,32 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
           .insert(colaboradoresData);
 
         if (colaboradoresError) throw colaboradoresError;
+
+        // Criar notificações para novos colaboradores
+        const novosColaboradores = colaboradoresSelecionados.filter(
+          id => !colaboradoresAntigosIds.includes(id)
+        );
+
+        if (novosColaboradores.length > 0) {
+          const notificacoesData = novosColaboradores.map(colaboradorId => ({
+            remetente_id: userId,
+            destinatario_id: colaboradorId,
+            tipo: 'tarefa_atribuida',
+            titulo: 'Você foi adicionado à uma tarefa',
+            mensagem: `${editor?.nome || 'Usuário'} adicionou você à tarefa: "${tarefaData.titulo}"`,
+            url_destino: `/kanban?tarefa=${tarefa.id}`,
+            lida: false
+          }));
+
+          const { error: notificacoesError } = await supabase
+            .from('notificacoes')
+            .insert(notificacoesData);
+
+          if (notificacoesError) {
+            console.error('Erro ao criar notificações:', notificacoesError);
+            // Não falha a operação por causa das notificações
+          }
+        }
       }
 
       return tarefa;

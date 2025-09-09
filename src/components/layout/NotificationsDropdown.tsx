@@ -127,6 +127,8 @@ export function NotificationsDropdown() {
         return <MessageSquare className="h-4 w-4" />;
       case 'atribuicao':
         return <AlertCircle className="h-4 w-4" />;
+      case 'tarefa_atribuida':
+        return <AlertCircle className="h-4 w-4" />;
       case 'agenda_solicitada':
       case 'agenda_acompanhante':
       case 'agenda_status':
@@ -146,6 +148,8 @@ export function NotificationsDropdown() {
         return 'bg-green-500';
       case 'atribuicao':
         return 'bg-orange-500';
+      case 'tarefa_atribuida':
+        return 'bg-purple-500';
       case 'agenda_solicitada':
         return 'bg-purple-500';
       case 'agenda_acompanhante':

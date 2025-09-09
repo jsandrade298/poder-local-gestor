@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,6 +68,7 @@ export default function Kanban() {
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
   const queryClient = useQueryClient();
+
 
   // Buscar demandas e tarefas do kanban
   const { data: demandas = [], isLoading } = useQuery({
@@ -186,6 +187,22 @@ export default function Kanban() {
       return data || [];
     }
   });
+
+  // Detectar parâmetro de tarefa na URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tarefaId = urlParams.get('tarefa');
+    
+    if (tarefaId && demandas.length > 0) {
+      const tarefa = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
+      if (tarefa) {
+        setSelectedTarefa(tarefa);
+        setIsViewTarefaDialogOpen(true);
+        // Limpar parâmetro da URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [demandas]);
 
   // Mutation para limpar kanban (demandas e tarefas)
   const limparKanbanMutation = useMutation({
