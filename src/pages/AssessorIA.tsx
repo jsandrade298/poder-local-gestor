@@ -10,7 +10,7 @@ import { Send, Bot, User, Loader2, Trash2, FileText, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { AppHeader } from "@/components/layout/AppHeader";
+
 import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MarkdownText } from "@/components/ui/markdown-text";
@@ -232,7 +232,6 @@ const AssessorIA = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <AppHeader />
       
       <div className="container mx-auto px-4 py-6 space-y-8">
         <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
