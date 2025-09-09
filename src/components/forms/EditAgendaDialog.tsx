@@ -127,17 +127,6 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
     (acompanhantesAtuais && acompanhantesAtuais.includes(user.id))
   );
 
-  // Debug para entender o problema
-  console.log('EditAgendaDialog - Debug:', {
-    user: user?.email,
-    userId: user?.id,
-    agendaId: agenda?.id,
-    solicitanteId: agenda?.solicitante_id,
-    validadorId: agenda?.validador_id,
-    acompanhantesAtuais,
-    canEdit
-  });
-
   // Atualizar agenda
   const updateAgendaMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -187,22 +176,18 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
 
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast({
         title: "✅ Agenda atualizada!",
         description: "As informações foram salvas com sucesso",
       });
       
-      // Invalidar queries para atualizar as listas
-      queryClient.invalidateQueries({ queryKey: ["minhas-agendas"] });
-      queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
-      queryClient.invalidateQueries({ queryKey: ["agenda-detalhada"] });
-      
-      // Atualizar o agenda no modal principal se callback fornecido
+      // Atualizar o agenda no modal principal primeiro
       if (onAgendaUpdated && agenda) {
         const updatedAgenda = {
           ...agenda,
           ...data,
+          data_hora_proposta: new Date(data.data_hora_proposta).toISOString(),
           // Manter acompanhantes atualizados
           acompanhantes_nomes: data.acompanha_mandato_ids?.map(id => 
             usuarios?.find(u => u.id === id)
@@ -210,6 +195,13 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
         };
         onAgendaUpdated(updatedAgenda);
       }
+      
+      // Aguardar um pouco antes de invalidar as queries para garantir que o DB foi atualizado
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["minhas-agendas"] });
+        queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
+        queryClient.invalidateQueries({ queryKey: ["agenda-detalhada"] });
+      }, 500);
       
       onOpenChange(false);
     },
@@ -224,12 +216,6 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
   });
 
   const onSubmit = async (data: FormData) => {
-    console.log('onSubmit - Debug:', {
-      user: user?.email,
-      canEdit,
-      data
-    });
-
     if (!canEdit) {
       toast({
         title: "Sem permissão",
