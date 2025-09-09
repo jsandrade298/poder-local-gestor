@@ -319,12 +319,26 @@ export default function Kanban() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    Confirmar limpeza do kanban{" "}
+                    {selectedUser === "producao-legislativa" 
+                      ? "de Produção Legislativa"
+                      : `de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
+                    }
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Isso removerá todas as demandas do kanban. As demandas voltarão para a lista geral e poderão ser adicionadas novamente quando necessário.
+                    Isso removerá todas as demandas do kanban{" "}
+                    <strong>
+                      {selectedUser === "producao-legislativa" 
+                        ? "de Produção Legislativa"
+                        : `pessoal de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
+                      }
+                    </strong>. 
+                    <br />
+                    As demandas voltarão para a lista geral e poderão ser adicionadas novamente quando necessário.
                     Esta ação não pode ser desfeita.
                     <br /><br />
-                    <strong>Demandas que serão removidas:</strong>
+                    <strong>Demandas que serão removidas deste kanban:</strong>
                     <br />
                     • A Fazer: {getDemandsByStatus('a_fazer').length} demandas
                     <br />
@@ -333,6 +347,8 @@ export default function Kanban() {
                     • Feito: {getDemandsByStatus('feito').length} demandas
                     <br />
                     • <strong>Total: {demandas.length} demandas</strong>
+                    <br /><br />
+                    <em>Outros kanbans não serão afetados.</em>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
