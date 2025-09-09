@@ -414,6 +414,7 @@ export type Database = {
           descricao: string
           id: string
           kanban_position: string | null
+          kanban_type: string | null
           logradouro: string | null
           municipe_id: string
           numero: string | null
@@ -438,6 +439,7 @@ export type Database = {
           descricao: string
           id?: string
           kanban_position?: string | null
+          kanban_type?: string | null
           logradouro?: string | null
           municipe_id: string
           numero?: string | null
@@ -462,6 +464,7 @@ export type Database = {
           descricao?: string
           id?: string
           kanban_position?: string | null
+          kanban_type?: string | null
           logradouro?: string | null
           municipe_id?: string
           numero?: string | null

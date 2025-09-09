@@ -31,23 +31,17 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
 
   // Buscar demandas não incluídas no kanban
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-nao-kanban', selectedUser],
+    queryKey: ['demandas-nao-kanban'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('demandas')
         .select(`
           *,
           areas(nome),
           municipes(nome)
         `)
-        .is('kanban_position', null);
-
-      // Filtrar por usuário se um usuário específico estiver selecionado
-      if (selectedUser && selectedUser !== "producao-legislativa") {
-        query = query.eq('responsavel_id', selectedUser);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .is('kanban_position', null)
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Erro ao buscar demandas:', error);
@@ -98,13 +92,16 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
     mutationFn: async (demandaIds: string[]) => {
       const { error } = await supabase
         .from('demandas')
-        .update({ kanban_position: 'a_fazer' })
+        .update({ 
+          kanban_position: 'a_fazer',
+          kanban_type: selectedUser || 'producao-legislativa'
+        })
         .in('id', demandaIds);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       queryClient.invalidateQueries({ queryKey: ['demandas-nao-kanban'] });
       toast.success(`${selectedDemandas.length} demanda(s) adicionada(s) ao kanban!`);
       setSelectedDemandas([]);

@@ -52,7 +52,7 @@ export default function Kanban() {
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-kanban', selectedUser],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('demandas')
         .select(`
           *,
@@ -60,17 +60,9 @@ export default function Kanban() {
           municipes(nome)
         `)
         .not('kanban_position', 'is', null)
-        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito']);
-
-      // Filtrar por usuário ou produção legislativa
-      if (selectedUser === "producao-legislativa") {
-        // Para produção legislativa, mantém o comportamento atual
-      } else {
-        // Para usuários específicos, filtrar por responsável
-        query = query.eq('responsavel_id', selectedUser);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
+        .eq('kanban_type', selectedUser)
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Erro ao buscar demandas:', error);
@@ -102,18 +94,13 @@ export default function Kanban() {
     mutationFn: async () => {
       console.log("🔄 Iniciando limpeza do kanban...");
       
-      // Buscar demandas baseado na seleção atual
-      let query = supabase
+      // Buscar demandas baseado no kanban selecionado
+      const { data: demandasParaRemover, error: fetchError } = await supabase
         .from('demandas')
         .select('id, titulo, kanban_position')
         .not('kanban_position', 'is', null)
-        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito']);
-
-      if (selectedUser !== "producao-legislativa") {
-        query = query.eq('responsavel_id', selectedUser);
-      }
-      
-      const { data: demandasParaRemover, error: fetchError } = await query;
+        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
+        .eq('kanban_type', selectedUser);
       
       if (fetchError) {
         console.error("❌ Erro ao buscar demandas para remover:", fetchError);
@@ -175,7 +162,10 @@ export default function Kanban() {
     mutationFn: async ({ demandaId, newPosition }: { demandaId: string; newPosition: string }) => {
       const { error } = await supabase
         .from('demandas')
-        .update({ kanban_position: newPosition })
+        .update({ 
+          kanban_position: newPosition,
+          kanban_type: selectedUser
+        })
         .eq('id', demandaId);
       
       if (error) throw error;
