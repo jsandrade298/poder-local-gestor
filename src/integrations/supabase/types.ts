@@ -991,6 +991,48 @@ export type Database = {
         }
         Relationships: []
       }
+      tarefas: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          descricao: string | null
+          id: string
+          kanban_position: string
+          kanban_type: string
+          prioridade: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          descricao?: string | null
+          id?: string
+          kanban_position?: string
+          kanban_type: string
+          prioridade?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          descricao?: string | null
+          id?: string
+          kanban_position?: string
+          kanban_type?: string
+          prioridade?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       temas_acao: {
         Row: {
           created_at: string

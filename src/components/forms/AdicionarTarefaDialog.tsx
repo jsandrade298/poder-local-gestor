@@ -27,38 +27,26 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
 
   const createTarefaMutation = useMutation({
     mutationFn: async (tarefa: typeof formData) => {
-      // Criar uma "demanda" que representa uma tarefa pessoal
-      const { data: novaDemanda, error: demandaError } = await supabase
-        .from('demandas')
+      // Criar uma tarefa na nova tabela
+      const { data: novaTarefa, error: tarefaError } = await supabase
+        .from('tarefas')
         .insert({
           titulo: tarefa.titulo,
           descricao: tarefa.descricao,
           prioridade: tarefa.prioridade,
-          status: 'aberta',
-          protocolo: `TAREFA-${Date.now()}`, // Protocolo único para tarefas
-          municipe_id: '00000000-0000-0000-0000-000000000000', // ID fake para tarefas pessoais
-          criado_por: (await supabase.auth.getUser()).data.user?.id
+          kanban_position: tarefa.posicao,
+          kanban_type: kanbanType, // ID do usuário ou tipo do kanban
+          created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
         .single();
 
-      if (demandaError) throw demandaError;
+      if (tarefaError) throw tarefaError;
 
-      // Adicionar ao kanban específico
-      const { error: kanbanError } = await supabase
-        .from('demanda_kanbans')
-        .insert({
-          demanda_id: novaDemanda.id,
-          kanban_type: kanbanType,
-          kanban_position: tarefa.posicao
-        });
-
-      if (kanbanError) throw kanbanError;
-
-      return novaDemanda;
+      return novaTarefa;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', kanbanType] });
+      queryClient.invalidateQueries({ queryKey: ['tarefas-kanban', kanbanType] });
       toast.success("Tarefa criada com sucesso!");
       setFormData({
         titulo: "",

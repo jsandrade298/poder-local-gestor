@@ -33,6 +33,20 @@ interface Demanda {
   areas?: { nome: string };
   municipes?: { nome: string };
   responsavel_id?: string;
+  tipo?: 'demanda' | 'tarefa'; // Novo campo para diferenciar
+}
+
+interface Tarefa {
+  id: string;
+  titulo: string;
+  descricao: string;
+  prioridade: string;
+  kanban_position: string;
+  kanban_type: string;
+  created_by: string;
+  completed: boolean;
+  created_at: string;
+  tipo: 'tarefa';
 }
 
 const statusColumns = [
@@ -49,11 +63,11 @@ export default function Kanban() {
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
   const queryClient = useQueryClient();
 
-  // Buscar demandas do kanban usando a nova tabela de relacionamento
+  // Buscar demandas e tarefas do kanban
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-kanban', selectedUser],
     queryFn: async () => {
-      // Primeiro buscar as IDs das demandas no kanban
+      // Buscar demandas do kanban
       const { data: kanbanData, error: kanbanError } = await supabase
         .from('demanda_kanbans')
         .select('demanda_id, kanban_position')
@@ -64,35 +78,66 @@ export default function Kanban() {
         throw kanbanError;
       }
       
-      if (!kanbanData || kanbanData.length === 0) {
-        return [];
+      let demandasCompletas: any[] = [];
+      
+      if (kanbanData && kanbanData.length > 0) {
+        // Buscar as demandas completas
+        const demandaIds = kanbanData.map(k => k.demanda_id);
+        const { data: demandasData, error: demandasError } = await supabase
+          .from('demandas')
+          .select(`
+            *,
+            areas(nome),
+            municipes(nome)
+          `)
+          .in('id', demandaIds)
+          .order('created_at', { ascending: false });
+        
+        if (demandasError) {
+          console.error('Erro ao buscar demandas:', demandasError);
+          throw demandasError;
+        }
+        
+        // Combinar os dados das demandas
+        demandasCompletas = demandasData?.map(demanda => {
+          const kanbanInfo = kanbanData.find(k => k.demanda_id === demanda.id);
+          return {
+            ...demanda,
+            kanban_position: kanbanInfo?.kanban_position || 'a_fazer',
+            tipo: 'demanda'
+          };
+        }) || [];
       }
       
-      // Buscar as demandas completas
-      const demandaIds = kanbanData.map(k => k.demanda_id);
-      const { data: demandasData, error: demandasError } = await supabase
-        .from('demandas')
-        .select(`
-          *,
-          areas(nome),
-          municipes(nome)
-        `)
-        .in('id', demandaIds)
+      // Buscar tarefas do kanban
+      const { data: tarefasData, error: tarefasError } = await supabase
+        .from('tarefas')
+        .select('*')
+        .eq('kanban_type', selectedUser)
         .order('created_at', { ascending: false });
       
-      if (demandasError) {
-        console.error('Erro ao buscar demandas:', demandasError);
-        throw demandasError;
+      if (tarefasError) {
+        console.error('Erro ao buscar tarefas:', tarefasError);
+        throw tarefasError;
       }
       
-      // Combinar os dados
-      return demandasData?.map(demanda => {
-        const kanbanInfo = kanbanData.find(k => k.demanda_id === demanda.id);
-        return {
-          ...demanda,
-          kanban_position: kanbanInfo?.kanban_position || 'a_fazer'
-        };
-      }) || [];
+      // Combinar tarefas formatadas para o mesmo padrão das demandas
+      const tarefasFormatadas = tarefasData?.map(tarefa => ({
+        id: tarefa.id,
+        titulo: tarefa.titulo,
+        protocolo: `TAREFA-${tarefa.id.slice(0, 8)}`,
+        descricao: tarefa.descricao || '',
+        status: tarefa.completed ? 'resolvida' : 'aberta',
+        kanban_position: tarefa.kanban_position,
+        prioridade: tarefa.prioridade,
+        data_prazo: null,
+        created_at: tarefa.created_at,
+        responsavel_id: tarefa.created_by,
+        tipo: 'tarefa' as const
+      })) || [];
+      
+      // Combinar demandas e tarefas
+      return [...demandasCompletas, ...tarefasFormatadas];
     }
   });
 
@@ -113,12 +158,12 @@ export default function Kanban() {
     }
   });
 
-  // Mutation para limpar kanban
+  // Mutation para limpar kanban (demandas e tarefas)
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
       console.log("🔄 Iniciando limpeza do kanban...");
       
-      // Buscar e remover todas as entradas do kanban selecionado
+      // Remover todas as entradas do kanban selecionado
       const { data: kanbanEntries, error: fetchError } = await supabase
         .from('demanda_kanbans')
         .select('id')
@@ -129,19 +174,39 @@ export default function Kanban() {
         throw fetchError;
       }
       
-      if (!kanbanEntries || kanbanEntries.length === 0) {
-        console.log("ℹ️ Nenhuma demanda no kanban para ser removida");
-        return;
+      if (kanbanEntries && kanbanEntries.length > 0) {
+        const { error } = await supabase
+          .from('demanda_kanbans')
+          .delete()
+          .eq('kanban_type', selectedUser);
+        
+        if (error) {
+          console.error("❌ Erro ao remover entradas do kanban:", error);
+          throw error;
+        }
       }
       
-      const { error } = await supabase
-        .from('demanda_kanbans')
-        .delete()
+      // Remover todas as tarefas do kanban selecionado
+      const { data: tarefasEntries, error: tarefasFetchError } = await supabase
+        .from('tarefas')
+        .select('id')
         .eq('kanban_type', selectedUser);
       
-      if (error) {
-        console.error("❌ Erro ao remover entradas do kanban:", error);
-        throw error;
+      if (tarefasFetchError) {
+        console.error("❌ Erro ao buscar tarefas do kanban:", tarefasFetchError);
+        throw tarefasFetchError;
+      }
+      
+      if (tarefasEntries && tarefasEntries.length > 0) {
+        const { error } = await supabase
+          .from('tarefas')
+          .delete()
+          .eq('kanban_type', selectedUser);
+        
+        if (error) {
+          console.error("❌ Erro ao remover tarefas do kanban:", error);
+          throw error;
+        }
       }
       
       console.log("✅ Kanban limpo com sucesso!");
@@ -177,16 +242,45 @@ export default function Kanban() {
     }
   });
 
-  // Mutation para atualizar posição no kanban
-  const updateKanbanPositionMutation = useMutation({
-    mutationFn: async ({ demandaId, newPosition }: { demandaId: string; newPosition: string }) => {
+  // Mutation para remover tarefa
+  const removerTarefaMutation = useMutation({
+    mutationFn: async (tarefaId: string) => {
       const { error } = await supabase
-        .from('demanda_kanbans')
-        .update({ kanban_position: newPosition })
-        .eq('demanda_id', demandaId)
-        .eq('kanban_type', selectedUser);
+        .from('tarefas')
+        .delete()
+        .eq('id', tarefaId);
       
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      toast.success("Tarefa removida!");
+    },
+    onError: (error) => {
+      console.error('Erro ao remover tarefa:', error);
+      toast.error("Erro ao remover tarefa");
+    }
+  });
+
+  // Mutation para atualizar posição no kanban (demandas e tarefas)
+  const updateKanbanPositionMutation = useMutation({
+    mutationFn: async ({ itemId, newPosition, tipo }: { itemId: string; newPosition: string; tipo: 'demanda' | 'tarefa' }) => {
+      if (tipo === 'tarefa') {
+        const { error } = await supabase
+          .from('tarefas')
+          .update({ kanban_position: newPosition })
+          .eq('id', itemId);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('demanda_kanbans')
+          .update({ kanban_position: newPosition })
+          .eq('demanda_id', itemId)
+          .eq('kanban_type', selectedUser);
+        
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
@@ -201,15 +295,20 @@ export default function Kanban() {
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
 
-    const demandaId = result.draggableId;
+    const itemId = result.draggableId;
     const sourcePosition = result.source.droppableId;
     const destinationPosition = result.destination.droppableId;
 
     if (sourcePosition === destinationPosition) return;
 
+    // Descobrir se é demanda ou tarefa
+    const item = demandas.find(d => d.id === itemId);
+    const tipo = item?.tipo || 'demanda';
+
     updateKanbanPositionMutation.mutate({ 
-      demandaId, 
-      newPosition: destinationPosition 
+      itemId, 
+      newPosition: destinationPosition,
+      tipo
     });
   };
 
@@ -247,7 +346,7 @@ export default function Kanban() {
   };
 
   const getDemandsByStatus = (kanbanPosition: string) => {
-    return demandas.filter((demanda: Demanda) => demanda.kanban_position === kanbanPosition);
+    return demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
   };
 
   const handleEditDemanda = (demanda: any) => {
@@ -434,22 +533,33 @@ export default function Kanban() {
                                   className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive z-10"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    removerDemandaMutation.mutate(demanda.id);
+                                    if (demanda.tipo === 'tarefa') {
+                                      removerTarefaMutation.mutate(demanda.id);
+                                    } else {
+                                      removerDemandaMutation.mutate(demanda.id);
+                                    }
                                   }}
-                                  disabled={removerDemandaMutation.isPending}
+                                  disabled={removerDemandaMutation.isPending || removerTarefaMutation.isPending}
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
                                 
                                 <CardHeader className="pb-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <CardTitle className="text-sm font-medium line-clamp-2">
-                                      {demanda.titulo}
-                                    </CardTitle>
-                                    <Badge variant="outline" className="text-xs shrink-0">
-                                      #{demanda.protocolo}
-                                    </Badge>
-                                  </div>
+                                   <div className="flex items-start justify-between gap-2">
+                                     <div className="flex items-center gap-2 flex-1">
+                                       <CardTitle className="text-sm font-medium line-clamp-2">
+                                         {demanda.titulo}
+                                       </CardTitle>
+                                       {demanda.tipo === 'tarefa' && (
+                                         <Badge variant="secondary" className="text-xs shrink-0 bg-blue-100 text-blue-700">
+                                           Tarefa
+                                         </Badge>
+                                       )}
+                                     </div>
+                                     <Badge variant="outline" className="text-xs shrink-0">
+                                       #{demanda.protocolo}
+                                     </Badge>
+                                   </div>
                                 </CardHeader>
                                 
                                 <CardContent className="pt-0 space-y-2">
