@@ -268,7 +268,18 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  style={provided.draggableProps.style}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    position: snapshot.isDragging ? 'fixed' as const : 'relative' as const,
+                                    width: snapshot.isDragging ? '700px' : undefined,
+                                    zIndex: snapshot.isDragging ? 10000 : undefined,
+                                    pointerEvents: snapshot.isDragging ? 'none' as const : undefined,
+                                    top: snapshot.isDragging ? '50%' : undefined,
+                                    left: snapshot.isDragging ? '50%' : undefined,
+                                    transform: snapshot.isDragging ? 
+                                      `translate(-50%, -50%) ${provided.draggableProps.style?.transform || ''}` : 
+                                      provided.draggableProps.style?.transform
+                                  }}
                                   className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border ${
                                     snapshot.isDragging 
                                       ? "shadow-xl bg-accent border-primary opacity-90" 
