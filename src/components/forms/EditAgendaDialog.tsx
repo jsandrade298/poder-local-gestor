@@ -48,9 +48,10 @@ interface EditAgendaDialogProps {
   agenda: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onAgendaUpdated?: (updatedAgenda: any) => void;
 }
 
-export const EditAgendaDialog = ({ agenda, open, onOpenChange }: EditAgendaDialogProps) => {
+export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }: EditAgendaDialogProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,15 +176,30 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange }: EditAgendaDialo
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "✅ Agenda atualizada!",
         description: "As informações foram salvas com sucesso",
       });
       
+      // Invalidar queries para atualizar as listas
       queryClient.invalidateQueries({ queryKey: ["minhas-agendas"] });
       queryClient.invalidateQueries({ queryKey: ["solicitacoes-agenda"] });
       queryClient.invalidateQueries({ queryKey: ["agenda-detalhada"] });
+      
+      // Atualizar o agenda no modal principal se callback fornecido
+      if (onAgendaUpdated && agenda) {
+        const updatedAgenda = {
+          ...agenda,
+          ...data,
+          // Manter acompanhantes atualizados
+          acompanhantes_nomes: data.acompanha_mandato_ids?.map(id => 
+            usuarios?.find(u => u.id === id)
+          ).filter(Boolean).map(u => ({ id: u.id, nome: u.nome })) || []
+        };
+        onAgendaUpdated(updatedAgenda);
+      }
+      
       onOpenChange(false);
     },
     onError: (error) => {

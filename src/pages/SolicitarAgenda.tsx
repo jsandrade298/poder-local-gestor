@@ -1533,6 +1533,12 @@ const SolicitarAgenda = () => {
           agenda={editingAgenda}
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
+          onAgendaUpdated={(updatedAgenda) => {
+            // Atualizar o selectedAgenda se for a mesma agenda sendo editada
+            if (selectedAgenda && selectedAgenda.id === updatedAgenda.id) {
+              setSelectedAgenda(updatedAgenda);
+            }
+          }}
         />
       </div>
     </div>
