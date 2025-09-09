@@ -10,6 +10,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
+import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { 
@@ -370,9 +371,10 @@ export default function Kanban() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            <AdicionarTarefaDialog kanbanType={selectedUser} />
             <Button onClick={() => setIsAdicionarDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Adicionar
+              Adicionar Demanda
             </Button>
           </div>
         </div>
