@@ -148,14 +148,24 @@ const SolicitarAgenda = () => {
         if (acompError) throw acompError;
       }
 
+      // Buscar nome do solicitante
+      const { data: solicitante } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const solicitanteNome = solicitante?.nome || 'Usuário';
+
       // Criar notificação para validador
       await supabase.from("notificacoes").insert({
         destinatario_id: data.validador_id,
         remetente_id: user.id,
         tipo: "agenda_solicitada",
         titulo: "Nova solicitação de agenda",
-        mensagem: `Nova agenda: ${data.titulo}`,
+        mensagem: `${solicitanteNome} solicitou validação da agenda: "${data.titulo}"`,
         url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
+        lida: false
       });
 
       // Notificar acompanhantes
@@ -164,9 +174,10 @@ const SolicitarAgenda = () => {
           destinatario_id: userId,
           remetente_id: user.id,
           tipo: "agenda_acompanhante",
-          titulo: "Você foi adicionado em uma agenda",
-          mensagem: `Agenda: ${data.titulo}`,
+          titulo: "Você foi adicionado como acompanhante",
+          mensagem: `${solicitanteNome} adicionou você como acompanhante da agenda: "${data.titulo}"`,
           url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
+          lida: false
         }));
 
         await supabase.from("notificacoes").insert(notifAcompanhantes);

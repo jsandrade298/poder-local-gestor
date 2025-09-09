@@ -132,6 +132,24 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
     mutationFn: async (data: FormData) => {
       if (!agenda?.id) throw new Error("ID da agenda não encontrado");
 
+      // Obter dados anteriores e do editor
+      const [agendaAnteriorResponse, editorResponse] = await Promise.all([
+        supabase
+          .from("agendas")
+          .select("validador_id, titulo, data_hora_proposta, solicitante_id")
+          .eq("id", agenda.id)
+          .single(),
+        supabase
+          .from("profiles")
+          .select("nome")
+          .eq("id", user?.id || "")
+          .maybeSingle()
+      ]);
+
+      const agendaAnterior = agendaAnteriorResponse.data;
+      const editor = editorResponse.data;
+      const acompanhantesAnteriores = acompanhantesAtuais || [];
+
       // Atualizar dados da agenda
       const { error: agendaError } = await supabase
         .from("agendas")
@@ -161,8 +179,9 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
       if (deleteError) throw deleteError;
 
       // Adicionar novos acompanhantes
-      if (data.acompanha_mandato_ids && data.acompanha_mandato_ids.length > 0) {
-        const novosAcompanhantes = data.acompanha_mandato_ids.map(userId => ({
+      const novosAcompanhantesIds = data.acompanha_mandato_ids || [];
+      if (novosAcompanhantesIds.length > 0) {
+        const novosAcompanhantes = novosAcompanhantesIds.map(userId => ({
           agenda_id: agenda.id,
           usuario_id: userId,
         }));
@@ -172,6 +191,79 @@ export const EditAgendaDialog = ({ agenda, open, onOpenChange, onAgendaUpdated }
           .insert(novosAcompanhantes);
 
         if (insertError) throw insertError;
+      }
+
+      // Criar notificações
+      const notificacoes = [];
+      const editorNome = editor?.nome || 'Usuário';
+
+      // 1. Notificar validador se mudou e não é o próprio editor
+      if (data.validador_id !== agendaAnterior?.validador_id && 
+          data.validador_id !== user?.id) {
+        notificacoes.push({
+          remetente_id: user?.id,
+          destinatario_id: data.validador_id,
+          tipo: 'agenda_status',
+          titulo: 'Agenda atribuída para validação',
+          mensagem: `${editorNome} atribuiu você como validador da agenda: "${data.titulo}"`,
+          url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
+          lida: false
+        });
+      }
+
+      // 2. Notificar novos acompanhantes
+      const novosAcompanhantes = novosAcompanhantesIds.filter(
+        id => !acompanhantesAnteriores.includes(id) && id !== user?.id
+      );
+
+      novosAcompanhantes.forEach(acompanhanteId => {
+        notificacoes.push({
+          remetente_id: user?.id,
+          destinatario_id: acompanhanteId,
+          tipo: 'agenda_acompanhante',
+          titulo: 'Você foi adicionado como acompanhante',
+          mensagem: `${editorNome} adicionou você como acompanhante da agenda: "${data.titulo}"`,
+          url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
+          lida: false
+        });
+      });
+
+      // 3. Notificar solicitante sobre mudanças importantes se não for o próprio editor
+      if (agendaAnterior?.solicitante_id && 
+          agendaAnterior.solicitante_id !== user?.id) {
+        const mudancasImportantes = [];
+        
+        if (data.validador_id !== agendaAnterior.validador_id) {
+          mudancasImportantes.push('validador');
+        }
+        
+        if (new Date(data.data_hora_proposta).getTime() !== new Date(agendaAnterior.data_hora_proposta).getTime()) {
+          mudancasImportantes.push('data/hora');
+        }
+        
+        if (mudancasImportantes.length > 0) {
+          notificacoes.push({
+            remetente_id: user?.id,
+            destinatario_id: agendaAnterior.solicitante_id,
+            tipo: 'agenda_status',
+            titulo: 'Sua agenda foi editada',
+            mensagem: `${editorNome} fez alterações na agenda "${data.titulo}" (${mudancasImportantes.join(', ')})`,
+            url_destino: `/solicitar-agenda?agenda=${agenda.id}`,
+            lida: false
+          });
+        }
+      }
+
+      // Inserir todas as notificações de uma vez
+      if (notificacoes.length > 0) {
+        const { error: notificacoesError } = await supabase
+          .from("notificacoes")
+          .insert(notificacoes);
+
+        if (notificacoesError) {
+          console.error('Erro ao criar notificações de agenda:', notificacoesError);
+          // Não falha a operação por causa das notificações
+        }
       }
 
       return data;
