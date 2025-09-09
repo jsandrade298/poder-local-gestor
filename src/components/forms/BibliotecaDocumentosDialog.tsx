@@ -337,9 +337,9 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                 )}
               </div>
             </CardHeader>
-            <CardContent className="flex-1 min-h-0 pb-2">
-              <ScrollArea className="h-[450px] w-full rounded-md border">
-                <div className="p-4">
+            <CardContent className="flex-1 min-h-0 p-0">
+              <ScrollArea className="h-[400px] w-full">
+                <div className="p-4 space-y-6">
                   {loading ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
