@@ -38,36 +38,36 @@ export function ViewTarefaDialog({ tarefa, open, onOpenChange, onEdit }: ViewTar
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <div 
-                className="w-4 h-4 rounded"
-                style={{ backgroundColor: tarefa.cor || '#3B82F6' }}
-              />
-              Visualizar Tarefa
-            </DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <div 
+              className="w-4 h-4 rounded"
+              style={{ backgroundColor: tarefa.cor || '#3B82F6' }}
+            />
+            Visualizar Tarefa
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Botão editar e cabeçalho da tarefa */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{tarefa.titulo}</h2>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  Tarefa
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">#{tarefa.protocolo}</p>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onEdit(tarefa)}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 flex-shrink-0"
             >
               <Edit className="h-4 w-4" />
               Editar
             </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Cabeçalho da tarefa */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{tarefa.titulo}</h2>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                Tarefa
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">#{tarefa.protocolo}</p>
           </div>
 
           {/* Descrição */}
