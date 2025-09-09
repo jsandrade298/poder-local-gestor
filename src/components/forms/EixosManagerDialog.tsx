@@ -249,56 +249,67 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
             </CardHeader>
             <CardContent>
               <DragDropContext onDragEnd={handleDragEnd}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">Ordem</TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Cor</TableHead>
-                      <TableHead className="w-24">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-5 gap-4 p-3 bg-muted rounded-lg font-semibold text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6"></div>
+                      Nome
+                    </div>
+                    <div>Descrição</div>
+                    <div>Cor</div>
+                    <div>Ações</div>
+                    <div></div>
+                  </div>
+                  
                   <Droppable droppableId="eixos-list">
                     {(provided) => (
-                      <TableBody {...provided.droppableProps} ref={provided.innerRef}>
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
                         {isLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center">
-                              Carregando...
-                            </TableCell>
-                          </TableRow>
+                          <div className="p-4 text-center bg-card rounded-lg border">
+                            Carregando...
+                          </div>
                         ) : eixos.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center">
-                              Nenhum eixo encontrado
-                            </TableCell>
-                          </TableRow>
+                          <div className="p-4 text-center bg-card rounded-lg border">
+                            Nenhum eixo encontrado
+                          </div>
                         ) : (
                           eixos.map((eixo, index) => (
                             <Draggable key={eixo.id} draggableId={eixo.id} index={index}>
                               {(provided, snapshot) => (
-                                <TableRow 
+                                <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  className={snapshot.isDragging ? "bg-accent border-2 border-primary shadow-lg" : ""}
-                                  style={provided.draggableProps.style}
+                                  className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border transition-all ${
+                                    snapshot.isDragging 
+                                      ? "shadow-lg bg-accent border-primary scale-105 z-50" 
+                                      : "hover:bg-accent/50"
+                                  }`}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    transform: snapshot.isDragging 
+                                      ? `${provided.draggableProps.style?.transform} rotate(2deg)`
+                                      : provided.draggableProps.style?.transform,
+                                  }}
                                 >
-                                  <TableCell {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                  </TableCell>
-                                  <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      {...provided.dragHandleProps} 
+                                      className="cursor-grab active:cursor-grabbing p-1 hover:bg-accent rounded"
+                                    >
+                                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                    </div>
                                     {editingId === eixo.id ? (
                                       <Input
                                         value={editingValues.nome}
                                         onChange={(e) => setEditingValues({ ...editingValues, nome: e.target.value })}
-                                        className="h-8"
+                                        className="h-8 flex-1"
                                       />
                                     ) : (
-                                      eixo.nome
+                                      <span className="font-medium">{eixo.nome}</span>
                                     )}
-                                  </TableCell>
-                                  <TableCell>
+                                  </div>
+                                  
+                                  <div className="flex items-center">
                                     {editingId === eixo.id ? (
                                       <Input
                                         value={editingValues.descricao}
@@ -306,10 +317,11 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                         className="h-8"
                                       />
                                     ) : (
-                                      eixo.descricao || '-'
+                                      <span className="text-sm text-muted-foreground">{eixo.descricao || '-'}</span>
                                     )}
-                                  </TableCell>
-                                  <TableCell>
+                                  </div>
+                                  
+                                  <div className="flex items-center">
                                     {editingId === eixo.id ? (
                                       <Input
                                         type="color"
@@ -323,11 +335,12 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                           className="w-4 h-4 rounded border"
                                           style={{ backgroundColor: eixo.cor }}
                                         />
-                                        {eixo.cor}
+                                        <span className="text-xs font-mono">{eixo.cor}</span>
                                       </div>
                                     )}
-                                  </TableCell>
-                                  <TableCell>
+                                  </div>
+                                  
+                                  <div className="flex items-center">
                                     {editingId === eixo.id ? (
                                       <div className="flex gap-1">
                                         <Button size="sm" variant="ghost" onClick={handleSave}>
@@ -352,17 +365,19 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                         </Button>
                                       </div>
                                     )}
-                                  </TableCell>
-                                </TableRow>
+                                  </div>
+                                  
+                                  <div></div>
+                                </div>
                               )}
                             </Draggable>
                           ))
                         )}
                         {provided.placeholder}
-                      </TableBody>
+                      </div>
                     )}
                   </Droppable>
-                </Table>
+                </div>
               </DragDropContext>
             </CardContent>
           </Card>
