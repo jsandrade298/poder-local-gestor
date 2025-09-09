@@ -275,8 +275,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           Biblioteca de Documentos
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Library className="h-5 w-5" />
             Biblioteca de Documentos Modelo
@@ -286,7 +286,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </p>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex flex-col min-h-0 flex-1 space-y-4">
           {/* Upload */}
           <Card>
             <CardHeader>
@@ -318,8 +318,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </Card>
 
           {/* Lista de Documentos */}
-          <Card>
-            <CardHeader>
+          <Card className="flex flex-col min-h-0 flex-1">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="text-lg">
                 Selecionar Documentos para Contexto
                 {documentosSelecionados.length > 0 && (
@@ -329,8 +329,8 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-80">
+            <CardContent className="flex flex-col min-h-0 flex-1 pb-2">
+              <ScrollArea className="flex-1 min-h-0 max-h-[400px]">
                 {loading ? (
                   <div className="text-center py-4 text-muted-foreground">
                     Carregando documentos...
@@ -392,7 +392,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
           </Card>
 
           {/* Botões de Ação */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-4 border-t flex-shrink-0">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
