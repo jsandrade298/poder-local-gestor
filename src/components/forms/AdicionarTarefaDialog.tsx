@@ -134,7 +134,6 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
                   <SelectValue placeholder="Selecionar responsável..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem responsável</SelectItem>
                   {responsaveis.map((responsavel) => (
                     <SelectItem key={responsavel.id} value={responsavel.id}>
                       {responsavel.nome}
