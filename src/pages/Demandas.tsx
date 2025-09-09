@@ -585,22 +585,19 @@ export default function Demandas() {
     }
   });
 
-  // Função para processar arquivo CSV/XLSX
+  // Função para processar arquivo XLSX  
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('🚀 Iniciando importação de arquivo...');
+    console.log('🚀 Iniciando importação de XLSX...');
     const file = event.target.files?.[0];
     if (!file) return;
 
     const fileName = file.name.toLowerCase();
-    const isCSV = fileName.endsWith('.csv');
-    const isXLSX = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-
-    if (!isCSV && !isXLSX) {
-      toast.error("Por favor, selecione um arquivo CSV ou XLSX.");
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+      toast.error("Por favor, selecione um arquivo XLSX.");
       return;
     }
 
-    console.log(`📁 Arquivo detectado: ${isXLSX ? 'XLSX' : 'CSV'} - ${file.name}`);
+    console.log(`📁 Arquivo XLSX detectado: ${file.name}`);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -1182,17 +1179,17 @@ export default function Demandas() {
         // Se não há munícipes não encontrados, prosseguir diretamente
         await finalizarImportacao(demandasComDados, municipeMap, []);
       } catch (error) {
-        console.error('Erro ao processar arquivo:', error);
-        toast.error("Erro ao processar arquivo. Verifique o formato.");
+        console.error('Erro ao processar XLSX:', error);
+        toast.error("Erro ao processar arquivo XLSX.");
       }
     };
     
-    // Determinar como ler o arquivo
-    if (isXLSX) {
-      reader.readAsArrayBuffer(file);
-    } else {
-      reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
+     
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
      
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
