@@ -6,12 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Search, Filter, Check, ChevronsUpDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { formatDateTime } from '@/lib/dateUtils';
+import { cn } from "@/lib/utils";
 
 interface AdicionarDemandasKanbanDialogProps {
   open: boolean;
@@ -27,6 +30,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const [prioridadeFilter, setPrioridadeFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
+  const [municipeOpen, setMunicipeOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Buscar todas as demandas (permitindo adicionar a múltiplos kanbans)
@@ -294,19 +298,65 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
               </SelectContent>
             </Select>
 
-            <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Munícipe" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border z-50">
-                <SelectItem value="all">Todos os Munícipes</SelectItem>
-                {municipes.map((municipe) => (
-                  <SelectItem key={municipe.id} value={municipe.id}>
-                    {municipe.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={municipeOpen} onOpenChange={setMunicipeOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={municipeOpen}
+                  className="w-[200px] justify-between"
+                >
+                  {municipeFilter === "all" 
+                    ? "Todos os Munícipes"
+                    : municipes.find(m => m.id === municipeFilter)?.nome || "Munícipe não encontrado"
+                  }
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0 bg-background border z-50">
+                <Command>
+                  <CommandInput placeholder="Buscar munícipe..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum munícipe encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setMunicipeFilter("all");
+                          setMunicipeOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            municipeFilter === "all" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        Todos os Munícipes
+                      </CommandItem>
+                      {municipes.map((municipe) => (
+                        <CommandItem
+                          key={municipe.id}
+                          value={municipe.nome}
+                          onSelect={() => {
+                            setMunicipeFilter(municipe.id);
+                            setMunicipeOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              municipeFilter === municipe.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {municipe.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
               <SelectTrigger className="w-[180px]">
@@ -333,6 +383,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                 setMunicipeFilter("all");
                 setPrioridadeFilter("all");
                 setResponsavelFilter("all");
+                setMunicipeOpen(false);
               }}
             >
               <Filter className="h-4 w-4 mr-2" />
