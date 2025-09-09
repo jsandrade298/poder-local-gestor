@@ -601,6 +601,47 @@ export default function Demandas() {
         const csv = e.target?.result as string;
         
         // Parser CSV melhorado para lidar com vírgulas, aspas e quebras de linha
+        function parseCSVToLines(text: string): string[] {
+          const lines: string[] = [];
+          let currentLine = '';
+          let inQuotes = false;
+          let i = 0;
+          
+          while (i < text.length) {
+            const char = text[i];
+            
+            if (char === '"') {
+              // Toggle quote state
+              inQuotes = !inQuotes;
+              currentLine += char;
+            } else if (char === '\n' && !inQuotes) {
+              // Line break outside quotes - end of record
+              if (currentLine.trim()) {
+                lines.push(currentLine.trim());
+              }
+              currentLine = '';
+            } else if (char === '\r' && text[i + 1] === '\n' && !inQuotes) {
+              // Windows line ending outside quotes
+              if (currentLine.trim()) {
+                lines.push(currentLine.trim());
+              }
+              currentLine = '';
+              i++; // Skip the \n
+            } else {
+              // Regular character or line break inside quotes
+              currentLine += char;
+            }
+            i++;
+          }
+          
+          // Add last line if exists
+          if (currentLine.trim()) {
+            lines.push(currentLine.trim());
+          }
+          
+          return lines;
+        }
+
         function parseCSVLine(line: string, separator: string): string[] {
           const result: string[] = [];
           let current = '';
@@ -688,22 +729,18 @@ export default function Demandas() {
           rawLines.push(currentLine.trim());
         }
 
-        // Filtrar linhas vazias ou inválidas
-        const lines = rawLines.filter(line => {
-          const trimmed = line.trim();
-          if (!trimmed) return false;
-          
-          // Verificar se tem pelo menos um separador válido
-          const hasSeparator = trimmed.includes(';') || trimmed.includes(',');
-          if (!hasSeparator) {
-            console.warn(`⚠️ Linha descartada (sem separador): "${trimmed.substring(0, 50)}..."`);
-            return false;
-          }
-          
-          return true;
-        });
+        // Filtrar apenas linhas completamente vazias
+        const lines = rawLines.filter(line => line.trim().length > 0);
         
-        console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
+        console.log(`📁 Total de linhas processadas: ${lines.length}`);
+        console.log(`📁 Primeira linha (header): "${lines[0]?.substring(0, 100)}..."`);
+        console.log(`📁 Segunda linha (dados): "${lines[1]?.substring(0, 100)}..."`);
+        console.log(`📁 Última linha: "${lines[lines.length - 1]?.substring(0, 100)}..."`);
+        
+        if (lines.length < 2) {
+          toast.error("O arquivo CSV deve ter pelo menos uma linha de header e uma de dados.");
+          return;
+        }
         
         if (lines.length < 2) {
           toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
@@ -1041,16 +1078,29 @@ export default function Demandas() {
         
         // Log de resumo da importação
         console.log('📊 Resumo da importação:');
-        console.log(`   Arquivo: ${file.name}`);
-        console.log(`   Separador usado: "${separator}"`);
-        console.log(`   Total de linhas: ${lines.length}`);
-        console.log(`   Linhas processadas: ${demandasComDados.length}`);
-        console.log(`   Colunas detectadas: ${headers.length}`);
+        console.log(`   📄 Arquivo: ${file.name}`);
+        console.log(`   📏 Tamanho: ${file.size} bytes`);
+        console.log(`   🔗 Separador usado: "${separator}"`);
+        console.log(`   📋 Total de linhas no arquivo: ${lines.length}`);
+        console.log(`   📊 Linhas de dados esperadas: ${lines.length - 1}`);
+        console.log(`   ✅ Demandas processadas: ${demandasComDados.length}`);
+        console.log(`   📝 Colunas detectadas: ${headers.length}`);
+        console.log(`   📌 Headers: ${headers.join(', ')}`);
+        
         if (demandasComDados.length === 0) {
-          console.error('❌ Nenhuma demanda foi processada. Possíveis causas:');
-          console.error('   - Separador incorreto');
+          console.error('❌ ERRO: Nenhuma demanda foi processada!');
+          console.error('📋 Primeiras 3 linhas do arquivo:');
+          lines.slice(0, 3).forEach((line, idx) => {
+            console.error(`   Linha ${idx + 1}: "${line.substring(0, 150)}..."`);
+          });
+          console.error('🔍 Possíveis causas:');
+          console.error('   - Separador incorreto detectado');
           console.error('   - Formato de CSV incompatível');
-          console.error('   - Campos obrigatórios ausentes');
+          console.error('   - Campos obrigatórios ausentes ou mal formatados');
+          console.error('   - Quebras de linha não tratadas corretamente');
+        } else {
+          const taxa = Math.round((demandasComDados.length / (lines.length - 1)) * 100);
+          console.log(`   🎯 Taxa de sucesso: ${taxa}% das linhas processadas`);
         }
 
         // Se há munícipes não encontrados, mostrar modal de validação
