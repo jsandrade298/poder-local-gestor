@@ -214,8 +214,14 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
       
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="actions-table">
-          {(provided) => (
-            <TableBody {...provided.droppableProps} ref={provided.innerRef}>
+          {(provided, snapshot) => (
+            <TableBody 
+              {...provided.droppableProps} 
+              ref={provided.innerRef}
+              className={cn(
+                snapshot.isDraggingOver && "bg-accent/30"
+              )}
+            >
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={12} className="text-center py-8">
@@ -233,19 +239,35 @@ export const PlanoAcaoTable = memo(function PlanoAcaoTable({
                   <InsertRow index={0} />
                   {filteredActions.map((action, index) => (
                     <React.Fragment key={action.id}>
-                      <Draggable draggableId={action.id} index={index}>
+                      <Draggable 
+                        draggableId={action.id} 
+                        index={index}
+                      >
                         {(provided, snapshot) => (
                           <TableRow 
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             className={cn(
                               action.concluida ? "opacity-60" : "",
-                              snapshot.isDragging && "shadow-lg bg-background"
+                              snapshot.isDragging && "shadow-xl bg-background z-50 border-2 border-primary/50",
+                              "relative"
                             )}
+                            style={{
+                              ...provided.draggableProps.style,
+                              // Garantir que o item em drag tenha z-index alto
+                              zIndex: snapshot.isDragging ? 9999 : 'auto'
+                            }}
                           >
                             {/* Handle de drag */}
                             <TableCell className="w-12 p-2">
-                              <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                              <div 
+                                {...provided.dragHandleProps} 
+                                className="cursor-grab active:cursor-grabbing hover:bg-accent/50 p-1 rounded"
+                                onMouseDown={(e) => {
+                                  // Garantir que outros eventos não interfiram
+                                  e.stopPropagation();
+                                }}
+                              >
                                 <GripVertical className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </TableCell>

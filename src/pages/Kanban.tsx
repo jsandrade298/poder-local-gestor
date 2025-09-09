@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, GripVertical } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
@@ -340,13 +340,19 @@ export default function Kanban() {
   // Mutation para atualizar posição no kanban (demandas e tarefas)
   const updateKanbanPositionMutation = useMutation({
     mutationFn: async ({ itemId, newPosition, tipo }: { itemId: string; newPosition: string; tipo: 'demanda' | 'tarefa' }) => {
+      console.log('🔄 Updating position:', { itemId, newPosition, tipo });
+      
       if (tipo === 'tarefa') {
         const { error } = await supabase
           .from('tarefas')
           .update({ kanban_position: newPosition })
           .eq('id', itemId);
         
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Error updating tarefa position:', error);
+          throw error;
+        }
+        console.log('✅ Tarefa position updated successfully');
       } else {
         const { error } = await supabase
           .from('demanda_kanbans')
@@ -354,31 +360,48 @@ export default function Kanban() {
           .eq('demanda_id', itemId)
           .eq('kanban_type', selectedUser);
         
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Error updating demanda position:', error);
+          throw error;
+        }
+        console.log('✅ Demanda position updated successfully');
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      toast.success("Posição atualizada!");
+      toast.success("Posição atualizada com sucesso!");
     },
     onError: (error) => {
-      console.error('Erro ao atualizar posição:', error);
-      toast.error("Erro ao atualizar posição");
+      console.error('❌ Erro ao atualizar posição:', error);
+      toast.error("Erro ao atualizar posição: " + error.message);
     }
   });
 
   const handleDragEnd = (result: any) => {
-    if (!result.destination) return;
+    console.log('🎯 Drag ended:', result);
+    
+    if (!result.destination) {
+      console.log('❌ No destination found');
+      return;
+    }
 
     const itemId = result.draggableId;
     const sourcePosition = result.source.droppableId;
     const destinationPosition = result.destination.droppableId;
 
-    if (sourcePosition === destinationPosition) return;
+    console.log('📦 Item ID:', itemId);
+    console.log('📍 Source:', sourcePosition, '➡️ Destination:', destinationPosition);
+
+    if (sourcePosition === destinationPosition) {
+      console.log('⏹️ Same position, skipping');
+      return;
+    }
 
     // Descobrir se é demanda ou tarefa
     const item = demandas.find(d => d.id === itemId);
     const tipo = item?.tipo || 'demanda';
+
+    console.log('🏷️ Item type:', tipo);
 
     updateKanbanPositionMutation.mutate({ 
       itemId, 
@@ -584,9 +607,7 @@ export default function Kanban() {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
-                          snapshot.isDraggingOver 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-muted-foreground/20'
+                          snapshot.isDraggingOver ? 'border-primary bg-accent/30' : 'border-muted-foreground/20'
                         }`}
                       >
                         {columnDemandas.map((demanda, index) => (
@@ -599,15 +620,22 @@ export default function Kanban() {
                               <Card
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                {...provided.dragHandleProps}
                                 className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
-                                  snapshot.isDragging ? 'shadow-lg rotate-2 scale-105' : ''
+                                  snapshot.isDragging ? 'shadow-xl rotate-1 scale-105 z-50' : ''
                                 }`}
                                 style={{
                                   borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))',
-                                  ...provided.draggableProps.style
+                                  ...provided.draggableProps.style,
+                                  zIndex: snapshot.isDragging ? 9999 : 'auto'
                                 }}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  // Prevenir click durante drag
+                                  if (snapshot.isDragging) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    return;
+                                  }
+                                  
                                   if (demanda.tipo === 'tarefa') {
                                     setSelectedTarefa(demanda);
                                     setIsViewTarefaDialogOpen(true);
@@ -617,6 +645,14 @@ export default function Kanban() {
                                   }
                                 }}
                               >
+                                {/* Drag handle visual indicator */}
+                                <div 
+                                  {...provided.dragHandleProps}
+                                  className="absolute top-1 left-1 opacity-0 group-hover:opacity-70 transition-opacity cursor-grab active:cursor-grabbing"
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                >
+                                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                </div>
                                 <Button
                                   variant="ghost"
                                   size="sm"
