@@ -161,12 +161,12 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Gerenciar Eixos</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-y-auto">
           {/* Criar novo eixo */}
           <Card>
             <CardHeader>
@@ -230,7 +230,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
             <CardHeader>
               <CardTitle>Eixos Existentes (Arraste para reordenar)</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="relative">
               <div className="space-y-2">
                 <div className="grid grid-cols-5 gap-4 p-3 bg-muted rounded-lg font-semibold text-sm">
                   <div className="flex items-center gap-2">
@@ -265,16 +265,14 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                   style={{
                                     ...provided.draggableProps.style,
                                     ...(snapshot.isDragging && {
-                                      position: 'fixed',
-                                      zIndex: 10000,
-                                      width: '600px',
-                                      maxWidth: '90vw',
-                                      pointerEvents: 'none'
+                                      width: 'calc(100% - 2rem)',
+                                      maxWidth: 'none',
+                                      zIndex: 1000
                                     })
                                   }}
                                   className={`grid grid-cols-5 gap-4 p-3 bg-card rounded-lg border transition-all ${
                                     snapshot.isDragging 
-                                      ? "shadow-2xl bg-accent border-primary scale-105 opacity-95" 
+                                      ? "shadow-2xl bg-accent border-primary scale-[0.98] opacity-95" 
                                       : "hover:bg-accent/50"
                                   }`}
                                 >
