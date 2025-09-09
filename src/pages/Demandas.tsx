@@ -1346,7 +1346,7 @@ export default function Demandas() {
             </div>
             
             {/* Linha separada para controles inferiores */}
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex items-center justify-between pt-4">
               <Button variant="outline" onClick={clearFilters}>
                 Limpar Filtros
               </Button>
