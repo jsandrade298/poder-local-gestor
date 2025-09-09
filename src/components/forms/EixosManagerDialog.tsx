@@ -282,10 +282,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   className={snapshot.isDragging ? "bg-accent border-2 border-primary shadow-lg" : ""}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    transform: snapshot.isDragging ? provided.draggableProps.style?.transform : undefined,
-                                  }}
+                                  style={provided.draggableProps.style}
                                 >
                                   <TableCell {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
