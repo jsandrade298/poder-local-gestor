@@ -139,15 +139,13 @@ export default function Kanban() {
         // Para produção legislativa, mostrar tarefas deste tipo
         tarefasData = data?.filter(tarefa => tarefa.kanban_type === selectedUser) || [];
       } else {
-        // Para usuários específicos, incluir tarefas onde:
-        // 1. Ele é o criador OU
-        // 2. Ele é colaborador OU
-        // 3. O kanban_type é dele (compatibilidade com tarefas antigas)
-        tarefasData = data?.filter(tarefa => 
-          tarefa.created_by === selectedUser || 
-          tarefa.kanban_type === selectedUser ||
-          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
-        ) || [];
+         // Para usuários específicos, incluir tarefas onde:
+         // 1. Ele é colaborador OU
+         // 2. O kanban_type é dele (compatibilidade com tarefas antigas)
+         tarefasData = data?.filter(tarefa => 
+           tarefa.kanban_type === selectedUser ||
+           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
+         ) || [];
       }
       
       // Combinar tarefas formatadas para o mesmo padrão das demandas
@@ -250,7 +248,6 @@ export default function Kanban() {
         
         // Filtrar tarefas que pertencem ao usuário
         tarefasEntries = data?.filter(tarefa => 
-          tarefa.created_by === selectedUser || 
           tarefa.kanban_type === selectedUser ||
           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador_id === selectedUser)
         ) || [];

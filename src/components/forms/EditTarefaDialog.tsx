@@ -35,8 +35,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
     descricao: "",
     prioridade: "media",
     posicao: "a_fazer",
-    cor: "#3B82F6",
-    completed: false
+    cor: "#3B82F6"
   });
 
   const queryClient = useQueryClient();
@@ -63,8 +62,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
         descricao: tarefa.descricao || "",
         prioridade: tarefa.prioridade || "media",
         posicao: tarefa.kanban_position || "a_fazer",
-        cor: tarefa.cor || "#3B82F6",
-        completed: tarefa.completed || false
+        cor: tarefa.cor || "#3B82F6"
       });
 
       // Carregar colaboradores da tarefa
@@ -85,8 +83,8 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
           prioridade: tarefaData.prioridade,
           kanban_position: tarefaData.posicao,
           cor: tarefaData.cor,
-          completed: tarefaData.completed,
-          completed_at: tarefaData.completed ? new Date().toISOString() : null,
+          completed: tarefaData.posicao === 'feito',
+          completed_at: tarefaData.posicao === 'feito' ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
         })
         .eq('id', tarefa.id);
@@ -259,18 +257,6 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="completed"
-                checked={formData.completed}
-                onCheckedChange={(checked) => setFormData({ ...formData, completed: !!checked })}
-              />
-              <Label htmlFor="completed" className="cursor-pointer">
-                Marcar como concluída
-              </Label>
-            </div>
-          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button
