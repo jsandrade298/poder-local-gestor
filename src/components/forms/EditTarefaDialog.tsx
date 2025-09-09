@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Palette } from "lucide-react";
+import { Palette } from "lucide-react";
 import { toast } from "sonner";
 
-interface AdicionarTarefaDialogProps {
-  kanbanType: string;
+interface EditTarefaDialogProps {
+  tarefa: any;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 const cores = [
@@ -26,15 +28,15 @@ const cores = [
   { nome: "Cinza", valor: "#6B7280" }
 ];
 
-export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
-  const [open, setOpen] = useState(false);
+export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialogProps) {
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
     prioridade: "media",
     posicao: "a_fazer",
-    cor: "#3B82F6"
+    cor: "#3B82F6",
+    completed: false
   });
 
   const queryClient = useQueryClient();
@@ -53,32 +55,56 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
     }
   });
 
-  const createTarefaMutation = useMutation({
-    mutationFn: async (tarefa: typeof formData) => {
-      console.log("🔄 Criando tarefa - dados:", tarefa);
-      console.log("🔄 Colaboradores selecionados:", colaboradoresSelecionados);
-      
-      // Criar uma tarefa na nova tabela
-      const { data: novaTarefa, error: tarefaError } = await supabase
+  // Carregar dados da tarefa quando o dialog abrir
+  useEffect(() => {
+    if (tarefa && open) {
+      setFormData({
+        titulo: tarefa.titulo || "",
+        descricao: tarefa.descricao || "",
+        prioridade: tarefa.prioridade || "media",
+        posicao: tarefa.kanban_position || "a_fazer",
+        cor: tarefa.cor || "#3B82F6",
+        completed: tarefa.completed || false
+      });
+
+      // Carregar colaboradores da tarefa
+      if (tarefa.colaboradores) {
+        setColaboradoresSelecionados(tarefa.colaboradores.map((c: any) => c.id));
+      }
+    }
+  }, [tarefa, open]);
+
+  const updateTarefaMutation = useMutation({
+    mutationFn: async (tarefaData: typeof formData) => {
+      // Atualizar tarefa
+      const { error: tarefaError } = await supabase
         .from('tarefas')
-        .insert({
-          titulo: tarefa.titulo,
-          descricao: tarefa.descricao,
-          prioridade: tarefa.prioridade,
-          kanban_position: tarefa.posicao,
-          kanban_type: kanbanType,
-          cor: tarefa.cor,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+        .update({
+          titulo: tarefaData.titulo,
+          descricao: tarefaData.descricao,
+          prioridade: tarefaData.prioridade,
+          kanban_position: tarefaData.posicao,
+          cor: tarefaData.cor,
+          completed: tarefaData.completed,
+          completed_at: tarefaData.completed ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString()
         })
-        .select()
-        .single();
+        .eq('id', tarefa.id);
 
       if (tarefaError) throw tarefaError;
 
-      // Adicionar colaboradores se houver algum selecionado
+      // Remover colaboradores existentes
+      const { error: deleteError } = await supabase
+        .from('tarefa_colaboradores')
+        .delete()
+        .eq('tarefa_id', tarefa.id);
+
+      if (deleteError) throw deleteError;
+
+      // Adicionar novos colaboradores se houver algum selecionado
       if (colaboradoresSelecionados.length > 0) {
         const colaboradoresData = colaboradoresSelecionados.map(colaboradorId => ({
-          tarefa_id: novaTarefa.id,
+          tarefa_id: tarefa.id,
           colaborador_id: colaboradorId
         }));
 
@@ -89,24 +115,16 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         if (colaboradoresError) throw colaboradoresError;
       }
 
-      return novaTarefa;
+      return tarefa;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
-      toast.success("Tarefa criada com sucesso!");
-      setFormData({
-        titulo: "",
-        descricao: "",
-        prioridade: "media",
-        posicao: "a_fazer",
-        cor: "#3B82F6"
-      });
-      setColaboradoresSelecionados([]);
-      setOpen(false);
+      toast.success("Tarefa atualizada com sucesso!");
+      onOpenChange(false);
     },
     onError: (error) => {
-      console.error('Erro ao criar tarefa:', error);
-      toast.error("Erro ao criar tarefa");
+      console.error('Erro ao atualizar tarefa:', error);
+      toast.error("Erro ao atualizar tarefa");
     }
   });
 
@@ -124,20 +142,14 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
       toast.error("Título é obrigatório");
       return;
     }
-    createTarefaMutation.mutate(formData);
+    updateTarefaMutation.mutate(formData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Tarefa
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
+          <DialogTitle>Editar Tarefa</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -209,7 +221,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="posicao">Posição Inicial</Label>
+              <Label htmlFor="posicao">Posição</Label>
               <Select
                 value={formData.posicao}
                 onValueChange={(value) => setFormData({ ...formData, posicao: value })}
@@ -247,20 +259,33 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
             </div>
           </div>
 
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="completed"
+                checked={formData.completed}
+                onCheckedChange={(checked) => setFormData({ ...formData, completed: !!checked })}
+              />
+              <Label htmlFor="completed" className="cursor-pointer">
+                Marcar como concluída
+              </Label>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2 pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={createTarefaMutation.isPending}
+              onClick={() => onOpenChange(false)}
+              disabled={updateTarefaMutation.isPending}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              disabled={createTarefaMutation.isPending}
+              disabled={updateTarefaMutation.isPending}
             >
-              {createTarefaMutation.isPending ? "Criando..." : "Criar Tarefa"}
+              {updateTarefaMutation.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>
         </form>

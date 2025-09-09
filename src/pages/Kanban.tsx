@@ -12,7 +12,9 @@ import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
+import { ViewTarefaDialog } from "@/components/forms/ViewTarefaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
+import { EditTarefaDialog } from "@/components/forms/EditTarefaDialog";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -58,8 +60,11 @@ const statusColumns = [
 
 export default function Kanban() {
   const [selectedDemanda, setSelectedDemanda] = useState<Demanda | null>(null);
+  const [selectedTarefa, setSelectedTarefa] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewTarefaDialogOpen, setIsViewTarefaDialogOpen] = useState(false);
+  const [isEditTarefaDialogOpen, setIsEditTarefaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
   const queryClient = useQueryClient();
@@ -411,6 +416,12 @@ export default function Kanban() {
     setIsEditDialogOpen(true);
   };
 
+  const handleEditTarefa = (tarefa: any) => {
+    setSelectedTarefa(tarefa);
+    setIsViewTarefaDialogOpen(false);
+    setIsEditTarefaDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -583,8 +594,13 @@ export default function Kanban() {
                                   ...provided.draggableProps.style
                                 }}
                                 onClick={() => {
-                                  setSelectedDemanda(demanda);
-                                  setIsViewDialogOpen(true);
+                                  if (demanda.tipo === 'tarefa') {
+                                    setSelectedTarefa(demanda);
+                                    setIsViewTarefaDialogOpen(true);
+                                  } else {
+                                    setSelectedDemanda(demanda);
+                                    setIsViewDialogOpen(true);
+                                  }
                                 }}
                               >
                                 <Button
@@ -721,6 +737,29 @@ export default function Kanban() {
             open={isEditDialogOpen}
             onOpenChange={(open) => {
               setIsEditDialogOpen(open);
+              if (!open) {
+                queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+              }
+            }}
+          />
+        )}
+
+        {/* Dialogs de Tarefa */}
+        {selectedTarefa && (
+          <ViewTarefaDialog
+            tarefa={selectedTarefa}
+            open={isViewTarefaDialogOpen}
+            onOpenChange={setIsViewTarefaDialogOpen}
+            onEdit={handleEditTarefa}
+          />
+        )}
+
+        {selectedTarefa && (
+          <EditTarefaDialog
+            tarefa={selectedTarefa}
+            open={isEditTarefaDialogOpen}
+            onOpenChange={(open) => {
+              setIsEditTarefaDialogOpen(open);
               if (!open) {
                 queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
               }
