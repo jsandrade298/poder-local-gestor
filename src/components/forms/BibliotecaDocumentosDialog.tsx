@@ -330,7 +330,7 @@ export const BibliotecaDocumentosDialog = ({ onDocumentosSelect }: BibliotecaDoc
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col min-h-0 flex-1 pb-2">
-              <ScrollArea className="flex-1 min-h-0 max-h-[400px]">
+              <ScrollArea className="flex-1 pr-4" style={{ maxHeight: '400px' }}>
                 {loading ? (
                   <div className="text-center py-4 text-muted-foreground">
                     Carregando documentos...
