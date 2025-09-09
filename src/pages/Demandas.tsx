@@ -600,37 +600,51 @@ export default function Demandas() {
       try {
         const csv = e.target?.result as string;
         
-        // Parser CSV mais robusto para lidar com aspas e quebras de linha
+        // Parser CSV melhorado para lidar com vírgulas, aspas e quebras de linha
         function parseCSVLine(line: string, separator: string): string[] {
           const result: string[] = [];
           let current = '';
           let inQuotes = false;
-          let quoteChar = '';
           
           for (let i = 0; i < line.length; i++) {
             const char = line[i];
             const nextChar = line[i + 1];
             
-            if (!inQuotes && (char === '"' || char === "'")) {
+            // Detectar início de campo com aspas
+            if (char === '"' && (i === 0 || line[i-1] === separator)) {
               inQuotes = true;
-              quoteChar = char;
-            } else if (inQuotes && char === quoteChar) {
-              if (nextChar === quoteChar) {
-                current += char;
-                i++; // Skip next quote
-              } else {
+              continue; // Pular a aspa de abertura
+            }
+            
+            // Detectar fim de campo com aspas
+            if (inQuotes && char === '"') {
+              if (nextChar === '"') {
+                // Aspa escapada
+                current += '"';
+                i++; // Pular próxima aspa
+              } else if (!nextChar || nextChar === separator) {
+                // Fim do campo
                 inQuotes = false;
-                quoteChar = '';
+                continue; // Pular a aspa de fechamento
+              } else {
+                // Aspa no meio do campo
+                current += char;
               }
             } else if (!inQuotes && char === separator) {
+              // Separador fora de aspas - fim do campo
               result.push(current.trim());
               current = '';
             } else {
+              // Caractere normal
               current += char;
             }
           }
           
-          result.push(current.trim());
+          // Adicionar último campo
+          if (current || line.endsWith(separator)) {
+            result.push(current.trim());
+          }
+          
           return result;
         }
 
@@ -696,11 +710,31 @@ export default function Demandas() {
           return;
         }
 
-        // Detectar separador mais preciso
+        // Detectar separador com mais precisão
         const firstLine = lines[0];
-        const semicolonCount = (firstLine.match(/;/g) || []).length;
-        const commaCount = (firstLine.match(/,/g) || []).length;
-        const separator = semicolonCount >= commaCount ? ';' : ',';
+        let separator = ';'; // Default
+
+        // Testar cada possível separador
+        const possibleSeparators = [',', ';', '\t', '|'];
+        let maxFields = 0;
+        let bestSeparator = ';';
+
+        for (const sep of possibleSeparators) {
+          const testFields = parseCSVLine(firstLine, sep);
+          // Verificar se tem campos esperados (titulo, descricao, etc)
+          const hasExpectedFields = testFields.some(field => 
+            field.toLowerCase().includes('titulo') || 
+            field.toLowerCase().includes('título')
+          );
+          
+          if (hasExpectedFields && testFields.length > maxFields) {
+            maxFields = testFields.length;
+            bestSeparator = sep;
+          }
+        }
+
+        separator = bestSeparator;
+        console.log(`📋 Separador detectado: "${separator}" com ${maxFields} campos`);
         
         // Usar parser robusto para o header
         const headers = parseCSVLine(firstLine, separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
@@ -857,59 +891,63 @@ export default function Demandas() {
           const line = lines[i];
           if (!line.trim()) continue;
           
-          const values = parseCSVLine(line, separator).map(v => 
-            v.replace(/^["']|["']$/g, '').trim()
-          );
+          // Usar a função parseCSVLine melhorada
+          const values = parseCSVLine(line, separator);
           
-          console.log(`🔍 Processando linha ${i + 1}:`, {
-            totalColunas: values.length,
-            linhaRaw: `"${line.substring(0, 150)}${line.length > 150 ? '...' : ''}"`,
-            primeirasColunas: values.slice(0, 5).map((val, idx) => `[${idx}]="${val.substring(0, 30)}${val.length > 30 ? '...' : ''}"`),
-            ultimasColunas: values.slice(-3).map((val, idx) => `[${values.length - 3 + idx}]="${val.substring(0, 30)}${val.length > 30 ? '...' : ''}"`),
+          // Remover aspas extras dos valores
+          const cleanedValues = values.map(v => {
+            // Remover aspas do início e fim
+            let cleaned = v.trim();
+            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || 
+                (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+              cleaned = cleaned.slice(1, -1);
+            }
+            return cleaned;
+          });
+          
+          // Debug melhorado
+          console.log(`🔍 Linha ${i + 1}: ${cleanedValues.length} campos detectados`, {
+            linhaRaw: `"${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`,
+            primeirasColunas: cleanedValues.slice(0, 3).map((val, idx) => `[${idx}]="${val.substring(0, 20)}${val.length > 20 ? '...' : ''}"`),
             temSeparador: line.includes(separator),
             contadorSeparadores: (line.match(new RegExp(`\\${separator}`, 'g')) || []).length
           });
           
           // Verificar se há colunas suficientes para os campos obrigatórios
           const maxColumnIndex = Math.max(...Object.values(columnPositions));
-          if (values.length <= maxColumnIndex) {
-            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, mas a maior posição esperada é ${maxColumnIndex}. Adicionando colunas vazias.`);
+          if (cleanedValues.length <= maxColumnIndex) {
+            console.log(`⚠️ Linha ${i + 1} tem apenas ${cleanedValues.length} colunas, mas a maior posição esperada é ${maxColumnIndex}. Adicionando colunas vazias.`);
             // Preencher com valores vazios até cobrir todas as posições necessárias
-            while (values.length <= maxColumnIndex) {
-              values.push('');
+            while (cleanedValues.length <= maxColumnIndex) {
+              cleanedValues.push('');
             }
           }
           
-          // Debug específico das posições dos campos
-          console.log(`🗺️ Linha ${i + 1} - Mapeamento de colunas:`, {
-            titulo: `posição ${columnPositions.titulo} = "${values[columnPositions.titulo] || '(vazio)'}"`,
-            municipe_nome: `posição ${columnPositions.municipe_nome} = "${values[columnPositions.municipe_nome] || '(vazio)'}"`,
-            descricao: `posição ${columnPositions.descricao || -1} = "${values[columnPositions.descricao] || '(vazio)'}"`,
-            mapeamento: columnPositions
-          });
-          
-          // Verificar campos obrigatórios na posição correta
-          const titulo = values[columnPositions.titulo]?.trim();
-          const municipeNome = values[columnPositions.municipe_nome]?.trim();
-          
-          console.log(`🔍 Campos extraídos - Título: "${titulo}", Munícipe: "${municipeNome}"`);
-          
-          if (!titulo) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: campo 'titulo' vazio na posição ${columnPositions.titulo}`);
+          // Verificar se temos os campos mínimos necessários usando cleanedValues
+          const titulo = cleanedValues[columnPositions.titulo]?.trim();
+          const municipeNome = cleanedValues[columnPositions.municipe_nome]?.trim();
+
+          if (!titulo || titulo.length < 3) {
+            console.warn(`⚠️ Linha ${i + 1} ignorada: título inválido ou muito curto - "${titulo}"`);
             continue;
           }
-          
-          if (!municipeNome) {
-            console.log(`⚠️ Linha ${i + 1} ignorada: campo 'municipe_nome' vazio na posição ${columnPositions.municipe_nome}`);
-            continue;
+
+          // Se não tem munícipe, tentar usar um valor padrão ou marcar para revisão
+          if (!municipeNome || municipeNome === '(vazio)' || municipeNome === '') {
+            console.warn(`⚠️ Linha ${i + 1}: munícipe vazio, marcando para revisão`);
+            cleanedValues[columnPositions.municipe_nome] = 'Munícipe não identificado';
           }
+          
+          console.log(`✅ Linha ${i + 1} - Título: "${titulo}", Munícipe: "${municipeNome || 'Não identificado'}"`);
+          
+          // Usar cleanedValues para o restante do processamento
           
           const demanda: any = { linha: i + 1 };
           
           // Processar campos usando posições mapeadas
           Object.keys(columnPositions).forEach(key => {
             const columnIndex = columnPositions[key];
-            const value = values[columnIndex];
+            const value = cleanedValues[columnIndex];
             
             // Debug específico para título e descrição
             if (key === 'titulo' || key === 'descricao') {
@@ -1000,6 +1038,20 @@ export default function Demandas() {
 
         console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
         console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
+        
+        // Log de resumo da importação
+        console.log('📊 Resumo da importação:');
+        console.log(`   Arquivo: ${file.name}`);
+        console.log(`   Separador usado: "${separator}"`);
+        console.log(`   Total de linhas: ${lines.length}`);
+        console.log(`   Linhas processadas: ${demandasComDados.length}`);
+        console.log(`   Colunas detectadas: ${headers.length}`);
+        if (demandasComDados.length === 0) {
+          console.error('❌ Nenhuma demanda foi processada. Possíveis causas:');
+          console.error('   - Separador incorreto');
+          console.error('   - Formato de CSV incompatível');
+          console.error('   - Campos obrigatórios ausentes');
+        }
 
         // Se há munícipes não encontrados, mostrar modal de validação
         if (municipesNaoEncontrados.size > 0) {
