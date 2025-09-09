@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { toast } from "sonner";
@@ -12,6 +12,12 @@ import { formatDateTime } from '@/lib/dateUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 interface Demanda {
   id: string;
@@ -39,13 +45,14 @@ export default function Kanban() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa"); // Default para produção legislativa
   const queryClient = useQueryClient();
 
   // Buscar demandas do kanban
   const { data: demandas = [], isLoading } = useQuery({
-    queryKey: ['demandas-kanban'],
+    queryKey: ['demandas-kanban', selectedUser],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('demandas')
         .select(`
           *,
@@ -53,8 +60,17 @@ export default function Kanban() {
           municipes(nome)
         `)
         .not('kanban_position', 'is', null)
-        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito'])
-        .order('created_at', { ascending: false });
+        .in('kanban_position', ['a_fazer', 'em_progresso', 'feito']);
+
+      // Filtrar por usuário ou produção legislativa
+      if (selectedUser === "producao-legislativa") {
+        // Para produção legislativa, mantém o comportamento atual
+      } else {
+        // Para usuários específicos, filtrar por responsável
+        query = query.eq('responsavel_id', selectedUser);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         console.error('Erro ao buscar demandas:', error);
@@ -86,12 +102,18 @@ export default function Kanban() {
     mutationFn: async () => {
       console.log("🔄 Iniciando limpeza do kanban...");
       
-      // Buscar todas as demandas que estão no kanban
-      const { data: demandasParaRemover, error: fetchError } = await supabase
+      // Buscar demandas baseado na seleção atual
+      let query = supabase
         .from('demandas')
         .select('id, titulo, kanban_position')
         .not('kanban_position', 'is', null)
         .in('kanban_position', ['a_fazer', 'em_progresso', 'feito']);
+
+      if (selectedUser !== "producao-legislativa") {
+        query = query.eq('responsavel_id', selectedUser);
+      }
+      
+      const { data: demandasParaRemover, error: fetchError } = await query;
       
       if (fetchError) {
         console.error("❌ Erro ao buscar demandas para remover:", fetchError);
@@ -119,7 +141,7 @@ export default function Kanban() {
       console.log("✅ Kanban limpo com sucesso!");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
@@ -139,7 +161,7 @@ export default function Kanban() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
@@ -159,7 +181,7 @@ export default function Kanban() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       toast.success("Posição atualizada!");
     },
     onError: (error) => {
@@ -241,10 +263,46 @@ export default function Kanban() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Kanban de Produção Legislativa</h1>
-            <p className="text-muted-foreground mt-1">
-              Organize o fluxo das demandas na produção legislativa (independente do status real)
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-foreground">Kanban</h1>
+              
+              {/* Dropdown de seleção de usuário */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="min-w-[200px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
+                    {selectedUser === "producao-legislativa" 
+                      ? "Produção Legislativa" 
+                      : responsaveis.find(r => r.id === selectedUser)?.nome || "Selecionar usuário"
+                    }
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px] bg-background/95 backdrop-blur border shadow-lg">
+                  <DropdownMenuItem 
+                    onClick={() => setSelectedUser("producao-legislativa")}
+                    className={selectedUser === "producao-legislativa" ? "bg-accent text-accent-foreground" : ""}
+                  >
+                    Produção Legislativa
+                  </DropdownMenuItem>
+                  {responsaveis.map((user) => (
+                    <DropdownMenuItem 
+                      key={user.id}
+                      onClick={() => setSelectedUser(user.id)}
+                      className={selectedUser === user.id ? "bg-accent text-accent-foreground" : ""}
+                    >
+                      {user.nome}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            <p className="text-muted-foreground">
+              {selectedUser === "producao-legislativa" 
+                ? "Organize o fluxo das demandas na produção legislativa (independente do status real)"
+                : `Kanban pessoal de ${responsaveis.find(r => r.id === selectedUser)?.nome || "usuário"}`
+              }
             </p>
           </div>
           <div className="flex gap-2">
