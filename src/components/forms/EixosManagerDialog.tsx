@@ -265,7 +265,12 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                 <TableRow
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  style={provided.draggableProps.style}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    ...(snapshot.isDragging && {
+                                      zIndex: 9999
+                                    })
+                                  }}
                                   className={snapshot.isDragging ? 'bg-accent shadow-lg' : ''}
                                 >
                                   <TableCell>
