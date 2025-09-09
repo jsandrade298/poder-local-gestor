@@ -950,10 +950,17 @@ export default function Demandas() {
         const municipesNaoEncontrados = new Map();
         const demandasComDados = [];
         
+        // Limitar processamento a no máximo 42 linhas de dados (43 total - 1 header)
+        const maxLinhasProcessar = Math.min(lines.length, 43);
+        console.log(`🎯 Processando no máximo ${maxLinhasProcessar - 1} demandas (linhas 2 a ${maxLinhasProcessar})`);
+        
         // Primeira passada: identificar dados e munícipes novos
-        for (let i = 1; i < lines.length; i++) {
+        for (let i = 1; i < maxLinhasProcessar; i++) {
           const line = lines[i];
-          if (!line.trim()) continue;
+          if (!line.trim()) {
+            console.log(`⏭️ Linha ${i + 1} vazia, pulando...`);
+            continue;
+          }
           
           // Usar a função parseCSVLine melhorada
           const values = parseCSVLine(line, detectedSeparator);
@@ -969,13 +976,15 @@ export default function Demandas() {
             return cleaned;
           });
           
-          // Debug melhorado
-          console.log(`🔍 Linha ${i + 1}: ${cleanedValues.length} campos detectados`, {
-            linhaRaw: `"${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`,
-            primeirasColunas: cleanedValues.slice(0, 3).map((val, idx) => `[${idx}]="${val.substring(0, 20)}${val.length > 20 ? '...' : ''}"`),
-            temSeparador: line.includes(detectedSeparator),
-            contadorSeparadores: (line.match(new RegExp(`\\${detectedSeparator}`, 'g')) || []).length
-          });
+          // Debug apenas para as primeiras 5 linhas
+          if (i <= 5) {
+            console.log(`🔍 Linha ${i + 1}: ${cleanedValues.length} campos detectados`, {
+              linhaRaw: `"${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`,
+              primeirasColunas: cleanedValues.slice(0, 3).map((val, idx) => `[${idx}]="${val.substring(0, 20)}${val.length > 20 ? '...' : ''}"`),
+              temSeparador: line.includes(detectedSeparator),
+              contadorSeparadores: (line.match(new RegExp(`\\${detectedSeparator}`, 'g')) || []).length
+            });
+          }
           
           // Verificar se há colunas suficientes para os campos obrigatórios
           const maxColumnIndex = Math.max(...Object.values(columnPositions));
@@ -1100,7 +1109,13 @@ export default function Demandas() {
           demandasComDados.push(demanda);
         }
 
-        console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
+        // Limitar a no máximo 42 demandas (número esperado)
+        if (demandasComDados.length > 42) {
+          console.warn(`⚠️ Muitas demandas detectadas (${demandasComDados.length}), limitando a 42`);
+          demandasComDados.splice(42); // Manter apenas as primeiras 42
+        }
+
+        console.log(`📝 ${demandasComDados.length} demandas válidas identificadas (máximo 42)`);
         console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
         
         // Log de resumo da importação
