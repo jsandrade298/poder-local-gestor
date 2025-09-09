@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
 import { useLocation, useSearchParams } from "react-router-dom";
-import { useFileImport } from '@/hooks/useFileImport';
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -585,319 +584,153 @@ export default function Demandas() {
     }
   });
 
-  // Função para processar arquivo XLSX  
+  // Função para processar arquivo CSV
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('🚀 Iniciando importação de XLSX...');
+    console.log('🚀 Iniciando importação de CSV...');
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
-      toast.error("Por favor, selecione um arquivo XLSX.");
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast.error("Por favor, selecione um arquivo CSV.");
       return;
     }
-
-    console.log(`📁 Arquivo XLSX detectado: ${file.name}`);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        let processedData: string[][];
+        const csv = e.target?.result as string;
         
-        if (isXLSX) {
-          console.log('📊 Processando arquivo XLSX...');
-          // Processar arquivo XLSX
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          
-          // Converter para array de arrays
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-            header: 1, 
-            defval: '', 
-            blankrows: false 
-          }) as string[][];
-          
-          console.log(`✅ XLSX processado: ${jsonData.length} linhas detectadas`);
-          processedData = jsonData;
-        } else {
-          console.log('📄 Processando arquivo CSV...');
-          // Processar arquivo CSV
-          const csv = e.target?.result as string;
-          
-          // Parser CSV melhorado para lidar com vírgulas, aspas e quebras de linha
-          function parseCSVToLines(text: string): string[] {
-          const lines: string[] = [];
-          let currentLine = '';
-          let inQuotes = false;
-          let i = 0;
-          
-          while (i < text.length) {
-            const char = text[i];
-            
-            if (char === '"') {
-              // Toggle quote state
-              inQuotes = !inQuotes;
-              currentLine += char;
-            } else if (char === '\n' && !inQuotes) {
-              // Line break outside quotes - end of record
-              if (currentLine.trim()) {
-                lines.push(currentLine.trim());
-              }
-              currentLine = '';
-            } else if (char === '\r' && text[i + 1] === '\n' && !inQuotes) {
-              // Windows line ending outside quotes
-              if (currentLine.trim()) {
-                lines.push(currentLine.trim());
-              }
-              currentLine = '';
-              i++; // Skip the \n
-            } else {
-              // Regular character or line break inside quotes
-              currentLine += char;
-            }
-            i++;
-          }
-          
-          // Add last line if exists
-          if (currentLine.trim()) {
-            lines.push(currentLine.trim());
-          }
-          
-          return lines;
-        }
-
+        // Parser CSV mais robusto para lidar com aspas e quebras de linha
         function parseCSVLine(line: string, separator: string): string[] {
           const result: string[] = [];
           let current = '';
           let inQuotes = false;
+          let quoteChar = '';
           
           for (let i = 0; i < line.length; i++) {
             const char = line[i];
             const nextChar = line[i + 1];
             
-            // Detectar início de campo com aspas
-            if (char === '"' && (i === 0 || line[i-1] === separator)) {
+            if (!inQuotes && (char === '"' || char === "'")) {
               inQuotes = true;
-              continue; // Pular a aspa de abertura
-            }
-            
-            // Detectar fim de campo com aspas
-            if (inQuotes && char === '"') {
-              if (nextChar === '"') {
-                // Aspa escapada
-                current += '"';
-                i++; // Pular próxima aspa
-              } else if (!nextChar || nextChar === separator) {
-                // Fim do campo
-                inQuotes = false;
-                continue; // Pular a aspa de fechamento
-              } else {
-                // Aspa no meio do campo
+              quoteChar = char;
+            } else if (inQuotes && char === quoteChar) {
+              if (nextChar === quoteChar) {
                 current += char;
+                i++; // Skip next quote
+              } else {
+                inQuotes = false;
+                quoteChar = '';
               }
             } else if (!inQuotes && char === separator) {
-              // Separador fora de aspas - fim do campo
               result.push(current.trim());
               current = '';
             } else {
-              // Caractere normal
               current += char;
             }
           }
           
-          // Adicionar último campo
-          if (current || line.endsWith(separator)) {
-            result.push(current.trim());
-          }
-          
+          result.push(current.trim());
           return result;
         }
 
-        // Parser CSV simples e eficaz
-        console.log('🔄 Usando parser CSV simplificado...');
+        // Primeiro passo: dividir linhas respeitando aspas
+        const rawLines = [];
+        let currentLine = '';
+        let insideQuotes = false;
+        let quoteChar = '';
         
-        // Detectar separador primeiro
-        const csvFirstLine = csv.split('\n')[0];
-        const separatorCounts = {
-          ',': (csvFirstLine.match(/,/g) || []).length,
-          ';': (csvFirstLine.match(/;/g) || []).length,
-          '\t': (csvFirstLine.match(/\t/g) || []).length
-        };
-        
-        let csvSeparator = ','; // padrão
-        let maxCount = separatorCounts[','];
-        
-        if (separatorCounts[';'] > maxCount) {
-          csvSeparator = ';';
-          maxCount = separatorCounts[';'];
-        }
-        if (separatorCounts['\t'] > maxCount) {
-          csvSeparator = '\t';
-        }
-        
-        console.log(`🔍 Separador detectado: "${csvSeparator}" (${maxCount} ocorrências na primeira linha)`);
-        
-        // Dividir em linhas simples
-        const rawLines = csv.split(/\r?\n/).filter(line => line.trim().length > 0);
-        console.log(`📊 Total de linhas: ${rawLines.length}`);
-        
-        // Verificar se é o número esperado de linhas (43)
-        if (rawLines.length !== 43) {
-          console.warn(`⚠️ Número de linhas inesperado: ${rawLines.length} (esperado: 43)`);
-          console.log(`📋 Primeiras 5 linhas:`);
-          rawLines.slice(0, 5).forEach((line, idx) => {
-            console.log(`   ${idx + 1}: "${line.substring(0, 100)}..."`);
-          });
-        }
-        
-        // Processar cada linha de forma simples
-        const parsedRows: string[][] = [];
-        for (let i = 0; i < rawLines.length; i++) {
-          const line = rawLines[i];
+        for (let i = 0; i < csv.length; i++) {
+          const char = csv[i];
+          const nextChar = csv[i + 1];
           
-          // Split simples primeiro
-          let fields = line.split(csvSeparator);
-          
-          // Limpar campos
-          fields = fields.map(field => {
-            let clean = field.trim();
-            // Remover aspas no início e fim
-            if ((clean.startsWith('"') && clean.endsWith('"')) || 
-                (clean.startsWith("'") && clean.endsWith("'"))) {
-              clean = clean.slice(1, -1);
+          if ((char === '"' || char === "'") && !insideQuotes) {
+            insideQuotes = true;
+            quoteChar = char;
+            currentLine += char;
+          } else if (char === quoteChar && insideQuotes) {
+            if (nextChar === quoteChar) {
+              currentLine += char + nextChar;
+              i++;
+            } else {
+              insideQuotes = false;
+              quoteChar = '';
+              currentLine += char;
             }
-            return clean;
-          });
+          } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+            if (currentLine.trim()) {
+              rawLines.push(currentLine.trim());
+            }
+            currentLine = '';
+            if (char === '\r' && nextChar === '\n') {
+              i++;
+            }
+          } else {
+            currentLine += char;
+          }
+        }
+        
+        if (currentLine.trim()) {
+          rawLines.push(currentLine.trim());
+        }
+
+        // Filtrar linhas vazias ou inválidas
+        const lines = rawLines.filter(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return false;
           
-          if (i < 3) {
-            console.log(`📝 Linha ${i + 1}: ${fields.length} campos - ${JSON.stringify(fields.slice(0, 3))}`);
+          // Verificar se tem pelo menos um separador válido
+          const hasSeparator = trimmed.includes(';') || trimmed.includes(',');
+          if (!hasSeparator) {
+            console.warn(`⚠️ Linha descartada (sem separador): "${trimmed.substring(0, 50)}..."`);
+            return false;
           }
           
-          parsedRows.push(fields);
-        }
+          return true;
+        });
         
-        console.log(`✅ Parser processou ${parsedRows.length} linhas`);
-        console.log(`📊 Header tem ${parsedRows[0]?.length || 0} campos`);
-        console.log(`📊 Primeira linha de dados tem ${parsedRows[1]?.length || 0} campos`);
-        
-        // Converter de volta para o formato esperado pelo código existente
-        const lines = parsedRows.map(row => row.join(';'));
-        
-        console.log(`📁 Total de linhas processadas: ${lines.length}`);
-        console.log(`📁 Primeira linha (header): "${lines[0]?.substring(0, 100)}..."`);
-        console.log(`📁 Segunda linha (dados): "${lines[1]?.substring(0, 100)}..."`);
-        console.log(`📁 Última linha: "${lines[lines.length - 1]?.substring(0, 100)}..."`);
-        
-        if (lines.length < 2) {
-          toast.error("O arquivo CSV deve ter pelo menos uma linha de header e uma de dados.");
-          return;
-        }
+        console.log(`📁 Total de linhas válidas encontradas: ${lines.length - 1} (excluindo header)`);
         
         if (lines.length < 2) {
           toast.error("O arquivo CSV está vazio ou não possui dados válidos.");
           return;
         }
 
-        // Detectar separador com mais precisão
-        const headerLine = lines[0];
-        let detectedSeparator = ';'; // Default
-
-        // Testar cada possível separador
-        const possibleSeparators = [',', ';', '\t', '|'];
-        let maxFields = 0;
-        let bestSeparator = ';';
-
-        for (const sep of possibleSeparators) {
-          const testFields = parseCSVLine(headerLine, sep);
-          // Verificar se tem campos esperados (titulo, descricao, etc)
-          const hasExpectedFields = testFields.some(field => 
-            field.toLowerCase().includes('titulo') || 
-            field.toLowerCase().includes('título')
-          );
-          
-          if (hasExpectedFields && testFields.length > maxFields) {
-            maxFields = testFields.length;
-            bestSeparator = sep;
-          }
-        }
-
-        detectedSeparator = bestSeparator;
-        console.log(`📋 Separador detectado: "${detectedSeparator}" com ${maxFields} campos`);
+        // Detectar separador mais preciso
+        const firstLine = lines[0];
+        const semicolonCount = (firstLine.match(/;/g) || []).length;
+        const commaCount = (firstLine.match(/,/g) || []).length;
+        const separator = semicolonCount >= commaCount ? ';' : ',';
         
         // Usar parser robusto para o header
-        const headers = parseCSVLine(headerLine, detectedSeparator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+        const headers = parseCSVLine(firstLine, separator).map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
         
         console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
-        console.log(`📋 Separador detectado: "${detectedSeparator}"`);
+        console.log(`📋 Separador detectado: "${separator}"`);
         console.log(`📋 Total de colunas no header: ${headers.length}`);
         
-        // Mapear headers para suas posições dinâmicas
-        const headerMap: Record<string, string> = {
-          'titulo': 'titulo',
-          'título': 'titulo',
-          'title': 'titulo',
-          'descricao': 'descricao',
-          'descrição': 'descricao',
-          'description': 'descricao',
-          'municipe_nome': 'municipe_nome',
-          'munícipe_nome': 'municipe_nome',
-          'municipe': 'municipe_nome',
-          'munícipe': 'municipe_nome',
-          'citizen': 'municipe_nome',
-          'area_nome': 'area_nome',
-          'área_nome': 'area_nome',
-          'area': 'area_nome',
-          'área': 'area_nome',
-          'responsavel_nome': 'responsavel_nome',
-          'responsável_nome': 'responsavel_nome',
-          'responsavel': 'responsavel_nome',
-          'responsável': 'responsavel_nome',
-          'status': 'status',
-          'prioridade': 'prioridade',
-          'priority': 'prioridade',
-          'logradouro': 'logradouro',
-          'endereco': 'logradouro',
-          'endereço': 'logradouro',
-          'numero': 'numero',
-          'número': 'numero',
-          'number': 'numero',
-          'bairro': 'bairro',
-          'neighborhood': 'bairro',
-          'cidade': 'cidade',
-          'city': 'cidade',
-          'cep': 'cep',
-          'complemento': 'complemento',
-          'data_prazo': 'data_prazo',
-          'prazo': 'data_prazo',
-          'deadline': 'data_prazo',
-          'observacoes': 'observacoes',
-          'observações': 'observacoes',
-          'notes': 'observacoes'
+        // Verificar se temos a estrutura básica esperada
+        if (headers.length < 3) {
+          toast.error("CSV deve ter pelo menos 3 colunas (Título, Descrição, Munícipe)");
+          return;
+        }
+        const columnPositions = {
+          titulo: 0,        // Coluna A
+          descricao: 1,     // Coluna B  
+          municipe_nome: 2, // Coluna C
+          area_nome: 3,     // Coluna D
+          responsavel_nome: 4, // Coluna E
+          status: 5,        // Coluna F
+          prioridade: 6,    // Coluna G
+          logradouro: 7,    // Coluna H
+          numero: 8,        // Coluna I
+          bairro: 9,        // Coluna J
+          cidade: 10,       // Coluna K
+          cep: 11,          // Coluna L
+          complemento: 12,  // Coluna M
+          data_prazo: 13,   // Coluna N
+          observacoes: 14   // Coluna O
         };
-
-        // Criar mapeamento dinâmico de posições baseado nos headers
-        const columnPositions: Record<string, number> = {};
-        headers.forEach((header, index) => {
-          const normalizedHeader = header.replace(/[\s_-]/g, '').toLowerCase();
-          const mappedField = headerMap[header] || headerMap[normalizedHeader];
-          if (mappedField) {
-            columnPositions[mappedField] = index;
-          }
-        });
-
-        console.log('🗂️ Mapeamento de colunas detectado:', columnPositions);
-
-        // Verificar se temos pelo menos título e munícipe
-        if (columnPositions.titulo === undefined) {
-          toast.error("Coluna 'titulo' não encontrada no CSV. Verifique o cabeçalho.");
-          return;
-        }
-        if (columnPositions.municipe_nome === undefined) {
-          toast.error("Coluna 'municipe_nome' não encontrada no CSV. Verifique o cabeçalho.");
-          return;
-        }
 
         // Buscar dados existentes usando carregamento em lotes
         console.log('🔍 Carregando dados do sistema...');
@@ -976,75 +809,67 @@ export default function Demandas() {
         const municipesNaoEncontrados = new Map();
         const demandasComDados = [];
         
-        console.log(`🎯 Processando ${lines.length - 1} possíveis demandas (linhas 2 a ${lines.length})`);
-        
         // Primeira passada: identificar dados e munícipes novos
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
-          if (!line.trim()) {
-            console.log(`⏭️ Linha ${i + 1} vazia, pulando...`);
-            continue;
-          }
+          if (!line.trim()) continue;
           
-          // Usar a função parseCSVLine melhorada
-          const values = parseCSVLine(line, detectedSeparator);
+          const values = parseCSVLine(line, separator).map(v => 
+            v.replace(/^["']|["']$/g, '').trim()
+          );
           
-          // Remover aspas extras dos valores
-          const cleanedValues = values.map(v => {
-            // Remover aspas do início e fim
-            let cleaned = v.trim();
-            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || 
-                (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
-              cleaned = cleaned.slice(1, -1);
-            }
-            return cleaned;
+          console.log(`🔍 Processando linha ${i + 1}:`, {
+            totalColunas: values.length,
+            titulo: values[0] || '(vazio)',
+            descricao: values[1] || '(vazio)',
+            municipe: values[2] || '(vazio)',
+            raw_line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
           });
           
-          // Debug apenas para as primeiras 5 linhas
-          if (i <= 5) {
-            console.log(`🔍 Linha ${i + 1}: ${cleanedValues.length} campos detectados`, {
-              linhaRaw: `"${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`,
-              primeirasColunas: cleanedValues.slice(0, 3).map((val, idx) => `[${idx}]="${val.substring(0, 20)}${val.length > 20 ? '...' : ''}"`),
-              temSeparador: line.includes(detectedSeparator),
-              contadorSeparadores: (line.match(new RegExp(`\\${detectedSeparator}`, 'g')) || []).length
-            });
-          }
-          
-          // Verificar se há colunas suficientes para os campos obrigatórios
-          const maxColumnIndex = Math.max(...Object.values(columnPositions));
-          if (cleanedValues.length <= maxColumnIndex) {
-            console.log(`⚠️ Linha ${i + 1} tem apenas ${cleanedValues.length} colunas, mas a maior posição esperada é ${maxColumnIndex}. Adicionando colunas vazias.`);
-            // Preencher com valores vazios até cobrir todas as posições necessárias
-            while (cleanedValues.length <= maxColumnIndex) {
-              cleanedValues.push('');
+          // Verificar se há colunas suficientes
+          if (values.length < 15) {
+            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, esperado 15. Adicionando colunas vazias.`);
+            // Preencher com valores vazios até ter 15 colunas
+            while (values.length < 15) {
+              values.push('');
             }
           }
           
-          // Verificar se temos os campos mínimos necessários usando cleanedValues
-          const titulo = cleanedValues[columnPositions.titulo]?.trim();
-          const municipeNome = cleanedValues[columnPositions.municipe_nome]?.trim();
-
-          if (!titulo || titulo.length < 3) {
-            console.warn(`⚠️ Linha ${i + 1} ignorada: título inválido ou muito curto - "${titulo}"`);
-            continue;
-          }
-
-          // Se não tem munícipe, tentar usar um valor padrão ou marcar para revisão
-          if (!municipeNome || municipeNome === '(vazio)' || municipeNome === '') {
-            console.warn(`⚠️ Linha ${i + 1}: munícipe vazio, marcando para revisão`);
-            cleanedValues[columnPositions.municipe_nome] = 'Munícipe não identificado';
-          }
+          // Auto-detecção de deslocamento de colunas quando título está vazio
+          let adjustedPositions = { ...columnPositions };
           
-          console.log(`✅ Linha ${i + 1} - Título: "${titulo}", Munícipe: "${municipeNome || 'Não identificado'}"`);
-          
-          // Usar cleanedValues para o restante do processamento
+          if (!values[columnPositions.titulo] || !values[columnPositions.titulo].trim()) {
+            // Verificar se a descrição parece ser um nome (indicativo de deslocamento)
+            const possibleName = values[columnPositions.descricao]?.trim();
+            const possibleDesc = values[columnPositions.municipe_nome]?.trim();
+            
+            if (possibleName && possibleName.includes(' ') && possibleName.length < 100) {
+              console.warn(`🔄 Linha ${i + 1}: Detectado deslocamento - ajustando posições das colunas`);
+              console.log(`   Original: titulo="${values[0]}" | desc="${values[1]}" | municipe="${values[2]}"`);
+              
+              // Ajustar todas as posições uma coluna para frente
+              Object.keys(adjustedPositions).forEach(key => {
+                if (adjustedPositions[key] < values.length - 1) {
+                  adjustedPositions[key] += 1;
+                }
+              });
+              
+              console.log(`   Ajustado: titulo="${values[adjustedPositions.titulo]}" | desc="${values[adjustedPositions.descricao]}" | municipe="${values[adjustedPositions.municipe_nome]}"`);
+            } else {
+              console.log(`⚠️ Linha ${i + 1} ignorada: sem título válido - valor: "${values[columnPositions.titulo] || ''}"`, {
+                linha_completa: line,
+                valores_separados: values
+              });
+              continue;
+            }
+          }
           
           const demanda: any = { linha: i + 1 };
           
-          // Processar campos usando posições mapeadas
-          Object.keys(columnPositions).forEach(key => {
-            const columnIndex = columnPositions[key];
-            const value = cleanedValues[columnIndex];
+          // Processar campos usando posições ajustadas
+          Object.keys(adjustedPositions).forEach(key => {
+            const columnIndex = adjustedPositions[key as keyof typeof adjustedPositions];
+            const value = values[columnIndex];
             
             // Debug específico para título e descrição
             if (key === 'titulo' || key === 'descricao') {
@@ -1127,7 +952,6 @@ export default function Demandas() {
           // Adicionar descrição padrão se não existir
           if (!demanda.descricao && demanda.titulo) {
             demanda.descricao = demanda.titulo;
-            console.log(`📝 Linha ${i + 1}: Usando título como descrição padrão`);
           }
           
           demandasComDados.push(demanda);
@@ -1135,33 +959,6 @@ export default function Demandas() {
 
         console.log(`📝 ${demandasComDados.length} demandas válidas identificadas`);
         console.log(`👥 ${municipesNaoEncontrados.size} munícipes únicos não encontrados`);
-        
-        // Log de resumo da importação
-        console.log('📊 Resumo da importação:');
-        console.log(`   📄 Arquivo: ${file.name}`);
-        console.log(`   📏 Tamanho: ${file.size} bytes`);
-        console.log(`   🔗 Separador usado: "${detectedSeparator}"`);
-        console.log(`   📋 Total de linhas no arquivo: ${lines.length}`);
-        console.log(`   📊 Linhas de dados esperadas: ${lines.length - 1}`);
-        console.log(`   ✅ Demandas processadas: ${demandasComDados.length}`);
-        console.log(`   📝 Colunas detectadas: ${headers.length}`);
-        console.log(`   📌 Headers: ${headers.join(', ')}`);
-        
-        if (demandasComDados.length === 0) {
-          console.error('❌ ERRO: Nenhuma demanda foi processada!');
-          console.error('📋 Primeiras 3 linhas do arquivo:');
-          lines.slice(0, 3).forEach((line, idx) => {
-            console.error(`   Linha ${idx + 1}: "${line.substring(0, 150)}..."`);
-          });
-          console.error('🔍 Possíveis causas:');
-          console.error('   - Separador incorreto detectado');
-          console.error('   - Formato de CSV incompatível');
-          console.error('   - Campos obrigatórios ausentes ou mal formatados');
-          console.error('   - Quebras de linha não tratadas corretamente');
-        } else {
-          const taxa = Math.round((demandasComDados.length / (lines.length - 1)) * 100);
-          console.log(`   🎯 Taxa de sucesso: ${taxa}% das linhas processadas`);
-        }
 
         // Se há munícipes não encontrados, mostrar modal de validação
         if (municipesNaoEncontrados.size > 0) {
@@ -1178,19 +975,15 @@ export default function Demandas() {
 
         // Se não há munícipes não encontrados, prosseguir diretamente
         await finalizarImportacao(demandasComDados, municipeMap, []);
+        
       } catch (error) {
-        console.error('Erro ao processar XLSX:', error);
-        toast.error("Erro ao processar arquivo XLSX.");
+        console.error('Erro ao processar CSV:', error);
+        toast.error("Erro ao processar arquivo CSV. Verifique o formato.");
       }
     };
     
-    reader.readAsArrayBuffer(file);
-     
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-     
+    reader.readAsText(file, 'UTF-8');
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

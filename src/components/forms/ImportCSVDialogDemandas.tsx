@@ -136,14 +136,14 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
           disabled={isImporting}
         >
           <Upload className="h-4 w-4 mr-2" />
-          {isImporting ? 'Importando...' : 'Importar XLSX'}
+          {isImporting ? 'Importando...' : 'Importar CSV'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Como Importar Demandas via XLSX
+            Como Importar Demandas via CSV
           </DialogTitle>
         </DialogHeader>
         
@@ -447,7 +447,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                   </Button>
                   <Button onClick={handleImportClick}>
                     <Upload className="h-4 w-4 mr-2" />
-                    Selecionar Arquivo XLSX
+                    Selecionar Arquivo CSV
                   </Button>
                 </div>
               </div>
@@ -459,7 +459,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          accept=".csv"
           onChange={onFileSelect}
           className="hidden"
         />
