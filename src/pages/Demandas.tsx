@@ -1343,12 +1343,19 @@ export default function Demandas() {
                 </Select>
               </div>
 
-              <div className="flex items-end justify-between gap-2 w-full">
+              <div className="flex items-center justify-between w-full">
                 <Button variant="outline" onClick={clearFilters}>
                   Limpar Filtros
                 </Button>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {isLoading ? 'Carregando...' : 
+                      pageSize === "all" ? 
+                        `${filteredDemandas.length} demandas` :
+                        `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
+                    }
+                  </span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Mostrar:</span>
                     <Select 
@@ -1369,13 +1376,6 @@ export default function Demandas() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {isLoading ? 'Carregando...' : 
-                      pageSize === "all" ? 
-                        `${filteredDemandas.length} demandas` :
-                        `${Math.min((currentPage - 1) * (pageSize as number) + 1, totalDemandas)} a ${Math.min(currentPage * (pageSize as number), totalDemandas)} de ${totalDemandas} demandas`
-                    }
-                  </span>
                 </div>
               </div>
             </div>
