@@ -185,7 +185,7 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - ajustado para colaboradores
+  // Detectar redirecionamento de notificação - colaboradores usam seu próprio kanban
   useEffect(() => {
     // Processar redirecionamento de notificação
     const tarefaId = searchParams.get('tarefa');
@@ -202,7 +202,7 @@ export default function Kanban() {
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       } else {
-        // Se não encontrou, buscar a tarefa e verificar se o usuário é colaborador
+        // Se não encontrou, buscar a tarefa e ajustar o selectedUser
         const buscarTarefaEspecifica = async () => {
           try {
             const { data: user } = await supabase.auth.getUser();
@@ -227,10 +227,12 @@ export default function Kanban() {
               (tc: any) => tc.colaborador_id === user.user.id
             );
             
-            // Se é colaborador, manter o kanban atual
-            // Se não é colaborador (é o responsável/criador), mudar para o kanban da tarefa
-            if (!isColaborador && tarefa.kanban_type !== selectedUser) {
-              setSelectedUser(tarefa.kanban_type);
+            // Se é colaborador, usar o ID do usuário atual como selectedUser
+            // Se não é colaborador, usar o kanban_type da tarefa (responsável)
+            const novoSelectedUser = isColaborador ? user.user.id : tarefa.kanban_type;
+            
+            if (novoSelectedUser !== selectedUser) {
+              setSelectedUser(novoSelectedUser);
             }
             
           } catch (error) {
