@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useDemandaNotification } from '@/contexts/DemandaNotificationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logError } from '@/lib/errorUtils';
 
 export function useDemandaNotificationSender() {
   const { state, updateNotificationStatus, updateCountdown, finishNotifications } = useDemandaNotification();
@@ -84,7 +85,7 @@ export function useDemandaNotificationSender() {
         }
 
       } catch (error: any) {
-        console.error('Erro ao enviar notificação:', error);
+        logError('Erro ao enviar notificação:', error);
         updateNotificationStatus(notification.id, 'error', error.message);
       }
     }

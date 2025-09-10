@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDemandaNotification } from '@/contexts/DemandaNotificationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { logError } from '@/lib/errorUtils';
 
 export function useDemandaStatusMonitor() {
   const { user } = useAuth();
@@ -100,7 +101,7 @@ export function useDemandaStatusMonitor() {
             });
 
           } catch (error) {
-            console.error('Erro ao processar mudança de status da demanda:', error);
+            logError('Erro ao processar mudança de status da demanda:', error);
           }
         }
       )

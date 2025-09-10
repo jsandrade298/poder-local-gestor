@@ -9,6 +9,7 @@ import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { formatDateTime } from '@/lib/dateUtils';
+import { logError } from '@/lib/errorUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
@@ -81,7 +82,7 @@ export default function Kanban() {
         .eq('kanban_type', selectedUser);
       
       if (kanbanError) {
-        console.error('Erro ao buscar kanban:', kanbanError);
+        logError('Erro ao buscar kanban:', kanbanError);
         throw kanbanError;
       }
       
@@ -101,7 +102,7 @@ export default function Kanban() {
           .order('created_at', { ascending: false });
         
         if (demandasError) {
-          console.error('Erro ao buscar demandas:', demandasError);
+          logError('Erro ao buscar demandas:', demandasError);
           throw demandasError;
         }
         
@@ -130,7 +131,7 @@ export default function Kanban() {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Erro ao buscar tarefas:', error);
+        logError('Erro ao buscar tarefas:', error);
         throw error;
       }
       
@@ -175,7 +176,7 @@ export default function Kanban() {
         .order('nome');
       
       if (error) {
-        console.error('Erro ao buscar responsáveis:', error);
+        logError('Erro ao buscar responsáveis:', error);
         throw error;
       }
       return data || [];
@@ -260,7 +261,7 @@ export default function Kanban() {
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
-      console.error('Erro ao limpar kanban:', error);
+      logError('Erro ao limpar kanban:', error);
       toast.error(`Erro ao limpar kanban: ${error.message}`);
     }
   });
@@ -281,7 +282,7 @@ export default function Kanban() {
       toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
-      console.error('Erro ao remover demanda:', error);
+      logError('Erro ao remover demanda:', error);
       toast.error("Erro ao remover demanda");
     }
   });
@@ -301,7 +302,7 @@ export default function Kanban() {
       toast.success("Tarefa removida!");
     },
     onError: (error) => {
-      console.error('Erro ao remover tarefa:', error);
+      logError('Erro ao remover tarefa:', error);
       toast.error("Erro ao remover tarefa");
     }
   });
@@ -364,7 +365,7 @@ export default function Kanban() {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
     },
     onError: (error) => {
-      console.error('Erro ao atualizar posição:', error);
+      logError('Erro ao atualizar posição:', error);
       toast.error("Erro ao atualizar posição do item");
     }
   });

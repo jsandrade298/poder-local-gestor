@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logError } from "@/lib/errorUtils";
 
 // Hook centralizado para carregamento de munícipes em formulários
 export function useMunicipesSelect() {
@@ -23,7 +24,7 @@ export function useMunicipesSelect() {
           .range(from, from + pageSize - 1);
           
         if (error) {
-          console.error('❌ Shared Hook: Erro ao buscar munícipes:', error);
+          logError('❌ Shared Hook: Erro ao buscar munícipes:', error);
           throw error;
         }
         

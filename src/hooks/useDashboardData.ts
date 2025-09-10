@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logError } from "@/lib/errorUtils";
 import { formatDateOnly } from '@/lib/dateUtils';
 
 export function useDashboardData() {
@@ -27,7 +28,7 @@ export function useDashboardData() {
           .range(offset, offset + BATCH_SIZE - 1);
         
         if (error) {
-          console.error('❌ Dashboard: Erro ao buscar demandas:', error);
+          logError('❌ Dashboard: Erro ao buscar demandas:', error);
           throw error;
         }
         
@@ -79,7 +80,7 @@ export function useDashboardData() {
           .range(from, from + size - 1);
         
         if (error) {
-          console.error('❌ Dashboard: Erro ao buscar munícipes:', error);
+          logError('❌ Dashboard: Erro ao buscar munícipes:', error);
           throw error;
         }
         

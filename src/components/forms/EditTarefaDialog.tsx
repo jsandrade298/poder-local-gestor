@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Palette } from "lucide-react";
 import { toast } from "sonner";
+import { logError } from "@/lib/errorUtils";
 
 interface EditTarefaDialogProps {
   tarefa: any;
@@ -154,7 +155,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
             .insert(notificacoesData);
 
           if (notificacoesError) {
-            console.error('Erro ao criar notificações:', notificacoesError);
+            logError('Erro ao criar notificações:', notificacoesError);
             // Não falha a operação por causa das notificações
           }
         }
@@ -168,7 +169,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
       onOpenChange(false);
     },
     onError: (error) => {
-      console.error('Erro ao atualizar tarefa:', error);
+      logError('Erro ao atualizar tarefa:', error);
       toast.error("Erro ao atualizar tarefa");
     }
   });
