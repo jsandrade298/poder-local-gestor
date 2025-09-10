@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -69,6 +70,7 @@ export default function Kanban() {
   const [isEditTarefaDialogOpen, setIsEditTarefaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   // Buscar demandas e tarefas do kanban
@@ -183,60 +185,50 @@ export default function Kanban() {
     }
   });
 
-  // Detectar parâmetro de tarefa na URL e ajustar o selectedUser se necessário
+  // Detectar redirecionamento de notificação - igual ao padrão da agenda
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tarefaId = urlParams.get('tarefa');
-    
-    if (tarefaId) {
-      // Buscar a tarefa diretamente no banco para determinar o kanban_type correto
-      const buscarTarefaEspecifica = async () => {
-        try {
-          const { data: tarefa, error } = await supabase
-            .from('tarefas')
-            .select('*')
-            .eq('id', tarefaId)
-            .single();
-          
-          if (error) {
-            logError('Erro ao buscar tarefa específica:', error);
-            return;
-          }
-          
-          if (tarefa) {
-            // Ajustar o selectedUser para corresponder ao kanban_type da tarefa
-            if (tarefa.kanban_type !== selectedUser) {
-              setSelectedUser(tarefa.kanban_type);
-            }
-            
-            // A tarefa será encontrada automaticamente após a query ser recarregada
-            // com o selectedUser correto
-          }
-        } catch (error) {
-          logError('Erro ao processar tarefa da URL:', error);
-        }
-      };
-      
-      buscarTarefaEspecifica();
-    }
-  }, []);
-
-  // Separar useEffect para abrir a tarefa após os dados serem carregados
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tarefaId = urlParams.get('tarefa');
+    // Processar redirecionamento de notificação
+    const tarefaId = searchParams.get('tarefa');
     
     if (tarefaId && demandas.length > 0) {
+      // Procurar a tarefa em todos os dados carregados
       const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
       
       if (tarefaEncontrada) {
         setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
-        // Limpar o parâmetro da URL após abrir
-        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Ajustar o selectedUser para corresponder ao kanban_type da tarefa se necessário
+        if (tarefaEncontrada.kanban_type && tarefaEncontrada.kanban_type !== selectedUser) {
+          setSelectedUser(tarefaEncontrada.kanban_type);
+        }
+        
+        // Limpar os parâmetros da URL após o redirecionamento
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      } else {
+        // Se não encontrou, pode ser porque o selectedUser está errado
+        // Buscar a tarefa diretamente no banco para determinar o kanban_type correto
+        const buscarTarefaEspecifica = async () => {
+          try {
+            const { data: tarefa, error } = await supabase
+              .from('tarefas')
+              .select('kanban_type')
+              .eq('id', tarefaId)
+              .single();
+            
+            if (!error && tarefa && tarefa.kanban_type !== selectedUser) {
+              setSelectedUser(tarefa.kanban_type);
+            }
+          } catch (error) {
+            logError('Erro ao buscar tarefa específica:', error);
+          }
+        };
+        
+        buscarTarefaEspecifica();
       }
     }
-  }, [demandas]);
+  }, [searchParams, demandas, selectedUser]);
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
