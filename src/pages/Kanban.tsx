@@ -415,9 +415,18 @@ export default function Kanban() {
               kanbanType={selectedUser}
             />
             
+            <Button 
+              onClick={() => setIsAdicionarDialogOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar Demanda
+            </Button>
+            
             <AdicionarDemandasKanbanDialog 
               open={isAdicionarDialogOpen}
               onOpenChange={setIsAdicionarDialogOpen}
+              selectedUser={selectedUser}
             />
 
             <AlertDialog>
