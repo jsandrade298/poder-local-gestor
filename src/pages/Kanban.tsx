@@ -185,67 +185,79 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - somente se há parâmetro na URL
+  // Detectar redirecionamento de notificação - mais específico
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // Só processar se realmente há um parâmetro tarefa na URL
-    if (tarefaId) {
-      const processarRedirecionamento = async () => {
-        try {
-          const { data: user } = await supabase.auth.getUser();
-          if (!user?.user?.id) return;
-          
-          // Buscar a tarefa e verificar se o usuário é colaborador
-          const { data: tarefa, error } = await supabase
-            .from('tarefas')
-            .select(`
-              *,
-              tarefa_colaboradores(colaborador_id)
-            `)
-            .eq('id', tarefaId)
-            .single();
-          
-          if (error || !tarefa) {
-            logError('Erro ao buscar tarefa específica:', error);
-            return;
-          }
-          
-          // Verificar se o usuário atual é colaborador
-          const isColaborador = tarefa.tarefa_colaboradores?.some(
-            (tc: any) => tc.colaborador_id === user.user.id
-          );
-          
-          // Determinar o selectedUser correto
-          const selectedUserCorreto = isColaborador ? user.user.id : tarefa.kanban_type;
-          
-          // Se o selectedUser atual não é o correto, ajustar
-          if (selectedUserCorreto !== selectedUser) {
-            setSelectedUser(selectedUserCorreto);
-            return; // Aguardar recarregamento dos dados
-          }
-          
-          // Se chegou aqui, o selectedUser já está correto e os dados estão carregados
-          // Procurar a tarefa nos dados atuais
-          const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
-          
-          if (tarefaEncontrada) {
-            setSelectedTarefa(tarefaEncontrada);
-            setIsViewTarefaDialogOpen(true);
-            
-            // Limpar os parâmetros da URL após o redirecionamento
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, '', newUrl);
-          }
-          
-        } catch (error) {
-          logError('Erro ao processar redirecionamento:', error);
-        }
-      };
+    // Log para debug
+    console.log('🔍 Kanban useEffect:', { tarefaId, hasSearchParams: !!tarefaId });
+    
+    // Só executar se realmente há um parâmetro tarefa na URL E ainda não foi processado
+    if (tarefaId && demandas.length > 0) {
+      // Verificar se já encontrou a tarefa nos dados atuais
+      const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
       
-      processarRedirecionamento();
+      if (tarefaEncontrada) {
+        console.log('✅ Tarefa encontrada, abrindo modal:', tarefaEncontrada.titulo);
+        setSelectedTarefa(tarefaEncontrada);
+        setIsViewTarefaDialogOpen(true);
+        
+        // Limpar os parâmetros da URL após o redirecionamento
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      } else {
+        console.log('🔄 Tarefa não encontrada, verificando kanban_type...');
+        
+        // Se não encontrou, buscar a tarefa e ajustar o selectedUser se necessário
+        const buscarTarefaEspecifica = async () => {
+          try {
+            const { data: user } = await supabase.auth.getUser();
+            if (!user?.user?.id) return;
+            
+            const { data: tarefa, error } = await supabase
+              .from('tarefas')
+              .select(`
+                *,
+                tarefa_colaboradores(colaborador_id)
+              `)
+              .eq('id', tarefaId)
+              .single();
+            
+            if (error || !tarefa) {
+              logError('Erro ao buscar tarefa específica:', error);
+              // Limpar URL se tarefa não existe
+              window.history.replaceState({}, '', window.location.pathname);
+              return;
+            }
+            
+            // Verificar se o usuário atual é colaborador
+            const isColaborador = tarefa.tarefa_colaboradores?.some(
+              (tc: any) => tc.colaborador_id === user.user.id
+            );
+            
+            // Determinar o selectedUser correto
+            const selectedUserCorreto = isColaborador ? user.user.id : tarefa.kanban_type;
+            
+            console.log('🎯 Usuário:', { isColaborador, selectedUserCorreto, currentSelectedUser: selectedUser });
+            
+            // Se o selectedUser atual não é o correto, ajustar
+            if (selectedUserCorreto !== selectedUser) {
+              console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
+              setSelectedUser(selectedUserCorreto);
+              // Não limpar URL ainda, aguardar recarregamento dos dados
+            }
+            
+          } catch (error) {
+            logError('Erro ao processar redirecionamento:', error);
+            // Limpar URL em caso de erro
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        };
+        
+        buscarTarefaEspecifica();
+      }
     }
-  }, [searchParams, selectedUser, demandas]);
+  }, [searchParams, demandas]);
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
