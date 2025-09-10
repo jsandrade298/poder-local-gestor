@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -338,6 +339,52 @@ export default function Kanban() {
     return responsavel?.nome || '';
   };
 
+  // Mutation para atualizar posição do item no kanban
+  const updatePositionMutation = useMutation({
+    mutationFn: async ({ itemId, newPosition, tipo }: { itemId: string, newPosition: string, tipo: string }) => {
+      if (tipo === 'tarefa') {
+        const { error } = await supabase
+          .from('tarefas')
+          .update({ kanban_position: newPosition })
+          .eq('id', itemId);
+        
+        if (error) throw error;
+      } else {
+        // Para demandas, atualizar na tabela demanda_kanbans
+        const { error } = await supabase
+          .from('demanda_kanbans')
+          .update({ kanban_position: newPosition })
+          .eq('demanda_id', itemId)
+          .eq('kanban_type', selectedUser);
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+    },
+    onError: (error) => {
+      console.error('Erro ao atualizar posição:', error);
+      toast.error("Erro ao atualizar posição do item");
+    }
+  });
+
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    const item = demandas.find(d => d.id === draggableId);
+    if (!item) return;
+
+    updatePositionMutation.mutate({
+      itemId: draggableId,
+      newPosition: destination.droppableId,
+      tipo: item.tipo || 'demanda'
+    });
+  };
+
   const getDemandsByStatus = (kanbanPosition: string) => {
     return demandas.filter((item: Demanda) => item.kanban_position === kanbanPosition);
   };
@@ -457,145 +504,171 @@ export default function Kanban() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {statusColumns.map((column) => {
-            const columnDemandas = getDemandsByStatus(column.id);
-            
-            return (
-              <div key={column.id} className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: column.color }}
-                    />
-                    {column.title}
-                    <Badge variant="secondary" className="ml-2">
-                      {columnDemandas.length}
-                    </Badge>
-                  </h2>
-                </div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {statusColumns.map((column) => {
+              const columnDemandas = getDemandsByStatus(column.id);
+              
+              return (
+                <div key={column.id} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: column.color }}
+                      />
+                      {column.title}
+                      <Badge variant="secondary" className="ml-2">
+                        {columnDemandas.length}
+                      </Badge>
+                    </h2>
+                  </div>
 
-                <div className="min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed border-muted-foreground/20">
-                  {columnDemandas.map((demanda) => (
-                    <Card
-                      key={demanda.id}
-                      className="cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4"
-                      style={{
-                        borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))'
-                      }}
-                      onClick={() => {
-                        if (demanda.tipo === 'tarefa') {
-                          setSelectedTarefa(demanda);
-                          setIsViewTarefaDialogOpen(true);
-                        } else {
-                          setSelectedDemanda(demanda);
-                          setIsViewDialogOpen(true);
-                        }
-                      }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (demanda.tipo === 'tarefa') {
-                            removerTarefaMutation.mutate(demanda.id);
-                          } else {
-                            removerDemandaMutation.mutate(demanda.id);
-                          }
-                        }}
+                  <Droppable droppableId={column.id}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
+                          snapshot.isDraggingOver 
+                            ? 'border-primary/50 bg-primary/5' 
+                            : 'border-muted-foreground/20'
+                        }`}
                       >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1 flex-1">
-                            <CardTitle className="text-sm font-medium leading-tight">
-                              {demanda.titulo}
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                              {demanda.protocolo}
-                            </p>
+                        {columnDemandas.map((demanda, index) => (
+                          <Draggable key={demanda.id} draggableId={demanda.id} index={index}>
+                            {(provided, snapshot) => (
+                              <Card
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
+                                  snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
+                                }`}
+                                style={{
+                                  borderLeftColor: demanda.tipo === 'tarefa' ? (demanda as any).cor || '#3B82F6' : 'hsl(var(--primary))',
+                                  ...provided.draggableProps.style
+                                }}
+                                onClick={() => {
+                                  if (!snapshot.isDragging) {
+                                    if (demanda.tipo === 'tarefa') {
+                                      setSelectedTarefa(demanda);
+                                      setIsViewTarefaDialogOpen(true);
+                                    } else {
+                                      setSelectedDemanda(demanda);
+                                      setIsViewDialogOpen(true);
+                                    }
+                                  }
+                                }}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (demanda.tipo === 'tarefa') {
+                                      removerTarefaMutation.mutate(demanda.id);
+                                    } else {
+                                      removerDemandaMutation.mutate(demanda.id);
+                                    }
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                                
+                                <CardHeader className="pb-2">
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1 flex-1">
+                                      <CardTitle className="text-sm font-medium leading-tight">
+                                        {demanda.titulo}
+                                      </CardTitle>
+                                      <p className="text-xs text-muted-foreground">
+                                        {demanda.protocolo}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </CardHeader>
+                                
+                                <CardContent className="pt-0 space-y-2">
+                                  {demanda.descricao && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                      {demanda.descricao}
+                                    </p>
+                                  )}
+                                  
+                                  <div className="flex items-center justify-between">
+                                    <Badge 
+                                      variant="outline" 
+                                      style={{ 
+                                        borderColor: getPrioridadeColor(demanda.prioridade),
+                                        color: getPrioridadeColor(demanda.prioridade)
+                                      }}
+                                      className="text-xs"
+                                    >
+                                      {getPrioridadeLabel(demanda.prioridade)}
+                                    </Badge>
+                                    
+                                    {demanda.data_prazo && (
+                                      <div className={`flex items-center gap-1 text-xs ${
+                                        isOverdue(demanda.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
+                                      }`}>
+                                        <Calendar className="h-3 w-3" />
+                                        {formatDateTime(demanda.data_prazo)}
+                                        {isOverdue(demanda.data_prazo) && (
+                                          <AlertTriangle className="h-3 w-3 ml-1" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    {demanda.areas?.nome && (
+                                      <div className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        {demanda.areas.nome}
+                                      </div>
+                                    )}
+                                    
+                                    {demanda.municipes?.nome && (
+                                      <div className="flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        {demanda.municipes.nome}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id) && (
+                                    <div className="text-xs text-muted-foreground">
+                                      <strong>Responsável:</strong> {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id)}
+                                    </div>
+                                  )}
+                                  
+                                  {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                      <strong>Colaboradores:</strong> {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        
+                        {columnDemandas.length === 0 && (
+                          <div className="text-center text-muted-foreground py-8">
+                            Nenhum item nesta coluna
                           </div>
-                        </div>
-                      </CardHeader>
-                      
-                      <CardContent className="pt-0 space-y-2">
-                        {demanda.descricao && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {demanda.descricao}
-                          </p>
                         )}
-                        
-                        <div className="flex items-center justify-between">
-                          <Badge 
-                            variant="outline" 
-                            style={{ 
-                              borderColor: getPrioridadeColor(demanda.prioridade),
-                              color: getPrioridadeColor(demanda.prioridade)
-                            }}
-                            className="text-xs"
-                          >
-                            {getPrioridadeLabel(demanda.prioridade)}
-                          </Badge>
-                          
-                          {demanda.data_prazo && (
-                            <div className={`flex items-center gap-1 text-xs ${
-                              isOverdue(demanda.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
-                            }`}>
-                              <Calendar className="h-3 w-3" />
-                              {formatDateTime(demanda.data_prazo)}
-                              {isOverdue(demanda.data_prazo) && (
-                                <AlertTriangle className="h-3 w-3 ml-1" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          {demanda.areas?.nome && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {demanda.areas.nome}
-                            </div>
-                          )}
-                          
-                          {demanda.municipes?.nome && (
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {demanda.municipes.nome}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id) && (
-                          <div className="text-xs text-muted-foreground">
-                            <strong>Responsável:</strong> {getResponsavelNome(demanda.responsavel_id || demanda.tarefa_responsavel_id)}
-                          </div>
-                        )}
-                        
-                        {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            <strong>Colaboradores:</strong> {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                  
-                  {columnDemandas.length === 0 && (
-                    <div className="text-center text-muted-foreground py-8">
-                      Nenhum item nesta coluna
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
 
         {/* Dialogs */}
         <ViewDemandaDialog
