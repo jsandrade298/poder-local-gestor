@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +72,8 @@ export default function Kanban() {
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const isDraggingRef = useRef(false);
+  const processedTarefaRef = useRef<string | null>(null);
 
   // Buscar demandas e tarefas do kanban
   const { data: demandas = [], isLoading } = useQuery({
@@ -185,13 +187,22 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - CORRIGIDO LOOP INFINITO
+  // Detectar redirecionamento de notificação - PREVENINDO ABERTURA NO DRAG&DROP
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // Só executar se há parâmetro tarefa na URL, tem dados carregados e modal não está aberto
-    if (tarefaId && demandas.length > 0 && !isViewTarefaDialogOpen) {
+    // Só executar se há parâmetro tarefa na URL, tem dados carregados, modal não está aberto 
+    // E não está arrastando nem já processou esta tarefa
+    if (tarefaId && 
+        demandas.length > 0 && 
+        !isViewTarefaDialogOpen && 
+        !isDraggingRef.current &&
+        processedTarefaRef.current !== tarefaId) {
+      
       console.log('🔍 Processando redirecionamento para tarefa:', tarefaId);
+      
+      // Marcar como processada para evitar reprocessamento
+      processedTarefaRef.current = tarefaId;
       
       // Limpar a URL IMEDIATAMENTE para evitar loops
       window.history.replaceState({}, '', window.location.pathname);
@@ -223,6 +234,7 @@ export default function Kanban() {
             
             if (error || !tarefa) {
               console.log('❌ Tarefa não existe');
+              processedTarefaRef.current = null; // Reset para permitir nova tentativa
               return;
             }
             
@@ -237,6 +249,7 @@ export default function Kanban() {
             // Se o selectedUser atual não é o correto, ajustar
             if (selectedUserCorreto !== selectedUser) {
               console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
+              processedTarefaRef.current = null; // Reset para permitir processamento após mudança
               setSelectedUser(selectedUserCorreto);
               // A tarefa será encontrada na próxima execução do useEffect quando demandas recarregar
             } else {
@@ -245,11 +258,17 @@ export default function Kanban() {
             
           } catch (error) {
             logError('Erro ao processar redirecionamento:', error);
+            processedTarefaRef.current = null; // Reset em caso de erro
           }
         };
         
         buscarTarefaEspecifica();
       }
+    }
+    
+    // Limpar processamento quando modal fecha
+    if (!isViewTarefaDialogOpen && processedTarefaRef.current) {
+      processedTarefaRef.current = null;
     }
   }, [searchParams, demandas, selectedUser, isViewTarefaDialogOpen]);
 
@@ -418,21 +437,43 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      // Reset flag após atualização bem-sucedida
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 100);
+      // Reset flag após atualização bem-sucedida
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 100);
     },
     onError: (error) => {
       logError('Erro ao atualizar posição:', error);
       toast.error("Erro ao atualizar posição do item");
+      // Reset flag em caso de erro
+      isDraggingRef.current = false;
     }
   });
 
   const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
+    
+    // Marcar que está arrastando para evitar processamento de URL
+    isDraggingRef.current = true;
 
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    if (!destination) {
+      isDraggingRef.current = false;
+      return;
+    }
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+      isDraggingRef.current = false;
+      return;
+    }
 
     const item = demandas.find(d => d.id === draggableId);
-    if (!item) return;
+    if (!item) {
+      isDraggingRef.current = false;
+      return;
+    }
 
     updatePositionMutation.mutate({
       itemId: draggableId,
