@@ -189,10 +189,18 @@ export default function Kanban() {
     const tarefaId = urlParams.get('tarefa');
     
     if (tarefaId && demandas.length > 0) {
-      const tarefa = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
-      if (tarefa) {
-        setSelectedTarefa(tarefa);
+      // Buscar tanto em demandas quanto em tarefas
+      let tarefaEncontrada = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
+      
+      if (!tarefaEncontrada) {
+        // Se não encontrou nas demandas, buscar nas tarefas avulsas
+        tarefaEncontrada = demandas.find(d => d.id === tarefaId);
+      }
+      
+      if (tarefaEncontrada) {
+        setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
+        // Limpar o parâmetro da URL após abrir
         window.history.replaceState({}, '', window.location.pathname);
       }
     }
