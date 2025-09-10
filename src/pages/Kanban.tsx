@@ -185,13 +185,16 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - CORRIGIDO PARA FUNCIONAMENTO ADEQUADO
+  // Detectar redirecionamento de notificação - CORRIGIDO LOOP INFINITO
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // Executar se há parâmetro tarefa na URL e tem dados carregados
-    if (tarefaId && demandas.length > 0) {
+    // Só executar se há parâmetro tarefa na URL, tem dados carregados e modal não está aberto
+    if (tarefaId && demandas.length > 0 && !isViewTarefaDialogOpen) {
       console.log('🔍 Processando redirecionamento para tarefa:', tarefaId);
+      
+      // Limpar a URL IMEDIATAMENTE para evitar loops
+      window.history.replaceState({}, '', window.location.pathname);
       
       // Buscar a tarefa nos dados atuais
       const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
@@ -200,9 +203,6 @@ export default function Kanban() {
         console.log('✅ Tarefa encontrada, abrindo modal:', tarefaEncontrada.titulo);
         setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
-        
-        // Limpar a URL imediatamente após abrir o modal
-        window.history.replaceState({}, '', window.location.pathname);
       } else {
         console.log('🔄 Tarefa não encontrada, ajustando kanban...');
         
@@ -222,8 +222,7 @@ export default function Kanban() {
               .single();
             
             if (error || !tarefa) {
-              console.log('❌ Tarefa não existe, limpando URL');
-              window.history.replaceState({}, '', window.location.pathname);
+              console.log('❌ Tarefa não existe');
               return;
             }
             
@@ -239,23 +238,20 @@ export default function Kanban() {
             if (selectedUserCorreto !== selectedUser) {
               console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
               setSelectedUser(selectedUserCorreto);
-              // URL será limpa quando os dados recarregarem e a tarefa for encontrada
+              // A tarefa será encontrada na próxima execução do useEffect quando demandas recarregar
             } else {
-              // Se o selectedUser está correto mas a tarefa não foi encontrada, limpar URL
-              console.log('⚠️ Tarefa não encontrada no kanban atual, limpando URL');
-              window.history.replaceState({}, '', window.location.pathname);
+              console.log('⚠️ Tarefa não encontrada no kanban atual');
             }
             
           } catch (error) {
             logError('Erro ao processar redirecionamento:', error);
-            window.history.replaceState({}, '', window.location.pathname);
           }
         };
         
         buscarTarefaEspecifica();
       }
     }
-  }, [searchParams, demandas, selectedUser]);
+  }, [searchParams, demandas, selectedUser, isViewTarefaDialogOpen]);
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
