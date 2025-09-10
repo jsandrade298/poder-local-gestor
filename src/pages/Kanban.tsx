@@ -185,10 +185,11 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - corrigido para colaboradores
+  // Detectar redirecionamento de notificação - somente se há parâmetro na URL
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
+    // Só processar se realmente há um parâmetro tarefa na URL
     if (tarefaId) {
       const processarRedirecionamento = async () => {
         try {
