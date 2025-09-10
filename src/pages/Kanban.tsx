@@ -185,12 +185,12 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - CORRIGIDO DEFINITIVAMENTE
+  // Detectar redirecionamento de notificação - CORRIGIDO PARA FUNCIONAMENTO ADEQUADO
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // CRITÉRIO RIGOROSO: Só executar se há parâmetro tarefa E não há modal já aberto
-    if (tarefaId && !isViewTarefaDialogOpen && demandas.length > 0) {
+    // Executar se há parâmetro tarefa na URL e tem dados carregados
+    if (tarefaId && demandas.length > 0) {
       console.log('🔍 Processando redirecionamento para tarefa:', tarefaId);
       
       // Buscar a tarefa nos dados atuais
@@ -201,12 +201,12 @@ export default function Kanban() {
         setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
         
-        // Limpar a URL imediatamente
+        // Limpar a URL imediatamente após abrir o modal
         window.history.replaceState({}, '', window.location.pathname);
       } else {
         console.log('🔄 Tarefa não encontrada, ajustando kanban...');
         
-        // Buscar a tarefa e ajustar o selectedUser se necessário (apenas uma vez)
+        // Buscar a tarefa e ajustar o selectedUser se necessário
         const buscarTarefaEspecifica = async () => {
           try {
             const { data: user } = await supabase.auth.getUser();
@@ -255,7 +255,7 @@ export default function Kanban() {
         buscarTarefaEspecifica();
       }
     }
-  }, [searchParams, demandas, isViewTarefaDialogOpen, selectedUser]);
+  }, [searchParams, demandas, selectedUser]);
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
