@@ -70,10 +70,14 @@ export default function Kanban() {
   const [isEditTarefaDialogOpen, setIsEditTarefaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isDraggingRef = useRef(false);
-  const processedTarefaRef = useRef<string | null>(null);
+  
+  // Ref para controlar se já processamos o parâmetro da URL
+  const processedTaskIdRef = useRef<string | null>(null);
+  // Ref para prevenir processamento durante o fechamento do modal
+  const isClosingModalRef = useRef(false);
 
   // Buscar demandas e tarefas do kanban
   const { data: demandas = [], isLoading } = useQuery({
@@ -187,28 +191,36 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação APENAS AO CLICAR EM NOTIFICAÇÃO
+  // Detectar redirecionamento de notificação
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // CONDIÇÕES RÍGIDAS: só executar se há parâmetro tarefa E modal está fechado
-    if (tarefaId && !isViewTarefaDialogOpen && demandas.length > 0) {
-      console.log('🔍 Processando redirecionamento para tarefa:', tarefaId);
+    // Se estamos fechando o modal, não processar
+    if (isClosingModalRef.current) {
+      return;
+    }
+    
+    // Verificar se há tarefa ID na URL e se ainda não foi processado
+    if (tarefaId && tarefaId !== processedTaskIdRef.current && demandas.length > 0) {
+      console.log('🔍 Processando tarefa da notificação:', tarefaId);
       
-      // Limpar URL IMEDIATAMENTE para evitar loops
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.delete('tarefa');
-      window.history.replaceState({}, '', currentUrl.toString());
+      // Marcar como processado IMEDIATAMENTE
+      processedTaskIdRef.current = tarefaId;
+      
+      // Limpar o parâmetro da URL
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('tarefa');
+      setSearchParams(newSearchParams, { replace: true });
       
       // Buscar a tarefa nos dados atuais
-      const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
+      const tarefaEncontrada = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
       
       if (tarefaEncontrada) {
-        console.log('✅ Tarefa encontrada, abrindo modal:', tarefaEncontrada.titulo);
+        console.log('✅ Tarefa encontrada, abrindo modal');
         setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
       } else {
-        console.log('🔄 Tarefa não encontrada, ajustando kanban...');
+        console.log('🔄 Tarefa não encontrada no kanban atual, verificando se precisa mudar usuário');
         
         // Buscar a tarefa e ajustar o selectedUser se necessário
         const buscarTarefaEspecifica = async () => {
@@ -226,7 +238,8 @@ export default function Kanban() {
               .single();
             
             if (error || !tarefa) {
-              console.log('❌ Tarefa não existe');
+              console.log('❌ Tarefa não existe no banco');
+              toast.error("Tarefa não encontrada");
               return;
             }
             
@@ -242,19 +255,51 @@ export default function Kanban() {
             if (selectedUserCorreto !== selectedUser) {
               console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
               setSelectedUser(selectedUserCorreto);
+              // Aguardar o kanban recarregar com o novo usuário
+              // O modal será aberto na próxima renderização quando a tarefa estiver disponível
             } else {
-              console.log('⚠️ Tarefa não encontrada no kanban atual');
+              toast.error("Tarefa não encontrada neste kanban");
             }
             
           } catch (error) {
             logError('Erro ao processar redirecionamento:', error);
+            toast.error("Erro ao abrir tarefa");
           }
         };
         
         buscarTarefaEspecifica();
       }
     }
-  }, [searchParams.get('tarefa')]);
+    
+    // Se o parâmetro foi removido, limpar a referência
+    if (!tarefaId && processedTaskIdRef.current) {
+      processedTaskIdRef.current = null;
+    }
+  }, [searchParams, demandas, selectedUser]);
+
+  // Função para fechar o modal de tarefa com controle
+  const handleCloseViewTarefaDialog = (open: boolean) => {
+    if (!open) {
+      isClosingModalRef.current = true;
+      setIsViewTarefaDialogOpen(false);
+      setSelectedTarefa(null);
+      
+      // Limpar o parâmetro da URL se ainda existir
+      const tarefaId = searchParams.get('tarefa');
+      if (tarefaId) {
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('tarefa');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+      
+      // Resetar flag após um pequeno delay
+      setTimeout(() => {
+        isClosingModalRef.current = false;
+      }, 100);
+    } else {
+      setIsViewTarefaDialogOpen(true);
+    }
+  };
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
@@ -625,7 +670,7 @@ export default function Kanban() {
                                   ...provided.draggableProps.style
                                 }}
                                 onClick={() => {
-                                  if (!snapshot.isDragging) {
+                                  if (!snapshot.isDragging && !isDraggingRef.current) {
                                     if (demanda.tipo === 'tarefa') {
                                       setSelectedTarefa(demanda);
                                       setIsViewTarefaDialogOpen(true);
@@ -762,7 +807,7 @@ export default function Kanban() {
         <ViewTarefaDialog
           tarefa={selectedTarefa}
           open={isViewTarefaDialogOpen}
-          onOpenChange={setIsViewTarefaDialogOpen}
+          onOpenChange={handleCloseViewTarefaDialog}
           onEdit={() => handleEditTarefa(selectedTarefa!)}
         />
 
