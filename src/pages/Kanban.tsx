@@ -185,7 +185,7 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - igual ao padrão da agenda
+  // Detectar redirecionamento de notificação - ajustado para colaboradores
   useEffect(() => {
     // Processar redirecionamento de notificação
     const tarefaId = searchParams.get('tarefa');
@@ -198,30 +198,43 @@ export default function Kanban() {
         setSelectedTarefa(tarefaEncontrada);
         setIsViewTarefaDialogOpen(true);
         
-        // Ajustar o selectedUser para corresponder ao kanban_type da tarefa se necessário
-        if (tarefaEncontrada.kanban_type && tarefaEncontrada.kanban_type !== selectedUser) {
-          setSelectedUser(tarefaEncontrada.kanban_type);
-        }
-        
         // Limpar os parâmetros da URL após o redirecionamento
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       } else {
-        // Se não encontrou, pode ser porque o selectedUser está errado
-        // Buscar a tarefa diretamente no banco para determinar o kanban_type correto
+        // Se não encontrou, buscar a tarefa e verificar se o usuário é colaborador
         const buscarTarefaEspecifica = async () => {
           try {
+            const { data: user } = await supabase.auth.getUser();
+            if (!user?.user?.id) return;
+            
             const { data: tarefa, error } = await supabase
               .from('tarefas')
-              .select('kanban_type')
+              .select(`
+                *,
+                tarefa_colaboradores(colaborador_id)
+              `)
               .eq('id', tarefaId)
               .single();
             
-            if (!error && tarefa && tarefa.kanban_type !== selectedUser) {
+            if (error || !tarefa) {
+              logError('Erro ao buscar tarefa específica:', error);
+              return;
+            }
+            
+            // Verificar se o usuário atual é colaborador
+            const isColaborador = tarefa.tarefa_colaboradores?.some(
+              (tc: any) => tc.colaborador_id === user.user.id
+            );
+            
+            // Se é colaborador, manter o kanban atual
+            // Se não é colaborador (é o responsável/criador), mudar para o kanban da tarefa
+            if (!isColaborador && tarefa.kanban_type !== selectedUser) {
               setSelectedUser(tarefa.kanban_type);
             }
+            
           } catch (error) {
-            logError('Erro ao buscar tarefa específica:', error);
+            logError('Erro ao processar tarefa da URL:', error);
           }
         };
         
