@@ -187,25 +187,18 @@ export default function Kanban() {
     }
   });
 
-  // Detectar redirecionamento de notificação - PREVENINDO ABERTURA NO DRAG&DROP
+  // Detectar redirecionamento de notificação APENAS AO CLICAR EM NOTIFICAÇÃO
   useEffect(() => {
     const tarefaId = searchParams.get('tarefa');
     
-    // Só executar se há parâmetro tarefa na URL, tem dados carregados, modal não está aberto 
-    // E não está arrastando nem já processou esta tarefa
-    if (tarefaId && 
-        demandas.length > 0 && 
-        !isViewTarefaDialogOpen && 
-        !isDraggingRef.current &&
-        processedTarefaRef.current !== tarefaId) {
-      
+    // CONDIÇÕES RÍGIDAS: só executar se há parâmetro tarefa E modal está fechado
+    if (tarefaId && !isViewTarefaDialogOpen && demandas.length > 0) {
       console.log('🔍 Processando redirecionamento para tarefa:', tarefaId);
       
-      // Marcar como processada para evitar reprocessamento
-      processedTarefaRef.current = tarefaId;
-      
-      // Limpar a URL IMEDIATAMENTE para evitar loops
-      window.history.replaceState({}, '', window.location.pathname);
+      // Limpar URL IMEDIATAMENTE para evitar loops
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete('tarefa');
+      window.history.replaceState({}, '', currentUrl.toString());
       
       // Buscar a tarefa nos dados atuais
       const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
@@ -234,7 +227,6 @@ export default function Kanban() {
             
             if (error || !tarefa) {
               console.log('❌ Tarefa não existe');
-              processedTarefaRef.current = null; // Reset para permitir nova tentativa
               return;
             }
             
@@ -249,28 +241,20 @@ export default function Kanban() {
             // Se o selectedUser atual não é o correto, ajustar
             if (selectedUserCorreto !== selectedUser) {
               console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
-              processedTarefaRef.current = null; // Reset para permitir processamento após mudança
               setSelectedUser(selectedUserCorreto);
-              // A tarefa será encontrada na próxima execução do useEffect quando demandas recarregar
             } else {
               console.log('⚠️ Tarefa não encontrada no kanban atual');
             }
             
           } catch (error) {
             logError('Erro ao processar redirecionamento:', error);
-            processedTarefaRef.current = null; // Reset em caso de erro
           }
         };
         
         buscarTarefaEspecifica();
       }
     }
-    
-    // Limpar processamento quando modal fecha
-    if (!isViewTarefaDialogOpen && processedTarefaRef.current) {
-      processedTarefaRef.current = null;
-    }
-  }, [searchParams, demandas, selectedUser, isViewTarefaDialogOpen]);
+  }, [searchParams.get('tarefa')]);
 
   // Mutation para limpar kanban
   const limparKanbanMutation = useMutation({
@@ -437,11 +421,6 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      // Reset flag após atualização bem-sucedida
-      setTimeout(() => {
-        isDraggingRef.current = false;
-      }, 100);
-      // Reset flag após atualização bem-sucedida
       setTimeout(() => {
         isDraggingRef.current = false;
       }, 100);
@@ -457,7 +436,6 @@ export default function Kanban() {
   const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
     
-    // Marcar que está arrastando para evitar processamento de URL
     isDraggingRef.current = true;
 
     if (!destination) {
