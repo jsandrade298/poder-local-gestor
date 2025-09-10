@@ -183,19 +183,51 @@ export default function Kanban() {
     }
   });
 
-  // Detectar parâmetro de tarefa na URL
+  // Detectar parâmetro de tarefa na URL e ajustar o selectedUser se necessário
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tarefaId = urlParams.get('tarefa');
+    
+    if (tarefaId) {
+      // Buscar a tarefa diretamente no banco para determinar o kanban_type correto
+      const buscarTarefaEspecifica = async () => {
+        try {
+          const { data: tarefa, error } = await supabase
+            .from('tarefas')
+            .select('*')
+            .eq('id', tarefaId)
+            .single();
+          
+          if (error) {
+            logError('Erro ao buscar tarefa específica:', error);
+            return;
+          }
+          
+          if (tarefa) {
+            // Ajustar o selectedUser para corresponder ao kanban_type da tarefa
+            if (tarefa.kanban_type !== selectedUser) {
+              setSelectedUser(tarefa.kanban_type);
+            }
+            
+            // A tarefa será encontrada automaticamente após a query ser recarregada
+            // com o selectedUser correto
+          }
+        } catch (error) {
+          logError('Erro ao processar tarefa da URL:', error);
+        }
+      };
+      
+      buscarTarefaEspecifica();
+    }
+  }, []);
+
+  // Separar useEffect para abrir a tarefa após os dados serem carregados
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tarefaId = urlParams.get('tarefa');
     
     if (tarefaId && demandas.length > 0) {
-      // Buscar tanto em demandas quanto em tarefas
-      let tarefaEncontrada = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
-      
-      if (!tarefaEncontrada) {
-        // Se não encontrou nas demandas, buscar nas tarefas avulsas
-        tarefaEncontrada = demandas.find(d => d.id === tarefaId);
-      }
+      const tarefaEncontrada = demandas.find(d => d.id === tarefaId);
       
       if (tarefaEncontrada) {
         setSelectedTarefa(tarefaEncontrada);
