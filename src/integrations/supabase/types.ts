@@ -1314,6 +1314,10 @@ export type Database = {
         Args: { curlopt: string; value: string }
         Returns: boolean
       }
+      is_tarefa_colaborador: {
+        Args: { tarefa_id_param: string; user_id_param: string }
+        Returns: boolean
+      }
       text_to_bytea: {
         Args: { data: string }
         Returns: string
