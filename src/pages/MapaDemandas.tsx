@@ -28,8 +28,6 @@ interface DemandaMapa {
   numero: string | null;
   cidade: string | null;
   area_id: string | null;
-  areas: { nome: string } | null;
-  municipes: { nome_completo: string } | null;
 }
 
 const STATUS_OPTIONS = [
@@ -65,67 +63,63 @@ export default function MapaDemandas() {
         .select('id, nome')
         .order('nome');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar áreas:', error);
+        return [];
+      }
       return data || [];
     }
   });
 
-  // Buscar TODAS as demandas e filtrar no JavaScript
-  const { data: todasDemandas, isLoading: loadingDemandas, refetch } = useQuery({
-    queryKey: ['demandas-mapa-todas'],
+  // Query simplificada - busca apenas campos básicos
+  const { data: todasDemandas, isLoading: loadingDemandas, refetch, error: queryError } = useQuery({
+    queryKey: ['demandas-mapa-simples'],
     queryFn: async () => {
+      console.log('Buscando demandas...');
+      
+      // Query muito simples, sem relacionamentos
       const { data, error } = await supabase
         .from('demandas')
-        .select(`
-          id,
-          titulo,
-          descricao,
-          status,
-          prioridade,
-          protocolo,
-          bairro,
-          logradouro,
-          numero,
-          cidade,
-          area_id,
-          areas (nome),
-          municipes (nome_completo)
-        `)
+        .select('id, titulo, descricao, status, prioridade, protocolo, bairro, logradouro, numero, cidade, area_id')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na query de demandas:', error);
+        throw error;
+      }
       
-      // Buscar as coordenadas separadamente (query raw)
-      const { data: coordenadas, error: coordError } = await supabase
-        .rpc('get_demandas_com_coordenadas');
+      console.log('Demandas encontradas:', data?.length || 0);
       
-      if (coordError) {
-        // Se a função não existir, tenta buscar direto
-        console.log('Buscando coordenadas diretamente...');
-        const { data: rawData } = await supabase
-          .from('demandas')
-          .select('id, latitude, longitude');
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Buscar coordenadas separadamente com query raw
+      const ids = data.map(d => d.id);
+      
+      try {
+        const { data: coordData, error: coordError } = await supabase
+          .rpc('buscar_coordenadas_demandas', { demanda_ids: ids });
         
-        // Mesclar os dados
-        return (data || []).map(d => {
-          const coord = rawData?.find(c => c.id === d.id);
+        if (coordError) {
+          console.log('Função RPC não existe, tentando alternativa...');
+          // Tentar buscar direto (pode falhar se tipos não estiverem atualizados)
+          return data.map(d => ({ ...d, latitude: null, longitude: null }));
+        }
+        
+        // Combinar dados
+        return data.map(d => {
+          const coord = coordData?.find((c: any) => c.id === d.id);
           return {
             ...d,
             latitude: coord?.latitude || null,
             longitude: coord?.longitude || null
           };
         });
+      } catch (e) {
+        console.log('Erro ao buscar coordenadas, retornando sem elas');
+        return data.map(d => ({ ...d, latitude: null, longitude: null }));
       }
-      
-      // Mesclar os dados
-      return (data || []).map(d => {
-        const coord = coordenadas?.find((c: any) => c.id === d.id);
-        return {
-          ...d,
-          latitude: coord?.latitude || null,
-          longitude: coord?.longitude || null
-        };
-      });
     }
   });
 
@@ -150,22 +144,15 @@ export default function MapaDemandas() {
     if (!demandas) return [];
 
     return demandas.filter(demanda => {
-      // Filtro de status
       if (statusFilter !== 'todos' && demanda.status !== statusFilter) {
         return false;
       }
-
-      // Filtro de área
       if (areaFilter !== 'todas' && demanda.area_id !== areaFilter) {
         return false;
       }
-
-      // Filtro de bairro
       if (bairroFilter !== 'todos' && demanda.bairro !== bairroFilter) {
         return false;
       }
-
-      // Filtro de busca
       if (searchTerm) {
         const termo = searchTerm.toLowerCase();
         const matchTitulo = demanda.titulo?.toLowerCase().includes(termo);
@@ -177,7 +164,6 @@ export default function MapaDemandas() {
           return false;
         }
       }
-
       return true;
     });
   }, [demandas, statusFilter, areaFilter, bairroFilter, searchTerm]);
@@ -215,7 +201,6 @@ export default function MapaDemandas() {
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-
     return { total, porStatus };
   }, [demandasFiltradas]);
 
@@ -239,12 +224,22 @@ export default function MapaDemandas() {
                 {estado && `/${estado}`}
               </p>
             </div>
-
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
           </div>
+
+          {/* Mostrar erro se houver */}
+          {queryError && (
+            <Card className="border-red-300 bg-red-50">
+              <CardContent className="p-4">
+                <p className="text-red-700 text-sm">
+                  Erro ao carregar demandas: {(queryError as Error).message}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-3">
@@ -264,7 +259,6 @@ export default function MapaDemandas() {
                     className="pl-9"
                   />
                 </div>
-
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Status" />
@@ -277,7 +271,6 @@ export default function MapaDemandas() {
                     ))}
                   </SelectContent>
                 </Select>
-
                 <Select value={areaFilter} onValueChange={setAreaFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Área" />
@@ -291,7 +284,6 @@ export default function MapaDemandas() {
                     ))}
                   </SelectContent>
                 </Select>
-
                 <Select value={bairroFilter} onValueChange={setBairroFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Bairro" />
@@ -306,7 +298,6 @@ export default function MapaDemandas() {
                   </SelectContent>
                 </Select>
               </div>
-
               {(statusFilter !== 'todos' || areaFilter !== 'todas' || bairroFilter !== 'todos' || searchTerm) && (
                 <div className="mt-3">
                   <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -358,6 +349,9 @@ export default function MapaDemandas() {
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
                     Total de demandas no sistema: {todasDemandas?.length || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Demandas com coordenadas: {demandas?.length || 0}
                   </p>
                 </div>
               ) : (
