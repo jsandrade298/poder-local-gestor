@@ -12,7 +12,8 @@ import {
   Calendar,
   Bot,
   MessageCircle,
-  Target
+  Target,
+  MapPin
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -31,6 +32,7 @@ import {
 const menuItems = [
   { title: "Visão Geral", url: "/", icon: Home },
   { title: "Demandas", url: "/demandas", icon: FileText },
+  { title: "Mapa", url: "/mapa-demandas", icon: MapPin },
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Kanban", url: "/kanban", icon: Columns },
   { title: "Plano de Ação", url: "/plano-acao", icon: Target },
