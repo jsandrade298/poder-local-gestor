@@ -70,10 +70,11 @@ export default function MapaDemandas() {
     }
   });
 
-  const { data: demandas, isLoading: loadingDemandas, refetch } = useQuery({
-    queryKey: ['demandas-mapa', statusFilter, areaFilter],
-    queryFn: async (): Promise<DemandaMapa[]> => {
-      let query = supabase
+  // Buscar TODAS as demandas e filtrar no JavaScript
+  const { data: todasDemandas, isLoading: loadingDemandas, refetch } = useQuery({
+    queryKey: ['demandas-mapa-todas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('demandas')
         .select(`
           id,
@@ -82,8 +83,6 @@ export default function MapaDemandas() {
           status,
           prioridade,
           protocolo,
-          latitude,
-          longitude,
           bairro,
           logradouro,
           numero,
@@ -92,38 +91,81 @@ export default function MapaDemandas() {
           areas (nome),
           municipes (nome_completo)
         `)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-
-      if (statusFilter !== 'todos') {
-        query = query.eq('status', statusFilter);
-      }
-
-      if (areaFilter !== 'todas') {
-        query = query.eq('area_id', areaFilter);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return (data || []) as DemandaMapa[];
+      
+      // Buscar as coordenadas separadamente (query raw)
+      const { data: coordenadas, error: coordError } = await supabase
+        .rpc('get_demandas_com_coordenadas');
+      
+      if (coordError) {
+        // Se a função não existir, tenta buscar direto
+        console.log('Buscando coordenadas diretamente...');
+        const { data: rawData } = await supabase
+          .from('demandas')
+          .select('id, latitude, longitude');
+        
+        // Mesclar os dados
+        return (data || []).map(d => {
+          const coord = rawData?.find(c => c.id === d.id);
+          return {
+            ...d,
+            latitude: coord?.latitude || null,
+            longitude: coord?.longitude || null
+          };
+        });
+      }
+      
+      // Mesclar os dados
+      return (data || []).map(d => {
+        const coord = coordenadas?.find((c: any) => c.id === d.id);
+        return {
+          ...d,
+          latitude: coord?.latitude || null,
+          longitude: coord?.longitude || null
+        };
+      });
     }
   });
+
+  // Filtrar apenas demandas COM coordenadas válidas
+  const demandas = useMemo(() => {
+    if (!todasDemandas) return [];
+    return todasDemandas.filter(d => 
+      d.latitude !== null && 
+      d.longitude !== null &&
+      !isNaN(Number(d.latitude)) &&
+      !isNaN(Number(d.longitude))
+    ) as DemandaMapa[];
+  }, [todasDemandas]);
 
   const bairrosUnicos = useMemo(() => {
     if (!demandas) return [];
     const bairros = new Set(demandas.map(d => d.bairro).filter(Boolean));
-    return Array.from(bairros).sort();
+    return Array.from(bairros).sort() as string[];
   }, [demandas]);
 
   const demandasFiltradas = useMemo(() => {
     if (!demandas) return [];
 
     return demandas.filter(demanda => {
-      if (bairroFilter && bairroFilter !== 'todos' && demanda.bairro !== bairroFilter) {
+      // Filtro de status
+      if (statusFilter !== 'todos' && demanda.status !== statusFilter) {
         return false;
       }
-      
+
+      // Filtro de área
+      if (areaFilter !== 'todas' && demanda.area_id !== areaFilter) {
+        return false;
+      }
+
+      // Filtro de bairro
+      if (bairroFilter !== 'todos' && demanda.bairro !== bairroFilter) {
+        return false;
+      }
+
+      // Filtro de busca
       if (searchTerm) {
         const termo = searchTerm.toLowerCase();
         const matchTitulo = demanda.titulo?.toLowerCase().includes(termo);
@@ -138,13 +180,13 @@ export default function MapaDemandas() {
 
       return true;
     });
-  }, [demandas, bairroFilter, searchTerm]);
+  }, [demandas, statusFilter, areaFilter, bairroFilter, searchTerm]);
 
   const markers: MapMarker[] = useMemo(() => {
     return demandasFiltradas.map(demanda => ({
       id: demanda.id,
-      latitude: demanda.latitude!,
-      longitude: demanda.longitude!,
+      latitude: Number(demanda.latitude),
+      longitude: Number(demanda.longitude),
       title: demanda.titulo,
       description: `${demanda.bairro || 'Sem bairro'} - ${demanda.protocolo}`,
       status: demanda.status || 'aberta'
@@ -312,9 +354,10 @@ export default function MapaDemandas() {
                   <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium">Nenhuma demanda com localização</h3>
                   <p className="text-muted-foreground mt-1 max-w-md">
-                    {demandas && demandas.length > 0 
-                      ? 'As demandas existentes não possuem coordenadas geográficas. Ao cadastrar novas demandas com endereço completo, elas aparecerão no mapa.'
-                      : 'Não há demandas cadastradas com coordenadas geográficas.'}
+                    As demandas precisam ter latitude e longitude preenchidas para aparecer no mapa.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Total de demandas no sistema: {todasDemandas?.length || 0}
                   </p>
                 </div>
               ) : (
