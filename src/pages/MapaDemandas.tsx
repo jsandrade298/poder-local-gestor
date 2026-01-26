@@ -44,7 +44,7 @@ const STATUS_OPTIONS = [
 export default function MapaDemandas() {
   const [statusFilter, setStatusFilter] = useState('todos');
   const [areaFilter, setAreaFilter] = useState('todas');
-  const [bairroFilter, setBairroFilter] = useState('');
+  const [bairroFilter, setBairroFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDemanda, setSelectedDemanda] = useState<DemandaMapa | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
@@ -120,10 +120,10 @@ export default function MapaDemandas() {
     if (!demandas) return [];
 
     return demandas.filter(demanda => {
-      if (bairroFilter && demanda.bairro !== bairroFilter) {
+      if (bairroFilter && bairroFilter !== 'todos' && demanda.bairro !== bairroFilter) {
         return false;
       }
-
+      
       if (searchTerm) {
         const termo = searchTerm.toLowerCase();
         const matchTitulo = demanda.titulo?.toLowerCase().includes(termo);
@@ -162,7 +162,7 @@ export default function MapaDemandas() {
   const clearFilters = () => {
     setStatusFilter('todos');
     setAreaFilter('todas');
-    setBairroFilter('');
+    setBairroFilter('todos');
     setSearchTerm('');
   };
 
@@ -255,7 +255,7 @@ export default function MapaDemandas() {
                     <SelectValue placeholder="Bairro" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os Bairros</SelectItem>
+                    <SelectItem value="todos">Todos os Bairros</SelectItem>
                     {bairrosUnicos.map(bairro => (
                       <SelectItem key={bairro} value={bairro}>
                         {bairro}
@@ -265,7 +265,7 @@ export default function MapaDemandas() {
                 </Select>
               </div>
 
-              {(statusFilter !== 'todos' || areaFilter !== 'todas' || bairroFilter || searchTerm) && (
+              {(statusFilter !== 'todos' || areaFilter !== 'todas' || bairroFilter !== 'todos' || searchTerm) && (
                 <div className="mt-3">
                   <Button variant="ghost" size="sm" onClick={clearFilters}>
                     <X className="h-4 w-4 mr-1" />
