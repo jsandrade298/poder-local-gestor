@@ -52,22 +52,24 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'aberta': return 'Aberta';
-      case 'em_andamento': return 'Em Andamento';
-      case 'aguardando': return 'Aguardando';
-      case 'resolvida': return 'Resolvida';
-      case 'cancelada': return 'Cancelada';
+      case 'solicitada': return 'Solicitada';
+      case 'em_producao': return 'Em Produção';
+      case 'encaminhado': return 'Encaminhado';
+      case 'atendido': return 'Atendido';
+      case 'devolvido': return 'Devolvido';
+      case 'visitado': return 'Visitado';
       default: return status;
     }
   };
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'aberta': return 'default';
-      case 'em_andamento': return 'secondary';
-      case 'aguardando': return 'outline';
-      case 'resolvida': return 'default';
-      case 'cancelada': return 'destructive';
+      case 'solicitada': return 'default';
+      case 'em_producao': return 'secondary';
+      case 'encaminhado': return 'outline';
+      case 'atendido': return 'default';
+      case 'devolvido': return 'destructive';
+      case 'visitado': return 'secondary';
       default: return 'secondary';
     }
   };
