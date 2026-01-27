@@ -400,10 +400,10 @@ export function NovoMunicipeDialog() {
                 <Input
                   id="complemento"
                   value={formData.complemento}
-                    onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
-                    placeholder="Apt, Bloco, etc."
-                  />
-                </div>
+                  onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
+                  placeholder="Apt, Bloco, etc."
+                />
+              </div>
 
               {/* Geolocalização */}
               <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
@@ -433,7 +433,6 @@ export function NovoMunicipeDialog() {
                     Preencha o endereço e clique em "Obter Coordenadas" para localizar no mapa.
                   </p>
                 )}
-              </div>
               </div>
             </div>
 
