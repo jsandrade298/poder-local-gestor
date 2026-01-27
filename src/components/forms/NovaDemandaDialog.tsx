@@ -401,22 +401,20 @@ export function NovaDemandaDialog() {
               <div className="space-y-2">
                 <Label htmlFor="area">Área</Label>
                 <Select
-                  value={formData.status}
-                  onValueChange={(value: "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido") => 
-                    setFormData(prev => ({ ...prev, status: value }))
+                  value={formData.area_id}
+                  onValueChange={(value) => 
+                    setFormData(prev => ({ ...prev, area_id: value }))
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione uma área" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="em_producao">Em Produção</SelectItem>
-                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
-                    <SelectItem value="devolvido">Devolvido</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
-                    <SelectItem value="atendido">Atendido</SelectItem>
+                    {areas.map((area) => (
+                      <SelectItem key={area.id} value={area.id}>
+                        {area.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
