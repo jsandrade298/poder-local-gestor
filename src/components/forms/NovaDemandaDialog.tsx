@@ -17,7 +17,7 @@ export function NovaDemandaDialog() {
   const [files, setFiles] = useState<File[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const [showMunicipeDropdown, setShowMunicipeDropdown] = useState(false);
-  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null; fonte: string | null }>({ lat: null, lng: null, fonte: null });
   const [enderecoPreenchido, setEnderecoPreenchido] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -99,7 +99,7 @@ export function NovaDemandaDialog() {
       }));
 
       if (resultado.latitude && resultado.longitude) {
-        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude, fonte: resultado.fonteGeo });
         setEnderecoPreenchido(true);
         toast({
           title: "Endereço encontrado!",
@@ -127,7 +127,7 @@ export function NovaDemandaDialog() {
     const cepFormatado = formatarCep(value);
     setFormData(prev => ({ ...prev, cep: cepFormatado }));
     setEnderecoPreenchido(false);
-    setCoordenadas({ lat: null, lng: null });
+    setCoordenadas({ lat: null, lng: null, fonte: null });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,7 +266,7 @@ export function NovaDemandaDialog() {
     setFiles([]);
     setSearchMunicipe("");
     setShowMunicipeDropdown(false);
-    setCoordenadas({ lat: null, lng: null });
+    setCoordenadas({ lat: null, lng: null, fonte: null });
     setEnderecoPreenchido(false);
     setFormData({
       titulo: "",
@@ -496,11 +496,18 @@ export function NovaDemandaDialog() {
               </div>
             </div>
 
-            {/* Indicador de coordenadas */}
+           {/* Indicador de coordenadas */}
             {coordenadas.lat && coordenadas.lng && (
               <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded-md">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Localização mapeada: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}</span>
+                <span>
+                  Localização mapeada: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
+                  {coordenadas.fonte && (
+                    <span className="text-xs text-green-500 ml-2">
+                      (via {coordenadas.fonte === 'brasilapi' ? 'BrasilAPI' : 'OpenStreetMap'})
+                    </span>
+                  )}
+                </span>
               </div>
             )}
             
