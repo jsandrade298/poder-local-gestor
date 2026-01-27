@@ -4,11 +4,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 interface AreaChartProps {
   data: Array<{
     name: string;
-    aberta: number;
-    em_andamento: number;
-    aguardando: number;
-    resolvida: number;
-    cancelada: number;
+    solicitada: number;
+    em_producao: number;
+    encaminhado: number;
+    devolvido: number;
+    visitado: number;
+    atendido: number;
     total: number;
   }>;
 }
@@ -50,34 +51,40 @@ export function AreaChart({ data }: AreaChartProps) {
               />
               <Legend />
               <Bar 
-                dataKey="aberta"
+                dataKey="solicitada"
                 stackId="a"
                 fill="#3b82f6"
-                name="Aberta"
+                name="Solicitada"
               />
               <Bar 
-                dataKey="em_andamento"
+                dataKey="em_producao"
                 stackId="a"
                 fill="#f59e0b"
-                name="Em Andamento"
+                name="Em Produção"
               />
               <Bar 
-                dataKey="aguardando"
+                dataKey="encaminhado"
                 stackId="a"
                 fill="#8b5cf6"
-                name="Aguardando"
+                name="Encaminhado"
               />
               <Bar 
-                dataKey="resolvida"
-                stackId="a"
-                fill="#10b981"
-                name="Resolvida"
-              />
-              <Bar 
-                dataKey="cancelada"
+                dataKey="devolvido"
                 stackId="a"
                 fill="#ef4444"
-                name="Cancelada"
+                name="Devolvido"
+              />
+              <Bar 
+                dataKey="visitado"
+                stackId="a"
+                fill="#06b6d4"
+                name="Visitado"
+              />
+              <Bar 
+                dataKey="atendido"
+                stackId="a"
+                fill="#10b981"
+                name="Atendido"
               />
             </BarChart>
           </ResponsiveContainer>
