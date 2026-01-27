@@ -1332,11 +1332,12 @@ export type Database = {
       prioridade_demanda: "baixa" | "media" | "alta" | "urgente"
       status_agenda: "pendente" | "confirmado" | "recusado" | "remarcar"
       status_demanda:
-        | "aberta"
-        | "em_andamento"
-        | "aguardando"
-        | "resolvida"
-        | "cancelada"
+        | "solicitada"
+        | "visitado"
+        | "em_producao"
+        | "encaminhado"
+        | "atendido"
+        | "devolvido"
     }
     CompositeTypes: {
       http_header: {
@@ -1484,11 +1485,12 @@ export const Constants = {
       prioridade_demanda: ["baixa", "media", "alta", "urgente"],
       status_agenda: ["pendente", "confirmado", "recusado", "remarcar"],
       status_demanda: [
-        "aberta",
-        "em_andamento",
-        "aguardando",
-        "resolvida",
-        "cancelada",
+        "solicitada",
+        "visitado",
+        "em_producao",
+        "encaminhado",
+        "atendido",
+        "devolvido",
       ],
     },
   },
