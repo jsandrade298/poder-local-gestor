@@ -27,7 +27,7 @@ export function NovaDemandaDialog() {
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "aberta" as "aberta" | "em_andamento" | "aguardando" | "resolvida" | "cancelada",
+    status: "solicitada" as "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -275,7 +275,7 @@ export function NovaDemandaDialog() {
       area_id: "",
       prioridade: "media",
       responsavel_id: "",
-      status: "aberta",
+      status: "solicitada",
       data_prazo: "",
       logradouro: "",
       numero: "",
@@ -401,37 +401,21 @@ export function NovaDemandaDialog() {
               <div className="space-y-2">
                 <Label htmlFor="area">Área</Label>
                 <Select
-                  value={formData.area_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, area_id: value }))}
+                  value={formData.status}
+                  onValueChange={(value: "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido") => 
+                    setFormData(prev => ({ ...prev, status: value }))
+                  }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione a área" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="responsavel">Responsável</Label>
-                <Select
-                  value={formData.responsavel_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {usuarios.map((usuario) => (
-                      <SelectItem key={usuario.id} value={usuario.id}>
-                        {usuario.nome}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="solicitada">Solicitada</SelectItem>
+                    <SelectItem value="em_producao">Em Produção</SelectItem>
+                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
+                    <SelectItem value="devolvido">Devolvido</SelectItem>
+                    <SelectItem value="visitado">Visitado</SelectItem>
+                    <SelectItem value="atendido">Atendido</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
