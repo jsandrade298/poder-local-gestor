@@ -29,11 +29,12 @@ interface DemandaMapa {
 
 const STATUS_OPTIONS = [
   { value: 'todos', label: 'Todos os Status' },
-  { value: 'aberta', label: 'Aberta' },
-  { value: 'em_andamento', label: 'Em Andamento' },
-  { value: 'aguardando', label: 'Aguardando' },
-  { value: 'resolvida', label: 'Resolvida' },
-  { value: 'cancelada', label: 'Cancelada' }
+  { value: 'solicitada', label: 'Solicitada' },
+  { value: 'em_producao', label: 'Em Produção' },
+  { value: 'encaminhado', label: 'Encaminhado' },
+  { value: 'devolvido', label: 'Devolvido' },
+  { value: 'visitado', label: 'Visitado' },
+  { value: 'atendido', label: 'Atendido' }
 ];
 
 export default function MapaDemandas() {
@@ -141,7 +142,7 @@ export default function MapaDemandas() {
       longitude: Number(demanda.longitude),
       title: demanda.titulo,
       description: `${demanda.bairro || 'Sem bairro'} - ${demanda.protocolo}`,
-      status: demanda.status || 'aberta'
+      status: demanda.status || 'solicitada'
     }));
   }, [demandasFiltradas]);
 
@@ -270,33 +271,37 @@ export default function MapaDemandas() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card className="p-3">
-          <div className="text-2xl font-bold">{stats.total}</div>
-          <div className="text-xs text-muted-foreground">Total no mapa</div>
-        </Card>
-        <Card className="p-3 border-l-4 border-l-blue-500">
-          <div className="text-2xl font-bold">{stats.porStatus.aberta || 0}</div>
-          <div className="text-xs text-muted-foreground">Abertas</div>
-        </Card>
-        <Card className="p-3 border-l-4 border-l-amber-500">
-          <div className="text-2xl font-bold">{stats.porStatus.em_andamento || 0}</div>
-          <div className="text-xs text-muted-foreground">Em Andamento</div>
-        </Card>
-        <Card className="p-3 border-l-4 border-l-purple-500">
-          <div className="text-2xl font-bold">{stats.porStatus.aguardando || 0}</div>
-          <div className="text-xs text-muted-foreground">Aguardando</div>
-        </Card>
-        <Card className="p-3 border-l-4 border-l-green-500">
-          <div className="text-2xl font-bold">{stats.porStatus.resolvida || 0}</div>
-          <div className="text-xs text-muted-foreground">Resolvidas</div>
-        </Card>
-        <Card className="p-3 border-l-4 border-l-red-500">
-          <div className="text-2xl font-bold">{stats.porStatus.cancelada || 0}</div>
-          <div className="text-xs text-muted-foreground">Canceladas</div>
-        </Card>
-      </div>
-
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            <Card className="p-3">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-xs text-muted-foreground">Total</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-blue-500">
+              <div className="text-2xl font-bold">{stats.porStatus.solicitada || 0}</div>
+              <div className="text-xs text-muted-foreground">Solicitadas</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-amber-500">
+              <div className="text-2xl font-bold">{stats.porStatus.em_producao || 0}</div>
+              <div className="text-xs text-muted-foreground">Em Produção</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-purple-500">
+              <div className="text-2xl font-bold">{stats.porStatus.encaminhado || 0}</div>
+              <div className="text-xs text-muted-foreground">Encaminhados</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-cyan-500">
+              <div className="text-2xl font-bold">{stats.porStatus.visitado || 0}</div>
+              <div className="text-xs text-muted-foreground">Visitados</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-green-500">
+              <div className="text-2xl font-bold">{stats.porStatus.atendido || 0}</div>
+              <div className="text-xs text-muted-foreground">Atendidos</div>
+            </Card>
+            <Card className="p-3 border-l-4 border-l-red-500">
+              <div className="text-2xl font-bold">{stats.porStatus.devolvido || 0}</div>
+              <div className="text-xs text-muted-foreground">Devolvidos</div>
+            </Card>
+          </div>
+      
       <Card className="flex-1 relative z-10">
         <CardContent className="p-4">
           {isLoading ? (
