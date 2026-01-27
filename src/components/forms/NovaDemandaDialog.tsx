@@ -420,6 +420,27 @@ export function NovaDemandaDialog() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="responsavel">Responsável</Label>
+                <Select
+                  value={formData.responsavel_id}
+                  onValueChange={(value) => 
+                    setFormData(prev => ({ ...prev, responsavel_id: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {usuarios.map((usuario) => (
+                      <SelectItem key={usuario.id} value={usuario.id}>
+                        {usuario.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
