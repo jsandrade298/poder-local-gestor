@@ -73,8 +73,7 @@ export default function Demandas() {
             .select(`
               *,
               areas(nome),
-              municipes(nome),
-              responsavel:profiles!responsavel_id(id, nome)
+              municipes(nome)
             `)
             .order('created_at', { ascending: false })
             .range(offset, offset + BATCH_SIZE - 1);
@@ -114,8 +113,7 @@ export default function Demandas() {
         .select(`
           *,
           areas(nome),
-          municipes(nome),
-          responsavel:profiles!responsavel_id(id, nome)
+          municipes(nome)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -203,6 +201,21 @@ export default function Demandas() {
       return data;
     }
   });
+
+  // Criar mapa de responsáveis para busca rápida pelo ID
+  const responsaveisMap = useMemo(() => {
+    const map = new Map<string, string>();
+    responsaveis.forEach((r: any) => {
+      map.set(r.id, r.nome);
+    });
+    return map;
+  }, [responsaveis]);
+
+  // Função para obter nome do responsável
+  const getResponsavelNome = (responsavelId: string | null) => {
+    if (!responsavelId) return 'Sem responsável';
+    return responsaveisMap.get(responsavelId) || 'Sem responsável';
+  };
 
   // Buscar valores únicos para cidade e bairro
   const { data: cidades = [] } = useQuery({
@@ -1451,7 +1464,7 @@ export default function Demandas() {
                           <span className="font-medium">Área:</span> {demanda.areas?.nome || 'Sem área'}
                         </div>
                         <div>
-                          <span className="font-medium">Responsável:</span> {demanda.responsavel?.nome || 'Sem responsável'}
+                          <span className="font-medium">Responsável:</span> {getResponsavelNome(demanda.responsavel_id)}
                         </div>
                       </div>
 
