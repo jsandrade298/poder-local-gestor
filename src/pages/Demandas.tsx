@@ -73,7 +73,8 @@ export default function Demandas() {
             .select(`
               *,
               areas(nome),
-              municipes(nome)
+              municipes(nome),
+              responsavel:profiles!responsavel_id(id, nome)
             `)
             .order('created_at', { ascending: false })
             .range(offset, offset + BATCH_SIZE - 1);
@@ -113,7 +114,8 @@ export default function Demandas() {
         .select(`
           *,
           areas(nome),
-          municipes(nome)
+          municipes(nome),
+          responsavel:profiles!responsavel_id(id, nome)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -1449,7 +1451,7 @@ export default function Demandas() {
                           <span className="font-medium">Área:</span> {demanda.areas?.nome || 'Sem área'}
                         </div>
                         <div>
-                          <span className="font-medium">Responsável:</span> Sem responsável
+                          <span className="font-medium">Responsável:</span> {demanda.responsavel?.nome || 'Sem responsável'}
                         </div>
                       </div>
 
