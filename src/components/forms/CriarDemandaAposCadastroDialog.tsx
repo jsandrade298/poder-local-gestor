@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, X, FileText, UserCheck } from "lucide-react";
+import { Upload, X, FileText, UserCheck, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useGeocoding } from "@/hooks/useGeocoding";
 
 interface CriarDemandaAposCadastroDialogProps {
   open: boolean;
@@ -35,7 +37,7 @@ export function CriarDemandaAposCadastroDialog({
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "São Paulo",
+    cidade: "Santo André",
     cep: "",
     complemento: "",
     observacoes: ""
@@ -43,6 +45,100 @@ export function CriarDemandaAposCadastroDialog({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
+  const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
+    lat: null,
+    lng: null
+  });
+
+  // Funções de CEP
+  const validarCep = (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    return cepLimpo.length === 8;
+  };
+
+  const handleCepChange = (value: string) => {
+    const cepLimpo = value.replace(/\D/g, '');
+    let cepFormatado = cepLimpo;
+    if (cepLimpo.length > 5) {
+      cepFormatado = `${cepLimpo.slice(0, 5)}-${cepLimpo.slice(5, 8)}`;
+    }
+    setFormData(prev => ({ ...prev, cep: cepFormatado }));
+  };
+
+  const handleBuscarCep = async () => {
+    const cepLimpo = formData.cep.replace(/\D/g, '');
+    if (!validarCep(formData.cep)) {
+      toast({
+        title: "CEP inválido",
+        description: "Digite um CEP válido com 8 dígitos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const resultado = await buscarCep(cepLimpo);
+    if (resultado) {
+      setFormData(prev => ({
+        ...prev,
+        logradouro: resultado.logradouro || prev.logradouro,
+        bairro: resultado.bairro || prev.bairro,
+        cidade: resultado.cidade || prev.cidade
+      }));
+      
+      // Atualizar coordenadas se disponíveis
+      if (resultado.latitude && resultado.longitude) {
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+      }
+      
+      toast({
+        title: "Endereço encontrado!",
+        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}`
+      });
+    } else {
+      toast({
+        title: "CEP não encontrado",
+        description: "Verifique o CEP digitado",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAtualizarGeolocalizacao = async () => {
+    const enderecoCompleto = [
+      formData.logradouro,
+      formData.numero,
+      formData.bairro,
+      formData.cidade,
+      'SP',
+      'Brasil'
+    ].filter(Boolean).join(', ');
+
+    if (!formData.logradouro || !formData.cidade) {
+      toast({
+        title: "Endereço incompleto",
+        description: "Preencha ao menos o logradouro e a cidade para geocodificar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const resultado = await geocodificarEndereco(enderecoCompleto);
+    if (resultado) {
+      setCoordenadas({ lat: resultado.lat, lng: resultado.lng });
+      toast({
+        title: "Coordenadas atualizadas!",
+        description: `Lat: ${resultado.lat.toFixed(6)}, Lng: ${resultado.lng.toFixed(6)}`
+      });
+    } else {
+      toast({
+        title: "Erro na geocodificação",
+        description: "Não foi possível encontrar as coordenadas para este endereço",
+        variant: "destructive"
+      });
+    }
+  };
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
@@ -129,10 +225,13 @@ export function CriarDemandaAposCadastroDialog({
         logradouro: data.logradouro || null,
         numero: data.numero || null,
         bairro: data.bairro || null,
-        cep: data.cep || null,
+        cep: data.cep?.replace(/\D/g, '') || null,
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
-        criado_por: user.user.id
+        criado_por: user.user.id,
+        latitude: coordenadas.lat,
+        longitude: coordenadas.lng,
+        geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
       };
 
       const { data: demanda, error } = await supabase
@@ -169,6 +268,7 @@ export function CriarDemandaAposCadastroDialog({
   const handleClose = () => {
     onOpenChange(false);
     setFiles([]);
+    setCoordenadas({ lat: null, lng: null });
     setFormData({
       titulo: "",
       descricao: "",
@@ -180,7 +280,7 @@ export function CriarDemandaAposCadastroDialog({
       logradouro: "",
       numero: "",
       bairro: "",
-      cidade: "São Paulo",
+      cidade: "Santo André",
       cep: "",
       complemento: "",
       observacoes: ""
@@ -384,7 +484,40 @@ export function CriarDemandaAposCadastroDialog({
 
           {/* Endereço */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            {/* Campo CEP com busca */}
+            <div className="space-y-2">
+              <Label htmlFor="cep">CEP</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={(e) => handleCepChange(e.target.value)}
+                  placeholder="00000-000"
+                  maxLength={9}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="secondary"
+                  onClick={handleBuscarCep}
+                  disabled={isBuscandoCep || !validarCep(formData.cep)}
+                >
+                  {isBuscandoCep ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Digite o CEP e clique na lupa para buscar o endereço automaticamente
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -423,21 +556,11 @@ export function CriarDemandaAposCadastroDialog({
                   id="cidade"
                   value={formData.cidade}
                   onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                  placeholder="Cidade"
+                  placeholder="Santo André"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                  placeholder="00000-000"
-                />
-              </div>
-
-              <div className="space-y-2">
+              <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="complemento">Complemento</Label>
                 <Input
                   id="complemento"
@@ -446,6 +569,36 @@ export function CriarDemandaAposCadastroDialog({
                   placeholder="Apt, Bloco, etc."
                 />
               </div>
+            </div>
+
+            {/* Geolocalização */}
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Geolocalização</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAtualizarGeolocalizacao}
+                  disabled={isGeocodificando || !formData.logradouro}
+                >
+                  {isGeocodificando ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <MapPin className="h-4 w-4 mr-2" />
+                  )}
+                  Obter Coordenadas
+                </Button>
+              </div>
+              {coordenadas.lat && coordenadas.lng ? (
+                <p className="text-xs text-green-600">
+                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Preencha o endereço e clique em "Obter Coordenadas" para localizar no mapa.
+                </p>
+              )}
             </div>
           </div>
 
