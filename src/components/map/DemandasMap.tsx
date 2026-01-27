@@ -55,84 +55,69 @@ function MapUpdater({ markers, fitBounds, config }: {
         m.latitude && m.longitude && 
         !isNaN(m.latitude) && !isNaN(m.longitude)
       );
-
+      
       if (validMarkers.length > 0) {
         const bounds = new LatLngBounds(
           validMarkers.map(m => [m.latitude, m.longitude] as [number, number])
         );
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       }
-    } else if (markers.length === 0) {
+    } else {
       map.setView([config.centerLat, config.centerLng], config.zoom);
     }
-  }, [markers, fitBounds, map, config]);
+  }, [markers, fitBounds, config, map]);
 
   return null;
 }
 
-// Cria um ícone de marker personalizado - TAMANHO MAIOR
-function createCustomIcon(color: string, size: number = 40): Icon {
+// Função para criar ícone SVG colorido
+function createColoredIcon(color: string): Icon {
   const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
-      <defs>
-        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.3"/>
-        </filter>
-      </defs>
-      <path fill="${color}" stroke="#ffffff" stroke-width="1.5" filter="url(#shadow)" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-      <circle fill="white" cx="12" cy="9" r="2.5"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="44" height="44">
+      <path fill="${color}" stroke="#ffffff" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 6.5 8.5 15.5 8.5 15.5s8.5-9 8.5-15.5C20.5 3.81 16.69 0 12 0z"/>
+      <circle fill="#ffffff" cx="12" cy="8.5" r="3.5"/>
     </svg>
   `;
-
+  
   return new Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
-    popupAnchor: [0, -size]
+    iconSize: [44, 44],
+    iconAnchor: [22, 44],
+    popupAnchor: [0, -44]
   });
 }
 
-// Componente principal do mapa
-export function DemandasMap({
-  markers,
-  config,
+export default function DemandasMap({ 
+  markers, 
+  config, 
   height = '500px',
   onMarkerClick,
   fitBounds = true
 }: DemandasMapProps) {
-  const mapRef = useRef(null);
-  const [isClient, setIsClient] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const mapRef = useRef<any>(null);
 
+  // Forçar recriação do mapa quando config mudar significativamente
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    setMapKey(prev => prev + 1);
+  }, [config.centerLat, config.centerLng]);
 
-  if (!isClient) {
-    return (
-      <div 
-        style={{ height, width: '100%' }} 
-        className="bg-gray-100 rounded-lg flex items-center justify-center"
-      >
-        <span className="text-gray-500">Carregando mapa...</span>
-      </div>
-    );
-  }
-
+  // Filtrar markers válidos
   const validMarkers = markers.filter(m => 
     m.latitude && m.longitude && 
-    !isNaN(m.latitude) && !isNaN(m.longitude)
+    !isNaN(m.latitude) && !isNaN(m.longitude) &&
+    m.latitude >= -90 && m.latitude <= 90 &&
+    m.longitude >= -180 && m.longitude <= 180
   );
 
   return (
-    <div 
-      style={{ height, width: '100%', position: 'relative', zIndex: 0 }} 
-      className="rounded-lg overflow-hidden border border-gray-200"
-    >
+    <div style={{ height, width: '100%', position: 'relative', zIndex: 1 }}>
       <MapContainer
+        key={mapKey}
         ref={mapRef}
         center={[config.centerLat, config.centerLng]}
         zoom={config.zoom}
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: '100%', width: '100%', zIndex: 1 }}
         scrollWheelZoom={true}
       >
         <TileLayer
@@ -140,30 +125,27 @@ export function DemandasMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapUpdater markers={validMarkers} fitBounds={fitBounds} config={config} />
-
+        <MapUpdater 
+          markers={validMarkers} 
+          fitBounds={fitBounds} 
+          config={config}
+        />
+        
         {validMarkers.map((marker) => {
           const color = marker.color || STATUS_COLORS[marker.status || 'default'] || STATUS_COLORS.default;
-          const icon = createCustomIcon(color, 44); // Tamanho aumentado para 44px
-
+          const icon = createColoredIcon(color);
+          
           return (
             <Marker
               key={marker.id}
               position={[marker.latitude, marker.longitude]}
               icon={icon}
               eventHandlers={{
-                click: () => {
-                  if (onMarkerClick) {
-                    onMarkerClick(marker);
-                  }
-                  if (marker.onClick) {
-                    marker.onClick();
-                  }
-                }
+                click: () => onMarkerClick?.(marker)
               }}
             >
               <Popup>
-                <div className="min-w-[200px]">
+                <div className="p-2 min-w-[200px]">
                   <h3 className="font-semibold text-sm mb-1">{marker.title}</h3>
                   {marker.description && (
                     <p className="text-xs text-gray-600 mb-2">{marker.description}</p>
@@ -216,5 +198,3 @@ export function MapLegend() {
     </div>
   );
 }
-
-export default DemandasMap;
