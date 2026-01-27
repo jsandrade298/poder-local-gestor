@@ -211,7 +211,10 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onEdit(demanda)}
+                        onClick={() => {
+                          onOpenChange(false);
+                          setTimeout(() => onEdit(demanda), 100);
+                        }}
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
