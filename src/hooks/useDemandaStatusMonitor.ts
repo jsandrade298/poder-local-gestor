@@ -76,17 +76,23 @@ export function useDemandaStatusMonitor() {
             // Converter status para texto amigável
             let statusTexto = newDemanda.status;
             switch (newDemanda.status) {
-              case 'aberta':
-                statusTexto = 'Aberta';
+              case 'solicitada':
+                statusTexto = 'Solicitada';
                 break;
-              case 'em_andamento':
-                statusTexto = 'Em Andamento';
+              case 'em_producao':
+                statusTexto = 'Em Produção';
                 break;
-              case 'resolvida':
-                statusTexto = 'Resolvida';
+              case 'encaminhado':
+                statusTexto = 'Encaminhado';
                 break;
-              case 'cancelada':
-                statusTexto = 'Cancelada';
+              case 'devolvido':
+                statusTexto = 'Devolvido';
+                break;
+              case 'visitado':
+                statusTexto = 'Visitado';
+                break;
+              case 'atendido':
+                statusTexto = 'Atendido';
                 break;
             }
 
