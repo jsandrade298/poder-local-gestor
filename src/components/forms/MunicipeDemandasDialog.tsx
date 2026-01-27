@@ -46,13 +46,14 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      'aberta': { label: 'Aberta', variant: 'default' as const, color: '#3B82F6' },
-      'em_andamento': { label: 'Em Andamento', variant: 'secondary' as const, color: '#F59E0B' },
-      'aguardando': { label: 'Aguardando', variant: 'secondary' as const, color: '#F97316' },
-      'resolvida': { label: 'Resolvida', variant: 'secondary' as const, color: '#10B981' },
-      'cancelada': { label: 'Cancelada', variant: 'destructive' as const, color: '#EF4444' }
+      'solicitada': { label: 'Solicitada', variant: 'default' as const, color: '#3B82F6' },
+      'em_producao': { label: 'Em Produção', variant: 'secondary' as const, color: '#F59E0B' },
+      'encaminhado': { label: 'Encaminhado', variant: 'secondary' as const, color: '#F97316' },
+      'devolvido': { label: 'Devolvido', variant: 'destructive' as const, color: '#EF4444' },
+      'visitado': { label: 'Visitado', variant: 'secondary' as const, color: '#06B6D4' },
+      'atendido': { label: 'Atendido', variant: 'secondary' as const, color: '#10B981' }
     };
-    return statusMap[status as keyof typeof statusMap] || statusMap.aberta;
+    return statusMap[status as keyof typeof statusMap] || statusMap.solicitada;
   };
 
   // Buscar os nomes dos responsáveis separadamente
@@ -123,9 +124,9 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-blue-500" />
                   <div>
-                    <p className="text-sm font-medium">Abertas</p>
+                    <p className="text-sm font-medium">Solicitadas</p>
                     <p className="text-xl font-bold text-blue-600">
-                      {demandas.filter(d => d.status === 'aberta').length}
+                      {demandas.filter(d => d.status === 'solicitada').length}
                     </p>
                   </div>
                 </div>
@@ -137,9 +138,9 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-yellow-500" />
                   <div>
-                    <p className="text-sm font-medium">Em Andamento</p>
+                    <p className="text-sm font-medium">Em Produção</p>
                     <p className="text-xl font-bold text-yellow-600">
-                      {demandas.filter(d => d.status === 'em_andamento').length}
+                      {demandas.filter(d => d.status === 'em_producao').length}
                     </p>
                   </div>
                 </div>
@@ -151,9 +152,23 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-orange-500" />
                   <div>
-                    <p className="text-sm font-medium">Aguardando</p>
+                    <p className="text-sm font-medium">Encaminhado</p>
                     <p className="text-xl font-bold text-orange-600">
-                      {demandas.filter(d => d.status === 'aguardando').length}
+                      {demandas.filter(d => d.status === 'encaminhado').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-cyan-500" />
+                  <div>
+                    <p className="text-sm font-medium">Visitado</p>
+                    <p className="text-xl font-bold text-cyan-600">
+                      {demandas.filter(d => d.status === 'visitado').length}
                     </p>
                   </div>
                 </div>
@@ -165,9 +180,9 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-green-500" />
                   <div>
-                    <p className="text-sm font-medium">Resolvidas</p>
+                    <p className="text-sm font-medium">Atendidas</p>
                     <p className="text-xl font-bold text-green-600">
-                      {demandas.filter(d => d.status === 'resolvida').length}
+                      {demandas.filter(d => d.status === 'atendido').length}
                     </p>
                   </div>
                 </div>
@@ -179,9 +194,9 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-500" />
                   <div>
-                    <p className="text-sm font-medium">Canceladas</p>
+                    <p className="text-sm font-medium">Devolvidas</p>
                     <p className="text-xl font-bold text-red-600">
-                      {demandas.filter(d => d.status === 'cancelada').length}
+                      {demandas.filter(d => d.status === 'devolvido').length}
                     </p>
                   </div>
                 </div>
