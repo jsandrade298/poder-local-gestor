@@ -191,22 +191,24 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'aberta': return 'Aberta';
-      case 'em_andamento': return 'Em Andamento';
-      case 'aguardando': return 'Aguardando';
-      case 'resolvida': return 'Resolvida';
-      case 'cancelada': return 'Cancelada';
+      case 'solicitada': return 'Solicitada';
+      case 'em_producao': return 'Em Produção';
+      case 'encaminhado': return 'Encaminhado';
+      case 'atendido': return 'Atendido';
+      case 'devolvido': return 'Devolvido';
+      case 'visitado': return 'Visitado';
       default: return status;
     }
   };
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'aberta': return 'default';
-      case 'em_andamento': return 'secondary';
-      case 'aguardando': return 'outline';
-      case 'resolvida': return 'default';
-      case 'cancelada': return 'destructive';
+      case 'solicitada': return 'default';
+      case 'em_producao': return 'secondary';
+      case 'encaminhado': return 'outline';
+      case 'atendido': return 'default';
+      case 'devolvido': return 'destructive';
+      case 'visitado': return 'secondary';
       default: return 'secondary';
     }
   };
@@ -307,11 +309,12 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="aberta">Aberta</SelectItem>
-                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                    <SelectItem value="aguardando">Aguardando</SelectItem>
-                    <SelectItem value="resolvida">Resolvida</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                    <SelectItem value="solicitada">Solicitada</SelectItem>
+                    <SelectItem value="em_producao">Em Produção</SelectItem>
+                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
+                    <SelectItem value="atendido">Atendido</SelectItem>
+                    <SelectItem value="devolvido">Devolvido</SelectItem>
+                    <SelectItem value="visitado">Visitado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
