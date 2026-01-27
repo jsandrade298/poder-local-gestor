@@ -1,9 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AppSidebar } from '@/components/layout/AppSidebar';
-import { AppHeader } from '@/components/layout/AppHeader';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -70,7 +67,6 @@ export default function MapaDemandas() {
     }
   });
 
-  // Query usando select('*') para contornar tipos desatualizados
   const { data: todasDemandas, isLoading: loadingDemandas, refetch, error: queryError } = useQuery({
     queryKey: ['demandas-mapa-all'],
     queryFn: async () => {
@@ -84,12 +80,10 @@ export default function MapaDemandas() {
         throw error;
       }
       
-      // Cast para nosso tipo (os dados vêm completos do banco)
       return (data || []) as unknown as DemandaMapa[];
     }
   });
 
-  // Filtrar apenas demandas COM coordenadas válidas
   const demandas = useMemo(() => {
     if (!todasDemandas) return [];
     return todasDemandas.filter(d => {
@@ -179,179 +173,173 @@ export default function MapaDemandas() {
   const isLoading = loadingConfig || loadingDemandas;
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader />
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <MapPin className="h-6 w-6 text-primary" />
-                Mapa de Demandas
-              </h1>
-              <p className="text-muted-foreground">
-                Visualização geográfica das demandas 
-                {cidade && ` - ${cidade}`}
-                {estado && `/${estado}`}
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-primary" />
+            Mapa de Demandas
+          </h1>
+          <p className="text-muted-foreground">
+            Visualização geográfica das demandas 
+            {cidade && ` - ${cidade}`}
+            {estado && `/${estado}`}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Atualizar
+        </Button>
+      </div>
+
+      {queryError && (
+        <Card className="border-red-300 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-red-700 text-sm">
+              Erro ao carregar demandas: {(queryError as Error).message}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="relative z-20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filtros
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="relative lg:col-span-2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título, protocolo, endereço..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="z-50">
+                {STATUS_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={areaFilter} onValueChange={setAreaFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Área" />
+              </SelectTrigger>
+              <SelectContent className="z-50">
+                <SelectItem value="todas">Todas as Áreas</SelectItem>
+                {areas?.map(area => (
+                  <SelectItem key={area.id} value={area.id}>
+                    {area.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={bairroFilter} onValueChange={setBairroFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Bairro" />
+              </SelectTrigger>
+              <SelectContent className="z-50">
+                <SelectItem value="todos">Todos os Bairros</SelectItem>
+                {bairrosUnicos.map(bairro => (
+                  <SelectItem key={bairro} value={bairro}>
+                    {bairro}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {(statusFilter !== 'todos' || areaFilter !== 'todas' || bairroFilter !== 'todos' || searchTerm) && (
+            <div className="mt-3">
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Limpar filtros
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card className="p-3">
+          <div className="text-2xl font-bold">{stats.total}</div>
+          <div className="text-xs text-muted-foreground">Total no mapa</div>
+        </Card>
+        <Card className="p-3 border-l-4 border-l-blue-500">
+          <div className="text-2xl font-bold">{stats.porStatus.aberta || 0}</div>
+          <div className="text-xs text-muted-foreground">Abertas</div>
+        </Card>
+        <Card className="p-3 border-l-4 border-l-amber-500">
+          <div className="text-2xl font-bold">{stats.porStatus.em_andamento || 0}</div>
+          <div className="text-xs text-muted-foreground">Em Andamento</div>
+        </Card>
+        <Card className="p-3 border-l-4 border-l-purple-500">
+          <div className="text-2xl font-bold">{stats.porStatus.aguardando || 0}</div>
+          <div className="text-xs text-muted-foreground">Aguardando</div>
+        </Card>
+        <Card className="p-3 border-l-4 border-l-green-500">
+          <div className="text-2xl font-bold">{stats.porStatus.resolvida || 0}</div>
+          <div className="text-xs text-muted-foreground">Resolvidas</div>
+        </Card>
+        <Card className="p-3 border-l-4 border-l-red-500">
+          <div className="text-2xl font-bold">{stats.porStatus.cancelada || 0}</div>
+          <div className="text-xs text-muted-foreground">Canceladas</div>
+        </Card>
+      </div>
+
+      <Card className="flex-1 relative z-10">
+        <CardContent className="p-4">
+          {isLoading ? (
+            <Skeleton className="w-full h-[500px] rounded-lg" />
+          ) : markers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[500px] text-center">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">Nenhuma demanda com localização</h3>
+              <p className="text-muted-foreground mt-1 max-w-md">
+                As demandas precisam ter latitude e longitude preenchidas para aparecer no mapa.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Total de demandas no sistema: {todasDemandas?.length || 0}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Demandas com coordenadas: {demandas?.length || 0}
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
-          </div>
-
-          {queryError && (
-            <Card className="border-red-300 bg-red-50">
-              <CardContent className="p-4">
-                <p className="text-red-700 text-sm">
-                  Erro ao carregar demandas: {(queryError as Error).message}
-                </p>
-              </CardContent>
-            </Card>
+          ) : (
+            <div className="space-y-3">
+              <DemandasMap
+                markers={markers}
+                config={mapConfig}
+                height="500px"
+                onMarkerClick={handleMarkerClick}
+                fitBounds={true}
+              />
+              <MapLegend />
+            </div>
           )}
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filtros
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="relative lg:col-span-2">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por título, protocolo, endereço..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Área" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as Áreas</SelectItem>
-                    {areas?.map(area => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={bairroFilter} onValueChange={setBairroFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Bairro" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Bairros</SelectItem>
-                    {bairrosUnicos.map(bairro => (
-                      <SelectItem key={bairro} value={bairro}>
-                        {bairro}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {(statusFilter !== 'todos' || areaFilter !== 'todas' || bairroFilter !== 'todos' || searchTerm) && (
-                <div className="mt-3">
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-1" />
-                    Limpar filtros
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Card className="p-3">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Total no mapa</div>
-            </Card>
-            <Card className="p-3 border-l-4 border-l-blue-500">
-              <div className="text-2xl font-bold">{stats.porStatus.aberta || 0}</div>
-              <div className="text-xs text-muted-foreground">Abertas</div>
-            </Card>
-            <Card className="p-3 border-l-4 border-l-amber-500">
-              <div className="text-2xl font-bold">{stats.porStatus.em_andamento || 0}</div>
-              <div className="text-xs text-muted-foreground">Em Andamento</div>
-            </Card>
-            <Card className="p-3 border-l-4 border-l-purple-500">
-              <div className="text-2xl font-bold">{stats.porStatus.aguardando || 0}</div>
-              <div className="text-xs text-muted-foreground">Aguardando</div>
-            </Card>
-            <Card className="p-3 border-l-4 border-l-green-500">
-              <div className="text-2xl font-bold">{stats.porStatus.resolvida || 0}</div>
-              <div className="text-xs text-muted-foreground">Resolvidas</div>
-            </Card>
-            <Card className="p-3 border-l-4 border-l-red-500">
-              <div className="text-2xl font-bold">{stats.porStatus.cancelada || 0}</div>
-              <div className="text-xs text-muted-foreground">Canceladas</div>
-            </Card>
-          </div>
-
-          <Card className="flex-1">
-            <CardContent className="p-4">
-              {isLoading ? (
-                <Skeleton className="w-full h-[500px] rounded-lg" />
-              ) : markers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">Nenhuma demanda com localização</h3>
-                  <p className="text-muted-foreground mt-1 max-w-md">
-                    As demandas precisam ter latitude e longitude preenchidas para aparecer no mapa.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Total de demandas no sistema: {todasDemandas?.length || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Demandas com coordenadas: {demandas?.length || 0}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <DemandasMap
-                    markers={markers}
-                    config={mapConfig}
-                    height="500px"
-                    onMarkerClick={handleMarkerClick}
-                    fitBounds={true}
-                  />
-                  <MapLegend />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {selectedDemanda && (
-            <ViewDemandaDialog
-              demanda={selectedDemanda}
-              open={showViewDialog}
-              onOpenChange={(open) => {
-                setShowViewDialog(open);
-                if (!open) setSelectedDemanda(null);
-              }}
-            />
-          )}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+      {selectedDemanda && (
+        <ViewDemandaDialog
+          demanda={selectedDemanda}
+          open={showViewDialog}
+          onOpenChange={(open) => {
+            setShowViewDialog(open);
+            if (!open) setSelectedDemanda(null);
+          }}
+        />
+      )}
+    </div>
   );
 }
