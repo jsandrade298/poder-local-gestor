@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Icon, LatLngBounds, divIcon } from 'leaflet';
+import { Icon, LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Tipos
@@ -69,12 +69,17 @@ function MapUpdater({ markers, fitBounds, config }: {
   return null;
 }
 
-// Cria um ícone de marker personalizado
-function createCustomIcon(color: string, size: number = 32): Icon {
+// Cria um ícone de marker personalizado - TAMANHO MAIOR
+function createCustomIcon(color: string, size: number = 40): Icon {
   const svgIcon = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
-      <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-      <circle fill="white" cx="12" cy="9" r="2"/>
+      <defs>
+        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.3"/>
+        </filter>
+      </defs>
+      <path fill="${color}" stroke="#ffffff" stroke-width="1.5" filter="url(#shadow)" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      <circle fill="white" cx="12" cy="9" r="2.5"/>
     </svg>
   `;
 
@@ -118,7 +123,10 @@ export function DemandasMap({
   );
 
   return (
-    <div style={{ height, width: '100%' }} className="rounded-lg overflow-hidden border border-gray-200">
+    <div 
+      style={{ height, width: '100%', position: 'relative', zIndex: 0 }} 
+      className="rounded-lg overflow-hidden border border-gray-200"
+    >
       <MapContainer
         ref={mapRef}
         center={[config.centerLat, config.centerLng]}
@@ -135,7 +143,7 @@ export function DemandasMap({
 
         {validMarkers.map((marker) => {
           const color = marker.color || STATUS_COLORS[marker.status || 'default'] || STATUS_COLORS.default;
-          const icon = createCustomIcon(color);
+          const icon = createCustomIcon(color, 44); // Tamanho aumentado para 44px
 
           return (
             <Marker
