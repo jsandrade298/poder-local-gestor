@@ -59,34 +59,34 @@ export default function Dashboard() {
             description="Todas as demandas cadastradas"
           />
           <KPICard
-            title="Demandas Abertas"
-            value={metrics.demandasAbertas}
+            title="Demandas Solicitadas"
+            value={metrics.demandasSolicitadas}
             icon={Clock}
             description="Aguardando atendimento"
           />
           <KPICard
             title="Em Andamento"
-            value={metrics.demandasEmAndamento}
+            value={metrics.demandasEmProducao}
             icon={Play}
             description="Sendo atendidas"
           />
           <KPICard
             title="Aguardando"
-            value={metrics.demandasAguardando}
+            value={metrics.demandasEncaminhadas}
             icon={Pause}
             description="Pendentes"
           />
           <KPICard
-            title="Resolvidas"
-            value={metrics.demandasResolvidas}
+            title="Atendidas"
+            value={metrics.demandasAtendidas}
             icon={CheckCircle}
             description="Concluídas"
           />
           <KPICard
-            title="Canceladas"
-            value={metrics.demandasCanceladas}
+            title="Devolvidas"
+            value={metrics.demandasDevolvidas}
             icon={XCircle}
-            description="Canceladas"
+            description="Devolvidas"
           />
         </div>
 
