@@ -26,7 +26,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "aberta" as "aberta" | "em_andamento" | "aguardando" | "resolvida" | "cancelada",
+    status: "solicitada" as "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -94,7 +94,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         area_id: demanda.area_id || "",
         prioridade: demanda.prioridade || "media",
         responsavel_id: demanda.responsavel_id || "",
-        status: demanda.status || "aberta",
+        status: demanda.status || "solicitada",
         data_prazo: demanda.data_prazo || "",
         logradouro: demanda.logradouro || "",
         numero: demanda.numero || "",
@@ -155,11 +155,12 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'aberta': return 'Aberta';
-      case 'em_andamento': return 'Em Andamento';
-      case 'resolvida': return 'Resolvida';
-      case 'cancelada': return 'Cancelada';
-      case 'aguardando': return 'Aguardando';
+      case 'solicitada': return 'Solicitada';
+      case 'em_producao': return 'Em Produção';
+      case 'atendido': return 'Atendido';
+      case 'devolvido': return 'Devolvido';
+      case 'visitado': return 'Visitado';
+      case 'encaminhado': return 'Encaminhado';
       default: return status;
     }
   };
@@ -557,7 +558,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: "aberta" | "em_andamento" | "aguardando" | "resolvida" | "cancelada") => 
+                  onValueChange={(value: "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido") => 
                     setFormData(prev => ({ ...prev, status: value }))
                   }
                 >
@@ -565,11 +566,12 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="aberta">Aberta</SelectItem>
-                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                    <SelectItem value="aguardando">Aguardando</SelectItem>
-                    <SelectItem value="resolvida">Resolvida</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                    <SelectItem value="solicitada">Solicitada</SelectItem>
+                    <SelectItem value="em_producao">Em Produção</SelectItem>
+                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
+                    <SelectItem value="atendido">Atendido</SelectItem>
+                    <SelectItem value="devolvido">Devolvido</SelectItem>
+                    <SelectItem value="visitado">Visitado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
