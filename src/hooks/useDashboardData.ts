@@ -116,23 +116,24 @@ export function useDashboardData() {
 
   // Calcular métricas
   const totalDemandas = demandas.length;
-  const demandasAbertas = demandas.filter(d => d.status === 'aberta').length;
-  const demandasEmAndamento = demandas.filter(d => d.status === 'em_andamento').length;
-  const demandasAguardando = demandas.filter(d => d.status === 'aguardando').length;
-  const demandasResolvidas = demandas.filter(d => d.status === 'resolvida').length;
-  const demandasCanceladas = demandas.filter(d => d.status === 'cancelada').length;
+  const demandasSolicitadas = demandas.filter(d => d.status === 'solicitada').length;
+  const demandasEmProducao = demandas.filter(d => d.status === 'em_producao').length;
+  const demandasEncaminhadas = demandas.filter(d => d.status === 'encaminhado').length;
+  const demandasAtendidas = demandas.filter(d => d.status === 'atendido').length;
+  const demandasDevolvidas = demandas.filter(d => d.status === 'devolvido').length;
   const totalMunicipes = municipes.length;
   const taxaConclusao = totalDemandas > 0 
-    ? Math.round((demandasResolvidas / totalDemandas) * 100)
+    ? Math.round((demandasAtendidas / totalDemandas) * 100)
     : 0;
 
   // Dados para gráfico de status (convertidos para percentuais)
   const statusCounts = [
-    { name: "Aberta", count: demandas.filter(d => d.status === 'aberta').length, color: "#3b82f6" },
-    { name: "Em Andamento", count: demandas.filter(d => d.status === 'em_andamento').length, color: "#f59e0b" },
-    { name: "Aguardando", count: demandas.filter(d => d.status === 'aguardando').length, color: "#8b5cf6" },
-    { name: "Resolvida", count: demandas.filter(d => d.status === 'resolvida').length, color: "#10b981" },
-    { name: "Cancelada", count: demandas.filter(d => d.status === 'cancelada').length, color: "#ef4444" },
+    { name: "Solicitada", count: demandas.filter(d => d.status === 'solicitada').length, color: "#3b82f6" },
+    { name: "Em Produção", count: demandas.filter(d => d.status === 'em_producao').length, color: "#f59e0b" },
+    { name: "Encaminhado", count: demandas.filter(d => d.status === 'encaminhado').length, color: "#8b5cf6" },
+    { name: "Devolvido", count: demandas.filter(d => d.status === 'devolvido').length, color: "#ef4444" },
+    { name: "Visitado", count: demandas.filter(d => d.status === 'visitado').length, color: "#06b6d4" },
+    { name: "Atendido", count: demandas.filter(d => d.status === 'atendido').length, color: "#10b981" },
   ];
   
   const statusData = statusCounts.map(item => ({
@@ -144,16 +145,17 @@ export function useDashboardData() {
   // Dados para gráfico de áreas com divisão por status
   const areaStatusData = demandas.reduce((acc, demanda) => {
     const areaName = demanda.areas?.nome || 'Sem área';
-    const status = demanda.status || 'aberta';
+    const status = demanda.status || 'solicitada';
     
     if (!acc[areaName]) {
       acc[areaName] = {
         name: areaName,
-        aberta: 0,
-        em_andamento: 0,
-        aguardando: 0,
-        resolvida: 0,
-        cancelada: 0,
+        solicitada: 0,
+        em_producao: 0,
+        encaminhado: 0,
+        devolvido: 0,
+        visitado: 0,
+        atendido: 0,
         total: 0
       };
     }
@@ -166,11 +168,12 @@ export function useDashboardData() {
 
   const areaChartData = Object.values(areaStatusData) as Array<{
     name: string;
-    aberta: number;
-    em_andamento: number;
-    aguardando: number;
-    resolvida: number;
-    cancelada: number;
+    solicitada: number;
+    em_producao: number;
+    encaminhado: number;
+    devolvido: number;
+    visitado: number;
+    atendido: number;
     total: number;
   }>;
 
@@ -178,7 +181,7 @@ export function useDashboardData() {
   // Calcular demandas em atraso (com base no campo data_prazo)
   const today = new Date('2025-09-03'); // Data atual para teste
   const demandasComAtraso = demandas.filter(demanda => {
-    if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
+    if (!demanda.data_prazo || demanda.status === 'atendido' || demanda.status === 'devolvido') {
       return false;
     }
     const prazo = new Date(demanda.data_prazo);
@@ -224,11 +227,11 @@ export function useDashboardData() {
   return {
     metrics: {
       totalDemandas,
-      demandasAbertas,
-      demandasEmAndamento,
-      demandasAguardando,
-      demandasResolvidas,
-      demandasCanceladas,
+      demandasSolicitadas,
+      demandasEmProducao,
+      demandasEncaminhadas,
+      demandasAtendidas,
+      demandasDevolvidas,
       totalMunicipes,
       taxaConclusao: `${taxaConclusao}%`,
       demandasEmAtraso: demandasComAtraso.length,
