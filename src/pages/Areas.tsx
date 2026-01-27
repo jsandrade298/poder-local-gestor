@@ -71,18 +71,18 @@ export default function Areas() {
         acc[demanda.area_id].total += 1;
         
         // Count by status
-        if (demanda.status === 'aberta') {
+        if (demanda.status === 'solicitada') {
           acc[demanda.area_id].abertas += 1;
           acc[demanda.area_id].ativas += 1;
-        } else if (demanda.status === 'em_andamento') {
+        } else if (demanda.status === 'em_producao') {
           acc[demanda.area_id].em_andamento += 1;
           acc[demanda.area_id].ativas += 1;
-        } else if (demanda.status === 'aguardando') {
+        } else if (demanda.status === 'encaminhado') {
           acc[demanda.area_id].aguardando += 1;
           acc[demanda.area_id].ativas += 1;
-        } else if (demanda.status === 'resolvida') {
+        } else if (demanda.status === 'atendido') {
           acc[demanda.area_id].resolvidas += 1;
-        } else if (demanda.status === 'cancelada') {
+        } else if (demanda.status === 'devolvido') {
           acc[demanda.area_id].canceladas += 1;
         }
         
@@ -196,11 +196,11 @@ export default function Areas() {
       ...area,
       total_demandas: demandasCount[area.id]?.total || 0,
       demandas_ativas: demandasCount[area.id]?.ativas || 0,
-      demandas_abertas: demandasCount[area.id]?.abertas || 0,
+      demandas_solicitadas: demandasCount[area.id]?.abertas || 0,
       demandas_em_andamento: demandasCount[area.id]?.em_andamento || 0,
       demandas_aguardando: demandasCount[area.id]?.aguardando || 0,
-      demandas_resolvidas: demandasCount[area.id]?.resolvidas || 0,
-      demandas_canceladas: demandasCount[area.id]?.canceladas || 0,
+      demandas_atendidas: demandasCount[area.id]?.resolvidas || 0,
+      demandas_devolvidas: demandasCount[area.id]?.canceladas || 0,
     }));
   }, [areas, demandasCount]);
 
@@ -247,7 +247,7 @@ export default function Areas() {
 
   const totalDemandas = areasWithCount.reduce((acc, area) => acc + area.total_demandas, 0);
   const totalAtivas = areasWithCount.reduce((acc, area) => acc + area.demandas_ativas, 0);
-  const totalResolvidas = areasWithCount.reduce((acc, area) => acc + area.demandas_resolvidas, 0);
+  const totalResolvidas = areasWithCount.reduce((acc, area) => acc + area.demandas_atendidas, 0);
 
   if (isLoadingAreas || isLoadingDemandas) {
     return (
@@ -391,7 +391,7 @@ export default function Areas() {
               <Clock className="h-5 w-5 text-warning" />
               <div>
                 <div className="text-2xl font-bold text-foreground">{totalAtivas}</div>
-                <p className="text-sm text-muted-foreground">Em Andamento</p>
+                <p className="text-sm text-muted-foreground">Em Produção</p>
               </div>
             </div>
           </CardContent>
@@ -402,7 +402,7 @@ export default function Areas() {
               <CheckCircle className="h-5 w-5 text-success" />
               <div>
                 <div className="text-2xl font-bold text-foreground">{totalResolvidas}</div>
-                <p className="text-sm text-muted-foreground">Resolvidas</p>
+                <p className="text-sm text-muted-foreground">Atendidas</p>
               </div>
             </div>
           </CardContent>
@@ -521,8 +521,8 @@ export default function Areas() {
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-sm md:text-lg font-bold text-blue-600">{area.demandas_abertas}</div>
-                      <p className="text-xs text-muted-foreground">Abertas</p>
+                      <div className="text-sm md:text-lg font-bold text-blue-600">{area.demandas_solicitadas}</div>
+                      <p className="text-xs text-muted-foreground">Solicitadas</p>
                     </div>
                     <div className="text-center">
                       <div className="text-sm md:text-lg font-bold text-warning">{area.demandas_em_andamento}</div>
@@ -530,25 +530,25 @@ export default function Areas() {
                     </div>
                     <div className="text-center">
                       <div className="text-sm md:text-lg font-bold text-orange-500">{area.demandas_aguardando}</div>
-                      <p className="text-xs text-muted-foreground">Aguardando</p>
+                      <p className="text-xs text-muted-foreground">Encaminhado</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-sm md:text-lg font-bold text-success">{area.demandas_resolvidas}</div>
-                      <p className="text-xs text-muted-foreground">Resolvidas</p>
+                      <div className="text-sm md:text-lg font-bold text-success">{area.demandas_atendidas}</div>
+                      <p className="text-xs text-muted-foreground">Atendidas</p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Taxa de Resolução</span>
                       <span className="text-muted-foreground">
-                        {area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0}%
+                        {area.total_demandas > 0 ? Math.round((area.demandas_atendidas / area.total_demandas) * 100) : 0}%
                       </span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2">
                       <div 
                         className="bg-success h-2 rounded-full transition-all" 
                         style={{ 
-                          width: `${area.total_demandas > 0 ? (area.demandas_resolvidas / area.total_demandas) * 100 : 0}%` 
+                          width: `${area.total_demandas > 0 ? (area.demandas_atendidas / area.total_demandas) * 100 : 0}%` 
                         }}
                       />
                     </div>
@@ -559,12 +559,12 @@ export default function Areas() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-2 h-2 rounded bg-success"></div>
-                        <span className="text-muted-foreground">Resolvidas: {area.demandas_resolvidas}</span>
+                        <span className="text-muted-foreground">Resolvidas: {area.demandas_atendidas}</span>
                       </div>
-                      {area.demandas_canceladas > 0 && (
+                      {area.demandas_devolvidas > 0 && (
                         <div className="flex items-center gap-1">
                           <div className="w-2 h-2 rounded bg-destructive"></div>
-                          <span className="text-muted-foreground">Canceladas: {area.demandas_canceladas}</span>
+                          <span className="text-muted-foreground">Canceladas: {area.demandas_devolvidas}</span>
                         </div>
                       )}
                     </div>
@@ -608,18 +608,18 @@ export default function Areas() {
                     <TableHead>Área</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-center">Total</TableHead>
-                    <TableHead className="text-center">Abertas</TableHead>
-                    <TableHead className="text-center">Em Andamento</TableHead>
-                    <TableHead className="text-center">Aguardando</TableHead>
-                    <TableHead className="text-center">Resolvidas</TableHead>
-                    <TableHead className="text-center">Canceladas</TableHead>
+                    <TableHead className="text-center">Solicitadas</TableHead>
+                    <TableHead className="text-center">Em Produção</TableHead>
+                    <TableHead className="text-center">Encaminhado</TableHead>
+                    <TableHead className="text-center">Atendidas</TableHead>
+                    <TableHead className="text-center">Devolvidas</TableHead>
                     <TableHead className="text-center">Taxa de Resolução</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredAreas.map((area) => {
-                    const taxaResolucao = area.total_demandas > 0 ? Math.round((area.demandas_resolvidas / area.total_demandas) * 100) : 0;
+                    const taxaResolucao = area.total_demandas > 0 ? Math.round((area.demandas_atendidas / area.total_demandas) * 100) : 0;
                     
                     return (
                       <TableRow key={area.id}>
@@ -639,7 +639,7 @@ export default function Areas() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            {area.demandas_abertas}
+                            {area.demandas_solicitadas}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -654,12 +654,12 @@ export default function Areas() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            {area.demandas_resolvidas}
+                            {area.demandas_atendidas}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="secondary" className="bg-red-100 text-red-800">
-                            {area.demandas_canceladas}
+                            {area.demandas_devolvidas}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
