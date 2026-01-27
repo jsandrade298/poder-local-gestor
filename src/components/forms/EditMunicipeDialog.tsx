@@ -6,10 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, X } from "lucide-react";
+import { Edit, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useGeocoding } from "@/hooks/useGeocoding";
 
 interface EditMunicipeDialogProps {
   municipe: any;
@@ -61,6 +63,110 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
+  const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
+    lat: municipe?.latitude || null,
+    lng: municipe?.longitude || null
+  });
+
+  // Atualizar coordenadas quando municipe muda
+  useEffect(() => {
+    if (municipe) {
+      setCoordenadas({
+        lat: municipe.latitude || null,
+        lng: municipe.longitude || null
+      });
+    }
+  }, [municipe]);
+
+  // Funções de CEP
+  const validarCep = (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    return cepLimpo.length === 8;
+  };
+
+  const handleCepChange = (value: string) => {
+    const cepLimpo = value.replace(/\D/g, '');
+    let cepFormatado = cepLimpo;
+    if (cepLimpo.length > 5) {
+      cepFormatado = `${cepLimpo.slice(0, 5)}-${cepLimpo.slice(5, 8)}`;
+    }
+    setFormData(prev => ({ ...prev, cep: cepFormatado }));
+  };
+
+  const handleBuscarCep = async () => {
+    const cepLimpo = formData.cep.replace(/\D/g, '');
+    if (!validarCep(formData.cep)) {
+      toast({
+        title: "CEP inválido",
+        description: "Digite um CEP válido com 8 dígitos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const resultado = await buscarCep(cepLimpo);
+    if (resultado) {
+      setFormData(prev => ({
+        ...prev,
+        logradouro: resultado.logradouro || prev.logradouro,
+        bairro: resultado.bairro || prev.bairro,
+        cidade: resultado.cidade || prev.cidade
+      }));
+      
+      // Atualizar coordenadas se disponíveis
+      if (resultado.latitude && resultado.longitude) {
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+      }
+      
+      toast({
+        title: "Endereço encontrado!",
+        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}`
+      });
+    } else {
+      toast({
+        title: "CEP não encontrado",
+        description: "Verifique o CEP digitado",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAtualizarGeolocalizacao = async () => {
+    const enderecoCompleto = [
+      formData.logradouro,
+      formData.numero,
+      formData.bairro,
+      formData.cidade,
+      'SP',
+      'Brasil'
+    ].filter(Boolean).join(', ');
+
+    if (!formData.logradouro || !formData.cidade) {
+      toast({
+        title: "Endereço incompleto",
+        description: "Preencha ao menos o logradouro e a cidade para geocodificar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const resultado = await geocodificarEndereco(enderecoCompleto);
+    if (resultado) {
+      setCoordenadas({ lat: resultado.lat, lng: resultado.lng });
+      toast({
+        title: "Coordenadas atualizadas!",
+        description: `Lat: ${resultado.lat.toFixed(6)}, Lng: ${resultado.lng.toFixed(6)}`
+      });
+    } else {
+      toast({
+        title: "Erro na geocodificação",
+        description: "Não foi possível encontrar as coordenadas para este endereço",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Processar endereço existente para separar em campos
   useEffect(() => {
@@ -160,9 +266,12 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           endereco: endereco || null,
           bairro: data.bairro || null,
           cidade: data.cidade,
-          cep: data.cep || null,
+          cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
-          observacoes: data.observacoes || null
+          observacoes: data.observacoes || null,
+          latitude: coordenadas.lat,
+          longitude: coordenadas.lng,
+          geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
         })
         .eq('id', municipe.id)
         .select();
@@ -319,7 +428,40 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
 
           {/* Endereço */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Endereço</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            {/* Campo CEP com busca */}
+            <div className="space-y-2">
+              <Label htmlFor="cep">CEP</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={(e) => handleCepChange(e.target.value)}
+                  placeholder="00000-000"
+                  maxLength={9}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="secondary"
+                  onClick={handleBuscarCep}
+                  disabled={isBuscandoCep || !validarCep(formData.cep)}
+                >
+                  {isBuscandoCep ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Digite o CEP e clique na lupa para buscar o endereço automaticamente
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2 space-y-2">
@@ -360,31 +502,49 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                   id="cidade"
                   value={formData.cidade}
                   onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                  placeholder="São Paulo"
+                  placeholder="Santo André"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                  placeholder="00000-000"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="complemento">Complemento</Label>
+              <Input
+                id="complemento"
+                value={formData.complemento}
+                onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
+                placeholder="Apt, Bloco, etc."
+              />
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="complemento">Complemento</Label>
-                <Input
-                  id="complemento"
-                  value={formData.complemento}
-                  onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
-                  placeholder="Apt, Bloco, etc."
-                />
+            {/* Geolocalização */}
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Geolocalização</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAtualizarGeolocalizacao}
+                  disabled={isGeocodificando || !formData.logradouro}
+                >
+                  {isGeocodificando ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <MapPin className="h-4 w-4 mr-2" />
+                  )}
+                  Atualizar Coordenadas
+                </Button>
               </div>
+              {coordenadas.lat && coordenadas.lng ? (
+                <p className="text-xs text-green-600">
+                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Sem coordenadas. Clique em "Atualizar Coordenadas" após preencher o endereço.
+                </p>
+              )}
             </div>
           </div>
 
