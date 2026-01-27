@@ -32,11 +32,12 @@ interface DemandasMapProps {
 
 // Cores por status
 const STATUS_COLORS: Record<string, string> = {
-  aberta: '#3b82f6',
-  em_andamento: '#f59e0b',
-  aguardando: '#8b5cf6',
-  resolvida: '#10b981',
-  cancelada: '#ef4444',
+  solicitada: '#3b82f6',    // Azul
+  em_producao: '#f59e0b',   // Laranja
+  encaminhado: '#8b5cf6',   // Roxo
+  devolvido: '#ef4444',     // Vermelho
+  visitado: '#06b6d4',      // Ciano
+  atendido: '#10b981',      // Verde
   default: '#6b7280'
 };
 
@@ -188,11 +189,12 @@ export function DemandasMap({
 // Formata o status para exibição
 function formatStatus(status: string): string {
   const statusMap: Record<string, string> = {
-    aberta: 'Aberta',
-    em_andamento: 'Em Andamento',
-    aguardando: 'Aguardando',
-    resolvida: 'Resolvida',
-    cancelada: 'Cancelada'
+    solicitada: 'Solicitada',
+    em_producao: 'Em Produção',
+    encaminhado: 'Encaminhado',
+    devolvido: 'Devolvido',
+    visitado: 'Visitado',
+    atendido: 'Atendido'
   };
   return statusMap[status] || status;
 }
