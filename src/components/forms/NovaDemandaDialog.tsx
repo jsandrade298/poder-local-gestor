@@ -5,18 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X, ChevronDown, MapPin, Loader2 } from "lucide-react";
+import { Plus, Upload, X, ChevronDown, MapPin, Loader2, Search, CheckCircle2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
-import { useGeocoding, buildFullAddress } from "@/hooks/useGeocoding";
+import { useBrasilAPI, formatarCep, validarCep } from "@/hooks/useBrasilAPI";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
   const [showMunicipeDropdown, setShowMunicipeDropdown] = useState(false);
+  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  const [enderecoPreenchido, setEnderecoPreenchido] = useState(false);
+  
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -30,6 +33,7 @@ export function NovaDemandaDialog() {
     numero: "",
     bairro: "",
     cidade: "Santo André",
+    estado: "SP",
     cep: "",
     complemento: "",
     observacoes: ""
@@ -37,7 +41,7 @@ export function NovaDemandaDialog() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { geocode, isLoading: isGeocoding } = useGeocoding();
+  const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
 
   const { data: municipes = [] } = useMunicipesSelect();
 
@@ -71,6 +75,60 @@ export function NovaDemandaDialog() {
       return data;
     }
   });
+
+  // Função para buscar CEP e preencher endereço automaticamente
+  const handleBuscarCep = async () => {
+    if (!validarCep(formData.cep)) {
+      toast({
+        title: "CEP inválido",
+        description: "Digite um CEP válido com 8 dígitos.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const resultado = await buscarCep(formData.cep);
+
+    if (resultado) {
+      setFormData(prev => ({
+        ...prev,
+        logradouro: resultado.logradouro || prev.logradouro,
+        bairro: resultado.bairro || prev.bairro,
+        cidade: resultado.cidade || prev.cidade,
+        estado: resultado.estado || prev.estado
+      }));
+
+      if (resultado.latitude && resultado.longitude) {
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+        setEnderecoPreenchido(true);
+        toast({
+          title: "Endereço encontrado!",
+          description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}/${resultado.estado}. Localização mapeada!`,
+        });
+      } else {
+        setCoordenadas({ lat: null, lng: null });
+        setEnderecoPreenchido(true);
+        toast({
+          title: "Endereço encontrado!",
+          description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}/${resultado.estado}. (Coordenadas não disponíveis para este CEP)`,
+        });
+      }
+    } else {
+      toast({
+        title: "CEP não encontrado",
+        description: "Verifique o CEP digitado e tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Buscar CEP automaticamente quando tiver 8 dígitos
+  const handleCepChange = (value: string) => {
+    const cepFormatado = formatarCep(value);
+    setFormData(prev => ({ ...prev, cep: cepFormatado }));
+    setEnderecoPreenchido(false);
+    setCoordenadas({ lat: null, lng: null });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -128,37 +186,6 @@ export function NovaDemandaDialog() {
         .eq('id', user.user.id)
         .maybeSingle();
 
-      // ========== GEOCODIFICAÇÃO AUTOMÁTICA ==========
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      let geocodificado = false;
-
-      // Só tenta geocodificar se tiver pelo menos logradouro e cidade
-      if (data.logradouro && data.cidade) {
-        const fullAddress = buildFullAddress(
-          data.logradouro,
-          data.numero,
-          data.bairro,
-          data.cidade,
-          'SP', // Estado padrão
-          data.cep
-        );
-
-        console.log('Geocodificando endereço:', fullAddress);
-        
-        const geoResult = await geocode(fullAddress);
-        
-        if (geoResult) {
-          latitude = geoResult.latitude;
-          longitude = geoResult.longitude;
-          geocodificado = true;
-          console.log('Coordenadas encontradas:', latitude, longitude);
-        } else {
-          console.log('Não foi possível geocodificar o endereço');
-        }
-      }
-      // ================================================
-
       const cleanData = {
         ...data,
         area_id: data.area_id || null,
@@ -167,19 +194,22 @@ export function NovaDemandaDialog() {
         logradouro: data.logradouro || null,
         numero: data.numero || null,
         bairro: data.bairro || null,
-        cep: data.cep || null,
+        cep: data.cep?.replace(/\D/g, '') || null,
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
         criado_por: user.user.id,
         // Campos de geolocalização
-        latitude,
-        longitude,
-        geocodificado
+        latitude: coordenadas.lat,
+        longitude: coordenadas.lng,
+        geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
       };
+
+      // Remover campo estado que não existe na tabela
+      const { estado, ...dataToInsert } = cleanData;
 
       const { data: demanda, error } = await supabase
         .from('demandas')
-        .insert(cleanData)
+        .insert(dataToInsert)
         .select('id, protocolo, titulo')
         .single();
 
@@ -207,12 +237,12 @@ export function NovaDemandaDialog() {
         }
       }
 
-      return { demanda, geocodificado, latitude, longitude };
+      return { demanda, geocodificado: coordenadas.lat !== null };
     },
     onSuccess: (result) => {
       const geoMsg = result.geocodificado 
         ? " Localização mapeada automaticamente!" 
-        : " (Endereço não pôde ser mapeado)";
+        : "";
       
       toast({
         title: "Demanda criada com sucesso!",
@@ -221,26 +251,7 @@ export function NovaDemandaDialog() {
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       queryClient.invalidateQueries({ queryKey: ['demandas-mapa-all'] });
       setOpen(false);
-      setFiles([]);
-      setSearchMunicipe("");
-      setShowMunicipeDropdown(false);
-      setFormData({
-        titulo: "",
-        descricao: "",
-        municipe_id: "",
-        area_id: "",
-        prioridade: "media",
-        responsavel_id: "",
-        status: "aberta",
-        data_prazo: "",
-        logradouro: "",
-        numero: "",
-        bairro: "",
-        cidade: "Santo André",
-        cep: "",
-        complemento: "",
-        observacoes: ""
-      });
+      resetForm();
     },
     onError: (error) => {
       toast({
@@ -250,6 +261,32 @@ export function NovaDemandaDialog() {
       });
     }
   });
+
+  const resetForm = () => {
+    setFiles([]);
+    setSearchMunicipe("");
+    setShowMunicipeDropdown(false);
+    setCoordenadas({ lat: null, lng: null });
+    setEnderecoPreenchido(false);
+    setFormData({
+      titulo: "",
+      descricao: "",
+      municipe_id: "",
+      area_id: "",
+      prioridade: "media",
+      responsavel_id: "",
+      status: "aberta",
+      data_prazo: "",
+      logradouro: "",
+      numero: "",
+      bairro: "",
+      cidade: "Santo André",
+      estado: "SP",
+      cep: "",
+      complemento: "",
+      observacoes: ""
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,8 +464,45 @@ export function NovaDemandaDialog() {
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">(será mapeado automaticamente)</span>
             </div>
+
+            {/* Campo CEP com busca */}
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cep"
+                    value={formData.cep}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={handleBuscarCep}
+                    disabled={isBuscandoCep || !validarCep(formData.cep)}
+                  >
+                    {isBuscandoCep ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Buscar</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Indicador de coordenadas */}
+            {coordenadas.lat && coordenadas.lng && (
+              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded-md">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Localização mapeada: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}</span>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -472,12 +546,13 @@ export function NovaDemandaDialog() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
+                <Label htmlFor="estado">Estado</Label>
                 <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                  placeholder="00000-000"
+                  id="estado"
+                  value={formData.estado}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                  placeholder="SP"
+                  maxLength={2}
                 />
               </div>
 
