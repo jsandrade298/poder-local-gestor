@@ -159,7 +159,7 @@ export default function Kanban() {
         titulo: tarefa.titulo,
         protocolo: `TAREFA-${tarefa.id.slice(0, 8)}`,
         descricao: tarefa.descricao || '',
-        status: tarefa.completed ? 'resolvida' : 'aberta',
+        status: tarefa.completed ? 'atendido' : 'solicitada',
         kanban_position: tarefa.kanban_position,
         prioridade: tarefa.prioridade,
         data_prazo: null,
