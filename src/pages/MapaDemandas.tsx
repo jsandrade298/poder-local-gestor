@@ -60,8 +60,7 @@ export default function MapaDemandas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('areas')
-        .select('id, nome')
-        .order('nome');
+        .select('*');
       
       if (error) {
         console.error('Erro ao buscar áreas:', error);
@@ -71,67 +70,40 @@ export default function MapaDemandas() {
     }
   });
 
-  // Query simplificada - busca apenas campos básicos
+  // Query usando select('*') para contornar tipos desatualizados
   const { data: todasDemandas, isLoading: loadingDemandas, refetch, error: queryError } = useQuery({
-    queryKey: ['demandas-mapa-simples'],
+    queryKey: ['demandas-mapa-all'],
     queryFn: async () => {
-      console.log('Buscando demandas...');
-      
-      // Query muito simples, sem relacionamentos
       const { data, error } = await supabase
         .from('demandas')
-        .select('id, titulo, descricao, status, prioridade, protocolo, bairro, logradouro, numero, cidade, area_id')
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Erro na query de demandas:', error);
+        console.error('Erro na query:', error);
         throw error;
       }
       
-      console.log('Demandas encontradas:', data?.length || 0);
-      
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      // Buscar coordenadas separadamente com query raw
-      const ids = data.map(d => d.id);
-      
-      try {
-        const { data: coordData, error: coordError } = await supabase
-          .rpc('buscar_coordenadas_demandas', { demanda_ids: ids });
-        
-        if (coordError) {
-          console.log('Função RPC não existe, tentando alternativa...');
-          // Tentar buscar direto (pode falhar se tipos não estiverem atualizados)
-          return data.map(d => ({ ...d, latitude: null, longitude: null }));
-        }
-        
-        // Combinar dados
-        return data.map(d => {
-          const coord = coordData?.find((c: any) => c.id === d.id);
-          return {
-            ...d,
-            latitude: coord?.latitude || null,
-            longitude: coord?.longitude || null
-          };
-        });
-      } catch (e) {
-        console.log('Erro ao buscar coordenadas, retornando sem elas');
-        return data.map(d => ({ ...d, latitude: null, longitude: null }));
-      }
+      // Cast para nosso tipo (os dados vêm completos do banco)
+      return (data || []) as unknown as DemandaMapa[];
     }
   });
 
   // Filtrar apenas demandas COM coordenadas válidas
   const demandas = useMemo(() => {
     if (!todasDemandas) return [];
-    return todasDemandas.filter(d => 
-      d.latitude !== null && 
-      d.longitude !== null &&
-      !isNaN(Number(d.latitude)) &&
-      !isNaN(Number(d.longitude))
-    ) as DemandaMapa[];
+    return todasDemandas.filter(d => {
+      const lat = d.latitude;
+      const lng = d.longitude;
+      return (
+        lat !== null && 
+        lat !== undefined &&
+        lng !== null && 
+        lng !== undefined &&
+        !isNaN(Number(lat)) &&
+        !isNaN(Number(lng))
+      );
+    });
   }, [todasDemandas]);
 
   const bairrosUnicos = useMemo(() => {
@@ -230,7 +202,6 @@ export default function MapaDemandas() {
             </Button>
           </div>
 
-          {/* Mostrar erro se houver */}
           {queryError && (
             <Card className="border-red-300 bg-red-50">
               <CardContent className="p-4">
