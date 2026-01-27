@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X, Search, ChevronDown } from "lucide-react";
+import { Plus, Upload, X, ChevronDown, MapPin, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
+import { useGeocoding, buildFullAddress } from "@/hooks/useGeocoding";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export function NovaDemandaDialog() {
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "São Paulo",
+    cidade: "Santo André",
     cep: "",
     complemento: "",
     observacoes: ""
@@ -36,13 +37,12 @@ export function NovaDemandaDialog() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { geocode, isLoading: isGeocoding } = useGeocoding();
 
   const { data: municipes = [] } = useMunicipesSelect();
 
-  // Filtrar munícipes baseado na busca
   const filteredMunicipes = useMemo(() => {
     if (!searchMunicipe) return municipes;
-    
     return municipes.filter(municipe =>
       municipe.nome.toLowerCase().includes(searchMunicipe.toLowerCase())
     );
@@ -55,7 +55,6 @@ export function NovaDemandaDialog() {
         .from('areas')
         .select('id, nome')
         .order('nome');
-      
       if (error) throw error;
       return data;
     }
@@ -68,7 +67,6 @@ export function NovaDemandaDialog() {
         .from('profiles')
         .select('id, nome')
         .order('nome');
-      
       if (error) throw error;
       return data;
     }
@@ -92,11 +90,10 @@ export function NovaDemandaDialog() {
 
   const uploadFiles = async (demandaId: string) => {
     for (const file of files) {
-      // Sanitizar o nome do arquivo para evitar caracteres especiais
       const sanitizedFileName = file.name
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-        .replace(/[^a-zA-Z0-9.-]/g, '_'); // Substitui caracteres especiais por underscore
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9.-]/g, '_');
       
       const fileName = `${demandaId}/${sanitizedFileName}`;
       const { error } = await supabase.storage
@@ -105,7 +102,6 @@ export function NovaDemandaDialog() {
       
       if (error) throw error;
 
-      // Salvar referência do arquivo na tabela anexos
       const { error: anexoError } = await supabase
         .from('anexos')
         .insert({
@@ -126,14 +122,43 @@ export function NovaDemandaDialog() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Usuário não autenticado');
 
-      // Buscar dados do usuário criador
       const { data: criador } = await supabase
         .from('profiles')
         .select('nome')
         .eq('id', user.user.id)
         .maybeSingle();
 
-      // Filtrar campos vazios e converter para null quando necessário
+      // ========== GEOCODIFICAÇÃO AUTOMÁTICA ==========
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let geocodificado = false;
+
+      // Só tenta geocodificar se tiver pelo menos logradouro e cidade
+      if (data.logradouro && data.cidade) {
+        const fullAddress = buildFullAddress(
+          data.logradouro,
+          data.numero,
+          data.bairro,
+          data.cidade,
+          'SP', // Estado padrão
+          data.cep
+        );
+
+        console.log('Geocodificando endereço:', fullAddress);
+        
+        const geoResult = await geocode(fullAddress);
+        
+        if (geoResult) {
+          latitude = geoResult.latitude;
+          longitude = geoResult.longitude;
+          geocodificado = true;
+          console.log('Coordenadas encontradas:', latitude, longitude);
+        } else {
+          console.log('Não foi possível geocodificar o endereço');
+        }
+      }
+      // ================================================
+
       const cleanData = {
         ...data,
         area_id: data.area_id || null,
@@ -145,7 +170,11 @@ export function NovaDemandaDialog() {
         cep: data.cep || null,
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
-        criado_por: user.user.id
+        criado_por: user.user.id,
+        // Campos de geolocalização
+        latitude,
+        longitude,
+        geocodificado
       };
 
       const { data: demanda, error } = await supabase
@@ -156,12 +185,10 @@ export function NovaDemandaDialog() {
 
       if (error) throw error;
 
-      // Upload dos arquivos se houver
       if (files.length > 0) {
         await uploadFiles(demanda.id);
       }
 
-      // Criar notificação para o responsável se houver um
       if (data.responsavel_id && data.responsavel_id !== user.user.id) {
         const { error: notificacaoError } = await supabase
           .from('notificacoes')
@@ -177,18 +204,22 @@ export function NovaDemandaDialog() {
 
         if (notificacaoError) {
           console.error('Erro ao criar notificação:', notificacaoError);
-          // Não falha a operação por causa da notificação
         }
       }
 
-      return demanda;
+      return { demanda, geocodificado, latitude, longitude };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const geoMsg = result.geocodificado 
+        ? " Localização mapeada automaticamente!" 
+        : " (Endereço não pôde ser mapeado)";
+      
       toast({
         title: "Demanda criada com sucesso!",
-        description: "A nova demanda foi registrada no sistema."
+        description: `A nova demanda foi registrada no sistema.${geoMsg}`
       });
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas-mapa-all'] });
       setOpen(false);
       setFiles([]);
       setSearchMunicipe("");
@@ -205,7 +236,7 @@ export function NovaDemandaDialog() {
         logradouro: "",
         numero: "",
         bairro: "",
-        cidade: "São Paulo",
+        cidade: "Santo André",
         cep: "",
         complemento: "",
         observacoes: ""
@@ -225,7 +256,7 @@ export function NovaDemandaDialog() {
     if (!formData.titulo || !formData.descricao || !formData.municipe_id) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios.",
+        description: "Preencha o título, descrição e selecione um munícipe.",
         variant: "destructive"
       });
       return;
@@ -233,18 +264,21 @@ export function NovaDemandaDialog() {
     createDemanda.mutate(formData);
   };
 
+  const selectedMunicipe = municipes.find(m => m.id === formData.municipe_id);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+        <Button>
           <Plus className="h-4 w-4 mr-2" />
           Nova Demanda
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Demanda</DialogTitle>
         </DialogHeader>
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações Básicas */}
           <div className="space-y-4">
@@ -256,7 +290,7 @@ export function NovaDemandaDialog() {
                 id="titulo"
                 value={formData.titulo}
                 onChange={(e) => setFormData(prev => ({ ...prev, titulo: e.target.value }))}
-                placeholder="Digite o título da demanda"
+                placeholder="Título da demanda"
                 required
               />
             </div>
@@ -267,83 +301,27 @@ export function NovaDemandaDialog() {
                 id="descricao"
                 value={formData.descricao}
                 onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-                placeholder="Descreva detalhadamente a demanda"
+                placeholder="Descreva a demanda em detalhes"
                 rows={4}
                 required
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea
-                id="observacoes"
-                value={formData.observacoes}
-                onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                placeholder="Observações adicionais"
-                rows={3}
-              />
-            </div>
-          </div>
-
-          {/* Upload de Arquivos */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Anexos</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="files">Arquivos (PDF, JPG, PNG)</Label>
-              <Input
-                id="files"
-                type="file"
-                multiple
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-            </div>
-
-            {files.length > 0 && (
-              <div className="space-y-2">
-                <Label>Arquivos selecionados:</Label>
-                <div className="space-y-2">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        <span className="text-sm">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Vinculações */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Vinculações</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="municipe">Munícipe *</Label>
-                
-                {/* Select com busca integrada */}
                 <div className="relative">
+                  {selectedMunicipe && (
+                    <div className="flex items-center justify-between p-2 border rounded-md bg-accent mb-2">
+                      <span className="text-sm">{selectedMunicipe.nome}</span>
+                      <X 
+                        className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground" 
+                        onClick={() => setFormData(prev => ({ ...prev, municipe_id: "" }))}
+                      />
+                    </div>
+                  )}
                   <Input
-                    placeholder={formData.municipe_id ? 
-                      municipes.find(m => m.id === formData.municipe_id)?.nome || "Selecione um munícipe" 
-                      : "Digite para buscar munícipe..."
-                    }
+                    placeholder="Buscar munícipe..."
                     value={searchMunicipe}
                     onChange={(e) => {
                       setSearchMunicipe(e.target.value);
@@ -351,14 +329,12 @@ export function NovaDemandaDialog() {
                     }}
                     onFocus={() => setShowMunicipeDropdown(true)}
                     onBlur={() => {
-                      // Delay para permitir clique nos itens
                       setTimeout(() => setShowMunicipeDropdown(false), 200);
                     }}
                     className="pr-10"
                   />
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
                   
-                  {/* Dropdown com resultados - só aparece quando necessário */}
                   {showMunicipeDropdown && (searchMunicipe.length > 0 || !formData.municipe_id) && (
                     <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                       {filteredMunicipes.length > 0 ? (
@@ -448,7 +424,11 @@ export function NovaDemandaDialog() {
 
           {/* Endereço */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">(será mapeado automaticamente)</span>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -548,6 +528,54 @@ export function NovaDemandaDialog() {
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="observacoes">Observações</Label>
+              <Textarea
+                id="observacoes"
+                value={formData.observacoes}
+                onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                placeholder="Observações adicionais"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Anexos */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Anexos</h3>
+            
+            <div className="flex items-center gap-4">
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-accent">
+                  <Upload className="h-4 w-4" />
+                  <span className="text-sm">Adicionar arquivo</span>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-xs text-muted-foreground">PDF, JPG, PNG (máx. 10MB cada)</span>
+            </div>
+
+            {files.length > 0 && (
+              <div className="space-y-2">
+                {files.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-accent rounded-md">
+                    <span className="text-sm truncate">{file.name}</span>
+                    <X 
+                      className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground" 
+                      onClick={() => removeFile(index)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -555,7 +583,14 @@ export function NovaDemandaDialog() {
               Cancelar
             </Button>
             <Button type="submit" disabled={createDemanda.isPending}>
-              {createDemanda.isPending ? "Criando..." : "Criar Demanda"}
+              {createDemanda.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                "Criar Demanda"
+              )}
             </Button>
           </div>
         </form>
