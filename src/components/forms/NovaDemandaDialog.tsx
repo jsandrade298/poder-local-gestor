@@ -504,7 +504,7 @@ export function NovaDemandaDialog() {
                   Localização mapeada: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
                   {coordenadas.fonte && (
                     <span className="text-xs text-green-500 ml-2">
-                      (via {coordenadas.fonte === 'brasilapi' ? 'BrasilAPI' : 'OpenStreetMap'})
+                      (via {coordenadas.fonte === 'brasilapi' ? 'BrasilAPI' : coordenadas.fonte === 'mapbox' ? 'Mapbox' : 'OpenStreetMap'})
                     </span>
                   )}
                 </span>
