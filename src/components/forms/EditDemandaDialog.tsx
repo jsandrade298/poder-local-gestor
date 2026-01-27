@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, X, Download } from "lucide-react";
+import { Upload, X, Download, Search, MapPin, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
+import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useGeocoding } from "@/hooks/useGeocoding";
 
 interface EditDemandaDialogProps {
   open: boolean;
@@ -84,6 +86,102 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   });
 
+  // Hooks de CEP e Geolocalização
+  const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
+  const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
+    lat: demanda?.latitude || null,
+    lng: demanda?.longitude || null
+  });
+
+  // Atualizar coordenadas quando demanda mudar
+  useEffect(() => {
+    if (demanda) {
+      setCoordenadas({
+        lat: demanda.latitude || null,
+        lng: demanda.longitude || null
+      });
+    }
+  }, [demanda]);
+
+  // Funções de CEP
+  const validarCep = (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    return cepLimpo.length === 8;
+  };
+
+  const handleCepChange = (value: string) => {
+    // Formatar CEP automaticamente (99999-999)
+    const cepLimpo = value.replace(/\D/g, '');
+    let cepFormatado = cepLimpo;
+    if (cepLimpo.length > 5) {
+      cepFormatado = `${cepLimpo.slice(0, 5)}-${cepLimpo.slice(5, 8)}`;
+    }
+    setFormData(prev => ({ ...prev, cep: cepFormatado }));
+  };
+
+  const handleBuscarCep = async () => {
+    const cepLimpo = formData.cep.replace(/\D/g, '');
+    if (!validarCep(formData.cep)) {
+      toast.error('CEP inválido');
+      return;
+    }
+
+    const resultado = await buscarCep(cepLimpo);
+    if (resultado) {
+      setFormData(prev => ({
+        ...prev,
+        logradouro: resultado.street || prev.logradouro,
+        bairro: resultado.neighborhood || prev.bairro,
+        cidade: resultado.city || prev.cidade
+      }));
+      toast.success('Endereço encontrado!');
+    }
+  };
+
+  const handleAtualizarGeolocalizacao = async () => {
+    const enderecoCompleto = [
+      formData.logradouro,
+      formData.numero,
+      formData.bairro,
+      formData.cidade,
+      'SP',
+      'Brasil'
+    ].filter(Boolean).join(', ');
+
+    if (!formData.logradouro || !formData.cidade) {
+      toast.error('Preencha ao menos o logradouro e a cidade para geocodificar');
+      return;
+    }
+
+    const resultado = await geocodificarEndereco(enderecoCompleto);
+    if (resultado) {
+      setCoordenadas({ lat: resultado.lat, lng: resultado.lng });
+      toast.success(`Coordenadas atualizadas: ${resultado.lat.toFixed(6)}, ${resultado.lng.toFixed(6)}`);
+    } else {
+      toast.error('Não foi possível encontrar as coordenadas para este endereço');
+    }
+  };
+
+  // Função para mapear status antigos para novos
+  const mapStatusAntigoParaNovo = (status: string): "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido" => {
+    const mapeamento: Record<string, "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido"> = {
+      'aberta': 'solicitada',
+      'em_andamento': 'em_producao',
+      'aguardando': 'encaminhado',
+      'resolvida': 'atendido',
+      'cancelada': 'devolvido',
+      // Novos valores já mapeados para si mesmos
+      'solicitada': 'solicitada',
+      'em_producao': 'em_producao',
+      'encaminhado': 'encaminhado',
+      'devolvido': 'devolvido',
+      'visitado': 'visitado',
+      'atendido': 'atendido'
+    };
+    return mapeamento[status] || 'solicitada';
+  };
+
   // Preencher formulário quando demanda mudar
   useEffect(() => {
     if (demanda) {
@@ -94,7 +192,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         area_id: demanda.area_id || "",
         prioridade: demanda.prioridade || "media",
         responsavel_id: demanda.responsavel_id || "",
-        status: demanda.status || "solicitada",
+        status: mapStatusAntigoParaNovo(demanda.status || "solicitada"),
         data_prazo: demanda.data_prazo || "",
         logradouro: demanda.logradouro || "",
         numero: demanda.numero || "",
@@ -203,10 +301,13 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         logradouro: data.logradouro || null,
         numero: data.numero || null,
         bairro: data.bairro || null,
-        cep: data.cep || null,
+        cep: data.cep?.replace(/\D/g, '') || null,
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
-        resolucao: data.resolucao || null
+        resolucao: data.resolucao || null,
+        latitude: coordenadas.lat,
+        longitude: coordenadas.lng,
+        geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
       };
 
       const { error } = await supabase
@@ -580,7 +681,39 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
           {/* Endereço */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            {/* Campo CEP com busca */}
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cep"
+                    value={formData.cep}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={handleBuscarCep}
+                    disabled={isBuscandoCep || !validarCep(formData.cep)}
+                  >
+                    {isBuscandoCep ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -624,16 +757,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                  placeholder="00000-000"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="complemento">Complemento</Label>
                 <Input
                   id="complemento"
@@ -642,6 +765,36 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                   placeholder="Apt, Bloco, etc."
                 />
               </div>
+            </div>
+
+            {/* Geolocalização */}
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Geolocalização</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAtualizarGeolocalizacao}
+                  disabled={isGeocodificando || !formData.logradouro}
+                >
+                  {isGeocodificando ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <MapPin className="h-4 w-4 mr-2" />
+                  )}
+                  Atualizar Coordenadas
+                </Button>
+              </div>
+              {coordenadas.lat && coordenadas.lng ? (
+                <p className="text-xs text-muted-foreground">
+                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Sem coordenadas. Clique em "Atualizar Coordenadas" após preencher o endereço.
+                </p>
+              )}
             </div>
           </div>
 
