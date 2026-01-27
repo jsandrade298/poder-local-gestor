@@ -653,7 +653,7 @@ export default function MapaUnificado() {
         </div>
         
         {/* Mapa */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative" style={{ zIndex: 1 }}>
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
               <div className="text-center">
@@ -665,7 +665,7 @@ export default function MapaUnificado() {
             <MapContainer
               center={[center.lat, center.lng]}
               zoom={zoom}
-              style={{ height: '100%', width: '100%' }}
+              style={{ height: '100%', width: '100%', zIndex: 1 }}
               scrollWheelZoom={true}
             >
               <TileLayer
@@ -709,16 +709,16 @@ export default function MapaUnificado() {
                 />
               ))}
 
-              {/* Clusters de Munícipes */}
+              {/* Clusters de Munícipes - deslocados para cima para não sobrepor demandas */}
               {municipeClusters.map((cluster, idx) => (
                 <Marker
                   key={`municipe-cluster-${idx}`}
                   position={[cluster.lat, cluster.lng]}
                   icon={new DivIcon({
-                    html: `<div style="background:#6366f1;border:3px solid #4338ca;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">${cluster.items.length}</div>`,
+                    html: `<div style="background:#6366f1;border:3px solid #4338ca;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;">${cluster.items.length}</div>`,
                     className: '',
-                    iconSize: [40, 40],
-                    iconAnchor: [20, 20]
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 54]
                   })}
                   eventHandlers={{
                     click: () => abrirClusterMunicipes(cluster.items)
