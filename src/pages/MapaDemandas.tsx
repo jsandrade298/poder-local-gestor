@@ -164,7 +164,7 @@ export default function MapaDemandas() {
   const stats = useMemo(() => {
     const total = demandasFiltradas.length;
     const porStatus = demandasFiltradas.reduce((acc, d) => {
-      const status = d.status || 'aberta';
+      const status = d.status || 'solicitada';
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
