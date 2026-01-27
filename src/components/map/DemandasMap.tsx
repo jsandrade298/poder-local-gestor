@@ -87,7 +87,21 @@ function createColoredIcon(color: string): Icon {
   });
 }
 
-export default function DemandasMap({ 
+// Formata o status para exibição
+function formatStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    solicitada: 'Solicitada',
+    em_producao: 'Em Produção',
+    encaminhado: 'Encaminhado',
+    devolvido: 'Devolvido',
+    visitado: 'Visitado',
+    atendido: 'Atendido'
+  };
+  return statusMap[status] || status;
+}
+
+// Componente principal do mapa - NAMED EXPORT
+export function DemandasMap({ 
   markers, 
   config, 
   height = '500px',
@@ -168,20 +182,7 @@ export default function DemandasMap({
   );
 }
 
-// Formata o status para exibição
-function formatStatus(status: string): string {
-  const statusMap: Record<string, string> = {
-    solicitada: 'Solicitada',
-    em_producao: 'Em Produção',
-    encaminhado: 'Encaminhado',
-    devolvido: 'Devolvido',
-    visitado: 'Visitado',
-    atendido: 'Atendido'
-  };
-  return statusMap[status] || status;
-}
-
-// Componente de legenda do mapa
+// Componente de legenda do mapa - NAMED EXPORT
 export function MapLegend() {
   return (
     <div className="flex flex-wrap gap-3 p-3 bg-white rounded-lg border border-gray-200">
