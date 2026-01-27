@@ -233,33 +233,36 @@ export default function Demandas() {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'aberta': return 'default';
-      case 'em_andamento': return 'secondary';
-      case 'aguardando': return 'outline';
-      case 'resolvida': return 'default';
-      case 'cancelada': return 'destructive';
+      case 'solicitada': return 'default';
+      case 'em_producao': return 'secondary';
+      case 'encaminhado': return 'outline';
+      case 'atendido': return 'default';
+      case 'devolvido': return 'destructive';
+      case 'visitado': return 'secondary';
       default: return 'secondary';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'aberta': return 'hsl(var(--chart-1))'; // #3b82f6
-      case 'em_andamento': return 'hsl(var(--chart-2))'; // #f59e0b
-      case 'aguardando': return 'hsl(var(--chart-3))'; // #8b5cf6
-      case 'resolvida': return 'hsl(var(--chart-4))'; // #10b981
-      case 'cancelada': return 'hsl(var(--chart-5))'; // #ef4444
+      case 'solicitada': return 'hsl(var(--chart-1))'; // #3b82f6
+      case 'em_producao': return 'hsl(var(--chart-2))'; // #f59e0b
+      case 'encaminhado': return 'hsl(var(--chart-3))'; // #8b5cf6
+      case 'atendido': return 'hsl(var(--chart-4))'; // #10b981
+      case 'devolvido': return 'hsl(var(--chart-5))'; // #ef4444
+      case 'visitado': return '#06b6d4'; // Ciano
       default: return 'hsl(var(--muted-foreground))';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'aberta': return 'Aberta';
-      case 'em_andamento': return 'Em Andamento';
-      case 'aguardando': return 'Aguardando';
-      case 'resolvida': return 'Resolvida';
-      case 'cancelada': return 'Cancelada';
+      case 'solicitada': return 'Solicitada';
+      case 'em_producao': return 'Em Produção';
+      case 'encaminhado': return 'Encaminhado';
+      case 'atendido': return 'Atendido';
+      case 'devolvido': return 'Devolvido';
+      case 'visitado': return 'Visitado';
       default: return status;
     }
   };
@@ -301,7 +304,7 @@ export default function Demandas() {
     // Filtro de atraso
     let matchesAtraso = true;
     if (atrasoFilter !== "all") {
-      if (!demanda.data_prazo || demanda.status === 'resolvida' || demanda.status === 'cancelada') {
+      if (!demanda.data_prazo || demanda.status === 'atendido' || demanda.status === 'devolvido') {
         matchesAtraso = false;
       } else {
         const today = new Date('2025-09-03'); // Data atual para teste
@@ -513,10 +516,10 @@ export default function Demandas() {
             
             // Mapear status para valores válidos do enum
             const statusMap: Record<string, string> = {
-              'aberta': 'aberta',
-              'em andamento': 'em_andamento',
-              'resolvida': 'resolvida',
-              'cancelada': 'cancelada'
+              'solicitada': 'solicitada',
+              'em andamento': 'em_producao',
+              'atendido': 'atendido',
+              'devolvido': 'devolvido'
             };
             
             console.log('🔍 Demanda original:', JSON.stringify({
@@ -532,8 +535,8 @@ export default function Demandas() {
               : 'media';
               
             const statusNormalizado = demanda.status 
-              ? statusMap[demanda.status.toLowerCase()] || 'aberta'
-              : 'aberta';
+              ? statusMap[demanda.status.toLowerCase()] || 'solicitada'
+              : 'solicitada';
               
             console.log('✅ Valores normalizados:', JSON.stringify({
               prioridade_original: demanda.prioridade,
@@ -924,14 +927,14 @@ export default function Demandas() {
                 demanda.responsavelId = responsavelMap.get(normalized);
               } else if (key === 'status') {
                 const statusMap: Record<string, string> = {
-                  'aberta': 'aberta',
-                  'em andamento': 'em_andamento',
-                  'em_andamento': 'em_andamento',
-                  'aguardando': 'aguardando',
-                  'resolvida': 'resolvida',
-                  'cancelada': 'cancelada'
+                  'solicitada': 'solicitada',
+                  'em andamento': 'em_producao',
+                  'em_producao': 'em_producao',
+                  'encaminhado': 'encaminhado',
+                  'atendido': 'atendido',
+                  'devolvido': 'devolvido'
                 };
-                demanda.status = statusMap[value.toLowerCase()] || 'aberta';
+                demanda.status = statusMap[value.toLowerCase()] || 'solicitada';
               } else if (key === 'prioridade') {
                 const prioridadeMap: Record<string, string> = {
                   'baixa': 'baixa',
@@ -1103,7 +1106,7 @@ export default function Demandas() {
         municipeId: d.municipeId,
         areaId: d.areaId || null,
         responsavelId: d.responsavelId || null,
-        status: d.status || 'aberta',
+        status: d.status || 'solicitada',
         prioridade: d.prioridade || 'media',
         logradouro: d.logradouro || null,
         numero: d.numero || null,
@@ -1233,11 +1236,12 @@ export default function Demandas() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="aberta">Aberta</SelectItem>
-                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                    <SelectItem value="aguardando">Aguardando</SelectItem>
-                    <SelectItem value="resolvida">Resolvida</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                    <SelectItem value="solicitada">Solicitada</SelectItem>
+                    <SelectItem value="em_producao">Em Produção</SelectItem>
+                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
+                    <SelectItem value="atendido">Atendido</SelectItem>
+                    <SelectItem value="devolvido">Devolvido</SelectItem>
+                    <SelectItem value="visitado">Visitado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
