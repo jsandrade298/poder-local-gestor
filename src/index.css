@@ -267,3 +267,28 @@ table {
 .scrollbar-always::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--accent)) !important;
 }
+
+/* Leaflet - Controle de z-index para não sobrepor modais */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}
+
+.leaflet-popup {
+  z-index: 20 !important;
+}
+
+/* Garantir que modais ficam acima do mapa */
+[data-radix-portal],
+[role="dialog"],
+.fixed[data-state="open"] {
+  z-index: 50 !important;
+}
