@@ -131,10 +131,16 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     if (resultado) {
       setFormData(prev => ({
         ...prev,
-        logradouro: resultado.street || prev.logradouro,
-        bairro: resultado.neighborhood || prev.bairro,
-        cidade: resultado.city || prev.cidade
+        logradouro: resultado.logradouro || prev.logradouro,
+        bairro: resultado.bairro || prev.bairro,
+        cidade: resultado.cidade || prev.cidade
       }));
+      
+      // Atualizar coordenadas se disponíveis
+      if (resultado.latitude && resultado.longitude) {
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+      }
+      
       toast.success('Endereço encontrado!');
     }
   };
