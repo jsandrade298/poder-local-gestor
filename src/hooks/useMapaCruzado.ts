@@ -42,6 +42,7 @@ export function useMapaCruzado(filtros?: FiltrosCruzados) {
 
       try {
         // 1. Buscar demandas (QUERY SIMPLIFICADA)
+        // CORREÇÃO: Removido 'cor' do select de areas para evitar erro 400
         let demandaQuery = supabase
           .from('demandas')
           .select(`
@@ -57,8 +58,7 @@ export function useMapaCruzado(filtros?: FiltrosCruzados) {
             area_id,
             areas (
               id,
-              nome,
-              cor
+              nome
             )
           `)
           .not('latitude', 'is', null)
@@ -142,7 +142,8 @@ export function useMapaCruzado(filtros?: FiltrosCruzados) {
             area: d.areas ? {
               id: d.areas.id,
               nome: d.areas.nome,
-              cor: d.areas.cor
+              // CORREÇÃO: Definindo cor padrão já que a coluna não existe
+              cor: '#3b82f6' 
             } : undefined,
             originalData: d
           }));
