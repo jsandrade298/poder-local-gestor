@@ -1,6 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface AreaMapa {
+  id: string;
+  nome: string;
+  cor: string | null;
+}
+
+export interface TagMapa {
+  id: string;
+  nome: string;
+  cor: string | null;
+}
 export function useMapaUnificado() {
   // --- BUSCA DEMANDAS (Com Áreas) ---
   const { data: demandas = [], isLoading: isLoadingDemandas, refetch: refetchDemandas } = useQuery({
