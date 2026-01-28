@@ -108,29 +108,37 @@ const createAdvancedClusterIcon = (cluster: any) => {
   let corMunicipes = '#3b82f6';
   
   if (demandas.length > 0) {
-    const areaMaisComum = demandas
-      .map((m: any) => m.options.area)
-      .filter(Boolean)
-      .reduce((acc: any, area: any) => {
-        acc[area.cor] = (acc[area.cor] || 0) + 1;
-        return acc;
-      }, {});
+    // Encontrar a cor de área mais comum entre as demandas
+    const areasComCores = demandas
+      .map((m: any) => m.options.area?.cor)
+      .filter(Boolean);
     
-    const corMaisComum = Object.entries(areaMaisComum).sort((a: any, b: any) => b[1] - a[1])[0];
-    if (corMaisComum) corDemandas = corMaisComum[0];
-  }
-  
-  if (municipes.length > 0) {
-    const tagMaisComum = municipes
-      .flatMap((m: any) => m.options.tagCores || [])
-      .filter(Boolean)
-      .reduce((acc: any, cor: string) => {
+    if (areasComCores.length > 0) {
+      const contagemCores = areasComCores.reduce((acc: any, cor: string) => {
         acc[cor] = (acc[cor] || 0) + 1;
         return acc;
       }, {});
+      
+      const corMaisComum = Object.entries(contagemCores).sort((a: any, b: any) => b[1] - a[1])[0];
+      if (corMaisComum) corDemandas = corMaisComum[0] as string;
+    }
+  }
+  
+  if (municipes.length > 0) {
+    // Encontrar a cor de tag mais comum entre os munícipes
+    const coresTags = municipes
+      .flatMap((m: any) => m.options.tagCores || [])
+      .filter(Boolean);
     
-    const corMaisComum = Object.entries(tagMaisComum).sort((a: any, b: any) => b[1] - a[1])[0];
-    if (corMaisComum) corMunicipes = corMaisComum[0];
+    if (coresTags.length > 0) {
+      const contagemCores = coresTags.reduce((acc: any, cor: string) => {
+        acc[cor] = (acc[cor] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const corMaisComum = Object.entries(contagemCores).sort((a: any, b: any) => b[1] - a[1])[0];
+      if (corMaisComum) corMunicipes = corMaisComum[0] as string;
+    }
   }
   
   // Criar gráfico de pizza
@@ -206,7 +214,8 @@ export function ClusterMapAvancado({
       tags: m.options.tags,
       tagCores: m.options.tagCores,
       area: m.options.area,
-      ...m.options.originalData
+      status: m.options.status,
+      originalData: m.options.originalData
     }));
     
     onClusterClick(markersData);
@@ -214,7 +223,7 @@ export function ClusterMapAvancado({
 
   const handleMarkerClick = useCallback((marker: MapMarker) => {
     onClusterClick([marker]);
-  }, [onClusterClick]);
+  }, [onClipboard]);
 
   const validMarkers = markers.filter(m => {
     const lat = Number(m.latitude);
@@ -268,6 +277,7 @@ export function ClusterMapAvancado({
               tags={marker.tags}
               tagCores={marker.tagCores}
               area={marker.area}
+              status={marker.status}
               originalData={marker.originalData}
               eventHandlers={{
                 click: () => handleMarkerClick(marker),
