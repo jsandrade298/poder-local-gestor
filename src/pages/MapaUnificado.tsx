@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   MapPin, RefreshCw, Search, Filter, 
   Route as RouteIcon, Navigation, Layers, Tag,
-  Check, ChevronsUpDown, X
+  Check, ChevronsUpDown, X, Eye, PlusCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,17 +37,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner"; // Para o aviso de "Em breve" da rota
 
+// --- COMPONENTES DE MAPA E MODAIS ---
 import { ClusterMap, MapMarker } from '@/components/map/ClusterMap';
+import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
+import { MunicipeDetailsDialog } from '@/components/forms/MunicipeDetailsDialog';
 
 // --- CONFIGURAÇÃO DE CORES DE STATUS ---
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  'solicitada': { color: '#64748b', label: 'Solicitada' },      // Slate
-  'em_producao': { color: '#eab308', label: 'Em Produção' },    // Amarelo
-  'encaminhado': { color: '#3b82f6', label: 'Encaminhado' },    // Azul
-  'atendido': { color: '#22c55e', label: 'Atendido' },          // Verde
-  'devolvido': { color: '#ef4444', label: 'Devolvido' },        // Vermelho
-  'visitado': { color: '#a855f7', label: 'Visitado' }           // Roxo/Lilás
+  'solicitada': { color: '#64748b', label: 'Solicitada' },      
+  'em_producao': { color: '#eab308', label: 'Em Produção' },    
+  'encaminhado': { color: '#3b82f6', label: 'Encaminhado' },    
+  'atendido': { color: '#22c55e', label: 'Atendido' },          
+  'devolvido': { color: '#ef4444', label: 'Devolvido' },        
+  'visitado': { color: '#a855f7', label: 'Visitado' }           
 };
 
 const normalizeStatusKey = (status: string) => {
@@ -77,10 +81,10 @@ function MultiSelectFilter({ title, options, selectedValues, onChange, icon }: M
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-auto py-2 px-3">
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-auto py-2 px-3 text-left font-normal">
           <div className="flex items-center gap-2 truncate">
             {icon}
-            <span className="truncate">
+            <span className="truncate block">
               {selectedValues.length === 0 && title}
               {selectedValues.length === 1 && options.find(o => o.value === selectedValues[0])?.label}
               {selectedValues.length > 1 && `${selectedValues.length} selecionados`}
@@ -89,7 +93,7 @@ function MultiSelectFilter({ title, options, selectedValues, onChange, icon }: M
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
+      <PopoverContent className="w-[280px] p-0" align="start">
         <Command>
           <CommandInput placeholder={`Buscar ${title}...`} />
           <CommandList>
@@ -164,19 +168,23 @@ export default function MapaUnificado() {
   const { center, zoom } = useMapConfig();
   const { demandas, municipes, isLoading, refetch } = useMapaUnificado();
 
-  // --- ESTADOS ---
+  // --- ESTADOS UI ---
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<MapMarker[]>([]);
   const [activeTabLeft, setActiveTabLeft] = useState("filtros");
   
-  // Estados de Filtro (AGORA SÃO ARRAYS PARA MULTI-SELEÇÃO)
+  // --- ESTADOS PARA MODAIS DE DETALHES ---
+  const [demandaIdToView, setDemandaIdToView] = useState<string | null>(null);
+  const [municipeIdToView, setMunicipeIdToView] = useState<string | null>(null);
+  
+  // Estados de Filtro
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [tipoFilter, setTipoFilter] = useState<string[]>([]); // 'demanda', 'municipe'
+  const [tipoFilter, setTipoFilter] = useState<string[]>([]);
 
-  // --- OPÇÕES DOS FILTROS (Extraídas dos dados) ---
+  // --- OPÇÕES DOS FILTROS ---
   const filterOptions = useMemo(() => {
     const areas = new Set<string>();
     const tags = new Set<string>();
@@ -213,7 +221,7 @@ export default function MapaUnificado() {
 
   // --- FILTRAGEM DOS DADOS ---
   const filteredMarkers = useMemo(() => {
-    // 1. Converter Demandas
+    // 1. Demandas
     const demandaMarkers: MapMarker[] = demandas.map(d => {
       const statusKey = normalizeStatusKey(d.status);
       const config = STATUS_CONFIG[statusKey] || STATUS_CONFIG['solicitada'];
@@ -230,7 +238,7 @@ export default function MapaUnificado() {
       };
     });
 
-    // 2. Converter Munícipes
+    // 2. Munícipes
     const municipeMarkers: MapMarker[] = municipes.map(m => ({
       id: m.id,
       latitude: m.latitude,
@@ -244,9 +252,8 @@ export default function MapaUnificado() {
 
     let all = [...demandaMarkers, ...municipeMarkers];
 
-    // --- APLICAR FILTROS (MULTI-SELEÇÃO) ---
+    // --- APLICAR FILTROS ---
 
-    // 1. Texto (Busca Global)
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       all = all.filter(m => 
@@ -255,12 +262,10 @@ export default function MapaUnificado() {
       );
     }
 
-    // 2. Tipo (Multi-select)
     if (tipoFilter.length > 0) {
       all = all.filter(m => tipoFilter.includes(m.type));
     }
 
-    // 3. Status (Apenas Demandas - Inclusivo)
     if (statusFilter.length > 0) {
       all = all.filter(m => {
         if (m.type === 'municipe') return true;
@@ -268,7 +273,6 @@ export default function MapaUnificado() {
       });
     }
 
-    // 4. Áreas (Apenas Demandas - Inclusivo)
     if (areaFilter.length > 0) {
       all = all.filter(m => {
         if (m.type === 'municipe') return true;
@@ -277,7 +281,6 @@ export default function MapaUnificado() {
       });
     }
 
-    // 5. Tags (Apenas Munícipes - Inclusivo)
     if (tagFilter.length > 0) {
       all = all.filter(m => {
         if (m.type === 'demanda') return true;
@@ -298,10 +301,15 @@ export default function MapaUnificado() {
     setIsRightPanelOpen(true);
   };
 
+  const handleAddToRoute = () => {
+    toast.info("Funcionalidade de Rota em desenvolvimento", {
+        description: "Em breve você poderá adicionar itens à rota otimizada."
+    });
+  };
+
   const selectedDemandas = selectedItems.filter(i => i.type === 'demanda');
   const selectedMunicipes = selectedItems.filter(i => i.type === 'municipe');
 
-  // --- UI ---
   return (
     <div className="flex w-full h-[calc(100vh-4rem)] overflow-hidden bg-gray-100 relative">
       
@@ -326,8 +334,7 @@ export default function MapaUnificado() {
           </div>
 
           <TabsContent value="filtros" className="flex-1 p-4 space-y-5 overflow-y-auto">
-            
-            {/* Busca */}
+            {/* ... Conteúdo dos Filtros (Busca, MultiSelects, etc) ... */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-gray-500">Busca Rápida</Label>
               <div className="relative">
@@ -340,31 +347,15 @@ export default function MapaUnificado() {
                 />
               </div>
             </div>
-
             <Separator />
-
             <div className="space-y-4">
-              
-              {/* Filtro: Tipo */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-gray-500">Tipo de Dado</Label>
-                <MultiSelectFilter 
-                  title="Todos os tipos" 
-                  options={filterOptions.tipos} 
-                  selectedValues={tipoFilter} 
-                  onChange={setTipoFilter}
-                />
+                <MultiSelectFilter title="Todos os tipos" options={filterOptions.tipos} selectedValues={tipoFilter} onChange={setTipoFilter} />
               </div>
-
-              {/* Filtro: Status */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase text-gray-500">Status (Demandas)</Label>
-                <MultiSelectFilter 
-                  title="Todos os status" 
-                  options={filterOptions.status} 
-                  selectedValues={statusFilter} 
-                  onChange={setStatusFilter}
-                />
+                <MultiSelectFilter title="Todos os status" options={filterOptions.status} selectedValues={statusFilter} onChange={setStatusFilter} />
                 {statusFilter.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {statusFilter.map(s => (
@@ -375,35 +366,15 @@ export default function MapaUnificado() {
                   </div>
                 )}
               </div>
-
-              {/* Filtro: Áreas */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-2">
-                    <Layers className="h-3 w-3" /> Áreas (Demandas)
-                </Label>
-                <MultiSelectFilter 
-                  title="Todas as áreas" 
-                  options={filterOptions.areas} 
-                  selectedValues={areaFilter} 
-                  onChange={setAreaFilter}
-                />
+                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-2"><Layers className="h-3 w-3" /> Áreas (Demandas)</Label>
+                <MultiSelectFilter title="Todas as áreas" options={filterOptions.areas} selectedValues={areaFilter} onChange={setAreaFilter} />
               </div>
-
-              {/* Filtro: Tags */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-2">
-                    <Tag className="h-3 w-3" /> Tags (Munícipes)
-                </Label>
-                <MultiSelectFilter 
-                  title="Todas as tags" 
-                  options={filterOptions.tags} 
-                  selectedValues={tagFilter} 
-                  onChange={setTagFilter}
-                />
+                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-2"><Tag className="h-3 w-3" /> Tags (Munícipes)</Label>
+                <MultiSelectFilter title="Todas as tags" options={filterOptions.tags} selectedValues={tagFilter} onChange={setTagFilter} />
               </div>
-
             </div>
-
             <Button variant="outline" className="w-full mt-4" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" /> Atualizar Mapa
             </Button>
@@ -418,9 +389,7 @@ export default function MapaUnificado() {
                     Selecione pontos no mapa para criar uma lista de visita otimizada.
                 </p>
             </div>
-            <div className="mt-8 text-center text-gray-400 text-sm">
-                (Funcionalidade em desenvolvimento)
-            </div>
+            <div className="mt-8 text-center text-gray-400 text-sm">(Funcionalidade em desenvolvimento)</div>
           </TabsContent>
         </Tabs>
       </aside>
@@ -432,7 +401,6 @@ export default function MapaUnificado() {
             <Skeleton className="h-12 w-12 rounded-full" />
           </div>
         )}
-        
         <div className="absolute inset-0 z-0">
             <ClusterMap
                 markers={filteredMarkers}
@@ -485,7 +453,6 @@ export default function MapaUnificado() {
                         </span>
                       </div>
                       <h4 className="font-semibold text-sm mb-1 text-gray-900 leading-tight">{item.title}</h4>
-                      
                       <div className="flex items-start gap-1.5 mb-3 mt-2">
                         <MapPin className="h-3.5 w-3.5 text-gray-400 mt-0.5 shrink-0" />
                         <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
@@ -493,9 +460,25 @@ export default function MapaUnificado() {
                         </p>
                       </div>
                       
-                      <Button size="sm" variant="outline" className="w-full text-xs h-8 bg-gray-50 border-dashed">
-                        Ver Detalhes
-                      </Button>
+                      {/* BOTÕES DE AÇÃO - DEMANDA */}
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            className="w-full text-xs h-8"
+                            onClick={() => setDemandaIdToView(item.id)}
+                        >
+                            <Eye className="w-3 h-3 mr-2" /> Ver Demanda
+                        </Button>
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="w-full text-xs h-8 border-dashed"
+                            onClick={handleAddToRoute}
+                        >
+                            <PlusCircle className="w-3 h-3 mr-2" /> Add a Rota
+                        </Button>
+                      </div>
                     </Card>
                   ))}
                 </ScrollArea>
@@ -505,28 +488,50 @@ export default function MapaUnificado() {
             <TabsContent value="municipes" className="flex-1 overflow-auto p-4 space-y-3 m-0">
                 <ScrollArea className="h-full pr-3">
                   {selectedMunicipes.map((item) => (
-                    <Card key={item.id} className="p-3 bg-white border-l-4 border-blue-500 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0 border border-blue-100">
-                        {item.title.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium truncate text-gray-900">{item.title}</h4>
-                        <div className="flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3 text-gray-400" />
-                            <span className="text-[10px] text-gray-500 truncate max-w-[200px]">
-                                {formatAddress(item.originalData)}
-                            </span>
+                    <Card key={item.id} className="p-3 bg-white border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0 border border-blue-100">
+                            {item.title.substring(0, 2).toUpperCase()}
                         </div>
-                        {item.originalData.tags && item.originalData.tags.length > 0 && (
-                            <div className="flex gap-1 mt-2 flex-wrap">
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {item.originalData.tags.slice(0, 3).map((t: any, idx: number) => (
-                                    <span key={idx} className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border">
-                                        {typeof t === 'object' ? t.nome : t}
-                                    </span>
-                                ))}
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium truncate text-gray-900">{item.title}</h4>
+                            <div className="flex items-center gap-1 mt-1">
+                                <MapPin className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] text-gray-500 truncate max-w-[200px]">
+                                    {formatAddress(item.originalData)}
+                                </span>
                             </div>
-                        )}
+                            {item.originalData.tags && item.originalData.tags.length > 0 && (
+                                <div className="flex gap-1 mt-2 flex-wrap mb-2">
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    {item.originalData.tags.slice(0, 3).map((t: any, idx: number) => (
+                                        <span key={idx} className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border">
+                                            {typeof t === 'object' ? t.nome : t}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                      </div>
+
+                      {/* BOTÕES DE AÇÃO - MUNÍCIPE */}
+                      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-50">
+                        <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            className="w-full text-xs h-8"
+                            onClick={() => setMunicipeIdToView(item.id)}
+                        >
+                            <Eye className="w-3 h-3 mr-2" /> Ver Munícipe
+                        </Button>
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="w-full text-xs h-8 border-dashed"
+                            onClick={handleAddToRoute}
+                        >
+                            <PlusCircle className="w-3 h-3 mr-2" /> Add a Rota
+                        </Button>
                       </div>
                     </Card>
                   ))}
@@ -535,6 +540,25 @@ export default function MapaUnificado() {
           </Tabs>
         </SheetContent>
       </Sheet>
+
+      {/* MODAL: VER DEMANDA */}
+      {demandaIdToView && (
+        <ViewDemandaDialog
+          open={!!demandaIdToView}
+          onOpenChange={(open) => !open && setDemandaIdToView(null)}
+          demandaId={demandaIdToView}
+        />
+      )}
+
+      {/* MODAL: VER MUNÍCIPE */}
+      {municipeIdToView && (
+        <MunicipeDetailsDialog
+          open={!!municipeIdToView}
+          onOpenChange={(open) => !open && setMunicipeIdToView(null)}
+          municipeId={municipeIdToView}
+        />
+      )}
+
     </div>
   );
 }
