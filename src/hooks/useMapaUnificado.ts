@@ -1,431 +1,285 @@
-import { useState, useCallback } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
-export interface PontoRota {
+// === INTERFACES ===
+export interface DemandaMapa {
   id: string;
-  tipo: 'demanda' | 'municipe' | 'origem';
-  nome: string;
+  titulo: string;
+  descricao: string;
+  status: string | null;
+  prioridade: string | null;
+  protocolo: string;
   latitude: number;
   longitude: number;
-  endereco?: string;
+  bairro: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  cidade: string | null;
+  area_id: string | null;
+  municipe_id: string;
+  municipe_nome?: string;
+  created_at: string | null;
 }
 
-export interface RotaCalculada {
-  distancia: number; // em metros
-  duracao: number; // em segundos
-  polyline: [number, number][]; // coordenadas da rota
-  pontosOrdenados: PontoRota[]; // pontos na ordem otimizada
+export interface MunicipeMapa {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  bairro: string | null;
+  endereco: string | null;
+  cidade: string | null;
+  latitude: number;
+  longitude: number;
+  tag_ids: string[];
+  created_at: string | null;
 }
 
-// Formata distância
-export function formatarDistancia(metros: number): string {
-  if (metros < 1000) return `${Math.round(metros)} m`;
-  return `${(metros / 1000).toFixed(1)} km`;
+export interface AreaMapa {
+  id: string;
+  nome: string;
+  descricao: string | null;
 }
 
-// Formata duração
-export function formatarDuracao(segundos: number): string {
-  const horas = Math.floor(segundos / 3600);
-  const minutos = Math.floor((segundos % 3600) / 60);
-  if (horas > 0) return `${horas}h ${minutos}min`;
-  return `${minutos} min`;
+export interface TagMapa {
+  id: string;
+  nome: string;
+  cor: string | null;
 }
 
-// Calcula distância entre dois pontos (Haversine)
-function calcularDistanciaHaversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000; // Raio da Terra em metros
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-// Algoritmo Nearest Neighbor para TSP (Problema do Caixeiro Viajante)
-function otimizarOrdemPontos(origem: PontoRota, pontos: PontoRota[]): PontoRota[] {
-  if (pontos.length <= 1) return pontos;
-  
-  const naoVisitados = [...pontos];
-  const rotaOtimizada: PontoRota[] = [];
-  let pontoAtual = origem;
-  
-  while (naoVisitados.length > 0) {
-    let menorDistancia = Infinity;
-    let indiceMaisProximo = 0;
-    
-    // Encontrar o ponto mais próximo do atual
-    naoVisitados.forEach((ponto, index) => {
-      const distancia = calcularDistanciaHaversine(
-        pontoAtual.latitude, pontoAtual.longitude,
-        ponto.latitude, ponto.longitude
-      );
-      if (distancia < menorDistancia) {
-        menorDistancia = distancia;
-        indiceMaisProximo = index;
+// === HOOK PRINCIPAL ===
+export function useMapaUnificado() {
+  // Buscar demandas com coordenadas e nome do munícipe
+  const { 
+    data: rawDemandas, 
+    isLoading: loadingDemandas, 
+    refetch: refetchDemandas,
+    error: errorDemandas
+  } = useQuery({
+    queryKey: ['mapa-unificado-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select(`
+          id,
+          titulo,
+          descricao,
+          status,
+          prioridade,
+          protocolo,
+          latitude,
+          longitude,
+          bairro,
+          logradouro,
+          numero,
+          cidade,
+          area_id,
+          municipe_id,
+          created_at,
+          municipes!demandas_municipe_id_fkey (
+            nome
+          )
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao buscar demandas para mapa:', error);
+        throw error;
       }
-    });
-    
-    // Adicionar o mais próximo à rota e remover dos não visitados
-    const proximoPonto = naoVisitados.splice(indiceMaisProximo, 1)[0];
-    rotaOtimizada.push(proximoPonto);
-    pontoAtual = proximoPonto;
-  }
-  
-  return rotaOtimizada;
-}
+      
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutos
+  });
 
-// Melhoria 2-opt para refinar a rota
-function melhorarRota2Opt(pontos: PontoRota[]): PontoRota[] {
-  if (pontos.length < 4) return pontos;
-  
-  let melhorada = [...pontos];
-  let melhorou = true;
-  let iteracoes = 0;
-  const maxIteracoes = 100;
-  
-  while (melhorou && iteracoes < maxIteracoes) {
-    melhorou = false;
-    iteracoes++;
+  // Buscar munícipes com coordenadas e suas tags
+  const { 
+    data: rawMunicipes, 
+    isLoading: loadingMunicipes, 
+    refetch: refetchMunicipes,
+    error: errorMunicipes
+  } = useQuery({
+    queryKey: ['mapa-unificado-municipes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select(`
+          id,
+          nome,
+          telefone,
+          email,
+          bairro,
+          endereco,
+          cidade,
+          latitude,
+          longitude,
+          created_at,
+          municipe_tags (
+            tag_id
+          )
+        `)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('nome', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar munícipes para mapa:', error);
+        throw error;
+      }
+      
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // Buscar áreas
+  const { data: areas, isLoading: loadingAreas } = useQuery({
+    queryKey: ['mapa-unificado-areas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('areas')
+        .select('id, nome, descricao')
+        .order('nome', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar áreas:', error);
+        return [];
+      }
+      
+      return (data || []) as AreaMapa[];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Buscar tags
+  const { data: tags, isLoading: loadingTags } = useQuery({
+    queryKey: ['mapa-unificado-tags'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('id, nome, cor')
+        .order('nome', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar tags:', error);
+        return [];
+      }
+      
+      return (data || []) as TagMapa[];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Processar demandas para o formato do mapa
+  const demandas = useMemo((): DemandaMapa[] => {
+    if (!rawDemandas) return [];
     
-    for (let i = 0; i < melhorada.length - 2; i++) {
-      for (let j = i + 2; j < melhorada.length; j++) {
-        const d1 = calcularDistanciaHaversine(
-          melhorada[i].latitude, melhorada[i].longitude,
-          melhorada[i + 1].latitude, melhorada[i + 1].longitude
+    return rawDemandas
+      .filter(d => {
+        const lat = d.latitude;
+        const lng = d.longitude;
+        return (
+          lat !== null && 
+          lat !== undefined &&
+          lng !== null && 
+          lng !== undefined &&
+          !isNaN(Number(lat)) &&
+          !isNaN(Number(lng)) &&
+          Number(lat) >= -90 && Number(lat) <= 90 &&
+          Number(lng) >= -180 && Number(lng) <= 180
         );
-        
-        const nextJ = (j + 1) % melhorada.length;
-        const d2 = j < melhorada.length - 1 ? calcularDistanciaHaversine(
-          melhorada[j].latitude, melhorada[j].longitude,
-          melhorada[nextJ].latitude, melhorada[nextJ].longitude
-        ) : 0;
-        
-        const d3 = calcularDistanciaHaversine(
-          melhorada[i].latitude, melhorada[i].longitude,
-          melhorada[j].latitude, melhorada[j].longitude
+      })
+      .map(d => ({
+        id: d.id,
+        titulo: d.titulo,
+        descricao: d.descricao,
+        status: d.status,
+        prioridade: d.prioridade,
+        protocolo: d.protocolo,
+        latitude: Number(d.latitude),
+        longitude: Number(d.longitude),
+        bairro: d.bairro,
+        logradouro: d.logradouro,
+        numero: d.numero,
+        cidade: d.cidade,
+        area_id: d.area_id,
+        municipe_id: d.municipe_id,
+        municipe_nome: (d.municipes as any)?.nome || 'Não identificado',
+        created_at: d.created_at,
+      }));
+  }, [rawDemandas]);
+
+  // Processar munícipes para o formato do mapa
+  const municipes = useMemo((): MunicipeMapa[] => {
+    if (!rawMunicipes) return [];
+    
+    return rawMunicipes
+      .filter(m => {
+        const lat = m.latitude;
+        const lng = m.longitude;
+        return (
+          lat !== null && 
+          lat !== undefined &&
+          lng !== null && 
+          lng !== undefined &&
+          !isNaN(Number(lat)) &&
+          !isNaN(Number(lng)) &&
+          Number(lat) >= -90 && Number(lat) <= 90 &&
+          Number(lng) >= -180 && Number(lng) <= 180
         );
-        
-        const d4 = j < melhorada.length - 1 ? calcularDistanciaHaversine(
-          melhorada[i + 1].latitude, melhorada[i + 1].longitude,
-          melhorada[nextJ].latitude, melhorada[nextJ].longitude
-        ) : 0;
-        
-        if (d3 + d4 < d1 + d2 - 1) { // -1 para evitar trocas insignificantes
-          const segmento = melhorada.slice(i + 1, j + 1).reverse();
-          melhorada = [...melhorada.slice(0, i + 1), ...segmento, ...melhorada.slice(j + 1)];
-          melhorou = true;
-        }
-      }
-    }
-  }
-  
-  return melhorada;
-}
+      })
+      .map(m => ({
+        id: m.id,
+        nome: m.nome,
+        telefone: m.telefone,
+        email: m.email,
+        bairro: m.bairro,
+        endereco: m.endereco,
+        cidade: m.cidade,
+        latitude: Number(m.latitude),
+        longitude: Number(m.longitude),
+        tag_ids: (m.municipe_tags as any[])?.map(t => t.tag_id) || [],
+        created_at: m.created_at,
+      }));
+  }, [rawMunicipes]);
 
-export function useMapaRota() {
-  const [pontosRota, setPontosRota] = useState<PontoRota[]>([]);
-  const [pontoOrigem, setPontoOrigem] = useState<PontoRota | null>(null);
-  const [rotaCalculada, setRotaCalculada] = useState<RotaCalculada | null>(null);
-  const [modoRota, setModoRota] = useState(false);
-  const [calculandoRota, setCalculandoRota] = useState(false);
-  const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false);
-  const { toast } = useToast();
-
-  // Adicionar ponto à rota
-  const adicionarPonto = useCallback((ponto: PontoRota) => {
-    setPontosRota(prev => {
-      if (prev.some(p => p.id === ponto.id)) {
-        toast({ title: "Ponto já na rota", description: ponto.nome, variant: "destructive" });
-        return prev;
-      }
-      toast({ title: "Adicionado à rota", description: ponto.nome });
-      return [...prev, ponto];
-    });
-    setRotaCalculada(null);
-  }, [toast]);
-
-  // Remover ponto
-  const removerPonto = useCallback((id: string) => {
-    setPontosRota(prev => prev.filter(p => p.id !== id));
-    setRotaCalculada(null);
-  }, []);
-
-  // Mover ponto manualmente
-  const moverPonto = useCallback((index: number, direcao: 'up' | 'down') => {
-    setPontosRota(prev => {
-      const novos = [...prev];
-      const novoIndex = direcao === 'up' ? index - 1 : index + 1;
-      if (novoIndex < 0 || novoIndex >= novos.length) return prev;
-      [novos[index], novos[novoIndex]] = [novos[novoIndex], novos[index]];
-      return novos;
-    });
-    setRotaCalculada(null);
-  }, []);
-
-  // Limpar rota
-  const limparRota = useCallback(() => {
-    setPontosRota([]);
-    setPontoOrigem(null);
-    setRotaCalculada(null);
-  }, []);
-
-  // Definir origem manualmente
-  const definirOrigem = useCallback((ponto: PontoRota) => {
-    setPontoOrigem(ponto);
-    setRotaCalculada(null);
-    toast({ title: "Origem definida", description: ponto.nome });
-  }, [toast]);
-
-  // Usar localização atual como origem
-  const usarLocalizacaoAtual = useCallback(async (): Promise<boolean> => {
-    if (!navigator.geolocation) {
-      toast({ title: "Geolocalização não suportada", variant: "destructive" });
-      return false;
-    }
-
-    setBuscandoLocalizacao(true);
+  // Extrair bairros únicos de demandas e munícipes
+  const bairrosUnicos = useMemo((): string[] => {
+    const bairros = new Set<string>();
     
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0
-        });
-      });
-
-      const origem: PontoRota = {
-        id: 'origem-atual',
-        tipo: 'origem',
-        nome: 'Minha Localização',
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        endereco: 'Localização atual'
-      };
-
-      setPontoOrigem(origem);
-      setRotaCalculada(null);
-      toast({ title: "Localização obtida!", description: "Origem definida com sucesso" });
-      return true;
-    } catch (error: any) {
-      console.error('Erro geolocalização:', error);
-      let msg = "Verifique as permissões do navegador";
-      if (error.code === 1) msg = "Permissão de localização negada";
-      if (error.code === 2) msg = "Localização indisponível";
-      if (error.code === 3) msg = "Tempo esgotado";
-      toast({ title: "Erro ao obter localização", description: msg, variant: "destructive" });
-      return false;
-    } finally {
-      setBuscandoLocalizacao(false);
-    }
-  }, [toast]);
-
-  // Limpar origem
-  const limparOrigem = useCallback(() => {
-    setPontoOrigem(null);
-    setRotaCalculada(null);
-  }, []);
-
-  // Calcular rota otimizada via OSRM
-  const calcularRotaOtimizada = useCallback(async (otimizar: boolean = true): Promise<RotaCalculada | null> => {
-    if (!pontoOrigem) {
-      toast({ title: "Defina o ponto de origem", description: "Use sua localização ou informe um endereço", variant: "destructive" });
-      return null;
-    }
-
-    if (pontosRota.length === 0) {
-      toast({ title: "Adicione pontos à rota", variant: "destructive" });
-      return null;
-    }
-
-    setCalculandoRota(true);
-
-    try {
-      // Otimizar ordem se solicitado
-      let pontosOrdenados = pontosRota;
-      if (otimizar && pontosRota.length > 1) {
-        pontosOrdenados = otimizarOrdemPontos(pontoOrigem, pontosRota);
-        if (pontosOrdenados.length > 3) {
-          pontosOrdenados = melhorarRota2Opt(pontosOrdenados);
-        }
-        setPontosRota(pontosOrdenados);
-      }
-
-      // Montar coordenadas: origem + pontos
-      const todosOsPontos = [pontoOrigem, ...pontosOrdenados];
-      const coordinates = todosOsPontos.map(p => `${p.longitude},${p.latitude}`).join(';');
-
-      // Chamar OSRM
-      const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=true`;
-      const response = await fetch(url);
-      
-      if (!response.ok) throw new Error('Erro na API de rotas');
-
-      const data = await response.json();
-      if (data.code !== 'Ok' || !data.routes?.[0]) throw new Error('Rota não encontrada');
-
-      const route = data.routes[0];
-      
-      // Converter polyline
-      const polyline: [number, number][] = route.geometry.coordinates.map(
-        (coord: [number, number]) => [coord[1], coord[0]]
-      );
-
-      const resultado: RotaCalculada = {
-        distancia: route.distance,
-        duracao: route.duration,
-        polyline,
-        pontosOrdenados
-      };
-
-      setRotaCalculada(resultado);
-      
-      toast({ 
-        title: "Rota otimizada!", 
-        description: `${formatarDistancia(route.distance)} - ${formatarDuracao(route.duration)}` 
-      });
-
-      return resultado;
-    } catch (error) {
-      console.error('Erro ao calcular rota:', error);
-      toast({ title: "Erro ao calcular rota", description: "Tente novamente", variant: "destructive" });
-      return null;
-    } finally {
-      setCalculandoRota(false);
-    }
-  }, [pontoOrigem, pontosRota, toast]);
-
-  // Gerar URL Google Maps com waypoints
-  const gerarUrlGoogleMaps = useCallback((): string | null => {
-    if (!pontoOrigem || pontosRota.length === 0) return null;
-
-    const pontos = rotaCalculada?.pontosOrdenados || pontosRota;
-    const origem = `${pontoOrigem.latitude},${pontoOrigem.longitude}`;
-    const destino = `${pontos[pontos.length - 1].latitude},${pontos[pontos.length - 1].longitude}`;
-    
-    // Waypoints intermediários (Google Maps suporta até 25)
-    const waypoints = pontos.slice(0, -1).slice(0, 23).map(p => `${p.latitude},${p.longitude}`).join('|');
-
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origem}&destination=${destino}&travelmode=driving`;
-    if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
-
-    return url;
-  }, [pontoOrigem, pontosRota, rotaCalculada]);
-
-  // Gerar URL Waze (navegação ponto a ponto)
-  const gerarUrlWaze = useCallback((): string | null => {
-    if (!pontoOrigem || pontosRota.length === 0) return null;
-
-    const pontos = rotaCalculada?.pontosOrdenados || pontosRota;
-    const primeiroPonto = pontos[0];
-    
-    // Waze não suporta múltiplos waypoints, navega até o primeiro ponto
-    return `https://waze.com/ul?ll=${primeiroPonto.latitude},${primeiroPonto.longitude}&navigate=yes`;
-  }, [pontoOrigem, pontosRota, rotaCalculada]);
-
-  // Abrir no Google Maps
-  const abrirNoGoogleMaps = useCallback(() => {
-    const url = gerarUrlGoogleMaps();
-    if (url) {
-      window.open(url, '_blank');
-    } else {
-      toast({ title: "Configure a rota primeiro", variant: "destructive" });
-    }
-  }, [gerarUrlGoogleMaps, toast]);
-
-  // Abrir no Waze
-  const abrirNoWaze = useCallback(() => {
-    const url = gerarUrlWaze();
-    if (url) {
-      window.open(url, '_blank');
-      if (pontosRota.length > 1) {
-        toast({ 
-          title: "Navegando até o primeiro ponto", 
-          description: "Ao chegar, abra novamente para ir ao próximo" 
-        });
-      }
-    } else {
-      toast({ title: "Configure a rota primeiro", variant: "destructive" });
-    }
-  }, [gerarUrlWaze, pontosRota.length, toast]);
-
-  // Copiar lista de endereços
-  const copiarEnderecos = useCallback(() => {
-    if (!pontoOrigem || pontosRota.length === 0) {
-      toast({ title: "Configure a rota primeiro", variant: "destructive" });
-      return;
-    }
-
-    const pontos = rotaCalculada?.pontosOrdenados || pontosRota;
-    const linhas = [
-      `🚗 ROTEIRO DE VISITAS`,
-      ``,
-      `📍 ORIGEM: ${pontoOrigem.nome}`,
-      pontoOrigem.endereco ? `   ${pontoOrigem.endereco}` : `   ${pontoOrigem.latitude.toFixed(6)}, ${pontoOrigem.longitude.toFixed(6)}`,
-      ``,
-      `📋 PARADAS:`,
-      ...pontos.map((p, i) => [
-        ``,
-        `${i + 1}. ${p.nome} ${p.tipo === 'demanda' ? '📄' : '👤'}`,
-        p.endereco ? `   ${p.endereco}` : `   ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`
-      ]).flat(),
-    ];
-
-    if (rotaCalculada) {
-      linhas.push(``, `📊 TOTAL: ${formatarDistancia(rotaCalculada.distancia)} - ${formatarDuracao(rotaCalculada.duracao)}`);
-    }
-
-    navigator.clipboard.writeText(linhas.join('\n'));
-    toast({ title: "Roteiro copiado!", description: "Cole onde precisar" });
-  }, [pontoOrigem, pontosRota, rotaCalculada, toast]);
-
-  // Distância estimada
-  const distanciaEstimada = useCallback((): number => {
-    if (!pontoOrigem || pontosRota.length === 0) return 0;
-    
-    let total = 0;
-    let atual = pontoOrigem;
-    
-    pontosRota.forEach(p => {
-      total += calcularDistanciaHaversine(atual.latitude, atual.longitude, p.latitude, p.longitude);
-      atual = p;
+    demandas.forEach(d => {
+      if (d.bairro) bairros.add(d.bairro);
     });
     
-    return total;
-  }, [pontoOrigem, pontosRota]);
+    municipes.forEach(m => {
+      if (m.bairro) bairros.add(m.bairro);
+    });
+    
+    return Array.from(bairros).sort();
+  }, [demandas, municipes]);
 
-  // Toggle modo rota
-  const toggleModoRota = useCallback(() => setModoRota(prev => !prev), []);
+  // Função para recarregar todos os dados
+  const refetch = async () => {
+    await Promise.all([
+      refetchDemandas(),
+      refetchMunicipes(),
+    ]);
+  };
+
+  const isLoading = loadingDemandas || loadingMunicipes || loadingAreas || loadingTags;
+  const error = errorDemandas || errorMunicipes;
 
   return {
-    pontosRota,
-    pontoOrigem,
-    rotaCalculada,
-    modoRota,
-    calculandoRota,
-    buscandoLocalizacao,
-    
-    adicionarPonto,
-    removerPonto,
-    moverPonto,
-    limparRota,
-    
-    definirOrigem,
-    usarLocalizacaoAtual,
-    limparOrigem,
-    
-    calcularRotaOtimizada,
-    distanciaEstimada,
-    
-    abrirNoGoogleMaps,
-    abrirNoWaze,
-    gerarUrlGoogleMaps,
-    gerarUrlWaze,
-    copiarEnderecos,
-    
-    toggleModoRota,
-    setModoRota,
+    demandas,
+    municipes,
+    areas: areas || [],
+    tags: tags || [],
+    bairrosUnicos,
+    isLoading,
+    error,
+    refetch,
   };
 }
