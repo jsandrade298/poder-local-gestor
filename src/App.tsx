@@ -25,7 +25,7 @@ import Areas from "./pages/Areas";
 import Usuarios from "./pages/Usuarios";
 import Configuracoes from "./pages/Configuracoes";
 import MapaUnificado from "./pages/MapaUnificado";
-import MapaCruzado from "./components/mapa/MapaCruzado";
+import MapaCruzado from "./components/map/MapaCruzado";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
