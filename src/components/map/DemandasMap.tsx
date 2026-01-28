@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Icon, LatLngBounds } from 'leaflet';
+import L from 'leaflet'; // Alterado para importação default
 import 'leaflet/dist/leaflet.css';
 
 // Tipos
@@ -57,7 +57,8 @@ function MapUpdater({ markers, fitBounds, config }: {
       );
       
       if (validMarkers.length > 0) {
-        const bounds = new LatLngBounds(
+        // CORREÇÃO: Usando L.LatLngBounds ao invés de LatLngBounds direto
+        const bounds = new L.LatLngBounds(
           validMarkers.map(m => [m.latitude, m.longitude] as [number, number])
         );
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
@@ -71,7 +72,7 @@ function MapUpdater({ markers, fitBounds, config }: {
 }
 
 // Função para criar ícone SVG colorido
-function createColoredIcon(color: string): Icon {
+function createColoredIcon(color: string): L.Icon {
   const svgIcon = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="44" height="44">
       <path fill="${color}" stroke="#ffffff" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 6.5 8.5 15.5 8.5 15.5s8.5-9 8.5-15.5C20.5 3.81 16.69 0 12 0z"/>
@@ -79,7 +80,8 @@ function createColoredIcon(color: string): Icon {
     </svg>
   `;
   
-  return new Icon({
+  // CORREÇÃO: Usando L.Icon ao invés de Icon direto
+  return new L.Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
     iconSize: [44, 44],
     iconAnchor: [22, 44],
@@ -147,6 +149,7 @@ export function DemandasMap({
         
         {validMarkers.map((marker) => {
           const color = marker.color || STATUS_COLORS[marker.status || 'default'] || STATUS_COLORS.default;
+          // Aqui chamamos a função corrigida que usa L.Icon
           const icon = createColoredIcon(color);
           
           return (
