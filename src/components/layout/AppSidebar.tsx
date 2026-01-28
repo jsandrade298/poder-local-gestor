@@ -13,8 +13,7 @@ import {
   Bot,
   MessageCircle,
   Target,
-  MapPin,
-  PieChart
+  MapPin
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -34,7 +33,7 @@ const menuItems = [
   { title: "Visão Geral", url: "/", icon: Home },
   { title: "Demandas", url: "/demandas", icon: FileText },
   { title: "Mapa", url: "/mapa", icon: MapPin },
-  { title: "Mapa Cruzado", url: "/mapa-cruzado", icon: PieChart },
+  // Removido: { title: "Mapa Cruzado", url: "/mapa-cruzado", icon: PieChart },
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Kanban", url: "/kanban", icon: Columns },
   { title: "Plano de Ação", url: "/plano-acao", icon: Target },
