@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, Circle, CircleMarker } from 'react-leaflet';
-import { Icon, DivIcon } from 'leaflet';
+import { Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   MapPin, RefreshCw, Search, X, Layers, Navigation, 
-  ChevronDown, ChevronUp, Route, Trash2, ExternalLink, Users, 
+  ChevronDown, ChevronUp, Route, Trash2, Users, 
   FileText, Eye, Menu, MapPinned, Locate, Copy, 
   Navigation2, Car, Play, CircleDot, Flame, Grid3X3, Map
 } from 'lucide-react';
@@ -54,7 +54,8 @@ interface HeatmapPoint {
   lat: number; lng: number; intensity: number;
 }
 
-// === FUNÇÕES DE CRIAÇÃO DE ÍCONES (fora do componente) ===
+// === FUNÇÕES DE CRIAÇÃO DE ÍCONES ===
+// Usando apenas Icon (não DivIcon) igual ao DemandasMap.tsx que funciona
 function createDemandaIcon(color: string, isSelected: boolean = false): Icon {
   const size = isSelected ? 42 : 34;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
@@ -98,37 +99,43 @@ function createOrigemIcon(): Icon {
   });
 }
 
-function createClusterIcon(cluster: ClusterUnificado): DivIcon {
-  const temDemandas = cluster.demandas.length > 0;
-  const temMunicipes = cluster.municipes.length > 0;
+// Cluster icon usando Icon (não DivIcon)
+function createClusterIcon(total: number, temDemandas: boolean, temMunicipes: boolean): Icon {
   const isMisto = temDemandas && temMunicipes;
-  const size = Math.min(44 + Math.floor(cluster.total / 10) * 4, 60);
+  const size = Math.min(44 + Math.floor(total / 10) * 4, 60);
   const r = size / 2 - 2;
   const cx = size / 2;
   const cy = size / 2;
   const fontSize = size > 50 ? 15 : 13;
   
-  let html: string;
+  let svg: string;
   if (isMisto) {
-    html = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    // Cluster misto: metade azul, metade verde
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <defs>
-        <clipPath id="left${cluster.id}"><rect x="0" y="0" width="${cx}" height="${size}"/></clipPath>
-        <clipPath id="right${cluster.id}"><rect x="${cx}" y="0" width="${cx}" height="${size}"/></clipPath>
+        <clipPath id="leftClip"><rect x="0" y="0" width="${cx}" height="${size}"/></clipPath>
+        <clipPath id="rightClip"><rect x="${cx}" y="0" width="${cx}" height="${size}"/></clipPath>
       </defs>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_DEMANDA}" clip-path="url(#left${cluster.id})"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_MUNICIPE}" clip-path="url(#right${cluster.id})"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_DEMANDA}" clip-path="url(#leftClip)"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_MUNICIPE}" clip-path="url(#rightClip)"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="4"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="2"/>
-      <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial" stroke="#000" stroke-width="2" paint-order="stroke">${cluster.total}</text>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial" stroke="#000" stroke-width="2" paint-order="stroke">${total}</text>
     </svg>`;
   } else {
     const cor = temDemandas ? COR_DEMANDA : COR_MUNICIPE;
-    html = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="${cor}" stroke="#fff" stroke-width="3"/>
-      <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial">${cluster.total}</text>
+      <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial">${total}</text>
     </svg>`;
   }
-  return new DivIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
+  
+  return new Icon({ 
+    iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, 
+    iconSize: [size, size], 
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2]
+  });
 }
 
 // === CLUSTERING ===
@@ -287,13 +294,13 @@ export default function MapaUnificado() {
     });
   }, [municipes, mostrarMunicipes, tagsFiltro, bairroFiltro, searchTerm, modoVisualizacao, tagsVisualizacao]);
   
-  // Clustering (modo padrão)
+  // Clustering (modo padrão) - NÃO CRIA ÍCONES AQUI
   const { clusters, demandaIndividuais, municipeIndividuais } = useMemo(() => {
     if (modoVisualizacao !== 'padrao') return { clusters: [], demandaIndividuais: [], municipeIndividuais: [] };
     return calcularClusters(demandasFiltradas, municipesFiltrados, mapZoom);
   }, [demandasFiltradas, municipesFiltrados, mapZoom, modoVisualizacao]);
   
-  // Heatmap points
+  // Heatmap points - SÓ DADOS, SEM ÍCONES
   const heatmapDemandas = useMemo(() => {
     if (modoVisualizacao !== 'heatmap_demandas') return [];
     return calcularHeatmapPoints(demandasFiltradas, mapZoom);
@@ -688,7 +695,12 @@ export default function MapaUnificado() {
               {modoVisualizacao === 'padrao' && (
                 <>
                   {clusters.map(c => (
-                    <Marker key={c.id} position={[c.lat, c.lng]} icon={createClusterIcon(c)} eventHandlers={{ click: () => abrirCluster(c) }} />
+                    <Marker 
+                      key={c.id} 
+                      position={[c.lat, c.lng]} 
+                      icon={createClusterIcon(c.total, c.demandas.length > 0, c.municipes.length > 0)} 
+                      eventHandlers={{ click: () => abrirCluster(c) }} 
+                    />
                   ))}
                   
                   {demandaIndividuais.map(d => {
