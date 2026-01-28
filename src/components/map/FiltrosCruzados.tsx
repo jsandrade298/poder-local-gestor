@@ -255,12 +255,12 @@ export function FiltrosCruzados({
           <div className="space-y-3">
             <div>
               <Label className="text-xs">Bairro</Label>
-              <Select value={selectedBairro} onValueChange={setSelectedBairro}>
+              <Select value={selectedBairro || '__all__'} onValueChange={(v) => setSelectedBairro(v === '__all__' ? '' : v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Todos os bairros" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os bairros</SelectItem>
+                  <SelectItem value="__all__">Todos os bairros</SelectItem>
                   {bairros.map(bairro => (
                     <SelectItem key={bairro} value={bairro}>
                       {bairro}
@@ -272,12 +272,12 @@ export function FiltrosCruzados({
 
             <div>
               <Label className="text-xs">Status</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus || '__all__'} onValueChange={(v) => setSelectedStatus(v === '__all__' ? '' : v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Todos os status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os status</SelectItem>
+                  <SelectItem value="__all__">Todos os status</SelectItem>
                   {statusOptions.map(status => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
