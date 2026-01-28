@@ -77,10 +77,10 @@ function MultiSelectFilter({ title, options, selectedValues, onChange, icon }: M
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-auto py-2 px-3 text-left font-normal">
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between h-auto py-2 px-3">
           <div className="flex items-center gap-2 truncate">
             {icon}
-            <span className="truncate block">
+            <span className="truncate">
               {selectedValues.length === 0 && title}
               {selectedValues.length === 1 && options.find(o => o.value === selectedValues[0])?.label}
               {selectedValues.length > 1 && `${selectedValues.length} selecionados`}
@@ -89,7 +89,7 @@ function MultiSelectFilter({ title, options, selectedValues, onChange, icon }: M
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align="start">
+      <PopoverContent className="w-[300px] p-0" align="start">
         <Command>
           <CommandInput placeholder={`Buscar ${title}...`} />
           <CommandList>
