@@ -1,83 +1,73 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, RefreshCw, AlertCircle, Users, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { DemandasMap, MapMarker } from '@/components/map/DemandasMap';
+import { useState } from 'react';
+import { useMapaUnificado } from '@/hooks/useMapaUnificado';
 import { useMapConfig } from '@/hooks/useMapaConfiguracoes';
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MapPin, RefreshCw, AlertCircle, Users, FileText, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetDescription 
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ClusterMap, MapMarker } from '@/components/map/ClusterMap';
 
 export default function MapaUnificado() {
-  const { cidade, estado, center, zoom } = useMapConfig();
+  const { center, zoom } = useMapConfig();
+  const { demandas, municipes, isLoading, refetch } = useMapaUnificado();
 
-  // 1. Buscar Demandas
-  const { data: demandas, isLoading: loadingDemandas } = useQuery({
-    queryKey: ['mapa-demandas-v1'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select('id, titulo, latitude, longitude, protocolo, status')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-      
-      if (error) throw error;
-      return data || [];
-    }
-  });
+  // Estados para o Painel Lateral
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<MapMarker[]>([]);
 
-  // 2. Buscar Munícipes
-  const { data: municipes, isLoading: loadingMunicipes, refetch } = useQuery({
-    queryKey: ['mapa-municipes-v1'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('id, nome, latitude, longitude, bairro')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-      
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  const isLoading = loadingDemandas || loadingMunicipes;
-
-  // Unificar dados em Marcadores
+  // Prepara os dados
   const markers: MapMarker[] = [
-    // Mapeia Demandas
-    ...(demandas || []).map(d => ({
+    ...demandas.map(d => ({
       id: d.id,
-      latitude: Number(d.latitude),
-      longitude: Number(d.longitude),
+      latitude: d.latitude,
+      longitude: d.longitude,
       title: d.titulo,
-      description: `Protocolo: ${d.protocolo} | Status: ${d.status}`,
+      description: d.protocolo,
       status: d.status || 'pendente',
-      type: 'demanda' as const
+      type: 'demanda' as const,
+      originalData: d
     })),
-    // Mapeia Munícipes
-    ...(municipes || []).map(m => ({
+    ...municipes.map(m => ({
       id: m.id,
-      latitude: Number(m.latitude),
-      longitude: Number(m.longitude),
+      latitude: m.latitude,
+      longitude: m.longitude,
       title: m.nome,
-      description: `Bairro: ${m.bairro || 'Não informado'}`,
-      type: 'municipe' as const
+      description: m.bairro || '',
+      type: 'municipe' as const,
+      originalData: m
     }))
   ];
 
+  // Ação ao clicar no Cluster ou Pino
+  const handleClusterClick = (items: MapMarker[]) => {
+    setSelectedItems(items);
+    setIsSheetOpen(true);
+  };
+
+  const selectedDemandas = selectedItems.filter(i => i.type === 'demanda');
+  const selectedMunicipes = selectedItems.filter(i => i.type === 'municipe');
+
   return (
     <div className="flex flex-col gap-4 p-4 h-[calc(100vh-4rem)]">
-      {/* Cabeçalho */}
+      {/* Cabeçalho e Filtros */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <MapPin className="h-6 w-6 text-primary" />
-            Mapa Unificado
+            Mapa de Gestão
           </h1>
           <p className="text-muted-foreground text-sm">
-            Visualização geoespacial de Demandas e Munícipes
-            {cidade && ` em ${cidade}/${estado}`}
+            Visualize munícipes e demandas agrupados por localidade.
           </p>
         </div>
         <div className="flex gap-2">
@@ -88,15 +78,15 @@ export default function MapaUnificado() {
         </div>
       </div>
 
-      {/* Resumo Rápido (Contadores) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Contadores Rápidos */}
+      <div className="grid grid-cols-2 gap-4">
         <Card className="p-3 bg-red-50 border-red-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-red-600" />
                 <span className="text-sm font-medium text-red-900">Demandas</span>
             </div>
-            <Badge variant="secondary" className="bg-white text-red-700">
-                {demandas?.length || 0}
+            <Badge variant="secondary" className="bg-white text-red-700 font-bold">
+                {demandas.length}
             </Badge>
         </Card>
         <Card className="p-3 bg-blue-50 border-blue-100 flex items-center justify-between">
@@ -104,43 +94,120 @@ export default function MapaUnificado() {
                 <Users className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium text-blue-900">Munícipes</span>
             </div>
-            <Badge variant="secondary" className="bg-white text-blue-700">
-                {municipes?.length || 0}
+            <Badge variant="secondary" className="bg-white text-blue-700 font-bold">
+                {municipes.length}
             </Badge>
         </Card>
       </div>
 
       {/* Área do Mapa */}
-      <Card className="flex-1 overflow-hidden flex flex-col border-none shadow-md relative">
+      <Card className="flex-1 overflow-hidden flex flex-col border-none shadow-md relative z-0">
         {isLoading ? (
           <div className="w-full h-full flex items-center justify-center bg-gray-50">
             <div className="flex flex-col items-center gap-2">
               <Skeleton className="h-12 w-12 rounded-full" />
-              <p className="text-muted-foreground animate-pulse">Carregando dados geográficos...</p>
+              <p className="text-muted-foreground animate-pulse">Carregando mapa inteligente...</p>
             </div>
           </div>
         ) : markers.length === 0 ? (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-center p-8">
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
             <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">Nenhum dado com localização</h3>
-            <p className="text-sm text-gray-500 max-w-md mt-1">
-              Não encontramos demandas ou munícipes com latitude e longitude cadastradas. 
-              Verifique se os endereços foram geocodificados corretamente.
-            </p>
+            <h3 className="text-lg font-medium">Mapa Vazio</h3>
+            <p className="text-sm text-gray-500">Nenhum dado com coordenadas (Latitude/Longitude) encontrado.</p>
           </div>
         ) : (
-          <DemandasMap
+          <ClusterMap
             markers={markers}
-            config={{
-              centerLat: center.lat,
-              centerLng: center.lng,
-              zoom: zoom
-            }}
-            height="100%"
-            onMarkerClick={(m) => console.log("Selecionado:", m)}
+            center={center}
+            zoom={zoom}
+            onClusterClick={handleClusterClick}
           />
         )}
       </Card>
+
+      {/* PAINEL LATERAL (SHEET) */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent className="w-[100%] sm:w-[540px] overflow-hidden flex flex-col">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Raio-X da Localidade</SheetTitle>
+            <SheetDescription>
+              Encontrados {selectedItems.length} registros neste ponto.
+            </SheetDescription>
+          </SheetHeader>
+
+          <Tabs defaultValue={selectedDemandas.length > 0 ? "demandas" : "municipes"} className="w-full flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 mb-2">
+              <TabsTrigger value="demandas" disabled={selectedDemandas.length === 0}>
+                Demandas ({selectedDemandas.length})
+              </TabsTrigger>
+              <TabsTrigger value="municipes" disabled={selectedMunicipes.length === 0}>
+                Munícipes ({selectedMunicipes.length})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* LISTA DE DEMANDAS */}
+            <TabsContent value="demandas" className="flex-1 overflow-auto pr-2">
+              <ScrollArea className="h-full">
+                <div className="space-y-3 pb-8">
+                  {selectedDemandas.map((item) => (
+                    <div key={item.id} className="p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant={item.originalData.status === 'concluido' ? 'default' : 'outline'}>
+                          {item.originalData.status}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground bg-gray-100 px-2 py-1 rounded">
+                          {item.originalData.protocolo}
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-sm mb-1">{item.title}</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                        {item.originalData.descricao || 'Sem descrição detalhada.'}
+                      </p>
+                      {item.originalData.responsavel_id && (
+                        <p className="text-xs text-gray-500 mb-2">Resp: {item.originalData.responsavel_id}</p>
+                      )}
+                      <Button size="sm" variant="secondary" className="w-full text-xs h-8">
+                        Ver Detalhes Completos <ArrowRight className="ml-2 h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* LISTA DE MUNÍCIPES */}
+            <TabsContent value="municipes" className="flex-1 overflow-auto pr-2">
+              <ScrollArea className="h-full">
+                <div className="space-y-3 pb-8">
+                  {selectedMunicipes.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                        {item.title.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium truncate">{item.title}</h4>
+                        <div className="flex flex-col gap-0.5">
+                          {item.originalData.telefone && (
+                            <span className="text-xs text-muted-foreground flex items-center">
+                               📞 {item.originalData.telefone}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-400 truncate">
+                            {item.originalData.email || 'Sem email'}
+                          </span>
+                        </div>
+                      </div>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0">
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
