@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle } from 'lucide-react';
 
 // Fix para ícones
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
@@ -21,19 +18,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-interface DadosFiltrados {
-  municipes: any[];
-  demandas: any[];
-  cruzados: any[];
-}
-
-interface ClusterMapAvancadoProps {
-  dados: DadosFiltrados;
-  isLoading: boolean;
-  center?: { lat: number; lng: number };
-  zoom?: number;
-}
-
 interface MapMarker {
   id: string;
   latitude: number;
@@ -41,9 +25,19 @@ interface MapMarker {
   title: string;
   description?: string;
   type: 'demanda' | 'municipe';
-  tags?: any[];
-  area?: any;
+  tags?: string[];
+  tagCores?: string[];
+  area?: { id: string; nome: string; cor: string };
+  status?: string;
   originalData?: any;
+}
+
+interface ClusterMapAvancadoProps {
+  markers: MapMarker[];
+  dadosCruzados: any[];
+  onClusterClick: (markers: MapMarker[]) => void;
+  center?: { lat: number; lng: number };
+  zoom?: number;
 }
 
 // Componente para ajustar bounds
@@ -66,167 +60,167 @@ function FitBounds({ markers }: { markers: MapMarker[] }) {
   return null;
 }
 
-// Criar ícone com cor baseada no tipo usando base64 (evita problema com DivIcon)
-const createIcon = (type: 'demanda' | 'municipe', cor?: string | null) => {
-  const color = type === 'demanda' 
-    ? (cor || '#ef4444') 
-    : (cor || '#3b82f6');
+// Criar ícone individual
+const createIcon = (marker: MapMarker) => {
+  let color = '#6b7280'; // Cor padrão
+  
+  if (marker.type === 'demanda' && marker.area) {
+    color = marker.area.cor || '#ef4444';
+  } else if (marker.type === 'municipe' && marker.tagCores?.[0]) {
+    color = marker.tagCores[0] || '#3b82f6';
+  } else if (marker.type === 'demanda') {
+    color = '#ef4444'; // Vermelho para demandas sem área
+  } else if (marker.type === 'municipe') {
+    color = '#3b82f6'; // Azul para munícipes sem tag
+  }
 
+  // SVG do marcador
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
       <path fill="${color}" stroke="white" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
       <circle cx="12" cy="9" r="2.5" fill="white"/>
+      ${
+        marker.type === 'demanda' 
+          ? '<text x="12" y="18" text-anchor="middle" fill="white" font-size="8" font-weight="bold">D</text>'
+          : '<text x="12" y="18" text-anchor="middle" fill="white" font-size="8" font-weight="bold">M</text>'
+      }
     </svg>`;
     
-  return new L.Icon({
-    iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -30],
+  return L.divIcon({
+    className: 'custom-pin',
+    html: svg,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
   });
 };
 
-// Criar ícone de cluster usando base64 (evita problema com DivIcon)
-const createClusterIcon = (cluster: any) => {
+// Criar ícone de cluster avançado
+const createAdvancedClusterIcon = (cluster: any) => {
   const childMarkers = cluster.getAllChildMarkers();
-  const total = childMarkers.length;
   
   // Contar tipos
-  let demandas = 0;
-  let municipes = 0;
+  const demandas = childMarkers.filter((m: any) => m.options.type === 'demanda');
+  const municipes = childMarkers.filter((m: any) => m.options.type === 'municipe');
   
-  childMarkers.forEach((m: any) => {
-    if (m.options.type === 'demanda') demandas++;
-    else municipes++;
-  });
-
-  // Calcular proporções para pizza
-  const percentDemanda = (demandas / total) * 100;
-  const size = Math.min(36 + Math.floor(total / 5) * 2, 50);
+  // Calcular cores predominantes
+  let corDemandas = '#ef4444';
+  let corMunicipes = '#3b82f6';
   
-  // Cores
-  const corDemanda = '#ef4444';
-  const corMunicipe = '#3b82f6';
+  if (demandas.length > 0) {
+    const areaMaisComum = demandas
+      .map((m: any) => m.options.area)
+      .filter(Boolean)
+      .reduce((acc: any, area: any) => {
+        acc[area.cor] = (acc[area.cor] || 0) + 1;
+        return acc;
+      }, {});
+    
+    const corMaisComum = Object.entries(areaMaisComum).sort((a: any, b: any) => b[1] - a[1])[0];
+    if (corMaisComum) corDemandas = corMaisComum[0];
+  }
+  
+  if (municipes.length > 0) {
+    const tagMaisComum = municipes
+      .flatMap((m: any) => m.options.tagCores || [])
+      .filter(Boolean)
+      .reduce((acc: any, cor: string) => {
+        acc[cor] = (acc[cor] || 0) + 1;
+        return acc;
+      }, {});
+    
+    const corMaisComum = Object.entries(tagMaisComum).sort((a: any, b: any) => b[1] - a[1])[0];
+    if (corMaisComum) corMunicipes = corMaisComum[0];
+  }
+  
+  // Criar gráfico de pizza
+  const total = childMarkers.length;
+  const percentDemandas = (demandas.length / total) * 100;
+  const percentMunicipes = (municipes.length / total) * 100;
   
   let backgroundStyle;
-  if (percentDemanda === 100) {
-    backgroundStyle = corDemanda;
-  } else if (percentDemanda === 0) {
-    backgroundStyle = corMunicipe;
+  if (percentDemandas === 100) {
+    backgroundStyle = corDemandas;
+  } else if (percentMunicipes === 100) {
+    backgroundStyle = corMunicipes;
   } else {
-    // Criar gradiente conic para efeito de pizza
-    backgroundStyle = `url("data:image/svg+xml,${encodeURIComponent(`
-      <svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'>
-        <circle cx='${size/2}' cy='${size/2}' r='${size/2}' fill='${corMunicipe}'/>
-        <path d='M${size/2},${size/2} L${size/2},0 A${size/2},${size/2} 0 ${percentDemanda > 50 ? 1 : 0},1 ${
-          size/2 + size/2 * Math.sin(percentDemanda/100 * Math.PI * 2)
-        },${
-          size/2 - size/2 * Math.cos(percentDemanda/100 * Math.PI * 2)
-        } Z' fill='${corDemanda}'/>
-      </svg>
-    `)}")`;
+    backgroundStyle = `conic-gradient(
+      ${corDemandas} 0% ${percentDemandas}%,
+      ${corMunicipes} ${percentDemandas}% 100%
+    )`;
   }
 
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-      <circle cx="${size/2}" cy="${size/2}" r="${size/2-2}" fill="${percentDemanda === 100 ? corDemanda : corMunicipe}" stroke="white" stroke-width="3"/>
-      ${percentDemanda > 0 && percentDemanda < 100 ? `
-        <path d="M${size/2},${size/2} L${size/2},2 A${size/2-2},${size/2-2} 0 ${percentDemanda > 50 ? 1 : 0},1 ${
-          size/2 + (size/2-2) * Math.sin(percentDemanda/100 * Math.PI * 2)
-        },${
-          size/2 - (size/2-2) * Math.cos(percentDemanda/100 * Math.PI * 2)
-        } Z" fill="${corDemanda}"/>
-      ` : ''}
-      <text x="${size/2}" y="${size/2 + 5}" text-anchor="middle" fill="white" font-weight="bold" font-size="12" font-family="sans-serif">${total}</text>
-    </svg>
+  const html = `
+    <div style="
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: ${backgroundStyle};
+      border: 3px solid white;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: white;
+      font-family: sans-serif;
+      font-size: 11px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    ">
+      <div style="font-size: 14px; line-height: 1">${total}</div>
+      ${
+        demandas.length > 0 && municipes.length > 0
+          ? `<div style="font-size: 8px; opacity: 0.9; line-height: 1">
+              ${demandas.length}D ${municipes.length}M
+            </div>`
+          : ''
+      }
+    </div>
   `;
 
-  return new L.Icon({
-    iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`,
-    iconSize: [size, size],
-    iconAnchor: [size/2, size/2],
+  return L.divIcon({
+    html: html,
+    className: 'advanced-cluster',
+    iconSize: [44, 44],
   });
 };
 
 export function ClusterMapAvancado({ 
-  dados, 
-  isLoading,
-  center = { lat: -23.6821, lng: -46.5651 }, // Santo André
-  zoom = 13
+  markers, 
+  dadosCruzados, 
+  onClusterClick,
+  center = { lat: -23.5505, lng: -46.6333 },
+  zoom = 12
 }: ClusterMapAvancadoProps) {
   const mapRef = useRef<any>(null);
 
-  // Converter dados para markers
-  const markers: MapMarker[] = useMemo(() => {
-    const result: MapMarker[] = [];
+  const handleClusterClick = useCallback((e: any) => {
+    const cluster = e.layer;
+    const childMarkers = cluster.getAllChildMarkers();
     
-    // Adicionar demandas
-    (dados?.demandas || []).forEach(d => {
-      if (d.latitude && d.longitude) {
-        result.push({
-          id: d.id,
-          latitude: Number(d.latitude),
-          longitude: Number(d.longitude),
-          title: d.titulo,
-          description: d.protocolo,
-          type: 'demanda',
-          area: d.areas,
-          originalData: d
-        });
-      }
-    });
+    const markersData = childMarkers.map((m: any) => ({
+      id: m.options.id,
+      type: m.options.type,
+      title: m.options.title,
+      tags: m.options.tags,
+      tagCores: m.options.tagCores,
+      area: m.options.area,
+      ...m.options.originalData
+    }));
     
-    // Adicionar munícipes
-    (dados?.municipes || []).forEach(m => {
-      if (m.latitude && m.longitude) {
-        result.push({
-          id: m.id,
-          latitude: Number(m.latitude),
-          longitude: Number(m.longitude),
-          title: m.nome,
-          description: m.bairro || m.telefone,
-          type: 'municipe',
-          tags: m.tags,
-          originalData: m
-        });
-      }
-    });
-    
-    return result;
-  }, [dados]);
+    onClusterClick(markersData);
+  }, [onClusterClick]);
 
-  const validMarkers = markers.filter(m => 
-    m.latitude && m.longitude && 
-    !isNaN(m.latitude) && !isNaN(m.longitude)
-  );
+  const handleMarkerClick = useCallback((marker: MapMarker) => {
+    onClusterClick([marker]);
+  }, [onClusterClick]);
 
-  if (isLoading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <div className="flex flex-col items-center gap-3">
-          <Skeleton className="h-12 w-12 rounded-full" />
-          <p className="text-muted-foreground text-sm animate-pulse">
-            Carregando mapa cruzado...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (validMarkers.length === 0) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <div className="flex flex-col items-center gap-3 text-center p-8">
-          <AlertCircle className="h-12 w-12 text-muted-foreground" />
-          <h3 className="font-semibold text-lg">Nenhum dado para exibir</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Não foram encontrados munícipes ou demandas com coordenadas geográficas.
-            Ajuste os filtros ou cadastre dados com localização.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const validMarkers = markers.filter(m => {
+    const lat = Number(m.latitude);
+    const lng = Number(m.longitude);
+    return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+  });
 
   return (
     <div className="w-full h-full relative z-0">
@@ -256,101 +250,91 @@ export function ClusterMapAvancado({
 
         <MarkerClusterGroup
           chunkedLoading
-          iconCreateFunction={createClusterIcon}
-          maxClusterRadius={50}
+          iconCreateFunction={createAdvancedClusterIcon}
+          maxClusterRadius={60}
           spiderfyOnMaxZoom={true}
-          showCoverageOnHover={false}
+          showCoverageOnHover={true}
+          onClick={handleClusterClick}
         >
           {validMarkers.map((marker) => (
             <Marker
               key={`${marker.type}-${marker.id}`}
               position={[marker.latitude, marker.longitude]}
-              icon={createIcon(marker.type, marker.area?.cor || marker.tags?.[0]?.cor)}
+              icon={createIcon(marker)}
               // @ts-expect-error Leaflet options customizadas
               type={marker.type}
               id={marker.id}
               title={marker.title}
               tags={marker.tags}
+              tagCores={marker.tagCores}
               area={marker.area}
+              originalData={marker.originalData}
+              eventHandlers={{
+                click: () => handleMarkerClick(marker),
+              }}
             >
               <Popup>
-                <div className="p-2 min-w-[200px]">
+                <div className="p-3 min-w-[250px] max-w-[300px]">
                   <div className="flex items-center justify-between mb-2">
-                    <Badge 
-                      variant={marker.type === 'demanda' ? 'destructive' : 'default'}
-                      className="text-xs"
-                    >
-                      {marker.type === 'demanda' ? 'Demanda' : 'Munícipe'}
-                    </Badge>
-                    {marker.originalData?.protocolo && (
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {marker.originalData.protocolo}
-                      </span>
+                    <div className={`px-2 py-1 rounded text-xs font-bold text-white ${
+                      marker.type === 'demanda' ? 'bg-red-500' : 'bg-blue-500'
+                    }`}>
+                      {marker.type === 'demanda' ? 'DEMANDA' : 'MUNÍCIPE'}
+                    </div>
+                    {marker.type === 'demanda' && marker.status && (
+                      <div className="text-xs px-2 py-1 rounded bg-gray-100">
+                        {marker.status}
+                      </div>
                     )}
                   </div>
                   
-                  <h4 className="font-semibold text-sm mb-1">{marker.title}</h4>
+                  <h4 className="font-bold text-sm mb-2">{marker.title}</h4>
                   
                   {marker.type === 'demanda' && marker.area && (
-                    <div className="flex items-center gap-1 mb-2">
+                    <div className="flex items-center gap-2 mb-2">
                       <div 
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: marker.area.cor || '#6b7280' }}
                       />
-                      <span className="text-xs text-muted-foreground">
-                        {marker.area.nome}
-                      </span>
+                      <span className="text-xs font-medium">{marker.area.nome}</span>
                     </div>
                   )}
                   
                   {marker.type === 'municipe' && marker.tags && marker.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {marker.tags.slice(0, 3).map((tag: any, idx: number) => (
-                        <span 
-                          key={idx}
-                          className="text-[10px] px-1.5 py-0.5 rounded-full"
-                          style={{ 
-                            backgroundColor: `${tag.cor || '#6b7280'}20`,
-                            color: tag.cor || '#6b7280'
-                          }}
-                        >
-                          {tag.nome}
-                        </span>
-                      ))}
-                      {marker.tags.length > 3 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          +{marker.tags.length - 3}
-                        </span>
-                      )}
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-500 mb-1">Grupos:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {marker.tags.slice(0, 3).map((tag, idx) => (
+                          <div 
+                            key={idx}
+                            className="text-[10px] px-2 py-1 rounded-full"
+                            style={{ 
+                              backgroundColor: `${marker.tagCores?.[idx] || '#6b7280'}20`,
+                              color: marker.tagCores?.[idx] || '#6b7280'
+                            }}
+                          >
+                            {tag}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                   
                   {marker.description && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-gray-600 mb-2">
                       {marker.description}
                     </p>
                   )}
+                  
+                  <div className="text-xs text-gray-400 mt-3 pt-2 border-t">
+                    Clique para ver análise detalhada
+                  </div>
                 </div>
               </Popup>
             </Marker>
           ))}
         </MarkerClusterGroup>
       </MapContainer>
-
-      {/* Legenda */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 z-[400]">
-        <div className="text-xs font-medium mb-2">Legenda</div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-500" />
-            <span className="text-xs">Demandas ({dados?.demandas?.length || 0})</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-xs">Munícipes ({dados?.municipes?.length || 0})</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
