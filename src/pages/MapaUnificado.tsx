@@ -53,6 +53,27 @@ const formatAddress = (data: any) => {
   return data.endereco_completo || 'Endereço não cadastrado';
 };
 
+// Helper seguro para pegar nome da área
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getAreaName = (demanda: any): string | null => {
+  // Tenta pegar de 'area' (singular) ou 'areas' (plural - comum no supabase)
+  const areaObj = demanda.area || demanda.areas;
+  
+  if (!areaObj) return null;
+  
+  // Se for objeto, pega .nome
+  if (typeof areaObj === 'object') {
+    return areaObj.nome || null;
+  }
+  
+  // Se for string, retorna a string
+  if (typeof areaObj === 'string') {
+    return areaObj;
+  }
+  
+  return null;
+};
+
 export default function MapaUnificado() {
   const { center, zoom } = useMapConfig();
   const { demandas, municipes, isLoading, refetch } = useMapaUnificado();
@@ -74,10 +95,12 @@ export default function MapaUnificado() {
     const areas = new Set<string>();
     const tags = new Set<string>();
 
+    // Debug: verifique no console se as áreas estão aparecendo
+    console.log("Processando filtros. Total demandas:", demandas.length);
+
     // Áreas vêm das Demandas
     demandas.forEach(d => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const areaNome = typeof d.area === 'object' ? (d.area as any)?.nome : d.area; 
+      const areaNome = getAreaName(d);
       if (areaNome) areas.add(areaNome);
     });
 
@@ -150,7 +173,7 @@ export default function MapaUnificado() {
     // 3. Filtro por STATUS (Restringe APENAS Demandas)
     if (statusFilter !== 'todos') {
       all = all.filter(m => {
-        if (m.type === 'municipe') return true; // Munícipes sempre passam pelo filtro de status
+        if (m.type === 'municipe') return true; 
         return normalizeStatusKey(m.status || '') === statusFilter;
       });
     }
@@ -158,9 +181,8 @@ export default function MapaUnificado() {
     // 4. Filtro por ÁREA (Restringe APENAS Demandas)
     if (areaFilter !== 'todas') {
       all = all.filter(m => {
-        if (m.type === 'municipe') return true; // Munícipes sempre passam pelo filtro de área
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const areaNome = typeof m.originalData.area === 'object' ? (m.originalData.area as any)?.nome : m.originalData.area;
+        if (m.type === 'municipe') return true;
+        const areaNome = getAreaName(m.originalData);
         return areaNome === areaFilter;
       });
     }
@@ -168,7 +190,7 @@ export default function MapaUnificado() {
     // 5. Filtro por TAG (Restringe APENAS Munícipes)
     if (tagFilter !== 'todas') {
       all = all.filter(m => {
-        if (m.type === 'demanda') return true; // Demandas sempre passam pelo filtro de tag
+        if (m.type === 'demanda') return true;
         const tags = m.originalData.tags || [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return tags.some((t: any) => (typeof t === 'object' ? t.nome : t) === tagFilter);
@@ -270,9 +292,13 @@ export default function MapaUnificado() {
                         <SelectTrigger><SelectValue placeholder="Todas as áreas" /></SelectTrigger>
                         <SelectContent>
                         <SelectItem value="todas">Todas as áreas</SelectItem>
-                        {filterOptions.areas.map(area => (
-                            <SelectItem key={area} value={area}>{area}</SelectItem>
-                        ))}
+                        {filterOptions.areas.length > 0 ? (
+                          filterOptions.areas.map(area => (
+                              <SelectItem key={area} value={area}>{area}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="disabled" disabled>Nenhuma área encontrada</SelectItem>
+                        )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -286,9 +312,13 @@ export default function MapaUnificado() {
                         <SelectTrigger><SelectValue placeholder="Todas as tags" /></SelectTrigger>
                         <SelectContent>
                         <SelectItem value="todas">Todas as tags</SelectItem>
-                        {filterOptions.tags.map(tag => (
-                            <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                        ))}
+                        {filterOptions.tags.length > 0 ? (
+                          filterOptions.tags.map(tag => (
+                              <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="disabled" disabled>Nenhuma tag encontrada</SelectItem>
+                        )}
                         </SelectContent>
                     </Select>
                 </div>
