@@ -25,7 +25,6 @@ import Areas from "./pages/Areas";
 import Usuarios from "./pages/Usuarios";
 import Configuracoes from "./pages/Configuracoes";
 import MapaUnificado from "./pages/MapaUnificado";
-import MapaCruzado from "@/components/map/MapaCruzado";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -58,7 +57,7 @@ const App = () => (
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/config" element={<Configuracoes />} />
               <Route path="/mapa" element={<MapaUnificado />} />
-              <Route path="/mapa-cruzado" element={<MapaCruzado />} />
+              {/* Rota do Mapa Cruzado removida - funcionalidade integrada ao Mapa principal */}
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
