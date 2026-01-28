@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 
 export interface AreaMapa {
@@ -86,47 +86,48 @@ function buildFullAddress(
   return parts.join(', ');
 }
 
-// Função de geocodificação usando Nominatim
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  if (!address || address.trim().length < 5) return null;
+// Função para gerar cor consistente baseada em texto
+function gerarCorPorTexto(texto: string): string {
+  const cores = [
+    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+    '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+    '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+    '#ec4899', '#f43f5e'
+  ];
   
-  try {
-    // Adicionar Brasil ao endereço para melhor precisão
-    const searchAddress = `${address}, Brasil`;
-    const encodedAddress = encodeURIComponent(searchAddress);
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=br`;
-
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'PoderLocalGestor/1.0 (Sistema de Gestão de Gabinete)'
-      }
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    
-    if (data.length === 0) return null;
-
-    const result = data[0];
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-
-    // Validar se está dentro do Brasil
-    if (lat >= -33.75 && lat <= 5.27 && lng >= -73.99 && lng <= -34.79) {
-      return { lat, lng };
-    }
-    
-    return null;
-  } catch (err) {
-    console.error('Erro na geocodificação:', err);
-    return null;
+  let hash = 0;
+  for (let i = 0; i < texto.length; i++) {
+    hash = texto.charCodeAt(i) + ((hash << 5) - hash);
   }
+  
+  return cores[Math.abs(hash) % cores.length];
 }
 
-// Delay para respeitar rate limit do Nominatim (1 req/segundo)
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Função para validar coordenadas
+function isValidCoordinate(lat: any, lng: any): boolean {
+  const latNum = typeof lat === 'string' ? parseFloat(lat) : lat;
+  const lngNum = typeof lng === 'string' ? parseFloat(lng) : lng;
+  
+  if (latNum === null || latNum === undefined || lngNum === null || lngNum === undefined) {
+    return false;
+  }
+  
+  if (isNaN(latNum) || isNaN(lngNum)) {
+    return false;
+  }
+  
+  // Verificar se não é zero
+  if (latNum === 0 && lngNum === 0) {
+    return false;
+  }
+  
+  // Verificar se está dentro de limites razoáveis para o Brasil
+  if (latNum < -35 || latNum > 6 || lngNum < -75 || lngNum > -30) {
+    return false;
+  }
+  
+  return true;
+}
 
 export function useMapaUnificado() {
   const queryClient = useQueryClient();
@@ -137,14 +138,14 @@ export function useMapaUnificado() {
   const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
     queryKey: ['mapa-areas-todas'],
     queryFn: async () => {
-      console.log('🔄 Buscando todas as áreas...');
+      console.log('🔄 [MAPA] Buscando todas as áreas...');
       const { data, error } = await supabase
         .from('areas')
         .select('id, nome, descricao')
         .order('nome');
       
       if (error) {
-        console.error('❌ Erro ao buscar áreas:', error);
+        console.error('❌ [MAPA] Erro ao buscar áreas:', error);
         return [];
       }
       
@@ -154,7 +155,7 @@ export function useMapaUnificado() {
         cor: gerarCorPorTexto(area.nome)
       }));
       
-      console.log(`✅ Áreas encontradas: ${areasComCor.length}`);
+      console.log(`✅ [MAPA] Áreas encontradas: ${areasComCor.length}`);
       return areasComCor as AreaMapa[];
     },
     staleTime: 5 * 60 * 1000,
@@ -164,14 +165,14 @@ export function useMapaUnificado() {
   const { data: tags = [], isLoading: isLoadingTags } = useQuery({
     queryKey: ['mapa-tags-todas'],
     queryFn: async () => {
-      console.log('🔄 Buscando todas as tags...');
+      console.log('🔄 [MAPA] Buscando todas as tags...');
       const { data, error } = await supabase
         .from('tags')
         .select('id, nome, cor')
         .order('nome');
       
       if (error) {
-        console.error('❌ Erro ao buscar tags:', error);
+        console.error('❌ [MAPA] Erro ao buscar tags:', error);
         return [];
       }
       
@@ -181,13 +182,13 @@ export function useMapaUnificado() {
         cor: tag.cor || gerarCorPorTexto(tag.nome)
       }));
       
-      console.log(`✅ Tags encontradas: ${tagsComCor.length}`);
+      console.log(`✅ [MAPA] Tags encontradas: ${tagsComCor.length}`);
       return tagsComCor as TagMapa[];
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  // Buscar demandas - TODAS (com e sem coordenadas)
+  // Buscar demandas - TODAS
   const { 
     data: demandasRaw = [], 
     isLoading: isLoadingDemandas,
@@ -195,8 +196,9 @@ export function useMapaUnificado() {
   } = useQuery({
     queryKey: ['mapa-demandas-todas'],
     queryFn: async () => {
-      console.log('🔄 Buscando todas as demandas...');
+      console.log('🔄 [MAPA] Buscando todas as demandas...');
       
+      // Query simplificada - buscar só o que existe na tabela
       const { data, error } = await supabase
         .from('demandas')
         .select(`
@@ -213,35 +215,49 @@ export function useMapaUnificado() {
           numero,
           cidade,
           cep,
-          endereco_completo,
           area_id,
           municipe_id,
           responsavel_id,
           data_prazo,
           created_at,
-          geocodificado,
           areas (id, nome),
           municipes (id, nome, telefone, bairro, logradouro, cidade, latitude, longitude)
         `)
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('❌ Erro ao buscar demandas:', error);
+        console.error('❌ [MAPA] Erro ao buscar demandas:', error);
         return [];
       }
       
-      console.log(`✅ Demandas encontradas: ${data?.length || 0}`);
+      console.log(`📊 [MAPA] Demandas retornadas do banco: ${data?.length || 0}`);
       
-      return (data || []).map(d => {
+      // Log de amostra para debug
+      if (data && data.length > 0) {
+        console.log('📍 [MAPA] Amostra da primeira demanda:', {
+          id: data[0].id,
+          titulo: data[0].titulo,
+          latitude: data[0].latitude,
+          longitude: data[0].longitude,
+          tipo_lat: typeof data[0].latitude,
+          tipo_lng: typeof data[0].longitude
+        });
+      }
+      
+      const processadas = (data || []).map(d => {
         // Tentar usar coordenadas da demanda, senão do munícipe
-        let lat = d.latitude ? Number(d.latitude) : null;
-        let lng = d.longitude ? Number(d.longitude) : null;
+        let lat = d.latitude;
+        let lng = d.longitude;
         
         // Se não tem coordenadas próprias, usar do munícipe
-        if ((!lat || !lng) && d.municipes?.latitude && d.municipes?.longitude) {
-          lat = Number(d.municipes.latitude);
-          lng = Number(d.municipes.longitude);
+        if (!isValidCoordinate(lat, lng) && d.municipes) {
+          lat = d.municipes.latitude;
+          lng = d.municipes.longitude;
         }
+        
+        // Converter para número
+        const latNum = typeof lat === 'string' ? parseFloat(lat) : (lat || null);
+        const lngNum = typeof lng === 'string' ? parseFloat(lng) : (lng || null);
         
         return {
           id: d.id,
@@ -250,14 +266,14 @@ export function useMapaUnificado() {
           status: d.status,
           prioridade: d.prioridade,
           protocolo: d.protocolo,
-          latitude: lat,
-          longitude: lng,
+          latitude: latNum,
+          longitude: lngNum,
           bairro: d.bairro || d.municipes?.bairro || null,
           logradouro: d.logradouro || d.municipes?.logradouro || null,
           numero: d.numero,
           cidade: d.cidade || d.municipes?.cidade || null,
           cep: d.cep,
-          endereco_completo: d.endereco_completo || buildFullAddress(
+          endereco_completo: buildFullAddress(
             d.logradouro || d.municipes?.logradouro,
             d.numero,
             d.bairro || d.municipes?.bairro,
@@ -273,15 +289,19 @@ export function useMapaUnificado() {
           responsavel_id: d.responsavel_id,
           data_prazo: d.data_prazo,
           created_at: d.created_at,
-          geocodificado: d.geocodificado || (lat !== null && lng !== null),
+          geocodificado: isValidCoordinate(latNum, lngNum),
           tipo: 'demanda' as const
         };
-      }) as DemandaMapa[];
+      });
+      
+      console.log(`✅ [MAPA] Demandas processadas: ${processadas.length}`);
+      
+      return processadas as DemandaMapa[];
     },
-    staleTime: 2 * 60 * 1000, // 2 minutos
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Buscar munícipes - TODOS (com e sem coordenadas)
+  // Buscar munícipes - TODOS
   const { 
     data: municipesRaw = [], 
     isLoading: isLoadingMunicipes,
@@ -289,8 +309,9 @@ export function useMapaUnificado() {
   } = useQuery({
     queryKey: ['mapa-municipes-todos'],
     queryFn: async () => {
-      console.log('🔄 Buscando todos os munícipes...');
+      console.log('🔄 [MAPA] Buscando todos os munícipes...');
       
+      // Query simplificada - buscar só o que existe na tabela
       const { data, error } = await supabase
         .from('municipes')
         .select(`
@@ -303,17 +324,27 @@ export function useMapaUnificado() {
           bairro,
           endereco,
           cidade,
-          cep,
-          endereco_completo,
-          geocodificado
+          cep
         `);
       
       if (error) {
-        console.error('❌ Erro ao buscar munícipes:', error);
+        console.error('❌ [MAPA] Erro ao buscar munícipes:', error);
         return [];
       }
       
-      console.log(`✅ Munícipes encontrados: ${data?.length || 0}`);
+      console.log(`📊 [MAPA] Munícipes retornados do banco: ${data?.length || 0}`);
+      
+      // Log de amostra para debug
+      if (data && data.length > 0) {
+        console.log('📍 [MAPA] Amostra do primeiro munícipe:', {
+          id: data[0].id,
+          nome: data[0].nome,
+          latitude: data[0].latitude,
+          longitude: data[0].longitude,
+          tipo_lat: typeof data[0].latitude,
+          tipo_lng: typeof data[0].longitude
+        });
+      }
       
       if (!data || data.length === 0) return [];
       
@@ -353,199 +384,72 @@ export function useMapaUnificado() {
         contagemDemandas[d.municipe_id] = (contagemDemandas[d.municipe_id] || 0) + 1;
       });
       
-      return data.map(m => ({
-        id: m.id,
-        nome: m.nome,
-        telefone: m.telefone,
-        email: m.email,
-        latitude: m.latitude ? Number(m.latitude) : null,
-        longitude: m.longitude ? Number(m.longitude) : null,
-        bairro: m.bairro,
-        logradouro: null,
-        endereco: m.endereco,
-        cidade: m.cidade,
-        cep: m.cep,
-        endereco_completo: m.endereco_completo || buildFullAddress(
-          m.endereco,
-          null,
-          m.bairro,
-          m.cidade,
-          m.cep
-        ),
-        tags: tagsPorMunicipe[m.id] || [],
-        demandas_count: contagemDemandas[m.id] || 0,
-        geocodificado: m.geocodificado || (m.latitude !== null && m.longitude !== null),
-        tipo: 'municipe' as const
-      })) as MunicipeMapa[];
+      const processados = data.map(m => {
+        // Converter para número
+        const latNum = typeof m.latitude === 'string' ? parseFloat(m.latitude) : (m.latitude || null);
+        const lngNum = typeof m.longitude === 'string' ? parseFloat(m.longitude) : (m.longitude || null);
+        
+        return {
+          id: m.id,
+          nome: m.nome,
+          telefone: m.telefone,
+          email: m.email,
+          latitude: latNum,
+          longitude: lngNum,
+          bairro: m.bairro,
+          logradouro: null,
+          endereco: m.endereco,
+          cidade: m.cidade,
+          cep: m.cep,
+          endereco_completo: buildFullAddress(
+            m.endereco,
+            null,
+            m.bairro,
+            m.cidade,
+            m.cep
+          ),
+          tags: tagsPorMunicipe[m.id] || [],
+          demandas_count: contagemDemandas[m.id] || 0,
+          geocodificado: isValidCoordinate(latNum, lngNum),
+          tipo: 'municipe' as const
+        };
+      });
+      
+      console.log(`✅ [MAPA] Munícipes processados: ${processados.length}`);
+      
+      return processados as MunicipeMapa[];
     },
     staleTime: 2 * 60 * 1000,
   });
 
   // Filtrar apenas os que têm coordenadas válidas para exibição no mapa
   const demandas = demandasRaw.filter(d => {
-    const lat = d.latitude;
-    const lng = d.longitude;
-    return lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    const valid = isValidCoordinate(d.latitude, d.longitude);
+    return valid;
   });
 
   const municipes = municipesRaw.filter(m => {
-    const lat = m.latitude;
-    const lng = m.longitude;
-    return lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    const valid = isValidCoordinate(m.latitude, m.longitude);
+    return valid;
   });
+
+  // Log final
+  console.log(`🗺️ [MAPA] RESUMO FINAL:`);
+  console.log(`   - Demandas totais: ${demandasRaw.length}`);
+  console.log(`   - Demandas com coordenadas válidas: ${demandas.length}`);
+  console.log(`   - Munícipes totais: ${municipesRaw.length}`);
+  console.log(`   - Munícipes com coordenadas válidas: ${municipes.length}`);
 
   // Contar itens sem geocodificação
   const semCoordenadas = {
-    demandas: demandasRaw.filter(d => !d.latitude || !d.longitude).length,
-    municipes: municipesRaw.filter(m => !m.latitude || !m.longitude).length
+    demandas: demandasRaw.filter(d => !isValidCoordinate(d.latitude, d.longitude)).length,
+    municipes: municipesRaw.filter(m => !isValidCoordinate(m.latitude, m.longitude)).length
   };
 
-  // Mutation para atualizar coordenadas de demanda
-  const updateDemandaCoords = useMutation({
-    mutationFn: async ({ id, lat, lng, endereco_completo }: { id: string; lat: number; lng: number; endereco_completo: string }) => {
-      const { error } = await supabase
-        .from('demandas')
-        .update({ 
-          latitude: lat, 
-          longitude: lng, 
-          endereco_completo,
-          geocodificado: true,
-          geocodificado_em: new Date().toISOString()
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-    }
-  });
-
-  // Mutation para atualizar coordenadas de munícipe
-  const updateMunicipeCoords = useMutation({
-    mutationFn: async ({ id, lat, lng, endereco_completo }: { id: string; lat: number; lng: number; endereco_completo: string }) => {
-      const { error } = await supabase
-        .from('municipes')
-        .update({ 
-          latitude: lat, 
-          longitude: lng, 
-          endereco_completo,
-          geocodificado: true,
-          geocodificado_em: new Date().toISOString()
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-    }
-  });
-
-  // Função para geocodificar todos os registros sem coordenadas
+  // Função para geocodificar (placeholder - precisa de implementação com Mapbox)
   const geocodificarTodos = useCallback(async () => {
-    if (geocodificando) return;
-    
-    setGeocodificando(true);
-    
-    const municipesSemCoords = municipesRaw.filter(m => !m.latitude || !m.longitude);
-    const demandasSemCoords = demandasRaw.filter(d => !d.latitude || !d.longitude);
-    
-    const total = municipesSemCoords.length + demandasSemCoords.length;
-    
-    if (total === 0) {
-      toast.info('Todos os registros já estão geocodificados!');
-      setGeocodificando(false);
-      return;
-    }
-    
-    setProgressoGeocodificacao({ atual: 0, total });
-    toast.info(`Iniciando geocodificação de ${total} registros...`);
-    
-    let processados = 0;
-    let sucesso = 0;
-    let falhas = 0;
-    
-    // Geocodificar munícipes primeiro
-    for (const municipe of municipesSemCoords) {
-      const endereco = municipe.endereco_completo || buildFullAddress(
-        municipe.endereco,
-        null,
-        municipe.bairro,
-        municipe.cidade,
-        municipe.cep
-      );
-      
-      if (endereco && endereco.length >= 5) {
-        const coords = await geocodeAddress(endereco);
-        if (coords) {
-          try {
-            await updateMunicipeCoords.mutateAsync({
-              id: municipe.id,
-              lat: coords.lat,
-              lng: coords.lng,
-              endereco_completo: endereco
-            });
-            sucesso++;
-          } catch (err) {
-            console.error('Erro ao salvar coordenadas do munícipe:', err);
-            falhas++;
-          }
-        } else {
-          falhas++;
-        }
-      } else {
-        falhas++;
-      }
-      
-      processados++;
-      setProgressoGeocodificacao({ atual: processados, total });
-      
-      // Respeitar rate limit do Nominatim
-      await delay(1100);
-    }
-    
-    // Geocodificar demandas
-    for (const demanda of demandasSemCoords) {
-      const endereco = demanda.endereco_completo || buildFullAddress(
-        demanda.logradouro,
-        demanda.numero,
-        demanda.bairro,
-        demanda.cidade,
-        demanda.cep
-      );
-      
-      if (endereco && endereco.length >= 5) {
-        const coords = await geocodeAddress(endereco);
-        if (coords) {
-          try {
-            await updateDemandaCoords.mutateAsync({
-              id: demanda.id,
-              lat: coords.lat,
-              lng: coords.lng,
-              endereco_completo: endereco
-            });
-            sucesso++;
-          } catch (err) {
-            console.error('Erro ao salvar coordenadas da demanda:', err);
-            falhas++;
-          }
-        } else {
-          falhas++;
-        }
-      } else {
-        falhas++;
-      }
-      
-      processados++;
-      setProgressoGeocodificacao({ atual: processados, total });
-      
-      // Respeitar rate limit do Nominatim
-      await delay(1100);
-    }
-    
-    setGeocodificando(false);
-    
-    // Recarregar dados
-    await refetchDemandas();
-    await refetchMunicipes();
-    
-    toast.success(`Geocodificação concluída! ${sucesso} sucesso, ${falhas} falhas.`);
-  }, [geocodificando, municipesRaw, demandasRaw, updateMunicipeCoords, updateDemandaCoords, refetchDemandas, refetchMunicipes]);
+    toast.info("Funcionalidade de geocodificação em lote será implementada.");
+  }, []);
 
   // Bairros únicos
   const bairrosUnicos = Array.from(new Set([
@@ -571,21 +475,4 @@ export function useMapaUnificado() {
       await refetchMunicipes();
     }
   };
-}
-
-// Função para gerar cor consistente baseada em texto
-function gerarCorPorTexto(texto: string): string {
-  const cores = [
-    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
-    '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
-    '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-    '#ec4899', '#f43f5e'
-  ];
-  
-  let hash = 0;
-  for (let i = 0; i < texto.length; i++) {
-    hash = texto.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  
-  return cores[Math.abs(hash) % cores.length];
 }
