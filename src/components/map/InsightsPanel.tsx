@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart3, 
   Users, 
@@ -9,79 +10,56 @@ import {
   TrendingUp, 
   Target,
   AlertCircle,
-  CheckCircle,
+  Lightbulb,
   Download
 } from 'lucide-react';
 
-interface InsightsPanelProps {
-  dados: {
-    estatisticas: {
-      totalDemandas: number;
-      totalMunicipes: number;
-      areas: any[];
-      tags: any[];
-      combinacaoPrincipal: any;
-    };
-    markers: any[];
-  };
+interface Insight {
+  tipo: 'correlacao' | 'concentracao' | 'oportunidade';
+  titulo: string;
+  descricao: string;
+  valor?: number;
+  cor?: string;
 }
 
-export function InsightsPanel({ dados }: InsightsPanelProps) {
-  const { estatisticas, markers } = dados;
+interface InsightsPanelProps {
+  insights: Insight[];
+  isLoading: boolean;
+}
 
-  // Encontrar insights interessantes
-  const insights = [
-    ...(estatisticas.combinacaoPrincipal ? [{
-      tipo: 'correlacao',
-      titulo: 'Correlação Forte Encontrada',
-      descricao: `${estatisticas.combinacaoPrincipal.tag} → ${estatisticas.combinacaoPrincipal.area}`,
-      porcentagem: estatisticas.combinacaoPrincipal.percentual.toFixed(1),
-      cor: estatisticas.combinacaoPrincipal.corTag,
-      icone: TrendingUp
-    }] : []),
-    
-    ...(estatisticas.areas.length > 0 ? [{
-      tipo: 'area_mais',
-      titulo: 'Área Mais Demandada',
-      descricao: estatisticas.areas[0]?.nome,
-      porcentagem: ((estatisticas.areas[0]?.count / estatisticas.totalDemandas) * 100).toFixed(1),
-      cor: estatisticas.areas[0]?.cor,
-      icone: Target
-    }] : []),
-    
-    ...(estatisticas.tags.length > 0 ? [{
-      tipo: 'grupo_mais',
-      titulo: 'Grupo Mais Ativo',
-      descricao: estatisticas.tags[0]?.nome,
-      porcentagem: ((estatisticas.tags[0]?.count / estatisticas.totalMunicipes) * 100).toFixed(1),
-      cor: estatisticas.tags[0]?.cor,
-      icone: Users
-    }] : []),
-  ];
+export function InsightsPanel({ insights, isLoading }: InsightsPanelProps) {
+  
+  const getInsightIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'correlacao':
+        return TrendingUp;
+      case 'concentracao':
+        return Target;
+      case 'oportunidade':
+        return Lightbulb;
+      default:
+        return BarChart3;
+    }
+  };
 
-  // Gerar recomendações
-  const recomendacoes = [
-    ...(estatisticas.combinacaoPrincipal && estatisticas.combinacaoPrincipal.percentual > 30 ? [{
-      nivel: 'alta',
-      titulo: 'Oportunidade Estratégica',
-      descricao: `Foque em ações para ${estatisticas.combinacaoPrincipal.area} para o grupo ${estatisticas.combinacaoPrincipal.tag}`,
-      acao: 'Criar plano de ação específico'
-    }] : []),
-    
-    ...(estatisticas.areas.length > 0 && estatisticas.areas[0]?.count > 5 ? [{
-      nivel: 'media',
-      titulo: 'Alta Demanda Local',
-      descricao: `Muitas demandas de ${estatisticas.areas[0]?.nome} nesta região`,
-      acao: 'Priorizar recursos para esta área'
-    }] : []),
-  ];
+  const getInsightColor = (tipo: string, cor?: string) => {
+    if (cor) return cor;
+    switch (tipo) {
+      case 'correlacao':
+        return '#8b5cf6'; // purple
+      case 'concentracao':
+        return '#f59e0b'; // amber
+      case 'oportunidade':
+        return '#10b981'; // green
+      default:
+        return '#6b7280';
+    }
+  };
 
-  const exportarDados = () => {
+  const exportarInsights = () => {
     const dadosExportacao = {
-      estatisticas,
-      marcadores: markers.length,
+      insights,
       timestamp: new Date().toISOString(),
-      insights
     };
     
     const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], { type: 'application/json' });
@@ -93,154 +71,105 @@ export function InsightsPanel({ dados }: InsightsPanelProps) {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="h-full overflow-auto pr-2">
+  if (isLoading) {
+    return (
       <div className="space-y-4">
-        {/* Resumo Geral */}
-        <Card className="p-4">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">Demandas</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-700">
-                {estatisticas.totalDemandas}
-              </div>
-            </div>
-            
-            <div className="bg-green-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-900">Munícipes</span>
-              </div>
-              <div className="text-2xl font-bold text-green-700">
-                {estatisticas.totalMunicipes}
-              </div>
-            </div>
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            Análise baseada em {markers.length} elementos no mapa
-          </div>
-        </Card>
-
-        {/* Insights Principais */}
-        <div>
-          <h4 className="font-medium mb-2 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Insights Principais
-          </h4>
-          <div className="space-y-2">
-            {insights.map((insight, idx) => {
-              const Icon = insight.icone;
-              return (
-                <Card key={idx} className="p-3 border-l-4" style={{ borderLeftColor: insight.cor }}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon className="h-3 w-3" />
-                        <span className="text-sm font-medium">{insight.titulo}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{insight.descricao}</p>
-                    </div>
-                    <Badge 
-                      variant="outline"
-                      className="text-xs"
-                      style={{ color: insight.cor, borderColor: insight.cor }}
-                    >
-                      {insight.porcentagem}%
-                    </Badge>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Áreas e Tags */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="font-medium mb-2 text-sm">Áreas Presentes</h4>
-            <div className="space-y-1">
-              {estatisticas.areas.slice(0, 3).map((area, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <div 
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: area.cor }}
-                    />
-                    <span className="truncate">{area.nome}</span>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {area.count}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="font-medium mb-2 text-sm">Grupos Presentes</h4>
-            <div className="space-y-1">
-              {estatisticas.tags.slice(0, 3).map((tag, idx) => (
-                <div key={idx} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <div 
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: tag.cor }}
-                    />
-                    <span className="truncate">{tag.nome}</span>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {tag.count}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Recomendações */}
-        {recomendacoes.length > 0 && (
-          <div>
-            <h4 className="font-medium mb-2 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Recomendações
-            </h4>
-            <div className="space-y-2">
-              {recomendacoes.map((rec, idx) => (
-                <Card key={idx} className="p-3 bg-amber-50 border-amber-200">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                    <div>
-                      <div className="text-sm font-medium text-amber-900">{rec.titulo}</div>
-                      <p className="text-xs text-amber-700 mt-1">{rec.descricao}</p>
-                      <div className="text-xs font-medium text-amber-800 mt-2">
-                        {rec.acao}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Exportação */}
-        <Card className="p-3 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium">Exportar Análise</div>
-              <p className="text-xs text-muted-foreground">Baixe os dados para relatórios</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={exportarDados}>
-              <Download className="h-3 w-3 mr-1" />
-              Exportar
-            </Button>
-          </div>
-        </Card>
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
       </div>
+    );
+  }
+
+  if (insights.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="font-semibold text-lg mb-2">Nenhum insight disponível</h3>
+        <p className="text-sm text-muted-foreground">
+          Aplique filtros e aguarde o carregamento dos dados para visualizar insights sobre correlações entre grupos de munícipes e áreas de demanda.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-amber-500" />
+            Insights Gerados
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {insights.length} insight{insights.length !== 1 ? 's' : ''} identificado{insights.length !== 1 ? 's' : ''} nos dados
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={exportarInsights}>
+          <Download className="h-4 w-4 mr-2" />
+          Exportar
+        </Button>
+      </div>
+
+      {/* Lista de Insights */}
+      <div className="space-y-4">
+        {insights.map((insight, idx) => {
+          const Icon = getInsightIcon(insight.tipo);
+          const cor = getInsightColor(insight.tipo, insight.cor);
+          
+          return (
+            <Card 
+              key={idx} 
+              className="p-4 border-l-4 hover:shadow-md transition-shadow"
+              style={{ borderLeftColor: cor }}
+            >
+              <div className="flex items-start gap-4">
+                <div 
+                  className="p-2 rounded-lg"
+                  style={{ backgroundColor: `${cor}20` }}
+                >
+                  <Icon className="h-5 w-5" style={{ color: cor }} />
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-semibold">{insight.titulo}</h4>
+                    {insight.valor !== undefined && (
+                      <Badge 
+                        variant="outline"
+                        className="ml-2"
+                        style={{ color: cor, borderColor: cor }}
+                      >
+                        {typeof insight.valor === 'number' && insight.valor < 100 
+                          ? `${insight.valor.toFixed(1)}%` 
+                          : insight.valor}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {insight.descricao}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Dica de uso */}
+      <Card className="p-4 bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-blue-900 text-sm">Como usar estes insights</h4>
+            <p className="text-xs text-blue-700 mt-1">
+              Estes insights são gerados automaticamente com base nos cruzamentos entre tags de munícipes e áreas de demandas. 
+              Use-os para identificar padrões, priorizar ações e planejar intervenções no território.
+            </p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
