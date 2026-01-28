@@ -117,7 +117,7 @@ export function useMapaCruzado() {
         .select(`
           municipe_id,
           tag_id,
-          tags!inner(nome, cor)
+          tags(nome, cor)
         `);
 
       if (errorMunicipeTags) {
@@ -132,7 +132,7 @@ export function useMapaCruzado() {
           id,
           municipe_id,
           area_id,
-          areas!inner(nome, cor),
+          areas(nome, cor),
           status,
           bairro,
           created_at
