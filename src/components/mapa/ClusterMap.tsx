@@ -60,13 +60,14 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Cores por status de demanda
+// Cores por status de demanda (valores reais do banco)
 const STATUS_COLORS: Record<string, string> = {
-  'aberta': '#ef4444',      // Vermelho
-  'em_andamento': '#f59e0b', // Amarelo
-  'concluida': '#22c55e',   // Verde
-  'cancelada': '#6b7280',   // Cinza
-  'pendente': '#3b82f6',    // Azul
+  'solicitada': '#3b82f6',    // Azul
+  'em_producao': '#f59e0b',   // Amarelo/Laranja
+  'encaminhado': '#8b5cf6',   // Roxo
+  'atendido': '#22c55e',      // Verde
+  'devolvido': '#ef4444',     // Vermelho
+  'visitado': '#06b6d4',      // Ciano
 };
 
 // Criar ícone customizado para demanda
@@ -347,72 +348,164 @@ export function ClusterMap({
         heatmapVisible={heatmapVisible}
       />
 
-      {/* Cluster de Demandas */}
-      {mostrarDemandas && !heatmapVisible && (
+      {/* Cluster Unificado de Demandas e Munícipes */}
+      {!heatmapVisible && (
         <MarkerClusterGroup
           chunkedLoading
-          maxClusterRadius={50}
+          maxClusterRadius={60}
           spiderfyOnMaxZoom
           showCoverageOnHover={false}
+          spiderfyDistanceMultiplier={1.5}
           iconCreateFunction={(cluster) => {
-            const count = cluster.getChildCount();
-            let size = 'small';
-            if (count > 10) size = 'medium';
-            if (count > 50) size = 'large';
+            const markers = cluster.getAllChildMarkers();
+            let demandasCount = 0;
+            let municipesCount = 0;
             
-            const sizes = {
-              small: { width: 30, height: 30, fontSize: 12 },
-              medium: { width: 40, height: 40, fontSize: 14 },
-              large: { width: 50, height: 50, fontSize: 16 }
-            };
+            markers.forEach((marker: any) => {
+              const tipo = marker.options?.data?.tipo;
+              if (tipo === 'demanda') demandasCount++;
+              else if (tipo === 'municipe') municipesCount++;
+            });
             
-            const s = sizes[size as keyof typeof sizes];
+            const total = demandasCount + municipesCount;
             
+            // Definir tamanho baseado na quantidade
+            let size = 36;
+            let fontSize = 12;
+            if (total > 10) { size = 44; fontSize = 13; }
+            if (total > 30) { size = 52; fontSize = 14; }
+            if (total > 50) { size = 60; fontSize = 15; }
+            
+            // Se só tem um tipo, usar cor sólida
+            if (municipesCount === 0) {
+              return L.divIcon({
+                html: `<div style="
+                  background: linear-gradient(135deg, #ef4444, #dc2626);
+                  width: ${size}px;
+                  height: ${size}px;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: white;
+                  font-weight: bold;
+                  font-size: ${fontSize}px;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                ">${total}</div>`,
+                className: 'custom-cluster-icon',
+                iconSize: L.point(size, size)
+              });
+            }
+            
+            if (demandasCount === 0) {
+              return L.divIcon({
+                html: `<div style="
+                  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                  width: ${size}px;
+                  height: ${size}px;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: white;
+                  font-weight: bold;
+                  font-size: ${fontSize}px;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                ">${total}</div>`,
+                className: 'custom-cluster-icon',
+                iconSize: L.point(size, size)
+              });
+            }
+            
+            // Cluster misto - criar ícone de pizza/dividido
+            const demandaPercent = (demandasCount / total) * 100;
+            const municipePercent = (municipesCount / total) * 100;
+            
+            // Usar conic-gradient para efeito de pizza
             return L.divIcon({
-              html: `<div style="
-                background: linear-gradient(135deg, #ef4444, #dc2626);
-                width: ${s.width}px;
-                height: ${s.height}px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: ${s.fontSize}px;
-                border: 3px solid white;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-              ">${count}</div>`,
-              className: 'custom-cluster-icon',
-              iconSize: L.point(s.width, s.height)
+              html: `
+                <div style="
+                  width: ${size}px;
+                  height: ${size}px;
+                  border-radius: 50%;
+                  background: conic-gradient(
+                    #ef4444 0% ${demandaPercent}%,
+                    #8b5cf6 ${demandaPercent}% 100%
+                  );
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                  position: relative;
+                ">
+                  <div style="
+                    background: white;
+                    width: ${size - 16}px;
+                    height: ${size - 16}px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                    font-size: ${fontSize}px;
+                    color: #374151;
+                  ">${total}</div>
+                </div>
+                <div style="
+                  position: absolute;
+                  bottom: -18px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  display: flex;
+                  gap: 2px;
+                  font-size: 9px;
+                  font-weight: 600;
+                  white-space: nowrap;
+                ">
+                  <span style="color: #ef4444;">${demandasCount}D</span>
+                  <span style="color: #8b5cf6;">${municipesCount}M</span>
+                </div>
+              `,
+              className: 'custom-cluster-icon-mixed',
+              iconSize: L.point(size, size + 20),
+              iconAnchor: L.point(size / 2, size / 2)
             });
           }}
         >
-          {demandas.map((demanda) => (
+          {/* Marcadores de Demandas */}
+          {mostrarDemandas && demandas.map((demanda) => (
             demanda.latitude && demanda.longitude && (
               <Marker
                 key={`demanda-${demanda.id}`}
                 position={[demanda.latitude, demanda.longitude]}
                 icon={createDemandaIcon(demanda.status, demanda.area_cor)}
+                data={{ tipo: 'demanda', item: demanda }}
                 eventHandlers={{
                   click: () => onDemandaClick?.(demanda)
                 }}
               >
                 <Popup>
-                  <div className="min-w-[200px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                      <span className="font-semibold text-sm">{demanda.titulo}</span>
+                  <div className="min-w-[220px]">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div>
+                        <span className="font-semibold text-sm block">{demanda.titulo}</span>
+                        <span className="text-xs text-gray-500">{demanda.protocolo}</span>
+                      </div>
                     </div>
                     
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <p><strong>Protocolo:</strong> {demanda.protocolo}</p>
-                      
+                    <div className="space-y-1.5 text-xs text-gray-600">
                       {demanda.status && (
                         <div className="flex items-center gap-1">
                           <strong>Status:</strong>
                           <Badge 
                             variant="outline" 
+                            className="text-xs h-5"
                             style={{ 
                               backgroundColor: STATUS_COLORS[demanda.status] + '20',
                               borderColor: STATUS_COLORS[demanda.status],
@@ -466,68 +559,34 @@ export function ClusterMap({
               </Marker>
             )
           ))}
-        </MarkerClusterGroup>
-      )}
 
-      {/* Cluster de Munícipes */}
-      {mostrarMunicipes && !heatmapVisible && (
-        <MarkerClusterGroup
-          chunkedLoading
-          maxClusterRadius={50}
-          spiderfyOnMaxZoom
-          showCoverageOnHover={false}
-          iconCreateFunction={(cluster) => {
-            const count = cluster.getChildCount();
-            let size = 'small';
-            if (count > 10) size = 'medium';
-            if (count > 50) size = 'large';
-            
-            const sizes = {
-              small: { width: 30, height: 30, fontSize: 12 },
-              medium: { width: 40, height: 40, fontSize: 14 },
-              large: { width: 50, height: 50, fontSize: 16 }
-            };
-            
-            const s = sizes[size as keyof typeof sizes];
-            
-            return L.divIcon({
-              html: `<div style="
-                background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-                width: ${s.width}px;
-                height: ${s.height}px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: ${s.fontSize}px;
-                border: 3px solid white;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-              ">${count}</div>`,
-              className: 'custom-cluster-icon',
-              iconSize: L.point(s.width, s.height)
-            });
-          }}
-        >
-          {municipes.map((municipe) => (
+          {/* Marcadores de Munícipes */}
+          {mostrarMunicipes && municipes.map((municipe) => (
             municipe.latitude && municipe.longitude && (
               <Marker
                 key={`municipe-${municipe.id}`}
                 position={[municipe.latitude, municipe.longitude]}
                 icon={createMunicipeIcon()}
+                data={{ tipo: 'municipe', item: municipe }}
                 eventHandlers={{
                   click: () => onMunicipeClick?.(municipe)
                 }}
               >
                 <Popup>
-                  <div className="min-w-[200px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <User className="h-4 w-4 text-purple-600" />
-                      <span className="font-semibold text-sm">{municipe.nome}</span>
+                  <div className="min-w-[220px]">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <User className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <span className="font-semibold text-sm block">{municipe.nome}</span>
+                        {municipe.demandas_count > 0 && (
+                          <span className="text-xs text-gray-500">{municipe.demandas_count} demanda(s)</span>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="space-y-1 text-xs text-gray-600">
+                    <div className="space-y-1.5 text-xs text-gray-600">
                       {municipe.telefone && (
                         <p className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -543,27 +602,23 @@ export function ClusterMap({
                         </p>
                       )}
                       
-                      {municipe.demandas_count > 0 && (
-                        <p><strong>Demandas:</strong> {municipe.demandas_count}</p>
-                      )}
-                      
                       {municipe.tags && municipe.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {municipe.tags.slice(0, 3).map(tag => (
                             <Badge 
                               key={tag.id} 
                               variant="outline"
+                              className="text-xs h-5"
                               style={{
                                 backgroundColor: (tag.cor || '#6b7280') + '20',
                                 borderColor: tag.cor || '#6b7280',
-                                fontSize: '10px'
                               }}
                             >
                               {tag.nome}
                             </Badge>
                           ))}
                           {municipe.tags.length > 3 && (
-                            <Badge variant="outline" style={{ fontSize: '10px' }}>
+                            <Badge variant="outline" className="text-xs h-5">
                               +{municipe.tags.length - 3}
                             </Badge>
                           )}
