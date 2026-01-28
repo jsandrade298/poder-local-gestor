@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, LayersControl, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -27,6 +27,7 @@ export interface MapMarker {
   title: string;
   description?: string;
   status?: string;
+  color?: string;
   type: 'demanda' | 'municipe';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   originalData?: any; 
@@ -39,18 +40,20 @@ export interface ClusterMapProps {
   onClusterClick: (markers: MapMarker[]) => void;
 }
 
-const COLORS = {
+const CLUSTER_COLORS = {
   demanda: '#ef4444', // Vermelho
   municipe: '#3b82f6', // Azul
 };
 
-// --- COMPONENTE AUXILIAR PARA ZOOM ---
+// --- COMPONENTE AUXILIAR PARA ZOOM INICIAL ---
 function FitBounds({ markers }: { markers: MapMarker[] }) {
   const map = useMap();
-  // Ajusta o zoom apenas na primeira renderização se houver marcadores
-  if (markers.length > 0) {
-    const group = L.featureGroup(markers.map((m) => L.marker([m.latitude, m.longitude])));
-    map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 15 });
+  // Só ajusta o zoom na inicialização (mount) se houver marcadores
+  // Não roda em atualizações subsequentes para não atrapalhar a navegação
+  if (markers.length > 0 && !map.options.minZoom) { 
+    // map.options.minZoom é um check sujo para ver se já configuramos algo, 
+    // mas o melhor é usar um ref se quisermos ser estritos. 
+    // Por enquanto, deixaremos o usuário controlar o zoom livremente.
   }
   return null;
 }
@@ -58,14 +61,12 @@ function FitBounds({ markers }: { markers: MapMarker[] }) {
 // --- COMPONENTE PRINCIPAL ---
 export function ClusterMap({ markers, center, zoom, onClusterClick }: ClusterMapProps) {
 
-  // Função que desenha o Ícone "Pizza" (Pie Chart)
+  // Ícone "Pizza" (Cluster)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createClusterCustomIcon = useCallback((cluster: any) => {
     const childMarkers = cluster.getAllChildMarkers();
-    
     let demandasCount = 0;
     
-    // Conta quantos são demandas
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     childMarkers.forEach((marker: any) => {
       if (marker.options.type === 'demanda') demandasCount++;
@@ -74,15 +75,13 @@ export function ClusterMap({ markers, center, zoom, onClusterClick }: ClusterMap
     const total = childMarkers.length;
     const percentDemanda = (demandasCount / total) * 100;
     
-    // Define a cor de fundo (sólida ou gradiente)
     let backgroundStyle;
-    if (percentDemanda === 100) backgroundStyle = COLORS.demanda;
-    else if (percentDemanda === 0) backgroundStyle = COLORS.municipe;
+    if (percentDemanda === 100) backgroundStyle = CLUSTER_COLORS.demanda;
+    else if (percentDemanda === 0) backgroundStyle = CLUSTER_COLORS.municipe;
     else {
-      // Cria o gráfico de pizza via CSS
       backgroundStyle = `conic-gradient(
-        ${COLORS.demanda} 0% ${percentDemanda}%, 
-        ${COLORS.municipe} ${percentDemanda}% 100%
+        ${CLUSTER_COLORS.demanda} 0% ${percentDemanda}%, 
+        ${CLUSTER_COLORS.municipe} ${percentDemanda}% 100%
       )`;
     }
 
@@ -108,17 +107,17 @@ export function ClusterMap({ markers, center, zoom, onClusterClick }: ClusterMap
 
     return L.divIcon({
       html: html,
-      className: 'custom-marker-cluster', // Classe para CSS customizado se precisar
+      className: 'custom-marker-cluster',
       iconSize: [36, 36],
     });
   }, []);
 
-  // Ícone individual (pino simples)
-  const createIndividualIcon = (type: 'demanda' | 'municipe') => {
-    const color = COLORS[type];
+  // Ícone Individual
+  const createIndividualIcon = (type: 'demanda' | 'municipe', color?: string) => {
+    const finalColor = color || (type === 'demanda' ? CLUSTER_COLORS.demanda : CLUSTER_COLORS.municipe);
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30">
-        <path fill="${color}" stroke="white" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <path fill="${finalColor}" stroke="white" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
         <circle cx="12" cy="9" r="2.5" fill="white"/>
       </svg>`;
     return L.divIcon({
@@ -153,53 +152,48 @@ export function ClusterMap({ markers, center, zoom, onClusterClick }: ClusterMap
           </LayersControl.BaseLayer>
         </LayersControl>
 
-        <FitBounds markers={markers} />
-
         <MarkerClusterGroup
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
-          maxClusterRadius={40} 
-          spiderfyOnMaxZoom={false} // Desativa o efeito "aranha", preferimos abrir o painel
+          maxClusterRadius={60} // Aumentei um pouco para agrupar melhor bairros
+          spiderfyOnMaxZoom={false}
           showCoverageOnHover={false}
+          zoomToBoundsOnClick={false} // <--- AQUI ESTÁ A MÁGICA: Bloqueia o zoom ao clicar
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onClick={(e: any) => {
             const cluster = e.layer;
-            const map = cluster._map;
+            const childMarkers = cluster.getAllChildMarkers();
             
-            // Se estivermos com zoom muito longe, aproxima.
-            // Se estiver perto (Zoom >= 16), abre o painel lateral com os dados.
-            if (map.getZoom() < 16) {
-               cluster.zoomToBounds();
-            } else {
-               const childMarkers = cluster.getAllChildMarkers();
-               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-               const markersData = childMarkers.map((m: any) => ({
-                 id: m.options.id,
-                 type: m.options.type,
-                 title: m.options.title,
-                 ...m.options.originalData
-               }));
-               onClusterClick(markersData);
-            }
+            // Extrai os dados dos marcadores do cluster
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const markersData = childMarkers.map((m: any) => ({
+                id: m.options.id,
+                type: m.options.type,
+                title: m.options.title,
+                color: m.options.color, // Preserva a cor
+                ...m.options.originalData
+            }));
+            
+            // Abre o painel lateral SEM dar zoom no mapa
+            onClusterClick(markersData);
           }}
         >
           {markers.map((marker) => (
             <Marker
               key={`${marker.type}-${marker.id}`}
               position={[marker.latitude, marker.longitude]}
-              icon={createIndividualIcon(marker.type)}
-              // Props extras passadas via options para serem recuperadas no cluster
+              icon={createIndividualIcon(marker.type, marker.color)}
+              // Props passadas para o Leaflet options para recuperar no cluster
               // @ts-expect-error Leaflet options customizadas
               type={marker.type} 
               id={marker.id}
               title={marker.title}
+              color={marker.color}
               originalData={marker}
               eventHandlers={{
                 click: () => onClusterClick([marker]),
               }}
-            >
-               {/* Removemos o Popup padrão para usar apenas o Painel Lateral */}
-            </Marker>
+            />
           ))}
         </MarkerClusterGroup>
       </MapContainer>
