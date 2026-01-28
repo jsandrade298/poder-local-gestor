@@ -85,23 +85,28 @@ function createClusterIcon(cluster: ClusterUnificado): DivIcon {
   const r = size / 2 - 2;
   const cx = size / 2;
   const cy = size / 2;
+  const fontSize = size > 50 ? 15 : 13;
   
   let svg: string;
   if (isMisto) {
+    // Cluster misto: número com contorno escuro para legibilidade
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <defs><clipPath id="left${cluster.id}"><rect x="0" y="0" width="${cx}" height="${size}"/></clipPath>
-      <clipPath id="right${cluster.id}"><rect x="${cx}" y="0" width="${cx}" height="${size}"/></clipPath></defs>
+      <defs>
+        <clipPath id="left${cluster.id}"><rect x="0" y="0" width="${cx}" height="${size}"/></clipPath>
+        <clipPath id="right${cluster.id}"><rect x="${cx}" y="0" width="${cx}" height="${size}"/></clipPath>
+      </defs>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_DEMANDA}" clip-path="url(#left${cluster.id})"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="${COR_MUNICIPE}" clip-path="url(#right${cluster.id})"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="3"/>
-      <line x1="${cx}" y1="2" x2="${cx}" y2="${size-2}" stroke="#fff" stroke-width="2"/>
-      <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="13" font-family="Arial">${cluster.total}</text>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="4"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="2"/>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#000" font-weight="bold" font-size="${fontSize}" font-family="Arial" opacity="0.4">${cluster.total}</text>
+      <text x="${cx - 0.5}" y="${cy + 4.5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial" stroke="#000" stroke-width="2" paint-order="stroke">${cluster.total}</text>
     </svg>`;
   } else {
     const cor = temDemandas ? COR_DEMANDA : COR_MUNICIPE;
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="${cor}" stroke="#fff" stroke-width="3"/>
-      <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="13" font-family="Arial">${cluster.total}</text>
+      <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial">${cluster.total}</text>
     </svg>`;
   }
   return new DivIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
@@ -427,7 +432,7 @@ export default function MapaUnificado() {
                 {/* Lista de Paradas */}
                 <div className="space-y-2">
                   <div className="text-sm font-medium flex items-center gap-2">
-                    <MapPinned className="h-4 w-4" />
+                    <MapPinned className="h-4 w-4 flex-shrink-0" />
                     Paradas ({rota.pontosRota.length})
                   </div>
                   
@@ -436,22 +441,22 @@ export default function MapaUnificado() {
                       Clique em <strong>+ Rota</strong> nos pontos do mapa para adicionar paradas
                     </p>
                   ) : (
-                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                    <div className="space-y-1 max-h-[180px] overflow-y-auto pr-1">
                       {rota.pontosRota.map((p, i) => (
                         <div key={p.id} className="flex items-center gap-2 p-2 border rounded text-sm bg-background">
-                          <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate font-medium">{p.nome}</p>
-                            <p className="text-xs text-muted-foreground">{p.tipo === 'demanda' ? '📄 Demanda' : '👤 Munícipe'}</p>
+                          <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="truncate text-xs font-medium leading-tight">{p.nome}</p>
+                            <p className="text-xs text-muted-foreground">{p.tipo === 'demanda' ? '📄' : '👤'}</p>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => rota.moverPonto(i, 'up')} disabled={i === 0}>
+                          <div className="flex items-center flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => rota.moverPonto(i, 'up')} disabled={i === 0}>
                               <ChevronUp className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => rota.moverPonto(i, 'down')} disabled={i === rota.pontosRota.length - 1}>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => rota.moverPonto(i, 'down')} disabled={i === rota.pontosRota.length - 1}>
                               <ChevronDown className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => rota.removerPonto(p.id)}>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => rota.removerPonto(p.id)}>
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
@@ -463,24 +468,26 @@ export default function MapaUnificado() {
                 
                 {/* Resultado da Rota */}
                 {rota.rotaCalculada && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg space-y-1">
-                    <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
-                      <Navigation2 className="h-4 w-4" />
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-700 font-medium text-sm mb-2">
+                      <Navigation2 className="h-4 w-4 flex-shrink-0" />
                       Rota Otimizada!
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Distância:</span>
-                      <span className="font-medium">{formatarDistancia(rota.rotaCalculada.distancia)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Tempo estimado:</span>
-                      <span className="font-medium">{formatarDuracao(rota.rotaCalculada.duracao)}</span>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Distância:</span>
+                        <p className="font-medium">{formatarDistancia(rota.rotaCalculada.distancia)}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tempo:</span>
+                        <p className="font-medium">{formatarDuracao(rota.rotaCalculada.duracao)}</p>
+                      </div>
                     </div>
                   </div>
                 )}
                 
                 {/* Botões de Ação */}
-                <div className="space-y-2">
+                <div className="space-y-2 pb-4">
                   {!rota.rotaCalculada ? (
                     <Button className="w-full" onClick={iniciarRota} disabled={rota.pontosRota.length === 0}>
                       <Navigation className="h-4 w-4 mr-2" />
@@ -493,12 +500,12 @@ export default function MapaUnificado() {
                         Iniciar Navegação
                       </Button>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm" onClick={rota.copiarEnderecos}>
-                          <Copy className="h-4 w-4 mr-1" />
+                        <Button variant="outline" size="sm" className="w-full" onClick={rota.copiarEnderecos}>
+                          <Copy className="h-3 w-3 mr-1" />
                           Copiar
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => rota.calcularRotaOtimizada(true)}>
-                          <RefreshCw className="h-4 w-4 mr-1" />
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => rota.calcularRotaOtimizada(true)}>
+                          <RefreshCw className="h-3 w-3 mr-1" />
                           Recalcular
                         </Button>
                       </div>
