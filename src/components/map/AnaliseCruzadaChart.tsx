@@ -17,13 +17,29 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface AnaliseCruzadaChartProps {
-  dadosCruzados: any[];
-  areas: any[];
-  tags: any[];
+interface Metricas {
+  totalMun: number;
+  totalDem: number;
+  totalCombinacoes: number;
+  topTags: { nome: string; quantidade: number; cor: string | null }[];
+  topAreas: { nome: string; quantidade: number; cor: string | null }[];
 }
 
-export function AnaliseCruzadaChart({ dadosCruzados, areas, tags }: AnaliseCruzadaChartProps) {
+interface DadosFiltrados {
+  municipes: any[];
+  demandas: any[];
+  cruzados: any[];
+}
+
+interface AnaliseCruzadaChartProps {
+  metricas: Metricas;
+  dados: DadosFiltrados;
+}
+
+export function AnaliseCruzadaChart({ metricas, dados }: AnaliseCruzadaChartProps) {
+  const dadosCruzados = dados?.cruzados || [];
+  const areas = metricas?.topAreas || [];
+  const tags = metricas?.topTags || [];
   
   // Preparar dados para gráfico de barras (Top combinações)
   const topCombinacoes = useMemo(() => {
