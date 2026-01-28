@@ -1,12 +1,11 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// === INTERFACES ===
+// Tipos
 export interface DemandaMapa {
   id: string;
   titulo: string;
-  descricao: string;
+  descricao: string | null;
   status: string | null;
   prioridade: string | null;
   protocolo: string;
@@ -17,9 +16,15 @@ export interface DemandaMapa {
   numero: string | null;
   cidade: string | null;
   area_id: string | null;
-  municipe_id: string;
-  municipe_nome?: string;
+  area_nome: string | null;
+  area_cor: string | null;
+  municipe_id: string | null;
+  municipe_nome: string | null;
+  municipe_telefone: string | null;
+  responsavel_id: string | null;
+  data_prazo: string | null;
   created_at: string | null;
+  tipo: 'demanda';
 }
 
 export interface MunicipeMapa {
@@ -27,19 +32,23 @@ export interface MunicipeMapa {
   nome: string;
   telefone: string | null;
   email: string | null;
-  bairro: string | null;
-  endereco: string | null;
-  cidade: string | null;
   latitude: number;
   longitude: number;
+  bairro: string | null;
+  logradouro: string | null;
+  endereco: string | null;
+  cidade: string | null;
+  tags: string[];
+  tag_cores: string[];
   tag_ids: string[];
-  created_at: string | null;
+  demandas_count: number;
+  tipo: 'municipe';
 }
 
 export interface AreaMapa {
   id: string;
   nome: string;
-  descricao: string | null;
+  cor: string | null;
 }
 
 export interface TagMapa {
@@ -48,137 +57,67 @@ export interface TagMapa {
   cor: string | null;
 }
 
-// === HOOK PRINCIPAL ===
+// Hook principal
 export function useMapaUnificado() {
-  // Buscar demandas com coordenadas e nome do munícipe
-  const { 
-    data: rawDemandas, 
-    isLoading: loadingDemandas, 
-    refetch: refetchDemandas,
-    error: errorDemandas
-  } = useQuery({
-    queryKey: ['mapa-unificado-demandas'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select(`
-          id,
-          titulo,
-          descricao,
-          status,
-          prioridade,
-          protocolo,
-          latitude,
-          longitude,
-          bairro,
-          logradouro,
-          numero,
-          cidade,
-          area_id,
-          municipe_id,
-          created_at,
-          municipes!demandas_municipe_id_fkey (
-            nome
-          )
-        `)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Erro ao buscar demandas para mapa:', error);
-        throw error;
-      }
-      
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 2, // 2 minutos
-  });
-
-  // Buscar munícipes com coordenadas e suas tags
-  const { 
-    data: rawMunicipes, 
-    isLoading: loadingMunicipes, 
-    refetch: refetchMunicipes,
-    error: errorMunicipes
-  } = useQuery({
-    queryKey: ['mapa-unificado-municipes'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select(`
-          id,
-          nome,
-          telefone,
-          email,
-          bairro,
-          endereco,
-          cidade,
-          latitude,
-          longitude,
-          created_at,
-          municipe_tags (
-            tag_id
-          )
-        `)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null)
-        .order('nome', { ascending: true });
-      
-      if (error) {
-        console.error('Erro ao buscar munícipes para mapa:', error);
-        throw error;
-      }
-      
-      return data || [];
-    },
-    staleTime: 1000 * 60 * 2,
-  });
-
-  // Buscar áreas
-  const { data: areas, isLoading: loadingAreas } = useQuery({
-    queryKey: ['mapa-unificado-areas'],
+  // 1. Buscar TODAS as áreas primeiro
+  const { data: areas = [] } = useQuery({
+    queryKey: ['mapa-areas-todas'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('areas')
-        .select('id, nome, descricao')
-        .order('nome', { ascending: true });
+        .select('*')
+        .order('nome');
       
       if (error) {
         console.error('Erro ao buscar áreas:', error);
         return [];
       }
-      
+      console.log('Áreas encontradas:', data?.length || 0);
       return (data || []) as AreaMapa[];
-    },
-    staleTime: 1000 * 60 * 5,
+    }
   });
 
-  // Buscar tags
-  const { data: tags, isLoading: loadingTags } = useQuery({
-    queryKey: ['mapa-unificado-tags'],
+  // 2. Buscar TODAS as tags
+  const { data: tags = [] } = useQuery({
+    queryKey: ['mapa-tags-todas'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tags')
-        .select('id, nome, cor')
-        .order('nome', { ascending: true });
+        .select('*')
+        .order('nome');
       
       if (error) {
         console.error('Erro ao buscar tags:', error);
         return [];
       }
-      
+      console.log('Tags encontradas:', data?.length || 0);
       return (data || []) as TagMapa[];
-    },
-    staleTime: 1000 * 60 * 5,
+    }
   });
 
-  // Processar demandas para o formato do mapa
-  const demandas = useMemo((): DemandaMapa[] => {
-    if (!rawDemandas) return [];
-    
-    return rawDemandas
-      .filter(d => {
+  // 3. Buscar TODAS as demandas e filtrar as geocodificadas
+  const { 
+    data: demandas = [], 
+    isLoading: loadingDemandas,
+    refetch: refetchDemandas 
+  } = useQuery({
+    queryKey: ['mapa-demandas-todas', areas],
+    queryFn: async () => {
+      // Buscar todas as demandas
+      const { data: todasDemandas, error } = await supabase
+        .from('demandas')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao buscar demandas:', error);
+        throw error;
+      }
+      
+      console.log('Total de demandas no sistema:', todasDemandas?.length || 0);
+      
+      // Filtrar apenas as que têm coordenadas válidas
+      const demandasGeocodificadas = (todasDemandas || []).filter(d => {
         const lat = d.latitude;
         const lng = d.longitude;
         return (
@@ -187,12 +126,34 @@ export function useMapaUnificado() {
           lng !== null && 
           lng !== undefined &&
           !isNaN(Number(lat)) &&
-          !isNaN(Number(lng)) &&
-          Number(lat) >= -90 && Number(lat) <= 90 &&
-          Number(lng) >= -180 && Number(lng) <= 180
+          !isNaN(Number(lng))
         );
-      })
-      .map(d => ({
+      });
+      
+      console.log('Demandas com coordenadas:', demandasGeocodificadas.length);
+
+      // Criar mapa de áreas para lookup rápido
+      const areasMap: Record<string, { nome: string; cor: string | null }> = {};
+      areas.forEach(a => {
+        areasMap[a.id] = { nome: a.nome, cor: a.cor };
+      });
+
+      // Buscar nomes dos munícipes
+      const municipeIds = [...new Set(demandasGeocodificadas.map(d => d.municipe_id).filter(Boolean))];
+      let municipesMap: Record<string, { nome: string; telefone: string | null }> = {};
+      
+      if (municipeIds.length > 0) {
+        const { data: municipesData } = await supabase
+          .from('municipes')
+          .select('id, nome, telefone')
+          .in('id', municipeIds);
+        
+        (municipesData || []).forEach(m => {
+          municipesMap[m.id] = { nome: m.nome, telefone: m.telefone };
+        });
+      }
+      
+      return demandasGeocodificadas.map(d => ({
         id: d.id,
         titulo: d.titulo,
         descricao: d.descricao,
@@ -206,18 +167,42 @@ export function useMapaUnificado() {
         numero: d.numero,
         cidade: d.cidade,
         area_id: d.area_id,
+        area_nome: d.area_id ? areasMap[d.area_id]?.nome || null : null,
+        area_cor: d.area_id ? areasMap[d.area_id]?.cor || null : null,
         municipe_id: d.municipe_id,
-        municipe_nome: (d.municipes as any)?.nome || 'Não identificado',
+        municipe_nome: d.municipe_id ? municipesMap[d.municipe_id]?.nome || null : null,
+        municipe_telefone: d.municipe_id ? municipesMap[d.municipe_id]?.telefone || null : null,
+        responsavel_id: d.responsavel_id,
+        data_prazo: d.data_prazo,
         created_at: d.created_at,
-      }));
-  }, [rawDemandas]);
+        tipo: 'demanda' as const
+      })) as DemandaMapa[];
+    },
+    enabled: areas.length >= 0 // Sempre executar
+  });
 
-  // Processar munícipes para o formato do mapa
-  const municipes = useMemo((): MunicipeMapa[] => {
-    if (!rawMunicipes) return [];
-    
-    return rawMunicipes
-      .filter(m => {
+  // 4. Buscar TODOS os munícipes e filtrar os geocodificados
+  const { 
+    data: municipes = [], 
+    isLoading: loadingMunicipes,
+    refetch: refetchMunicipes 
+  } = useQuery({
+    queryKey: ['mapa-municipes-todos'],
+    queryFn: async () => {
+      // Buscar todos os munícipes
+      const { data: todosMunicipes, error: municipesError } = await supabase
+        .from('municipes')
+        .select('*');
+      
+      if (municipesError) {
+        console.error('Erro ao buscar munícipes:', municipesError);
+        throw municipesError;
+      }
+      
+      console.log('Total de munícipes no sistema:', todosMunicipes?.length || 0);
+
+      // Filtrar apenas os que têm coordenadas válidas
+      const municipesGeocodificados = (todosMunicipes || []).filter(m => {
         const lat = m.latitude;
         const lng = m.longitude;
         return (
@@ -226,60 +211,94 @@ export function useMapaUnificado() {
           lng !== null && 
           lng !== undefined &&
           !isNaN(Number(lat)) &&
-          !isNaN(Number(lng)) &&
-          Number(lat) >= -90 && Number(lat) <= 90 &&
-          Number(lng) >= -180 && Number(lng) <= 180
+          !isNaN(Number(lng))
         );
-      })
-      .map(m => ({
+      });
+      
+      console.log('Munícipes com coordenadas:', municipesGeocodificados.length);
+      
+      if (municipesGeocodificados.length === 0) return [];
+
+      // Buscar tags de cada munícipe
+      const { data: tagsData, error: tagsError } = await supabase
+        .from('municipe_tags')
+        .select(`
+          municipe_id,
+          tags:tag_id(id, nome, cor)
+        `)
+        .in('municipe_id', municipesGeocodificados.map(m => m.id));
+      
+      if (tagsError) console.warn('Erro ao buscar tags de munícipes:', tagsError);
+
+      // Buscar contagem de demandas por munícipe
+      const { data: demandasCount, error: demandasError } = await supabase
+        .from('demandas')
+        .select('municipe_id')
+        .in('municipe_id', municipesGeocodificados.map(m => m.id))
+        .neq('status', 'atendido');
+      
+      if (demandasError) console.warn('Erro ao buscar demandas de munícipes:', demandasError);
+
+      // Montar mapa de tags por munícipe
+      const tagsMap: Record<string, { ids: string[], nomes: string[], cores: string[] }> = {};
+      (tagsData || []).forEach(item => {
+        const tag = item.tags as any;
+        if (!tag) return;
+        
+        if (!tagsMap[item.municipe_id]) {
+          tagsMap[item.municipe_id] = { ids: [], nomes: [], cores: [] };
+        }
+        tagsMap[item.municipe_id].ids.push(tag.id);
+        tagsMap[item.municipe_id].nomes.push(tag.nome);
+        tagsMap[item.municipe_id].cores.push(tag.cor || '#6b7280');
+      });
+
+      // Montar contagem de demandas por munícipe
+      const demandasMap: Record<string, number> = {};
+      (demandasCount || []).forEach(item => {
+        if (item.municipe_id) {
+          demandasMap[item.municipe_id] = (demandasMap[item.municipe_id] || 0) + 1;
+        }
+      });
+
+      return municipesGeocodificados.map(m => ({
         id: m.id,
         nome: m.nome,
         telefone: m.telefone,
         email: m.email,
-        bairro: m.bairro,
-        endereco: m.endereco,
-        cidade: m.cidade,
         latitude: Number(m.latitude),
         longitude: Number(m.longitude),
-        tag_ids: (m.municipe_tags as any[])?.map(t => t.tag_id) || [],
-        created_at: m.created_at,
-      }));
-  }, [rawMunicipes]);
+        bairro: m.bairro,
+        logradouro: null,
+        endereco: m.endereco,
+        cidade: m.cidade,
+        tags: tagsMap[m.id]?.nomes || [],
+        tag_cores: tagsMap[m.id]?.cores || [],
+        tag_ids: tagsMap[m.id]?.ids || [],
+        demandas_count: demandasMap[m.id] || 0,
+        tipo: 'municipe' as const
+      })) as MunicipeMapa[];
+    }
+  });
 
-  // Extrair bairros únicos de demandas e munícipes
-  const bairrosUnicos = useMemo((): string[] => {
-    const bairros = new Set<string>();
-    
-    demandas.forEach(d => {
-      if (d.bairro) bairros.add(d.bairro);
-    });
-    
-    municipes.forEach(m => {
-      if (m.bairro) bairros.add(m.bairro);
-    });
-    
-    return Array.from(bairros).sort();
-  }, [demandas, municipes]);
+  // Buscar bairros únicos
+  const bairrosUnicos = [...new Set([
+    ...demandas.map(d => d.bairro).filter(Boolean),
+    ...municipes.map(m => m.bairro).filter(Boolean)
+  ])].sort() as string[];
 
-  // Função para recarregar todos os dados
-  const refetch = async () => {
-    await Promise.all([
-      refetchDemandas(),
-      refetchMunicipes(),
-    ]);
+  const refetch = () => {
+    refetchDemandas();
+    refetchMunicipes();
   };
-
-  const isLoading = loadingDemandas || loadingMunicipes || loadingAreas || loadingTags;
-  const error = errorDemandas || errorMunicipes;
 
   return {
     demandas,
     municipes,
-    areas: areas || [],
-    tags: tags || [],
+    areas,
+    tags,
     bairrosUnicos,
-    isLoading,
-    error,
-    refetch,
+    isLoading: loadingDemandas || loadingMunicipes,
+    refetch
   };
 }
