@@ -131,9 +131,6 @@ function createClusterIcon(cluster: ClusterUnificado): DivIcon {
   return new DivIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
 }
 
-// Ícone de origem pré-criado
-const ORIGEM_ICON = createOrigemIcon();
-
 // === CLUSTERING ===
 function calcularClusters(demandas: DemandaMapa[], municipes: MunicipeMapa[], zoom: number) {
   const cellSize = 360 / Math.pow(2, zoom + 2);
@@ -679,7 +676,7 @@ export default function MapaUnificado() {
               
               {/* Origem */}
               {rota.pontoOrigem && (
-                <Marker position={[rota.pontoOrigem.latitude, rota.pontoOrigem.longitude]} icon={ORIGEM_ICON}>
+                <Marker position={[rota.pontoOrigem.latitude, rota.pontoOrigem.longitude]} icon={createOrigemIcon()}>
                   <Popup><div className="text-center text-sm"><strong>🚗 Origem</strong><br/>{rota.pontoOrigem.nome}</div></Popup>
                 </Marker>
               )}
