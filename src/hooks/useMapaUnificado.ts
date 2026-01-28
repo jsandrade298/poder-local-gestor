@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -51,7 +51,6 @@ export interface MunicipeMapa {
   latitude: number | null;
   longitude: number | null;
   bairro: string | null;
-  logradouro: string | null;
   endereco: string | null;
   cidade: string | null;
   cep: string | null;
@@ -130,7 +129,6 @@ function isValidCoordinate(lat: any, lng: any): boolean {
 }
 
 export function useMapaUnificado() {
-  const queryClient = useQueryClient();
   const [geocodificando, setGeocodificando] = useState(false);
   const [progressoGeocodificacao, setProgressoGeocodificacao] = useState({ atual: 0, total: 0 });
 
@@ -149,7 +147,6 @@ export function useMapaUnificado() {
         return [];
       }
       
-      // Gerar cores baseadas no nome da área
       const areasComCor = (data || []).map(area => ({
         ...area,
         cor: gerarCorPorTexto(area.nome)
@@ -176,7 +173,6 @@ export function useMapaUnificado() {
         return [];
       }
       
-      // Garantir que todas as tags tenham cor
       const tagsComCor = (data || []).map(tag => ({
         ...tag,
         cor: tag.cor || gerarCorPorTexto(tag.nome)
@@ -188,7 +184,7 @@ export function useMapaUnificado() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Buscar demandas - TODAS
+  // Buscar demandas - CORRIGIDO: removido logradouro de municipes
   const { 
     data: demandasRaw = [], 
     isLoading: isLoadingDemandas,
@@ -198,7 +194,7 @@ export function useMapaUnificado() {
     queryFn: async () => {
       console.log('🔄 [MAPA] Buscando todas as demandas...');
       
-      // Query simplificada - buscar só o que existe na tabela
+      // Query CORRIGIDA - removido logradouro de municipes pois não existe
       const { data, error } = await supabase
         .from('demandas')
         .select(`
@@ -221,7 +217,7 @@ export function useMapaUnificado() {
           data_prazo,
           created_at,
           areas (id, nome),
-          municipes (id, nome, telefone, bairro, logradouro, cidade, latitude, longitude)
+          municipes (id, nome, telefone, bairro, cidade, latitude, longitude)
         `)
         .order('created_at', { ascending: false });
       
@@ -232,7 +228,6 @@ export function useMapaUnificado() {
       
       console.log(`📊 [MAPA] Demandas retornadas do banco: ${data?.length || 0}`);
       
-      // Log de amostra para debug
       if (data && data.length > 0) {
         console.log('📍 [MAPA] Amostra da primeira demanda:', {
           id: data[0].id,
@@ -269,12 +264,12 @@ export function useMapaUnificado() {
           latitude: latNum,
           longitude: lngNum,
           bairro: d.bairro || d.municipes?.bairro || null,
-          logradouro: d.logradouro || d.municipes?.logradouro || null,
+          logradouro: d.logradouro || null,
           numero: d.numero,
           cidade: d.cidade || d.municipes?.cidade || null,
           cep: d.cep,
           endereco_completo: buildFullAddress(
-            d.logradouro || d.municipes?.logradouro,
+            d.logradouro,
             d.numero,
             d.bairro || d.municipes?.bairro,
             d.cidade || d.municipes?.cidade,
@@ -311,7 +306,6 @@ export function useMapaUnificado() {
     queryFn: async () => {
       console.log('🔄 [MAPA] Buscando todos os munícipes...');
       
-      // Query simplificada - buscar só o que existe na tabela
       const { data, error } = await supabase
         .from('municipes')
         .select(`
@@ -334,7 +328,6 @@ export function useMapaUnificado() {
       
       console.log(`📊 [MAPA] Munícipes retornados do banco: ${data?.length || 0}`);
       
-      // Log de amostra para debug
       if (data && data.length > 0) {
         console.log('📍 [MAPA] Amostra do primeiro munícipe:', {
           id: data[0].id,
@@ -385,7 +378,6 @@ export function useMapaUnificado() {
       });
       
       const processados = data.map(m => {
-        // Converter para número
         const latNum = typeof m.latitude === 'string' ? parseFloat(m.latitude) : (m.latitude || null);
         const lngNum = typeof m.longitude === 'string' ? parseFloat(m.longitude) : (m.longitude || null);
         
@@ -397,7 +389,6 @@ export function useMapaUnificado() {
           latitude: latNum,
           longitude: lngNum,
           bairro: m.bairro,
-          logradouro: null,
           endereco: m.endereco,
           cidade: m.cidade,
           cep: m.cep,
@@ -423,15 +414,8 @@ export function useMapaUnificado() {
   });
 
   // Filtrar apenas os que têm coordenadas válidas para exibição no mapa
-  const demandas = demandasRaw.filter(d => {
-    const valid = isValidCoordinate(d.latitude, d.longitude);
-    return valid;
-  });
-
-  const municipes = municipesRaw.filter(m => {
-    const valid = isValidCoordinate(m.latitude, m.longitude);
-    return valid;
-  });
+  const demandas = demandasRaw.filter(d => isValidCoordinate(d.latitude, d.longitude));
+  const municipes = municipesRaw.filter(m => isValidCoordinate(m.latitude, m.longitude));
 
   // Log final
   console.log(`🗺️ [MAPA] RESUMO FINAL:`);
@@ -446,7 +430,7 @@ export function useMapaUnificado() {
     municipes: municipesRaw.filter(m => !isValidCoordinate(m.latitude, m.longitude)).length
   };
 
-  // Função para geocodificar (placeholder - precisa de implementação com Mapbox)
+  // Função para geocodificar (placeholder)
   const geocodificarTodos = useCallback(async () => {
     toast.info("Funcionalidade de geocodificação em lote será implementada.");
   }, []);
