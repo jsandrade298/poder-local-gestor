@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet'; // Alterado para importação default
+import * as L from 'leaflet'; // CORREÇÃO: Importação compatível com todas as configs de TS
 import 'leaflet/dist/leaflet.css';
 
 // Tipos
@@ -57,7 +57,6 @@ function MapUpdater({ markers, fitBounds, config }: {
       );
       
       if (validMarkers.length > 0) {
-        // CORREÇÃO: Usando L.LatLngBounds ao invés de LatLngBounds direto
         const bounds = new L.LatLngBounds(
           validMarkers.map(m => [m.latitude, m.longitude] as [number, number])
         );
@@ -80,7 +79,6 @@ function createColoredIcon(color: string): L.Icon {
     </svg>
   `;
   
-  // CORREÇÃO: Usando L.Icon ao invés de Icon direto
   return new L.Icon({
     iconUrl: `data:image/svg+xml;base64,${btoa(svgIcon)}`,
     iconSize: [44, 44],
@@ -149,7 +147,6 @@ export function DemandasMap({
         
         {validMarkers.map((marker) => {
           const color = marker.color || STATUS_COLORS[marker.status || 'default'] || STATUS_COLORS.default;
-          // Aqui chamamos a função corrigida que usa L.Icon
           const icon = createColoredIcon(color);
           
           return (
