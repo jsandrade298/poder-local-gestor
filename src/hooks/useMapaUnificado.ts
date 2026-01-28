@@ -113,8 +113,8 @@ export function useMapaUnificado() {
         .from('demandas')
         .select(`
           *,
-          areas!left (nome, cor),
-          municipes!left (nome, telefone)
+          areas (nome, cor),
+          municipes (nome, telefone)
         `)
         .not('latitude', 'is', null)
         .not('longitude', 'is', null)
@@ -196,7 +196,7 @@ export function useMapaUnificado() {
         .from('municipe_tags')
         .select(`
           municipe_id,
-          tags!inner (id, nome, cor)
+          tags (id, nome, cor)
         `)
         .in('municipe_id', municipesValidos.map(m => m.id));
       
@@ -223,7 +223,7 @@ export function useMapaUnificado() {
         tags: tagsPorMunicipe[m.id]?.map(t => t.nome) || [],
         tag_cores: tagsPorMunicipe[m.id]?.map(t => t.cor) || [],
         tag_ids: tagsPorMunicipe[m.id]?.map(t => t.id) || [],
-        demandas_count: 0, // Podemos calcular depois se necessário
+        demandas_count: 0,
         tipo: 'municipe' as const
       })) as MunicipeMapa[];
     }
