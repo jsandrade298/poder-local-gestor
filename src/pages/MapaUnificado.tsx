@@ -37,7 +37,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner"; // Para o aviso de "Em breve" da rota
+import { toast } from "sonner"; 
 
 // --- COMPONENTES DE MAPA E MODAIS ---
 import { ClusterMap, MapMarker } from '@/components/map/ClusterMap';
@@ -334,7 +334,6 @@ export default function MapaUnificado() {
           </div>
 
           <TabsContent value="filtros" className="flex-1 p-4 space-y-5 overflow-y-auto">
-            {/* ... Conteúdo dos Filtros (Busca, MultiSelects, etc) ... */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-gray-500">Busca Rápida</Label>
               <div className="relative">
@@ -466,7 +465,10 @@ export default function MapaUnificado() {
                             size="sm" 
                             variant="secondary" 
                             className="w-full text-xs h-8"
-                            onClick={() => setDemandaIdToView(item.id)}
+                            onClick={() => {
+                              console.log("Abrindo demanda:", item.id);
+                              setDemandaIdToView(item.id);
+                            }}
                         >
                             <Eye className="w-3 h-3 mr-2" /> Ver Demanda
                         </Button>
@@ -520,7 +522,10 @@ export default function MapaUnificado() {
                             size="sm" 
                             variant="secondary" 
                             className="w-full text-xs h-8"
-                            onClick={() => setMunicipeIdToView(item.id)}
+                            onClick={() => {
+                              console.log("Abrindo munícipe:", item.id);
+                              setMunicipeIdToView(item.id);
+                            }}
                         >
                             <Eye className="w-3 h-3 mr-2" /> Ver Munícipe
                         </Button>
@@ -541,23 +546,21 @@ export default function MapaUnificado() {
         </SheetContent>
       </Sheet>
 
-      {/* MODAL: VER DEMANDA */}
-      {demandaIdToView && (
-        <ViewDemandaDialog
-          open={!!demandaIdToView}
-          onOpenChange={(open) => !open && setDemandaIdToView(null)}
-          demandaId={demandaIdToView}
-        />
-      )}
+      {/* MODAIS DE VISUALIZAÇÃO - AGORA COM KEYS PARA FORÇAR RE-RENDER */}
+      
+      <ViewDemandaDialog
+        key={`demanda-${demandaIdToView}`}
+        open={!!demandaIdToView}
+        onOpenChange={(open) => !open && setDemandaIdToView(null)}
+        demandaId={demandaIdToView || ""}
+      />
 
-      {/* MODAL: VER MUNÍCIPE */}
-      {municipeIdToView && (
-        <MunicipeDetailsDialog
-          open={!!municipeIdToView}
-          onOpenChange={(open) => !open && setMunicipeIdToView(null)}
-          municipeId={municipeIdToView}
-        />
-      )}
+      <MunicipeDetailsDialog
+        key={`municipe-${municipeIdToView}`}
+        open={!!municipeIdToView}
+        onOpenChange={(open) => !open && setMunicipeIdToView(null)}
+        municipeId={municipeIdToView || ""}
+      />
 
     </div>
   );
