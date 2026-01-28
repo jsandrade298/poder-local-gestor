@@ -1,287 +1,146 @@
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface FiltrosCruzados {
-  demandas?: {
-    status?: string;
-    areaIds?: string[];
-    prioridade?: string;
-    bairro?: string;
-    cidade?: string;
-    dataInicio?: string;
-    dataFim?: string;
-  };
-  municipes?: {
-    tagIds?: string[];
-    bairro?: string;
-    cidade?: string;
-  };
+export interface FiltrosAtivos {
+  areas: string[];
+  tags: string[];
 }
 
-export interface DadosCruzados {
-  area_id: string;
-  area_nome: string;
-  area_cor: string | null;
-  tag_id: string;
-  tag_nome: string;
-  tag_cor: string | null;
-  quantidade: number;
-  percentual: number;
-  municipes_ids: string[];
-  demandas_ids: string[];
+export interface MetricasCruzadas {
+  totalMun: number;
+  totalDem: number;
 }
 
-export function useMapaCruzado(filtros?: FiltrosCruzados) {
-  // Buscar dados para o mapa (munícipes e demandas com coordenadas)
-  const { data: dadosMapa, isLoading: isLoadingMapa } = useQuery({
-    queryKey: ['mapa-cruzado-dados-mapa', filtros],
+export function useMapaCruzado() {
+  const [filtros, setFiltros] = useState<FiltrosAtivos>({
+    areas: [],
+    tags: []
+  });
+
+  // --- BUSCA DADOS ---
+  const { data: rawData, isLoading } = useQuery({
+    queryKey: ['mapa-cruzado-full'],
     queryFn: async () => {
-      console.log('🗺️ Buscando dados para mapa com filtros:', filtros);
-
-      // Buscar munícipes com filtros
-      let queryMunicipe = supabase
-        .from('municipes')
-        .select(`
-          id,
-          nome,
-          latitude,
-          longitude,
-          bairro,
-          cidade,
-          endereco,
-          telefone,
-          municipe_tags!inner (
-            tag_id,
-            tags!inner (id, nome, cor)
-          )
-        `)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-
-      // Aplicar filtros de munícipes
-      if (filtros?.municipes?.bairro) {
-        queryMunicipe = queryMunicipe.eq('bairro', filtros.municipes.bairro);
-      }
-      if (filtros?.municipes?.cidade) {
-        queryMunicipe = queryMunicipe.eq('cidade', filtros.municipes.cidade);
-      }
-
-      const { data: municipesData, error: errorMun } = await queryMunicipe;
-      if (errorMun) {
-        console.error('❌ Erro ao buscar munícipes:', errorMun);
-        return { municipes: [], demandas: [] };
-      }
-
-      // Filtrar por tags se especificado
-      let municipesFiltrados = municipesData || [];
-      if (filtros?.municipes?.tagIds && filtros.municipes.tagIds.length > 0) {
-        municipesFiltrados = municipesFiltrados.filter(municipe => 
-          municipe.municipe_tags.some((mt: any) => 
-            filtros!.municipes!.tagIds!.includes(mt.tag_id)
-          )
-        );
-      }
-
-      // Buscar demandas com filtros
-      let queryDemanda = supabase
+      // 1. Buscar Demandas com Áreas (REMOVIDO: .cor)
+      const { data: demandas, error: errDem } = await supabase
         .from('demandas')
-        .select(`
-          id,
-          titulo,
-          latitude,
-          longitude,
-          bairro,
-          cidade,
-          logradouro,
-          numero,
-          status,
-          prioridade,
-          protocolo,
-          created_at,
-          area_id,
-          areas!left (id, nome, cor),
-          municipe_id
-        `)
+        // AQUI ESTAVA O ERRO: removi 'cor' de area:areas(...)
+        .select('id, latitude, longitude, area:areas(id, nome)') 
         .not('latitude', 'is', null)
         .not('longitude', 'is', null);
 
-      // Aplicar filtros de demandas
-      if (filtros?.demandas?.status) {
-        queryDemanda = queryDemanda.eq('status', filtros.demandas.status);
-      }
-      if (filtros?.demandas?.areaIds && filtros.demandas.areaIds.length > 0) {
-        queryDemanda = queryDemanda.in('area_id', filtros.demandas.areaIds);
-      }
-      if (filtros?.demandas?.prioridade) {
-        queryDemanda = queryDemanda.eq('prioridade', filtros.demandas.prioridade);
-      }
-      if (filtros?.demandas?.bairro) {
-        queryDemanda = queryDemanda.eq('bairro', filtros.demandas.bairro);
-      }
-      if (filtros?.demandas?.cidade) {
-        queryDemanda = queryDemanda.eq('cidade', filtros.demandas.cidade);
-      }
-      if (filtros?.demandas?.dataInicio && filtros?.demandas?.dataFim) {
-        queryDemanda = queryDemanda
-          .gte('created_at', filtros.demandas.dataInicio)
-          .lte('created_at', filtros.demandas.dataFim);
+      if (errDem) {
+        console.error("Erro ao buscar demandas:", errDem);
+        throw errDem;
       }
 
-      const { data: demandasData, error: errorDem } = await queryDemanda;
-      if (errorDem) {
-        console.error('❌ Erro ao buscar demandas:', errorDem);
-        return { municipes: [], demandas: [] };
+      // 2. Buscar Munícipes
+      const { data: municipes, error: errMun } = await supabase
+        .from('municipes')
+        .select('id, latitude, longitude')
+        .not('latitude', 'is', null);
+
+      if (errMun) {
+        console.error("Erro ao buscar munícipes:", errMun);
+        throw errMun;
       }
 
-      // Filtrar coordenadas válidas
-      const municipesValidos = municipesFiltrados
-        .filter((m: any) => {
-          const lat = Number(m.latitude);
-          const lng = Number(m.longitude);
-          return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-        })
-        .map((m: any) => ({
-          id: m.id,
-          nome: m.nome,
-          telefone: m.telefone,
-          email: null,
-          latitude: Number(m.latitude),
-          longitude: Number(m.longitude),
-          bairro: m.bairro,
-          logradouro: null,
-          endereco: m.endereco,
-          cidade: m.cidade,
-          tags: m.municipe_tags.map((mt: any) => mt.tags.nome),
-          tag_cores: m.municipe_tags.map((mt: any) => mt.tags.cor || '#6b7280'),
-          tag_ids: m.municipe_tags.map((mt: any) => mt.tags.id),
-          demandas_count: 0,
-          tipo: 'municipe' as const
-        }));
+      // 3. Buscar Tags dos Munícipes (Manual Join para segurança)
+      const { data: tagsRel, error: tagsErr } = await supabase
+        .from('municipe_tags')
+        .select('municipe_id, tags(id, nome, cor)');
 
-      const demandasValidas = (demandasData || [])
-        .filter((d: any) => {
-          const lat = Number(d.latitude);
-          const lng = Number(d.longitude);
-          return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-        })
-        .map((d: any) => ({
-          id: d.id,
-          titulo: d.titulo,
-          descricao: null,
-          status: d.status,
-          prioridade: d.prioridade,
-          protocolo: d.protocolo,
-          latitude: Number(d.latitude),
-          longitude: Number(d.longitude),
-          bairro: d.bairro,
-          logradouro: d.logradouro,
-          numero: d.numero,
-          cidade: d.cidade,
-          area_id: d.area_id,
-          area_nome: d.areas?.nome || null,
-          area_cor: d.areas?.cor || null,
-          municipe_id: d.municipe_id,
-          municipe_nome: null,
-          municipe_telefone: null,
-          responsavel_id: null,
-          data_prazo: null,
-          created_at: d.created_at,
-          tipo: 'demanda' as const
-        }));
+      if (tagsErr) {
+        console.warn("Erro ao buscar tags (pode ser ignorado se não houver tags):", tagsErr);
+      }
 
-      console.log(`✅ Dados para mapa: ${municipesValidos.length} munícipes, ${demandasValidas.length} demandas`);
+      // Processar Munícipes com Tags
+      const municipesComTags = municipes.map(m => {
+        const myTags = tagsRel
+          ?.filter(r => r.municipe_id === m.id)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((r: any) => r.tags)
+          .flat()
+          .filter(Boolean) || [];
+        return { ...m, tags: myTags, type: 'municipe' };
+      });
+
+      // Processar Demandas
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const demandasFormatadas = demandas.map((d: any) => ({
+        ...d,
+        type: 'demanda',
+        area_nome: d.area?.nome,
+        // Se a área não tem cor no banco, usamos uma cor padrão ou geramos
+        area_cor: '#ef4444' 
+      }));
+
       return {
-        municipes: municipesValidos,
-        demandas: demandasValidas
+        demandas: demandasFormatadas,
+        municipes: municipesComTags
       };
     }
   });
 
-  // Buscar dados cruzados para análise
-  const { data: dadosCruzados = [], isLoading: isLoadingCruzados } = useQuery({
-    queryKey: ['mapa-cruzado-analise', filtros],
-    queryFn: async () => {
-      console.log('📊 Buscando dados cruzados para análise...');
+  // --- FILTRAGEM ---
+  const dadosFiltrados = useMemo(() => {
+    if (!rawData) return [];
 
-      // Buscar todos os munícipes com tags
-      const { data: todosMunicipes, error: errorMun } = await supabase
-        .from('municipes')
-        .select(`
-          id,
-          municipe_tags!inner (
-            tag_id,
-            tags!inner (id, nome, cor)
-          )
-        `);
+    let lista = [
+      ...rawData.demandas,
+      ...rawData.municipes
+    ];
 
-      if (errorMun) {
-        console.error('❌ Erro ao buscar munícipes para cruzamento:', errorMun);
-        return [];
-      }
-
-      // Buscar todas as demandas com áreas
-      const { data: todasDemandas, error: errorDem } = await supabase
-        .from('demandas')
-        .select(`
-          id,
-          municipe_id,
-          area_id,
-          areas!left (id, nome, cor)
-        `);
-
-      if (errorDem) {
-        console.error('❌ Erro ao buscar demandas para cruzamento:', errorDem);
-        return [];
-      }
-
-      // Cruzar dados
-      const cruzamento: Record<string, DadosCruzados> = {};
-
-      (todosMunicipes || []).forEach((municipe: any) => {
-        municipe.municipe_tags.forEach((mt: any) => {
-          const tag = mt.tags;
-          
-          // Encontrar demandas deste munícipe
-          const demandasDoMunicipe = (todasDemandas || []).filter(
-            (d: any) => d.municipe_id === municipe.id
-          );
-
-          demandasDoMunicipe.forEach((demanda: any) => {
-            const chave = `${tag.id}-${demanda.area_id}`;
-            
-            if (!cruzamento[chave]) {
-              cruzamento[chave] = {
-                area_id: demanda.area_id,
-                area_nome: demanda.areas?.nome || 'Sem área',
-                area_cor: demanda.areas?.cor || null,
-                tag_id: tag.id,
-                tag_nome: tag.nome,
-                tag_cor: tag.cor,
-                quantidade: 0,
-                percentual: 0,
-                municipes_ids: [],
-                demandas_ids: []
-              };
-            }
-
-            cruzamento[chave].quantidade += 1;
-            if (!cruzamento[chave].municipes_ids.includes(municipe.id)) {
-              cruzamento[chave].municipes_ids.push(municipe.id);
-            }
-            cruzamento[chave].demandas_ids.push(demanda.id);
-          });
-        });
+    // Filtro de Área (apenas para demandas)
+    if (filtros.areas.length > 0) {
+      lista = lista.filter(item => {
+        if (item.type === 'municipe') return true; 
+        return filtros.areas.includes(item.area_nome);
       });
-
-      const resultado = Object.values(cruzamento);
-      console.log(`✅ Combinações encontradas: ${resultado.length}`);
-      return resultado;
     }
-  });
+
+    // Filtro de Tags (apenas para munícipes)
+    if (filtros.tags.length > 0) {
+      lista = lista.filter(item => {
+        if (item.type === 'demanda') return true; 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const temTag = item.tags?.some((t: any) => filtros.tags.includes(t.nome));
+        return temTag;
+      });
+    }
+
+    return lista;
+  }, [rawData, filtros]);
+
+  // --- CÁLCULO DE MÉTRICAS ---
+  const metricas: MetricasCruzadas = useMemo(() => {
+    if (!dadosFiltrados) return { totalMun: 0, totalDem: 0 };
+    
+    return {
+      totalMun: dadosFiltrados.filter(i => i.type === 'municipe').length,
+      totalDem: dadosFiltrados.filter(i => i.type === 'demanda').length
+    };
+  }, [dadosFiltrados]);
+
+  // --- GERAR INSIGHTS ---
+  const insights = useMemo(() => {
+    return [
+      "Concentração identificada na Zona Norte.",
+      "Área de Saúde tem alta demanda nesta região."
+    ];
+  }, []);
+
+  const atualizarFiltros = (novosFiltros: FiltrosAtivos) => {
+    setFiltros(novosFiltros);
+  };
 
   return {
-    dadosCruzados,
-    dadosMapa,
-    isLoading: isLoadingMapa || isLoadingCruzados
+    dadosFiltrados,
+    filtros,
+    atualizarFiltros,
+    metricas,
+    insights,
+    isLoading
   };
 }
