@@ -25,35 +25,37 @@ import { ptBR } from 'date-fns/locale';
 interface Tag {
   id: string;
   nome: string;
-  cor: string;
+  cor: string | null;
 }
 
 interface Area {
   id: string;
   nome: string;
-  cor: string;
+  cor: string | null;
 }
 
-interface FiltrosCruzadosProps {
+interface FiltrosState {
+  tagIds: string[];
+  areaIds: string[];
+  bairro?: string;
+  status?: string;
+  dataInicio?: string;
+  dataFim?: string;
   tags: Tag[];
   areas: Area[];
   bairros: string[];
-  onFiltrosChange: (filtros: {
-    tagIds: string[];
-    areaIds: string[];
-    bairro?: string;
-    status?: string;
-    dataInicio?: string;
-    dataFim?: string;
-  }) => void;
+}
+
+interface FiltrosCruzadosProps {
+  filtros: FiltrosState;
+  onChange: (filtros: Partial<FiltrosState>) => void;
 }
 
 export function FiltrosCruzados({ 
-  tags, 
-  areas, 
-  bairros, 
-  onFiltrosChange 
+  filtros, 
+  onChange 
 }: FiltrosCruzadosProps) {
+  const { tags = [], areas = [], bairros = [] } = filtros;
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [selectedBairro, setSelectedBairro] = useState<string>('');
@@ -72,7 +74,7 @@ export function FiltrosCruzados({
   ];
 
   const aplicarFiltros = () => {
-    onFiltrosChange({
+    onChange({
       tagIds: selectedTags,
       areaIds: selectedAreas,
       bairro: selectedBairro || undefined,
@@ -90,9 +92,13 @@ export function FiltrosCruzados({
     setDataInicio(undefined);
     setDataFim(undefined);
     
-    onFiltrosChange({
+    onChange({
       tagIds: [],
       areaIds: [],
+      bairro: undefined,
+      status: undefined,
+      dataInicio: undefined,
+      dataFim: undefined,
     });
   };
 
