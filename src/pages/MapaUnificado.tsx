@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents, Circle, CircleMarker } from 'react-leaflet';
-import { Icon, LatLngBounds, DivIcon } from 'leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,36 +61,36 @@ interface HeatmapPoint {
 }
 
 // === ÍCONES ===
-function createDemandaIcon(color: string, isSelected: boolean = false): Icon {
+function createDemandaIcon(color: string, isSelected: boolean = false): L.Icon {
   const size = isSelected ? 42 : 34;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
     <path fill="${color}" stroke="#fff" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 6.5 8.5 15.5 8.5 15.5s8.5-9 8.5-15.5C20.5 3.81 16.69 0 12 0z"/>
     <circle fill="#fff" cx="12" cy="8.5" r="3"/>
   </svg>`;
-  return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size], popupAnchor: [0, -size] });
+  return new L.Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size], popupAnchor: [0, -size] });
 }
 
-function createMunicipeIcon(color: string = COR_MUNICIPE, isSelected: boolean = false): Icon {
+function createMunicipeIcon(color: string = COR_MUNICIPE, isSelected: boolean = false): L.Icon {
   const size = isSelected ? 38 : 30;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
     <circle fill="${color}" stroke="#fff" stroke-width="1.5" cx="12" cy="12" r="10"/>
     <circle fill="#fff" cx="12" cy="9" r="3"/>
     <path fill="#fff" d="M12 14c-3 0-5.5 1.5-5.5 3.5v.5h11v-.5c0-2-2.5-3.5-5.5-3.5z"/>
   </svg>`;
-  return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -size/2] });
+  return new L.Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -size/2] });
 }
 
-function createOrigemIcon(): Icon {
+function createOrigemIcon(): L.Icon {
   const size = 44;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
     <circle fill="${COR_ORIGEM}" stroke="#fff" stroke-width="2" cx="12" cy="12" r="10"/>
     <circle fill="#fff" cx="12" cy="12" r="4"/>
     <circle fill="${COR_ORIGEM}" cx="12" cy="12" r="2"/>
   </svg>`;
-  return new Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size/2] });
+  return new L.Icon({ iconUrl: `data:image/svg+xml;base64,${btoa(svg)}`, iconSize: [size, size], iconAnchor: [size/2, size/2] });
 }
 
-function createClusterIcon(cluster: ClusterUnificado): DivIcon {
+function createClusterIcon(cluster: ClusterUnificado): L.DivIcon {
   const temDemandas = cluster.demandas.length > 0;
   const temMunicipes = cluster.municipes.length > 0;
   const isMisto = temDemandas && temMunicipes;
@@ -120,7 +120,7 @@ function createClusterIcon(cluster: ClusterUnificado): DivIcon {
       <text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#fff" font-weight="bold" font-size="${fontSize}" font-family="Arial">${cluster.total}</text>
     </svg>`;
   }
-  return new DivIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
+  return new L.DivIcon({ html: svg, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
 }
 
 // === CLUSTERING ===
