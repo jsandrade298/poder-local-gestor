@@ -14,6 +14,7 @@ import {
   Phone,
   X,
   ChevronRight,
+  ChevronDown,
   Navigation,
   Plus,
   Trash2,
@@ -34,23 +35,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
-// Cores por status
+// Cores por status (valores reais do banco)
 const STATUS_COLORS: Record<string, string> = {
-  'aberta': '#ef4444',
-  'em_andamento': '#f59e0b',
-  'concluida': '#22c55e',
-  'cancelada': '#6b7280',
-  'pendente': '#3b82f6',
+  'solicitada': '#3b82f6',    // Azul
+  'em_producao': '#f59e0b',   // Amarelo/Laranja
+  'encaminhado': '#8b5cf6',   // Roxo
+  'atendido': '#22c55e',      // Verde
+  'devolvido': '#ef4444',     // Vermelho
+  'visitado': '#06b6d4',      // Ciano
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  'aberta': 'Aberta',
-  'em_andamento': 'Em Andamento',
-  'concluida': 'Concluída',
-  'cancelada': 'Cancelada',
-  'pendente': 'Pendente',
+  'solicitada': 'Solicitada',
+  'em_producao': 'Em Produção',
+  'encaminhado': 'Encaminhado',
+  'atendido': 'Atendido',
+  'devolvido': 'Devolvido',
+  'visitado': 'Visitado',
 };
 
 export default function MapaUnificado() {
@@ -70,13 +74,18 @@ export default function MapaUnificado() {
   // Estados de filtro
   const [busca, setBusca] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'demandas' | 'municipes'>('todos');
-  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
-  const [areaFiltro, setAreaFiltro] = useState<string>('todas');
-  const [tagFiltro, setTagFiltro] = useState<string>('todas');
+  const [statusFiltro, setStatusFiltro] = useState<string[]>([]);
+  const [areasFiltro, setAreasFiltro] = useState<string[]>([]);
+  const [tagsFiltro, setTagsFiltro] = useState<string[]>([]);
 
   // Estados de heatmap
   const [heatmapVisible, setHeatmapVisible] = useState(false);
   const [heatmapType, setHeatmapType] = useState<'demandas' | 'municipes' | 'ambos'>('demandas');
+
+  // Estados de seções expandidas
+  const [statusExpanded, setStatusExpanded] = useState(true);
+  const [areasExpanded, setAreasExpanded] = useState(true);
+  const [tagsExpanded, setTagsExpanded] = useState(true);
 
   // Estados de seleção
   const [itemSelecionado, setItemSelecionado] = useState<DemandaMapa | MunicipeMapa | null>(null);
@@ -99,15 +108,15 @@ export default function MapaUnificado() {
         if (!match) return false;
       }
 
-      // Filtro de status
-      if (statusFiltro !== 'todos' && d.status !== statusFiltro) return false;
+      // Filtro de status (multi-select)
+      if (statusFiltro.length > 0 && d.status && !statusFiltro.includes(d.status)) return false;
 
-      // Filtro de área
-      if (areaFiltro !== 'todas' && d.area_id !== areaFiltro) return false;
+      // Filtro de áreas (multi-select)
+      if (areasFiltro.length > 0 && d.area_id && !areasFiltro.includes(d.area_id)) return false;
 
       return true;
     });
-  }, [demandas, busca, statusFiltro, areaFiltro]);
+  }, [demandas, busca, statusFiltro, areasFiltro]);
 
   // Filtrar munícipes
   const municipesFiltrados = useMemo(() => {
@@ -122,15 +131,15 @@ export default function MapaUnificado() {
         if (!match) return false;
       }
 
-      // Filtro de tag
-      if (tagFiltro !== 'todas') {
-        const temTag = m.tags?.some(t => t.id === tagFiltro);
-        if (!temTag) return false;
+      // Filtro de tags (multi-select)
+      if (tagsFiltro.length > 0) {
+        const temAlgumaTag = m.tags?.some(t => tagsFiltro.includes(t.id));
+        if (!temAlgumaTag) return false;
       }
 
       return true;
     });
-  }, [municipes, busca, tagFiltro]);
+  }, [municipes, busca, tagsFiltro]);
 
   // Contagem por status
   const contagemStatus = useMemo(() => {
@@ -294,80 +303,194 @@ export default function MapaUnificado() {
 
               {/* Status */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">STATUS (DEMANDAS)</label>
-                <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
+                <button 
+                  onClick={() => setStatusExpanded(!statusExpanded)}
+                  className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <span>STATUS (DEMANDAS)</span>
+                  <div className="flex items-center gap-1">
+                    {statusFiltro.length > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {statusFiltro.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${statusExpanded ? '' : '-rotate-90'}`} />
+                  </div>
+                </button>
+                {statusExpanded && (
+                  <div className="pt-1 space-y-1">
                     {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        <div className="flex items-center gap-2">
+                      <div key={value} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`status-${value}`}
+                          checked={statusFiltro.includes(value)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setStatusFiltro([...statusFiltro, value]);
+                            } else {
+                              setStatusFiltro(statusFiltro.filter(s => s !== value));
+                            }
+                          }}
+                        />
+                        <label 
+                          htmlFor={`status-${value}`}
+                          className="flex items-center gap-2 text-sm cursor-pointer flex-1"
+                        >
                           <div 
                             className="w-3 h-3 rounded-full" 
                             style={{ backgroundColor: STATUS_COLORS[value] }}
                           />
                           {label}
-                        </div>
-                      </SelectItem>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            ({contagemStatus[value] || 0})
+                          </span>
+                        </label>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                    {statusFiltro.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full h-7 text-xs"
+                        onClick={() => setStatusFiltro([])}
+                      >
+                        Limpar seleção
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Áreas */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <FileText className="h-3 w-3" />
-                  ÁREAS (DEMANDAS)
-                </label>
-                <Select value={areaFiltro} onValueChange={setAreaFiltro}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as áreas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as áreas</SelectItem>
-                    {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: area.cor || '#6b7280' }}
+                <button 
+                  onClick={() => setAreasExpanded(!areasExpanded)}
+                  className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    ÁREAS (DEMANDAS)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {areasFiltro.length > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {areasFiltro.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${areasExpanded ? '' : '-rotate-90'}`} />
+                  </div>
+                </button>
+                {areasExpanded && (
+                  <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
+                    {areas.map((area) => {
+                      const count = demandasRaw.filter(d => d.area_id === area.id).length;
+                      return (
+                        <div key={area.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`area-${area.id}`}
+                            checked={areasFiltro.includes(area.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setAreasFiltro([...areasFiltro, area.id]);
+                              } else {
+                                setAreasFiltro(areasFiltro.filter(a => a !== area.id));
+                              }
+                            }}
                           />
-                          {area.nome}
+                          <label 
+                            htmlFor={`area-${area.id}`}
+                            className="flex items-center gap-2 text-sm cursor-pointer flex-1 truncate"
+                          >
+                            <div 
+                              className="w-3 h-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: area.cor || '#6b7280' }}
+                            />
+                            <span className="truncate">{area.nome}</span>
+                            <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                              ({count})
+                            </span>
+                          </label>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      );
+                    })}
+                    {areasFiltro.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full h-7 text-xs"
+                        onClick={() => setAreasFiltro([])}
+                      >
+                        Limpar seleção
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Tags */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  TAGS (MUNÍCIPES)
-                </label>
-                <Select value={tagFiltro} onValueChange={setTagFiltro}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as tags" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as tags</SelectItem>
-                    {tags.map((tag) => (
-                      <SelectItem key={tag.id} value={tag.id}>
-                        <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setTagsExpanded(!tagsExpanded)}
+                  className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    TAGS (MUNÍCIPES)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {tagsFiltro.length > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {tagsFiltro.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${tagsExpanded ? '' : '-rotate-90'}`} />
+                  </div>
+                </button>
+                {tagsExpanded && (
+                  <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
+                    {tags.map((tag) => {
+                      const count = municipesRaw.filter(m => m.tags?.some(t => t.id === tag.id)).length;
+                      return (
+                        <div key={tag.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`tag-${tag.id}`}
+                            checked={tagsFiltro.includes(tag.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setTagsFiltro([...tagsFiltro, tag.id]);
+                              } else {
+                                setTagsFiltro(tagsFiltro.filter(t => t !== tag.id));
+                              }
+                            }}
+                          />
+                        <label 
+                          htmlFor={`tag-${tag.id}`}
+                          className="flex items-center gap-2 text-sm cursor-pointer flex-1 truncate"
+                        >
                           <div 
-                            className="w-3 h-3 rounded-full" 
+                            className="w-3 h-3 rounded-full flex-shrink-0" 
                             style={{ backgroundColor: tag.cor || '#6b7280' }}
                           />
-                          {tag.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                          <span className="truncate">{tag.nome}</span>
+                          <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                            ({count})
+                          </span>
+                        </label>
+                      </div>
+                    );
+                  })}
+                  {tagsFiltro.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full h-7 text-xs"
+                      onClick={() => setTagsFiltro([])}
+                    >
+                      Limpar seleção
+                    </Button>
+                  )}
+                </div>
+                )}
               </div>
 
               <Separator />
