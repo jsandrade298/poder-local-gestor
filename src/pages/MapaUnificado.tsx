@@ -3,7 +3,9 @@ import { useMapaUnificado, DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnif
 import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
 import { ShapefileUpload } from '@/components/mapa/ShapefileUpload';
+import { VotosUpload } from '@/components/mapa/VotosUpload';
 import { useCamadasGeograficas } from '@/hooks/useCamadasGeograficas';
+import { useDadosEleitorais } from '@/hooks/useDadosEleitorais';
 import { calcularEstatisticasPorRegiao, getFeatureName, filtrarPorRegiao } from '@/lib/geoUtils';
 import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
 import { EditDemandaDialog } from '@/components/forms/EditDemandaDialog';
@@ -40,7 +42,8 @@ import {
   Eye,
   EyeOff,
   Palette,
-  Map as MapIcon
+  Map as MapIcon,
+  Vote
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -106,6 +109,14 @@ export default function MapaUnificado() {
     isLoading: isLoadingCamadas
   } = useCamadasGeograficas();
 
+  // Hook para dados eleitorais (usa a camada selecionada)
+  const {
+    dadosEleitorais,
+    eleicoesDisponiveis,
+    getVotosPorRegiao,
+    getTotalVotos
+  } = useDadosEleitorais(camadaSelecionadaStats);
+
   // Estados de filtro
   const [busca, setBusca] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'demandas' | 'municipes'>('todos');
@@ -158,6 +169,10 @@ export default function MapaUnificado() {
     feature: any;
     nome: string;
   } | null>(null);
+
+  // Estados para dados eleitorais
+  const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'atendimento' | 'votos' | 'comparativo'>('padrao');
+  const [eleicaoSelecionada, setEleicaoSelecionada] = useState<string | null>(null);
 
   // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
   const municipesComTagsSelecionadas = useMemo(() => {
@@ -311,28 +326,60 @@ export default function MapaUnificado() {
     return stats;
   }, [camadasVisiveis, demandasFiltradas, municipesFiltrados]);
 
-  // Obter estatísticas ordenadas de uma camada específica
+  // Calcular votos por camada para todas as camadas visíveis
+  const votosPorCamada = useMemo(() => {
+    const votosMap = new Map<string, Map<string, number>>();
+    
+    // Se temos dados eleitorais e uma camada selecionada
+    if (dadosEleitorais.length > 0 && camadaSelecionadaStats) {
+      const votosCamada = getVotosPorRegiao(eleicaoSelecionada || undefined);
+      votosMap.set(camadaSelecionadaStats, votosCamada);
+    }
+    
+    return votosMap;
+  }, [dadosEleitorais, camadaSelecionadaStats, eleicaoSelecionada, getVotosPorRegiao]);
+
+  // Obter estatísticas ordenadas de uma camada específica (agora inclui votos)
   const getEstatisticasCamadaOrdenadas = useCallback((camadaId: string | null | undefined) => {
     if (!camadaId) return [];
     
     const stats = estatisticasPorRegiao.get(camadaId);
-    if (!stats) return [];
+    const votos = votosPorCamada.get(camadaId);
+    
+    // Coletar todos os nomes de regiões
+    const nomesRegioes = new Set<string>();
+    stats?.forEach((_, nome) => nomesRegioes.add(nome));
+    votos?.forEach((_, nome) => nomesRegioes.add(nome));
+    
+    if (nomesRegioes.size === 0) return [];
     
     try {
-      return Array.from(stats.entries())
-        .map(([nome, valores]) => ({
-          nome,
-          demandas: valores.demandas,
-          municipes: valores.municipes,
-          total: valores.demandas + valores.municipes
-        }))
-        .filter(item => item.total > 0)
-        .sort((a, b) => b.total - a.total);
+      return Array.from(nomesRegioes)
+        .map(nome => {
+          const estatistica = stats?.get(nome);
+          const votosRegiao = votos?.get(nome) || 0;
+          
+          return {
+            nome,
+            demandas: estatistica?.demandas || 0,
+            municipes: estatistica?.municipes || 0,
+            votos: votosRegiao,
+            total: (estatistica?.demandas || 0) + (estatistica?.municipes || 0)
+          };
+        })
+        .filter(item => item.total > 0 || item.votos > 0)
+        .sort((a, b) => {
+          // Ordenar baseado no modo de visualização
+          if (modoVisualizacao === 'votos') {
+            return b.votos - a.votos;
+          }
+          return b.total - a.total;
+        });
     } catch (err) {
       console.warn('Erro ao ordenar estatísticas:', err);
       return [];
     }
-  }, [estatisticasPorRegiao]);
+  }, [estatisticasPorRegiao, votosPorCamada, modoVisualizacao]);
 
   // Handler para upload de shapefile
   const handleShapefileUpload = useCallback((
@@ -1071,7 +1118,10 @@ export default function MapaUnificado() {
                     {/* Seletor de Camada */}
                     <Select 
                       value={camadaSelecionadaStats || camadasVisiveis[0]?.id} 
-                      onValueChange={setCamadaSelecionadaStats}
+                      onValueChange={(value) => {
+                        setCamadaSelecionadaStats(value);
+                        setEleicaoSelecionada(null); // Reset eleição ao mudar camada
+                      }}
                     >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Selecione uma camada" />
@@ -1085,15 +1135,92 @@ export default function MapaUnificado() {
                       </SelectContent>
                     </Select>
 
-                    {/* Toggle Colorir por Densidade */}
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-muted-foreground">
-                        Colorir por densidade
-                      </label>
-                      <Switch
-                        checked={colorirPorDensidade}
-                        onCheckedChange={setColorirPorDensidade}
+                    {/* Botão Importar Votos */}
+                    {(camadaSelecionadaStats || camadasVisiveis[0]?.id) && (
+                      <VotosUpload
+                        camadaId={camadaSelecionadaStats || camadasVisiveis[0]?.id}
+                        camadaNome={camadasVisiveis.find(c => c.id === (camadaSelecionadaStats || camadasVisiveis[0]?.id))?.nome || ''}
+                        regioesDisponiveis={
+                          camadasVisiveis
+                            .find(c => c.id === (camadaSelecionadaStats || camadasVisiveis[0]?.id))
+                            ?.geojson?.features?.map((f: any) => getFeatureName(f.properties)) || []
+                        }
                       />
+                    )}
+
+                    {/* Seletor de Eleição (se houver dados) */}
+                    {eleicoesDisponiveis.length > 0 && (
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Eleição</label>
+                        <Select 
+                          value={eleicaoSelecionada || eleicoesDisponiveis[0]} 
+                          onValueChange={setEleicaoSelecionada}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {eleicoesDisponiveis.map(ano => (
+                              <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          🗳️ {getTotalVotos(eleicaoSelecionada || undefined).toLocaleString('pt-BR')} votos total
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Modo de Visualização */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Colorir por</label>
+                      <div className="grid grid-cols-2 gap-1">
+                        <Button
+                          variant={modoVisualizacao === 'padrao' ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setModoVisualizacao('padrao')}
+                        >
+                          Padrão
+                        </Button>
+                        <Button
+                          variant={modoVisualizacao === 'atendimento' ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setModoVisualizacao('atendimento')}
+                        >
+                          Atendimento
+                        </Button>
+                        <Button
+                          variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setModoVisualizacao('votos')}
+                          disabled={eleicoesDisponiveis.length === 0}
+                        >
+                          <Vote className="h-3 w-3 mr-1" />
+                          Votos
+                        </Button>
+                        <Button
+                          variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setModoVisualizacao('comparativo')}
+                          disabled={eleicoesDisponiveis.length === 0}
+                        >
+                          Comparar
+                        </Button>
+                      </div>
+                      
+                      {/* Legenda do modo comparativo */}
+                      {modoVisualizacao === 'comparativo' && (
+                        <div className="text-xs space-y-0.5 p-2 bg-muted/50 rounded">
+                          <p className="font-medium">Legenda:</p>
+                          <p><span className="inline-block w-3 h-3 bg-[#ef4444] rounded mr-1" />Mais votos que atendimento</p>
+                          <p><span className="inline-block w-3 h-3 bg-[#eab308] rounded mr-1" />Equilibrado</p>
+                          <p><span className="inline-block w-3 h-3 bg-[#22c55e] rounded mr-1" />Mais atendimento que votos</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Lista de Regiões */}
@@ -1119,12 +1246,18 @@ export default function MapaUnificado() {
                             <span className="text-muted-foreground w-4">{index + 1}.</span>
                             <span className="truncate">{item.nome}</span>
                           </span>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <Badge variant="outline" className="h-5 text-xs gap-1">
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {item.votos > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs gap-0.5 bg-indigo-100 text-indigo-800">
+                                <Vote className="h-2.5 w-2.5" />
+                                {item.votos.toLocaleString('pt-BR')}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="h-5 text-xs gap-0.5">
                               <FileText className="h-2.5 w-2.5" />
                               {item.demandas}
                             </Badge>
-                            <Badge variant="outline" className="h-5 text-xs gap-1">
+                            <Badge variant="outline" className="h-5 text-xs gap-0.5">
                               <Users className="h-2.5 w-2.5" />
                               {item.municipes}
                             </Badge>
@@ -1267,6 +1400,8 @@ export default function MapaUnificado() {
           heatmapType={heatmapType}
           camadasGeograficas={camadasVisiveis}
           estatisticasPorRegiao={estatisticasPorRegiao}
+          votosPorCamada={votosPorCamada}
+          modoVisualizacao={modoVisualizacao}
           colorirPorDensidade={colorirPorDensidade}
           onRegiaoClick={handleRegiaoClick}
           onDemandaClick={(d) => {
