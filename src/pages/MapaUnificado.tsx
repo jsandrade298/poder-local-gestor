@@ -1414,8 +1414,8 @@ export default function MapaUnificado() {
       />
 
       {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
-      {/* 
-      <ViewMunicipeDialog
+      { 
+      <MunicipeDetailsDialog
         municipe={municipeModalId ? municipesRaw.find(m => m.id === municipeModalId) || null : null}
         open={!!municipeModalId}
         onOpenChange={(open) => {
@@ -1441,7 +1441,7 @@ export default function MapaUnificado() {
           }
         }}
       />
-      */}
+      }
     </div>
   );
 }
