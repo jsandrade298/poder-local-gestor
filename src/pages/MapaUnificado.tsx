@@ -82,6 +82,9 @@ export default function MapaUnificado() {
   const [heatmapVisible, setHeatmapVisible] = useState(false);
   const [heatmapType, setHeatmapType] = useState<'demandas' | 'municipes' | 'ambos'>('demandas');
 
+  // Estado do Filtro Cruzado
+  const [filtroCruzado, setFiltroCruzado] = useState(false);
+
   // Estados de seções expandidas
   const [statusExpanded, setStatusExpanded] = useState(true);
   const [areasExpanded, setAreasExpanded] = useState(true);
@@ -93,6 +96,29 @@ export default function MapaUnificado() {
   // Estados de rota
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
   const [origemRota, setOrigemRota] = useState<{ lat: number; lng: number } | null>(null);
+
+  // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
+  const municipesComTagsSelecionadas = useMemo(() => {
+    if (tagsFiltro.length === 0) return [];
+    return municipes
+      .filter(m => m.tags?.some(t => tagsFiltro.includes(t.id)))
+      .map(m => m.id);
+  }, [municipes, tagsFiltro]);
+
+  // IDs de munícipes que têm demandas com os filtros selecionados (para filtro cruzado inverso)
+  const municipesComDemandasFiltradas = useMemo(() => {
+    if (statusFiltro.length === 0 && areasFiltro.length === 0) return [];
+    
+    return [...new Set(
+      demandas
+        .filter(d => {
+          const matchStatus = statusFiltro.length === 0 || (d.status && statusFiltro.includes(d.status));
+          const matchArea = areasFiltro.length === 0 || (d.area_id && areasFiltro.includes(d.area_id));
+          return matchStatus && matchArea && d.municipe_id;
+        })
+        .map(d => d.municipe_id!)
+    )];
+  }, [demandas, statusFiltro, areasFiltro]);
 
   // Filtrar demandas
   const demandasFiltradas = useMemo(() => {
@@ -114,9 +140,18 @@ export default function MapaUnificado() {
       // Filtro de áreas (multi-select)
       if (areasFiltro.length > 0 && d.area_id && !areasFiltro.includes(d.area_id)) return false;
 
+      // FILTRO CRUZADO: Tags → Demandas
+      // Se filtro cruzado ativo E tem tags selecionadas, 
+      // mostrar apenas demandas de munícipes com essas tags
+      if (filtroCruzado && tagsFiltro.length > 0) {
+        if (!d.municipe_id || !municipesComTagsSelecionadas.includes(d.municipe_id)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [demandas, busca, statusFiltro, areasFiltro]);
+  }, [demandas, busca, statusFiltro, areasFiltro, filtroCruzado, tagsFiltro, municipesComTagsSelecionadas]);
 
   // Filtrar munícipes
   const municipesFiltrados = useMemo(() => {
@@ -137,9 +172,40 @@ export default function MapaUnificado() {
         if (!temAlgumaTag) return false;
       }
 
+      // FILTRO CRUZADO: Demandas → Munícipes
+      // Se filtro cruzado ativo E tem status/áreas selecionados,
+      // mostrar apenas munícipes que têm demandas com esses filtros
+      if (filtroCruzado && (statusFiltro.length > 0 || areasFiltro.length > 0)) {
+        if (!municipesComDemandasFiltradas.includes(m.id)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [municipes, busca, tagsFiltro]);
+  }, [municipes, busca, tagsFiltro, filtroCruzado, statusFiltro, areasFiltro, municipesComDemandasFiltradas]);
+
+  // Estatísticas do filtro cruzado
+  const estatisticasCruzado = useMemo(() => {
+    if (!filtroCruzado) return null;
+    
+    return {
+      // Tags → Demandas
+      municipesPorTags: municipesComTagsSelecionadas.length,
+      demandasPorTags: tagsFiltro.length > 0 
+        ? demandas.filter(d => d.municipe_id && municipesComTagsSelecionadas.includes(d.municipe_id)).length 
+        : 0,
+      // Demandas → Munícipes
+      municipesPorDemandas: municipesComDemandasFiltradas.length,
+      demandasComFiltro: (statusFiltro.length > 0 || areasFiltro.length > 0)
+        ? demandas.filter(d => {
+            const matchStatus = statusFiltro.length === 0 || (d.status && statusFiltro.includes(d.status));
+            const matchArea = areasFiltro.length === 0 || (d.area_id && areasFiltro.includes(d.area_id));
+            return matchStatus && matchArea;
+          }).length
+        : 0
+    };
+  }, [filtroCruzado, tagsFiltro, statusFiltro, areasFiltro, municipesComTagsSelecionadas, municipesComDemandasFiltradas, demandas]);
 
   // Contagem por status
   const contagemStatus = useMemo(() => {
@@ -495,7 +561,7 @@ export default function MapaUnificado() {
 
               <Separator />
 
-              {/* Controles de Heatmap */}
+              {/* Controles de Heatmap e Filtro Cruzado */}
               <HeatmapControls
                 heatmapVisible={heatmapVisible}
                 setHeatmapVisible={setHeatmapVisible}
@@ -503,6 +569,9 @@ export default function MapaUnificado() {
                 setHeatmapType={setHeatmapType}
                 demandasCount={demandasFiltradas.length}
                 municipesCount={municipesFiltrados.length}
+                filtroCruzado={filtroCruzado}
+                setFiltroCruzado={setFiltroCruzado}
+                estatisticasCruzado={estatisticasCruzado}
               />
 
               <Separator />
