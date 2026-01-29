@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMapaUnificado, DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
 import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
@@ -97,6 +98,9 @@ export default function MapaUnificado() {
     refetch
   } = useMapaUnificado();
 
+  // Query client para invalidar queries manualmente
+  const queryClient = useQueryClient();
+
   // Hook para camadas geográficas
   const {
     camadas,
@@ -111,6 +115,13 @@ export default function MapaUnificado() {
 
   // Estado para camada selecionada nas estatísticas (declarado ANTES do hook que o usa)
   const [camadaSelecionadaStats, setCamadaSelecionadaStats] = useState<string | null>(null);
+
+  // Inicializar camadaSelecionadaStats quando há camadas visíveis
+  useEffect(() => {
+    if (!camadaSelecionadaStats && camadasVisiveis.length > 0) {
+      setCamadaSelecionadaStats(camadasVisiveis[0].id);
+    }
+  }, [camadasVisiveis, camadaSelecionadaStats]);
 
   // Hook para dados eleitorais (usa a camada selecionada)
   const {
@@ -1142,6 +1153,17 @@ export default function MapaUnificado() {
                       <VotosUpload
                         camadas={camadas}
                         getFeatureName={getFeatureName}
+                        onComplete={(camadaId, eleicao) => {
+                          // Invalidar queries para forçar refetch
+                          queryClient.invalidateQueries({ queryKey: ['dados-eleitorais', camadaId] });
+                          queryClient.invalidateQueries({ queryKey: ['eleicoes-disponiveis', camadaId] });
+                          
+                          // Após importar, selecionar a camada e eleição para visualização
+                          setCamadaSelecionadaStats(camadaId);
+                          setEleicaoSelecionada(eleicao);
+                          // Mudar para modo de votos para visualizar os dados importados
+                          setModoVisualizacao('votos');
+                        }}
                       />
                     )}
 
@@ -1168,18 +1190,30 @@ export default function MapaUnificado() {
                       </div>
                     )}
 
+                    {/* Toggle de coloração por densidade */}
+                    <div className="flex items-center justify-between py-2">
+                      <label className="text-xs font-medium flex items-center gap-2">
+                        <Palette className="h-3.5 w-3.5" />
+                        Colorir regiões por dados
+                      </label>
+                      <Switch
+                        checked={modoVisualizacao !== 'padrao'}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            // Se há dados eleitorais, usar modo votos; senão, atendimento
+                            setModoVisualizacao(eleicoesDisponiveis.length > 0 ? 'votos' : 'atendimento');
+                          } else {
+                            setModoVisualizacao('padrao');
+                          }
+                        }}
+                      />
+                    </div>
+
                     {/* Modo de Visualização */}
+                    {modoVisualizacao !== 'padrao' && (
                     <div className="space-y-2">
                       <label className="text-xs text-muted-foreground">Colorir por</label>
                       <div className="grid grid-cols-2 gap-1">
-                        <Button
-                          variant={modoVisualizacao === 'padrao' ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => setModoVisualizacao('padrao')}
-                        >
-                          Padrão
-                        </Button>
                         <Button
                           variant={modoVisualizacao === 'atendimento' ? 'default' : 'outline'}
                           size="sm"
@@ -1201,11 +1235,11 @@ export default function MapaUnificado() {
                         <Button
                           variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
                           size="sm"
-                          className="h-7 text-xs"
+                          className="h-7 text-xs col-span-2"
                           onClick={() => setModoVisualizacao('comparativo')}
                           disabled={eleicoesDisponiveis.length === 0}
                         >
-                          Comparar
+                          Comparar Votos x Atendimento
                         </Button>
                       </div>
                       
@@ -1218,7 +1252,36 @@ export default function MapaUnificado() {
                           <p><span className="inline-block w-3 h-3 bg-[#22c55e] rounded mr-1" />Mais atendimento que votos</p>
                         </div>
                       )}
+                      
+                      {/* Legenda do modo votos */}
+                      {modoVisualizacao === 'votos' && (
+                        <div className="text-xs space-y-0.5 p-2 bg-muted/50 rounded">
+                          <p className="font-medium">Intensidade de votos:</p>
+                          <div className="flex items-center gap-2">
+                            <span>Menos</span>
+                            <div className="flex-1 h-3 rounded" style={{
+                              background: 'linear-gradient(to right, #e0e7ff, #c7d2fe, #a5b4fc, #818cf8, #6366f1, #4f46e5)'
+                            }} />
+                            <span>Mais</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Legenda do modo atendimento */}
+                      {modoVisualizacao === 'atendimento' && (
+                        <div className="text-xs space-y-0.5 p-2 bg-muted/50 rounded">
+                          <p className="font-medium">Densidade de atendimento:</p>
+                          <div className="flex items-center gap-2">
+                            <span>Baixa</span>
+                            <div className="flex-1 h-3 rounded" style={{
+                              background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444)'
+                            }} />
+                            <span>Alta</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                    )}
 
                     {/* Lista de Regiões */}
                     <div className="max-h-48 overflow-y-auto space-y-1">
