@@ -138,14 +138,19 @@ export function VotosUpload({
         const text = await file.text();
         dados = parseCSV(text);
       } else {
-        // Processar Excel usando SheetJS
-        const XLSX = await import('xlsx');
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer);
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
-        
-        dados = parseExcelData(jsonData);
+        // Processar Excel usando SheetJS (import dinâmico)
+        try {
+          const XLSX = await import('xlsx');
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer);
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+          
+          dados = parseExcelData(jsonData);
+        } catch (xlsxError) {
+          console.error('Erro ao carregar xlsx:', xlsxError);
+          throw new Error('Para arquivos Excel, instale a dependência xlsx (npm install xlsx). Ou use um arquivo CSV.');
+        }
       }
 
       if (dados.length === 0) {
