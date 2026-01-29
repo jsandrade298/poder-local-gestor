@@ -1,7 +1,50 @@
-import * as turf from '@turf/turf';
+/**
+ * Utilitários geoespaciais sem dependências externas
+ * Implementa algoritmo de ray-casting para verificar ponto em polígono
+ */
 
 /**
- * Verifica se um ponto está dentro de um polígono
+ * Verifica se um ponto está dentro de um polígono usando ray-casting
+ */
+function pointInPolygon(point: [number, number], polygon: number[][]): boolean {
+  const [x, y] = point;
+  let inside = false;
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0];
+    const yi = polygon[i][1];
+    const xj = polygon[j][0];
+    const yj = polygon[j][1];
+    
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    
+    if (intersect) inside = !inside;
+  }
+  
+  return inside;
+}
+
+/**
+ * Extrai coordenadas de uma feature GeoJSON
+ */
+function getPolygonCoordinates(feature: any): number[][][] {
+  if (!feature?.geometry) return [];
+  
+  const { type, coordinates } = feature.geometry;
+  
+  if (type === 'Polygon') {
+    return coordinates;
+  } else if (type === 'MultiPolygon') {
+    // Flatten MultiPolygon para array de polígonos
+    return coordinates.flat();
+  }
+  
+  return [];
+}
+
+/**
+ * Verifica se um ponto está dentro de um polígono/feature GeoJSON
  */
 export function pontoNaRegiao(
   latitude: number,
@@ -9,8 +52,16 @@ export function pontoNaRegiao(
   feature: any
 ): boolean {
   try {
-    const ponto = turf.point([longitude, latitude]);
-    return turf.booleanPointInPolygon(ponto, feature);
+    const polygons = getPolygonCoordinates(feature);
+    const point: [number, number] = [longitude, latitude];
+    
+    for (const polygon of polygons) {
+      if (pointInPolygon(point, polygon)) {
+        return true;
+      }
+    }
+    
+    return false;
   } catch (error) {
     console.error('Erro ao verificar ponto na região:', error);
     return false;
@@ -106,29 +157,27 @@ export function filtrarPorRegiao<T extends { latitude?: number | null; longitude
 }
 
 /**
- * Calcula o centro de um polígono/feature
+ * Calcula o centro (centróide) de um polígono
  */
 export function getCentroRegiao(feature: any): [number, number] | null {
   try {
-    const centroid = turf.centroid(feature);
-    const coords = centroid.geometry.coordinates;
-    return [coords[1], coords[0]]; // [lat, lng] para Leaflet
+    const polygons = getPolygonCoordinates(feature);
+    if (polygons.length === 0) return null;
+    
+    const polygon = polygons[0]; // Usar primeiro polígono
+    let sumX = 0;
+    let sumY = 0;
+    const n = polygon.length;
+    
+    for (const coord of polygon) {
+      sumX += coord[0];
+      sumY += coord[1];
+    }
+    
+    return [sumY / n, sumX / n]; // [lat, lng] para Leaflet
   } catch (error) {
     console.error('Erro ao calcular centro da região:', error);
     return null;
-  }
-}
-
-/**
- * Calcula a área de uma região em km²
- */
-export function getAreaRegiao(feature: any): number {
-  try {
-    const area = turf.area(feature);
-    return area / 1000000; // Converter m² para km²
-  } catch (error) {
-    console.error('Erro ao calcular área da região:', error);
-    return 0;
   }
 }
 
@@ -137,11 +186,34 @@ export function getAreaRegiao(feature: any): number {
  */
 export function getBoundingBox(geojson: any): [[number, number], [number, number]] | null {
   try {
-    const bbox = turf.bbox(geojson);
-    // bbox retorna [minX, minY, maxX, maxY] = [minLng, minLat, maxLng, maxLat]
+    if (!geojson?.features) return null;
+    
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    
+    for (const feature of geojson.features) {
+      const polygons = getPolygonCoordinates(feature);
+      
+      for (const polygon of polygons) {
+        for (const coord of polygon) {
+          const lng = coord[0];
+          const lat = coord[1];
+          
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+        }
+      }
+    }
+    
+    if (minLat === Infinity) return null;
+    
     return [
-      [bbox[1], bbox[0]], // [minLat, minLng]
-      [bbox[3], bbox[2]]  // [maxLat, maxLng]
+      [minLat, minLng],
+      [maxLat, maxLng]
     ];
   } catch (error) {
     console.error('Erro ao calcular bounding box:', error);
