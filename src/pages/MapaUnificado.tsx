@@ -109,6 +109,9 @@ export default function MapaUnificado() {
     isLoading: isLoadingCamadas
   } = useCamadasGeograficas();
 
+  // Estado para camada selecionada nas estatísticas (declarado ANTES do hook que o usa)
+  const [camadaSelecionadaStats, setCamadaSelecionadaStats] = useState<string | null>(null);
+
   // Hook para dados eleitorais (usa a camada selecionada)
   const {
     dadosEleitorais,
@@ -161,8 +164,7 @@ export default function MapaUnificado() {
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
   const [origemRota, setOrigemRota] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Estados para camadas geográficas
-  const [camadaSelecionadaStats, setCamadaSelecionadaStats] = useState<string | null>(null);
+  // Estados para camadas geográficas (camadaSelecionadaStats já declarado acima)
   const [colorirPorDensidade, setColorirPorDensidade] = useState(false);
   const [regiaoSelecionada, setRegiaoSelecionada] = useState<{
     camadaId: string;
