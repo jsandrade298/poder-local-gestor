@@ -30,6 +30,9 @@ interface GeoJSONLayerProps {
   // Modo de visualização
   modoVisualizacao?: ModoVisualizacao;
   
+  // Filtro de tipo (para considerar só demandas, só munícipes ou ambos)
+  tipoFiltro?: 'todos' | 'demandas' | 'municipes';
+  
   // Legacy: para compatibilidade com código existente
   colorirPorDensidade?: boolean;
 }
@@ -133,6 +136,7 @@ export function GeoJSONLayer({
   estatisticas,
   votosPorRegiao,
   modoVisualizacao = 'padrao',
+  tipoFiltro = 'todos',
   colorirPorDensidade = false // Legacy support
 }: GeoJSONLayerProps) {
   const map = useMap();
@@ -147,13 +151,26 @@ export function GeoJSONLayer({
   useEffect(() => {
     if (!data || !data.features || data.features.length === 0) return;
 
+    // Função auxiliar para calcular atendimento baseado no tipoFiltro
+    const calcularAtendimento = (stats: { demandas: number; municipes: number } | undefined): number => {
+      if (!stats) return 0;
+      switch (tipoFiltro) {
+        case 'demandas':
+          return stats.demandas;
+        case 'municipes':
+          return stats.municipes;
+        default:
+          return stats.demandas + stats.municipes;
+      }
+    };
+
     // Calcular valores máximos para cada modo
     let maxAtendimento = 0;
     let maxVotos = 0;
 
     if (estatisticas) {
       estatisticas.forEach((stats) => {
-        const total = stats.demandas + stats.municipes;
+        const total = calcularAtendimento(stats);
         if (total > maxAtendimento) maxAtendimento = total;
       });
     }
@@ -173,7 +190,7 @@ export function GeoJSONLayer({
         // Obter dados para esta feature
         const stats = estatisticas?.get(featureName);
         const votos = votosPorRegiao?.get(featureName) || 0;
-        const atendimento = (stats?.demandas || 0) + (stats?.municipes || 0);
+        const atendimento = calcularAtendimento(stats);
         
         // Determinar cor baseada no modo
         switch (modoEfetivo) {
@@ -207,6 +224,7 @@ export function GeoJSONLayer({
         // Obter dados para tooltip
         const stats = estatisticas?.get(featureName);
         const votos = votosPorRegiao?.get(featureName) || 0;
+        const atendimento = calcularAtendimento(stats);
         
         // Construir conteúdo do tooltip
         let tooltipContent = `<strong>${featureName}</strong>`;
@@ -216,13 +234,17 @@ export function GeoJSONLayer({
         }
         
         if (stats) {
-          tooltipContent += `<br/>📋 ${stats.demandas} demanda(s)`;
-          tooltipContent += `<br/>👥 ${stats.municipes} munícipe(s)`;
+          // Mostrar apenas os dados relevantes ao filtro
+          if (tipoFiltro === 'todos' || tipoFiltro === 'demandas') {
+            tooltipContent += `<br/>📋 ${stats.demandas} demanda(s)`;
+          }
+          if (tipoFiltro === 'todos' || tipoFiltro === 'municipes') {
+            tooltipContent += `<br/>👥 ${stats.municipes} munícipe(s)`;
+          }
         }
         
         // Adicionar indicador de oportunidade no modo comparativo
-        if (modoEfetivo === 'comparativo' && votos > 0 && stats) {
-          const atendimento = stats.demandas + stats.municipes;
+        if (modoEfetivo === 'comparativo' && votos > 0) {
           if (votos > 0 && atendimento === 0) {
             tooltipContent += `<br/><span style="color: #ef4444">⚠️ Sem atendimentos</span>`;
           } else if (atendimento > 0) {
@@ -295,7 +317,7 @@ export function GeoJSONLayer({
         layerRef.current = null;
       }
     };
-  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, modoEfetivo]);
+  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, modoEfetivo, tipoFiltro]);
 
   return null;
 }
