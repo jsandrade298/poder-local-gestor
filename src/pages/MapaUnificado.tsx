@@ -2,6 +2,11 @@ import { useState, useMemo } from 'react';
 import { useMapaUnificado, DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
 import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
+import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
+import { EditDemandaDialog } from '@/components/forms/EditDemandaDialog';
+// Nota: Se os modais de Munícipe existirem no projeto, descomente as linhas abaixo:
+// import { ViewMunicipeDialog } from '@/components/forms/ViewMunicipeDialog';
+// import { EditMunicipeDialog } from '@/components/forms/EditMunicipeDialog';
 import { 
   MapPin, 
   Filter, 
@@ -14,6 +19,7 @@ import {
   Phone,
   X,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   Navigation,
   Plus,
@@ -24,7 +30,9 @@ import {
   Copy,
   CheckCircle,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Flame,
+  Link2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -96,6 +104,20 @@ export default function MapaUnificado() {
     demandas: DemandaMapa[];
     municipes: MunicipeMapa[];
   } | null>(null);
+
+  // Estados dos modais
+  const [demandaModalId, setDemandaModalId] = useState<string | null>(null);
+  const [demandaParaEditar, setDemandaParaEditar] = useState<any>(null);
+  const [isEditDemandaOpen, setIsEditDemandaOpen] = useState(false);
+  const [municipeModalId, setMunicipeModalId] = useState<string | null>(null);
+  const [municipeParaEditar, setMunicipeParaEditar] = useState<any>(null);
+  const [isEditMunicipeOpen, setIsEditMunicipeOpen] = useState(false);
+
+  // Estado da sidebar minimizada
+  const [sidebarMinimizada, setSidebarMinimizada] = useState(false);
+
+  // Estado da aba do cluster
+  const [abaCluster, setAbaCluster] = useState<'demandas' | 'municipes'>('demandas');
 
   // Estados de rota
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
@@ -301,63 +323,127 @@ export default function MapaUnificado() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Sidebar Esquerda - Filtros */}
-      <div className="w-80 border-r bg-background flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b flex-shrink-0">
-          <div className="flex items-center gap-2 mb-1">
-            <MapPin className="h-5 w-5 text-primary" />
-            <h1 className="font-semibold text-lg">Gestão Territorial</h1>
+      {/* Sidebar Esquerda - Filtros (Minimizável) */}
+      <div className={`border-r bg-background flex flex-col h-full overflow-hidden transition-all duration-300 ${
+        sidebarMinimizada ? 'w-16' : 'w-80'
+      }`}>
+        {sidebarMinimizada ? (
+          // Versão Minimizada
+          <div className="flex flex-col items-center py-4 gap-4 h-full">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setSidebarMinimizada(false)}
+              className="hover:bg-accent"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <div className="flex flex-col items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium writing-mode-vertical">{totalNoMapa}</span>
+            </div>
+            <Separator className="w-8" />
+            <div className="flex flex-col items-center gap-3">
+              <Button 
+                variant={heatmapVisible ? "default" : "ghost"} 
+                size="icon"
+                onClick={() => setHeatmapVisible(!heatmapVisible)}
+                title="Mapa de Calor"
+              >
+                <Flame className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant={filtroCruzado ? "default" : "ghost"} 
+                size="icon"
+                onClick={() => setFiltroCruzado(!filtroCruzado)}
+                title="Filtro Cruzado"
+              >
+                <Link2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1" />
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              title="Atualizar"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {totalNoMapa} itens no mapa
-          </p>
-        </div>
-
-        <Tabs defaultValue="filtros" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-3 px-4 pt-2 flex-shrink-0">
-            <TabsTrigger value="filtros" className="text-xs">
-              <Filter className="h-3 w-3 mr-1" />
-              Filtros
-            </TabsTrigger>
-            <TabsTrigger value="rotas" className="text-xs">
-              <Route className="h-3 w-3 mr-1" />
-              Rotas
-            </TabsTrigger>
-            <TabsTrigger value="analise" className="text-xs">
-              <BarChart3 className="h-3 w-3 mr-1" />
-              Análise
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 overflow-y-auto">
-            {/* Tab Filtros */}
-            <TabsContent value="filtros" className="p-4 space-y-4 mt-0">
-              {/* Busca */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">BUSCA RÁPIDA</label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Nome, protocolo, endereço..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className="pl-8"
-                  />
+        ) : (
+          // Versão Expandida
+          <>
+            <div className="p-4 border-b flex-shrink-0">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" />
+                  <h1 className="font-semibold text-lg">Gestão Territorial</h1>
                 </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setSidebarMinimizada(true)}
+                  className="h-8 w-8"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                {totalNoMapa} itens no mapa
+              </p>
+            </div>
 
-              {/* Tipo de dado */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">TIPO DE DADO</label>
-                <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os tipos</SelectItem>
-                    <SelectItem value="demandas">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-red-500" />
+            <Tabs defaultValue="filtros" className="flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-3 px-4 pt-2 flex-shrink-0">
+                <TabsTrigger value="filtros" className="text-xs">
+                  <Filter className="h-3 w-3 mr-1" />
+                  Filtros
+                </TabsTrigger>
+                <TabsTrigger value="rotas" className="text-xs">
+                  <Route className="h-3 w-3 mr-1" />
+                  Rotas
+                </TabsTrigger>
+                <TabsTrigger value="analise" className="text-xs">
+                  <BarChart3 className="h-3 w-3 mr-1" />
+                  Análise
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="flex-1 overflow-y-auto">
+                {/* Tab Filtros */}
+                <TabsContent value="filtros" className="p-4 space-y-4 mt-0">
+                  {/* Busca */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">BUSCA RÁPIDA</label>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Nome, protocolo, endereço..."
+                        value={busca}
+                        onChange={(e) => setBusca(e.target.value)}
+                        className="pl-8"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tipo de dado */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">TIPO DE DADO</label>
+                    <Select value={tipoFiltro} onValueChange={(v) => setTipoFiltro(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os tipos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os tipos</SelectItem>
+                        <SelectItem value="demandas">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-red-500" />
                         Demandas
                       </div>
                     </SelectItem>
@@ -827,6 +913,8 @@ export default function MapaUnificado() {
             </TabsContent>
           </div>
         </Tabs>
+          </>
+        )}
       </div>
 
       {/* Mapa Central */}
@@ -1043,6 +1131,21 @@ export default function MapaUnificado() {
                   <Plus className="h-4 w-4 mr-2" />
                   Adicionar à Rota
                 </Button>
+                <Button 
+                  variant="default" 
+                  className="w-full"
+                  onClick={() => {
+                    if ('titulo' in itemSelecionado) {
+                      setDemandaModalId(itemSelecionado.id);
+                    } else {
+                      setMunicipeModalId(itemSelecionado.id);
+                    }
+                    setItemSelecionado(null);
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Ver Detalhes Completos
+                </Button>
               </div>
             </div>
           </ScrollArea>
@@ -1059,7 +1162,7 @@ export default function MapaUnificado() {
                 Cluster Selecionado
               </h2>
               <p className="text-sm text-muted-foreground">
-                {clusterSelecionado.demandas.length} demandas · {clusterSelecionado.municipes.length} munícipes
+                {clusterSelecionado.demandas.length + clusterSelecionado.municipes.length} itens no total
               </p>
             </div>
             <Button 
@@ -1071,212 +1174,274 @@ export default function MapaUnificado() {
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              {/* Ações em lote */}
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    const todos = [...clusterSelecionado.demandas, ...clusterSelecionado.municipes];
-                    let adicionados = 0;
-                    todos.forEach(item => {
-                      if (!pontosRota.find(p => p.id === item.id)) {
-                        adicionados++;
-                      }
-                    });
-                    setPontosRota([...pontosRota, ...todos.filter(item => !pontosRota.find(p => p.id === item.id))]);
-                    toast.success(`${adicionados} itens adicionados à rota`);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar todos à rota
-                </Button>
-              </div>
+          {/* Ações em lote */}
+          <div className="p-4 border-b flex-shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                const todos = [...clusterSelecionado.demandas, ...clusterSelecionado.municipes];
+                let adicionados = 0;
+                todos.forEach(item => {
+                  if (!pontosRota.find(p => p.id === item.id)) {
+                    adicionados++;
+                  }
+                });
+                setPontosRota([...pontosRota, ...todos.filter(item => !pontosRota.find(p => p.id === item.id))]);
+                toast.success(`${adicionados} itens adicionados à rota`);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar todos à rota
+            </Button>
+          </div>
 
-              {/* Lista de Demandas */}
-              {clusterSelecionado.demandas.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-red-600">
-                    <FileText className="h-4 w-4" />
-                    Demandas ({clusterSelecionado.demandas.length})
+          {/* Abas de Demandas e Munícipes */}
+          <Tabs value={abaCluster} onValueChange={(v) => setAbaCluster(v as 'demandas' | 'municipes')} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-2 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
+              <TabsTrigger value="demandas" className="text-xs gap-1">
+                <FileText className="h-3 w-3" />
+                Demandas ({clusterSelecionado.demandas.length})
+              </TabsTrigger>
+              <TabsTrigger value="municipes" className="text-xs gap-1">
+                <Users className="h-3 w-3" />
+                Munícipes ({clusterSelecionado.municipes.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* Tab Demandas */}
+              <TabsContent value="demandas" className="mt-0 space-y-2">
+                {clusterSelecionado.demandas.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma demanda neste cluster</p>
                   </div>
-                  <div className="space-y-2">
-                    {clusterSelecionado.demandas.map((demanda) => (
-                      <Card key={demanda.id} className="p-3">
-                        <div className="flex items-start gap-3">
-                          <div 
-                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: (demanda.area_cor || '#ef4444') + '20' }}
-                          >
-                            <FileText 
-                              className="h-4 w-4" 
-                              style={{ color: demanda.area_cor || '#ef4444' }}
-                            />
+                ) : (
+                  clusterSelecionado.demandas.map((demanda) => (
+                    <Card key={demanda.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: (demanda.area_cor || '#ef4444') + '20' }}
+                        >
+                          <FileText 
+                            className="h-4 w-4" 
+                            style={{ color: demanda.area_cor || '#ef4444' }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                          <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {demanda.status && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs h-5"
+                                style={{ 
+                                  backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                                  borderColor: STATUS_COLORS[demanda.status],
+                                  color: STATUS_COLORS[demanda.status]
+                                }}
+                              >
+                                {STATUS_LABELS[demanda.status] || demanda.status}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{demanda.titulo}</p>
-                            <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {demanda.status && (
+                          {demanda.municipe_nome && (
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {demanda.municipe_nome}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2 pt-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => adicionarARota(demanda)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Rota
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => setDemandaModalId(demanda.id)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Detalhes
+                        </Button>
+                        {demanda.municipe_telefone && (
+                          <a
+                            href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
+                          >
+                            <Phone className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+
+              {/* Tab Munícipes */}
+              <TabsContent value="municipes" className="mt-0 space-y-2">
+                {clusterSelecionado.municipes.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum munícipe neste cluster</p>
+                  </div>
+                ) : (
+                  clusterSelecionado.municipes.map((municipe) => (
+                    <Card key={municipe.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <Users className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{municipe.nome}</p>
+                          {municipe.telefone && (
+                            <p className="text-xs text-muted-foreground">{municipe.telefone}</p>
+                          )}
+                          {municipe.bairro && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3" />
+                              {municipe.bairro}
+                            </p>
+                          )}
+                          {municipe.demandas_count > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {municipe.demandas_count} demanda(s)
+                            </p>
+                          )}
+                          {municipe.tags && municipe.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {municipe.tags.slice(0, 2).map(tag => (
                                 <Badge 
-                                  variant="outline" 
+                                  key={tag.id} 
+                                  variant="outline"
                                   className="text-xs h-5"
-                                  style={{ 
-                                    backgroundColor: STATUS_COLORS[demanda.status] + '20',
-                                    borderColor: STATUS_COLORS[demanda.status],
-                                    color: STATUS_COLORS[demanda.status]
+                                  style={{
+                                    backgroundColor: (tag.cor || '#6b7280') + '20',
+                                    borderColor: tag.cor || '#6b7280',
                                   }}
                                 >
-                                  {STATUS_LABELS[demanda.status] || demanda.status}
+                                  {tag.nome}
+                                </Badge>
+                              ))}
+                              {municipe.tags.length > 2 && (
+                                <Badge variant="outline" className="text-xs h-5">
+                                  +{municipe.tags.length - 2}
                                 </Badge>
                               )}
                             </div>
-                            {demanda.municipe_nome && (
-                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                {demanda.municipe_nome}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2 mt-2 pt-2 border-t">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 text-xs flex-1"
-                            onClick={() => adicionarARota(demanda)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Rota
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 text-xs flex-1"
-                            onClick={() => {
-                              setItemSelecionado(demanda);
-                              setClusterSelecionado(null);
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Detalhes
-                          </Button>
-                          {demanda.municipe_telefone && (
-                            <a
-                              href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
-                            >
-                              <Phone className="h-3 w-3" />
-                            </a>
                           )}
                         </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Lista de Munícipes */}
-              {clusterSelecionado.municipes.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-purple-600">
-                    <Users className="h-4 w-4" />
-                    Munícipes ({clusterSelecionado.municipes.length})
-                  </div>
-                  <div className="space-y-2">
-                    {clusterSelecionado.municipes.map((municipe) => (
-                      <Card key={municipe.id} className="p-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                            <Users className="h-4 w-4 text-purple-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{municipe.nome}</p>
-                            {municipe.telefone && (
-                              <p className="text-xs text-muted-foreground">{municipe.telefone}</p>
-                            )}
-                            {municipe.bairro && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                <MapPin className="h-3 w-3" />
-                                {municipe.bairro}
-                              </p>
-                            )}
-                            {municipe.demandas_count > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {municipe.demandas_count} demanda(s)
-                              </p>
-                            )}
-                            {municipe.tags && municipe.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {municipe.tags.slice(0, 2).map(tag => (
-                                  <Badge 
-                                    key={tag.id} 
-                                    variant="outline"
-                                    className="text-xs h-5"
-                                    style={{
-                                      backgroundColor: (tag.cor || '#6b7280') + '20',
-                                      borderColor: tag.cor || '#6b7280',
-                                    }}
-                                  >
-                                    {tag.nome}
-                                  </Badge>
-                                ))}
-                                {municipe.tags.length > 2 && (
-                                  <Badge variant="outline" className="text-xs h-5">
-                                    +{municipe.tags.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2 mt-2 pt-2 border-t">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 text-xs flex-1"
-                            onClick={() => adicionarARota(municipe)}
+                      </div>
+                      <div className="flex gap-2 mt-2 pt-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => adicionarARota(municipe)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Rota
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => setMunicipeModalId(municipe.id)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Detalhes
+                        </Button>
+                        {municipe.telefone && (
+                          <a
+                            href={formatWhatsAppLink(municipe.telefone) || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
                           >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Rota
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 text-xs flex-1"
-                            onClick={() => {
-                              setItemSelecionado(municipe);
-                              setClusterSelecionado(null);
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Detalhes
-                          </Button>
-                          {municipe.telefone && (
-                            <a
-                              href={formatWhatsAppLink(municipe.telefone) || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
-                            >
-                              <Phone className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
+                            <Phone className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
             </div>
-          </div>
+          </Tabs>
         </div>
       )}
+
+      {/* Modais de Demanda */}
+      <ViewDemandaDialog
+        demanda={demandaModalId ? demandasRaw.find(d => d.id === demandaModalId) || null : null}
+        open={!!demandaModalId}
+        onOpenChange={(open) => {
+          if (!open) setDemandaModalId(null);
+        }}
+        onEdit={() => {
+          const demanda = demandasRaw.find(d => d.id === demandaModalId);
+          if (demanda) {
+            setDemandaParaEditar(demanda);
+            setDemandaModalId(null);
+            setIsEditDemandaOpen(true);
+          }
+        }}
+      />
+
+      <EditDemandaDialog
+        demanda={demandaParaEditar}
+        open={isEditDemandaOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditDemandaOpen(false);
+            setDemandaParaEditar(null);
+          }
+        }}
+      />
+
+      {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
+      {/* 
+      <ViewMunicipeDialog
+        municipe={municipeModalId ? municipesRaw.find(m => m.id === municipeModalId) || null : null}
+        open={!!municipeModalId}
+        onOpenChange={(open) => {
+          if (!open) setMunicipeModalId(null);
+        }}
+        onEdit={() => {
+          const municipe = municipesRaw.find(m => m.id === municipeModalId);
+          if (municipe) {
+            setMunicipeParaEditar(municipe);
+            setMunicipeModalId(null);
+            setIsEditMunicipeOpen(true);
+          }
+        }}
+      />
+
+      <EditMunicipeDialog
+        municipe={municipeParaEditar}
+        open={isEditMunicipeOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditMunicipeOpen(false);
+            setMunicipeParaEditar(null);
+          }
+        }}
+      />
+      */}
     </div>
   );
 }
