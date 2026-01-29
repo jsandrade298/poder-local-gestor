@@ -65,9 +65,10 @@ export function GeoJSONLayer({
 }: GeoJSONLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
+  const hasZoomedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (!data || !data.features) return;
+    if (!data || !data.features || data.features.length === 0) return;
 
     // Calcular valor máximo para colorir por densidade
     let maxValor = 0;
@@ -157,6 +158,20 @@ export function GeoJSONLayer({
 
     layer.addTo(map);
     layerRef.current = layer;
+
+    // Fazer zoom para a camada na primeira vez que é adicionada
+    // Apenas se ainda não tiver feito zoom para esta camada
+    if (!hasZoomedRef.current) {
+      try {
+        const bounds = layer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [20, 20], maxZoom: 14 });
+          hasZoomedRef.current = true;
+        }
+      } catch (e) {
+        console.warn('Não foi possível fazer zoom para a camada:', e);
+      }
+    }
 
     return () => {
       if (layerRef.current) {
