@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useMapaUnificado, DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
 import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
+import { ShapefileUpload } from '@/components/mapa/ShapefileUpload';
+import { useCamadasGeograficas } from '@/hooks/useCamadasGeograficas';
+import { calcularEstatisticasPorRegiao, getFeatureName, filtrarPorRegiao } from '@/lib/geoUtils';
 import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
 import { EditDemandaDialog } from '@/components/forms/EditDemandaDialog';
 // Nota: Se os modais de Munícipe existirem no projeto, descomente as linhas abaixo:
-import { MunicipeDetailsDialog } from '@/components/forms/MunicipeDetailsDialog';
-import { EditMunicipeDialog } from '@/components/forms/EditMunicipeDialog';
-
+// import { ViewMunicipeDialog } from '@/components/forms/ViewMunicipeDialog';
+// import { EditMunicipeDialog } from '@/components/forms/EditMunicipeDialog';
 import { 
   MapPin, 
   Filter, 
@@ -33,7 +35,12 @@ import {
   AlertTriangle,
   Loader2,
   Flame,
-  Link2
+  Link2,
+  Layers,
+  Eye,
+  EyeOff,
+  Palette,
+  Map
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -45,6 +52,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { toast } from 'sonner';
 
 // Cores por status (valores reais do banco)
@@ -79,6 +93,18 @@ export default function MapaUnificado() {
     isLoading,
     refetch
   } = useMapaUnificado();
+
+  // Hook para camadas geográficas
+  const {
+    camadas,
+    camadasVisiveis,
+    adicionarCamada,
+    toggleVisibilidade,
+    atualizarCor,
+    atualizarOpacidade,
+    removerCamada,
+    isLoading: isLoadingCamadas
+  } = useCamadasGeograficas();
 
   // Estados de filtro
   const [busca, setBusca] = useState('');
@@ -123,6 +149,15 @@ export default function MapaUnificado() {
   // Estados de rota
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
   const [origemRota, setOrigemRota] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Estados para camadas geográficas
+  const [camadaSelecionadaStats, setCamadaSelecionadaStats] = useState<string | null>(null);
+  const [colorirPorDensidade, setColorirPorDensidade] = useState(false);
+  const [regiaoSelecionada, setRegiaoSelecionada] = useState<{
+    camadaId: string;
+    feature: any;
+    nome: string;
+  } | null>(null);
 
   // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
   const municipesComTagsSelecionadas = useMemo(() => {
@@ -248,6 +283,64 @@ export default function MapaUnificado() {
   const totalNoMapa = 
     (tipoFiltro === 'todos' || tipoFiltro === 'demandas' ? demandasFiltradas.length : 0) +
     (tipoFiltro === 'todos' || tipoFiltro === 'municipes' ? municipesFiltrados.length : 0);
+
+  // Calcular estatísticas por região para cada camada visível
+  const estatisticasPorRegiao = useMemo(() => {
+    const stats = new Map<string, Map<string, { demandas: number; municipes: number }>>();
+    
+    camadasVisiveis.forEach(camada => {
+      if (camada.geojson) {
+        const camadaStats = calcularEstatisticasPorRegiao(
+          camada.geojson,
+          demandasFiltradas,
+          municipesFiltrados
+        );
+        stats.set(camada.id, camadaStats);
+      }
+    });
+    
+    return stats;
+  }, [camadasVisiveis, demandasFiltradas, municipesFiltrados]);
+
+  // Obter estatísticas ordenadas de uma camada específica
+  const getEstatisticasCamadaOrdenadas = useCallback((camadaId: string) => {
+    const stats = estatisticasPorRegiao.get(camadaId);
+    if (!stats) return [];
+    
+    return Array.from(stats.entries())
+      .map(([nome, valores]) => ({
+        nome,
+        demandas: valores.demandas,
+        municipes: valores.municipes,
+        total: valores.demandas + valores.municipes
+      }))
+      .filter(item => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [estatisticasPorRegiao]);
+
+  // Handler para upload de shapefile
+  const handleShapefileUpload = useCallback((
+    geojson: any, 
+    nome: string, 
+    tipo: string, 
+    cor: string, 
+    opacidade: number
+  ) => {
+    adicionarCamada.mutate({
+      nome,
+      tipo,
+      geojson,
+      cor_padrao: cor,
+      opacidade,
+      visivel: true
+    });
+  }, [adicionarCamada]);
+
+  // Handler para clique em uma região
+  const handleRegiaoClick = useCallback((camadaId: string, feature: any, nomeRegiao: string) => {
+    setRegiaoSelecionada({ camadaId, feature, nome: nomeRegiao });
+    toast.info(`Região selecionada: ${nomeRegiao}`);
+  }, []);
 
   // Obter geolocalização
   const obterLocalizacao = () => {
@@ -814,15 +907,235 @@ export default function MapaUnificado() {
 
             {/* Tab Análise */}
             <TabsContent value="analise" className="p-4 space-y-4 mt-0">
-              {/* Cards de resumo */}
+              {/* Camadas Geográficas */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Camadas Geográficas
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Botão de Importar */}
+                  <ShapefileUpload onUploadComplete={handleShapefileUpload} />
+
+                  {/* Lista de Camadas */}
+                  {isLoadingCamadas ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Carregando camadas...</span>
+                    </div>
+                  ) : camadas.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">Nenhuma camada importada</p>
+                      <p className="text-xs">Importe um shapefile para começar</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {camadas.map(camada => (
+                        <div 
+                          key={camada.id}
+                          className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div 
+                              className="w-4 h-4 rounded flex-shrink-0"
+                              style={{ backgroundColor: camada.cor_padrao }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{camada.nome}</p>
+                              <p className="text-xs text-muted-foreground">{camada.tipo}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {/* Toggle Visibilidade */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => toggleVisibilidade.mutate({ 
+                                id: camada.id, 
+                                visivel: !camada.visivel 
+                              })}
+                              title={camada.visivel ? 'Ocultar camada' : 'Mostrar camada'}
+                            >
+                              {camada.visivel ? (
+                                <Eye className="h-3.5 w-3.5 text-primary" />
+                              ) : (
+                                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+
+                            {/* Color Picker */}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Alterar cor"
+                                >
+                                  <Palette className="h-3.5 w-3.5" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-3" align="end">
+                                <div className="space-y-3">
+                                  <div className="space-y-1">
+                                    <label className="text-xs font-medium">Cor</label>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        type="color"
+                                        value={camada.cor_padrao}
+                                        onChange={(e) => atualizarCor.mutate({ 
+                                          id: camada.id, 
+                                          cor: e.target.value 
+                                        })}
+                                        className="w-10 h-8 p-1 cursor-pointer"
+                                      />
+                                      <Input
+                                        value={camada.cor_padrao}
+                                        onChange={(e) => atualizarCor.mutate({ 
+                                          id: camada.id, 
+                                          cor: e.target.value 
+                                        })}
+                                        className="flex-1 h-8 text-xs font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-xs font-medium">
+                                      Opacidade: {Math.round(camada.opacidade * 100)}%
+                                    </label>
+                                    <Slider
+                                      value={[camada.opacidade]}
+                                      onValueChange={([value]) => atualizarOpacidade.mutate({ 
+                                        id: camada.id, 
+                                        opacidade: value 
+                                      })}
+                                      min={0.1}
+                                      max={0.8}
+                                      step={0.1}
+                                    />
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+
+                            {/* Remover */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => removerCamada.mutate(camada.id)}
+                              title="Remover camada"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Estatísticas por Região */}
+              {camadasVisiveis.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Estatísticas por Região
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Seletor de Camada */}
+                    <Select 
+                      value={camadaSelecionadaStats || camadasVisiveis[0]?.id} 
+                      onValueChange={setCamadaSelecionadaStats}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecione uma camada" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {camadasVisiveis.map(camada => (
+                          <SelectItem key={camada.id} value={camada.id}>
+                            {camada.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Toggle Colorir por Densidade */}
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-muted-foreground">
+                        Colorir por densidade
+                      </label>
+                      <Switch
+                        checked={colorirPorDensidade}
+                        onCheckedChange={setColorirPorDensidade}
+                      />
+                    </div>
+
+                    {/* Lista de Regiões */}
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {getEstatisticasCamadaOrdenadas(camadaSelecionadaStats || camadasVisiveis[0]?.id).map((item, index) => (
+                        <div 
+                          key={item.nome}
+                          className="flex items-center justify-between text-xs p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                          onClick={() => {
+                            // Encontrar a feature correspondente para zoom
+                            const camada = camadasVisiveis.find(c => c.id === (camadaSelecionadaStats || camadasVisiveis[0]?.id));
+                            if (camada?.geojson?.features) {
+                              const feature = camada.geojson.features.find((f: any) => 
+                                getFeatureName(f.properties) === item.nome
+                              );
+                              if (feature) {
+                                handleRegiaoClick(camada.id, feature, item.nome);
+                              }
+                            }
+                          }}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span className="text-muted-foreground w-4">{index + 1}.</span>
+                            <span className="truncate">{item.nome}</span>
+                          </span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge variant="outline" className="h-5 text-xs gap-1">
+                              <FileText className="h-2.5 w-2.5" />
+                              {item.demandas}
+                            </Badge>
+                            <Badge variant="outline" className="h-5 text-xs gap-1">
+                              <Users className="h-2.5 w-2.5" />
+                              {item.municipes}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {getEstatisticasCamadaOrdenadas(camadaSelecionadaStats || camadasVisiveis[0]?.id).length === 0 && (
+                        <p className="text-xs text-center text-muted-foreground py-4">
+                          Nenhum item encontrado nas regiões
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Separator />
+
+              {/* Resumo Geral */}
               <div className="grid grid-cols-2 gap-2">
                 <Card>
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-red-500" />
                       <div>
-                        <p className="text-lg font-bold">{demandasRaw.length}</p>
-                        <p className="text-xs text-muted-foreground">Demandas</p>
+                        <p className="text-lg font-bold">{demandasFiltradas.length}</p>
+                        <p className="text-xs text-muted-foreground">Demandas filtradas</p>
                       </div>
                     </div>
                   </CardContent>
@@ -832,8 +1145,8 @@ export default function MapaUnificado() {
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-purple-500" />
                       <div>
-                        <p className="text-lg font-bold">{municipesRaw.length}</p>
-                        <p className="text-xs text-muted-foreground">Munícipes</p>
+                        <p className="text-lg font-bold">{municipesFiltrados.length}</p>
+                        <p className="text-xs text-muted-foreground">Munícipes filtrados</p>
                       </div>
                     </div>
                   </CardContent>
@@ -936,6 +1249,10 @@ export default function MapaUnificado() {
           mostrarMunicipes={tipoFiltro !== 'demandas'}
           heatmapVisible={heatmapVisible}
           heatmapType={heatmapType}
+          camadasGeograficas={camadasVisiveis}
+          estatisticasPorRegiao={estatisticasPorRegiao}
+          colorirPorDensidade={colorirPorDensidade}
+          onRegiaoClick={handleRegiaoClick}
           onDemandaClick={(d) => {
             setItemSelecionado(d);
             setClusterSelecionado(null);
@@ -1414,12 +1731,21 @@ export default function MapaUnificado() {
         }}
       />
 
-      {/* Modais de Munícipe */}
-      <MunicipeDetailsDialog
+      {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
+      {/* 
+      <ViewMunicipeDialog
         municipe={municipeModalId ? municipesRaw.find(m => m.id === municipeModalId) || null : null}
         open={!!municipeModalId}
         onOpenChange={(open) => {
           if (!open) setMunicipeModalId(null);
+        }}
+        onEdit={() => {
+          const municipe = municipesRaw.find(m => m.id === municipeModalId);
+          if (municipe) {
+            setMunicipeParaEditar(municipe);
+            setMunicipeModalId(null);
+            setIsEditMunicipeOpen(true);
+          }
         }}
       />
 
@@ -1433,6 +1759,7 @@ export default function MapaUnificado() {
           }
         }}
       />
+      */}
     </div>
   );
 }
