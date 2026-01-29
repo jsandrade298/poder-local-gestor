@@ -19,13 +19,255 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Upload, Loader2, Map as MapIcon, FileUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, Loader2, Map as MapIcon, FileUp, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ShapefileUploadProps {
   onUploadComplete: (geojson: any, nome: string, tipo: string, cor: string, opacidade: number) => void;
 }
+
+// ============================================
+// FUNÇÕES DE CONVERSÃO UTM -> WGS84
+// ============================================
+
+/**
+ * Converte coordenadas UTM para Lat/Lon (WGS84)
+ * Fórmula Karney para maior precisão
+ */
+function utmToLatLon(
+  easting: number, 
+  northing: number, 
+  zone: number = 23, 
+  hemisphere: 'N' | 'S' = 'S'
+): [number, number] {
+  // Constantes WGS84
+  const a = 6378137.0; // semi-eixo maior
+  const f = 1 / 298.257223563; // achatamento
+  const k0 = 0.9996; // fator de escala
+  
+  const e = Math.sqrt(2 * f - f * f);
+  const e2 = e * e;
+  const ePrime2 = e2 / (1 - e2);
+  
+  // Ajustar coordenadas
+  const x = easting - 500000;
+  let y = northing;
+  if (hemisphere === 'S') {
+    y = y - 10000000;
+  }
+  
+  // Meridiano central
+  const lon0 = (zone - 1) * 6 - 180 + 3;
+  const lon0Rad = lon0 * Math.PI / 180;
+  
+  // Footprint latitude
+  const M = y / k0;
+  const mu = M / (a * (1 - e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256));
+  
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  
+  let phi1 = mu + (3*e1/2 - 27*Math.pow(e1, 3)/32) * Math.sin(2*mu);
+  phi1 += (21*e1*e1/16 - 55*Math.pow(e1, 4)/32) * Math.sin(4*mu);
+  phi1 += (151*Math.pow(e1, 3)/96) * Math.sin(6*mu);
+  phi1 += (1097*Math.pow(e1, 4)/512) * Math.sin(8*mu);
+  
+  const N1 = a / Math.sqrt(1 - e2 * Math.sin(phi1) * Math.sin(phi1));
+  const T1 = Math.tan(phi1) * Math.tan(phi1);
+  const C1 = ePrime2 * Math.cos(phi1) * Math.cos(phi1);
+  const R1 = a * (1 - e2) / Math.pow(1 - e2 * Math.sin(phi1) * Math.sin(phi1), 1.5);
+  const D = x / (N1 * k0);
+  
+  const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (
+    D*D/2 - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*ePrime2) * Math.pow(D, 4)/24
+    + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*ePrime2 - 3*C1*C1) * Math.pow(D, 6)/720
+  );
+  
+  const lon = lon0Rad + (D - (1 + 2*T1 + C1) * Math.pow(D, 3)/6
+    + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*ePrime2 + 24*T1*T1) * Math.pow(D, 5)/120) / Math.cos(phi1);
+  
+  return [lat * 180 / Math.PI, lon * 180 / Math.PI];
+}
+
+/**
+ * Detecta a zona UTM baseada nas coordenadas (para Brasil, zonas 18-25)
+ */
+function detectarZonaUTM(coords: number[]): number {
+  // Para Santo André e região metropolitana de SP: Zona 23S
+  // Para maior parte do Brasil: zonas 18-25
+  const x = coords[0];
+  
+  // Se X está entre 166000 e 834000, provavelmente é UTM
+  // Vamos usar zona 23 como padrão para SP
+  if (x > 100000 && x < 900000) {
+    return 23; // Zona padrão para SP
+  }
+  
+  return 23;
+}
+
+/**
+ * Verifica se coordenadas estão em UTM (valores altos)
+ */
+function isUTM(coords: number[]): boolean {
+  if (!coords || coords.length < 2) return false;
+  // UTM tem valores tipicamente > 100000
+  return Math.abs(coords[0]) > 1000 || Math.abs(coords[1]) > 100000;
+}
+
+/**
+ * Converte recursivamente todas as coordenadas de um GeoJSON de UTM para WGS84
+ */
+function convertCoordsToWGS84(coords: any, zone: number = 23): any {
+  if (typeof coords[0] === 'number') {
+    // É um par de coordenadas [x, y]
+    const [lat, lon] = utmToLatLon(coords[0], coords[1], zone, 'S');
+    return [lon, lat]; // GeoJSON usa [lon, lat]
+  }
+  // É uma lista de coordenadas
+  return coords.map((c: any) => convertCoordsToWGS84(c, zone));
+}
+
+/**
+ * Converte todo o GeoJSON de UTM para WGS84
+ */
+function convertGeoJSONToWGS84(geoData: any): any {
+  const firstCoord = getFirstCoordinate(geoData);
+  
+  if (!firstCoord || !isUTM(firstCoord)) {
+    return geoData; // Já está em WGS84
+  }
+  
+  const zone = detectarZonaUTM(firstCoord);
+  console.log(`Convertendo de UTM Zona ${zone}S para WGS84...`);
+  
+  // Clonar o objeto para não modificar o original
+  const converted = JSON.parse(JSON.stringify(geoData));
+  
+  for (const feature of converted.features) {
+    if (feature?.geometry?.coordinates) {
+      feature.geometry.coordinates = convertCoordsToWGS84(feature.geometry.coordinates, zone);
+    }
+  }
+  
+  return converted;
+}
+
+/**
+ * Obtém a primeira coordenada do GeoJSON
+ */
+function getFirstCoordinate(geoData: any): number[] | null {
+  try {
+    const feature = geoData?.features?.[0];
+    if (!feature?.geometry?.coordinates) return null;
+    
+    let coords = feature.geometry.coordinates;
+    // Navegar até encontrar um par de números
+    while (Array.isArray(coords) && Array.isArray(coords[0])) {
+      coords = coords[0];
+    }
+    return coords;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// FUNÇÕES DE FIX DE ENCODING
+// ============================================
+
+/**
+ * Corrige problemas de encoding Latin-1/UTF-8
+ * Converte caracteres como "AmÃ©rica" -> "América"
+ */
+function fixEncoding(text: string): string {
+  if (!text) return text;
+  
+  // Mapa de substituições comuns de UTF-8 mal interpretado como Latin-1
+  const replacements: [RegExp, string][] = [
+    [/Ã¡/g, 'á'],
+    [/Ã /g, 'à'],
+    [/Ã¢/g, 'â'],
+    [/Ã£/g, 'ã'],
+    [/Ã¤/g, 'ä'],
+    [/Ã©/g, 'é'],
+    [/Ã¨/g, 'è'],
+    [/Ãª/g, 'ê'],
+    [/Ã«/g, 'ë'],
+    [/Ã­/g, 'í'],
+    [/Ã¬/g, 'ì'],
+    [/Ã®/g, 'î'],
+    [/Ã¯/g, 'ï'],
+    [/Ã³/g, 'ó'],
+    [/Ã²/g, 'ò'],
+    [/Ã´/g, 'ô'],
+    [/Ãµ/g, 'õ'],
+    [/Ã¶/g, 'ö'],
+    [/Ãº/g, 'ú'],
+    [/Ã¹/g, 'ù'],
+    [/Ã»/g, 'û'],
+    [/Ã¼/g, 'ü'],
+    [/Ã§/g, 'ç'],
+    [/Ã±/g, 'ñ'],
+    [/Ã/g, 'Á'],
+    [/Ã€/g, 'À'],
+    [/Ã‚/g, 'Â'],
+    [/Ãƒ/g, 'Ã'],
+    [/Ã„/g, 'Ä'],
+    [/Ã‰/g, 'É'],
+    [/Ãˆ/g, 'È'],
+    [/ÃŠ/g, 'Ê'],
+    [/Ã‹/g, 'Ë'],
+    [/Ã/g, 'Í'],
+    [/ÃŒ/g, 'Ì'],
+    [/ÃŽ/g, 'Î'],
+    [/Ã/g, 'Ï'],
+    [/Ã"/g, 'Ó'],
+    [/Ã'/g, 'Ò'],
+    [/Ã"/g, 'Ô'],
+    [/Ã•/g, 'Õ'],
+    [/Ã–/g, 'Ö'],
+    [/Ãš/g, 'Ú'],
+    [/Ã™/g, 'Ù'],
+    [/Ã›/g, 'Û'],
+    [/Ãœ/g, 'Ü'],
+    [/Ã‡/g, 'Ç'],
+    [/Ã'/g, 'Ñ'],
+    // Casos específicos encontrados
+    [/Ã£o/g, 'ão'],
+    [/Ã§Ã£o/g, 'ção'],
+  ];
+  
+  let result = text;
+  for (const [pattern, replacement] of replacements) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result;
+}
+
+/**
+ * Corrige encoding de todas as propriedades das features
+ */
+function fixGeoJSONEncoding(geoData: any): any {
+  if (!geoData?.features) return geoData;
+  
+  for (const feature of geoData.features) {
+    if (feature?.properties) {
+      for (const key of Object.keys(feature.properties)) {
+        if (typeof feature.properties[key] === 'string') {
+          feature.properties[key] = fixEncoding(feature.properties[key]);
+        }
+      }
+    }
+  }
+  
+  return geoData;
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 
 export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,6 +278,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
   const [opacidade, setOpacidade] = useState(0.3);
   const [geojsonPreview, setGeojsonPreview] = useState<any>(null);
   const [fileName, setFileName] = useState('');
+  const [wasConverted, setWasConverted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
@@ -45,6 +288,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     setOpacidade(0.3);
     setGeojsonPreview(null);
     setFileName('');
+    setWasConverted(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -56,12 +300,13 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
 
     // Validar extensão
     if (!file.name.endsWith('.zip') && !file.name.endsWith('.geojson') && !file.name.endsWith('.json')) {
-      toast.error('Por favor, envie um arquivo .zip (shapefile) ou .geojson');
+      toast.error('Por favor, envie um arquivo .zip (shapefile) ou .geojson/.json');
       return;
     }
 
     setIsLoading(true);
     setFileName(file.name);
+    setWasConverted(false);
 
     try {
       let geoData: any;
@@ -90,7 +335,6 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           geoData = Array.isArray(geojson) ? geojson[0] : geojson;
         } catch (shpError: any) {
           console.error('Erro shpjs:', shpError);
-          // Mensagem mais amigável para erros comuns de shapefile
           if (shpError.message?.includes('proj4')) {
             throw new Error('Shapefile sem arquivo de projeção (.prj). Tente converter para GeoJSON primeiro.');
           }
@@ -108,15 +352,11 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         throw new Error('Arquivo não é um GeoJSON válido (falta propriedade "type")');
       }
 
+      // Normalizar para FeatureCollection
       if (!geoData.features) {
-        // Se for uma Feature única, converter para FeatureCollection
         if (geoData.type === 'Feature') {
-          geoData = {
-            type: 'FeatureCollection',
-            features: [geoData]
-          };
+          geoData = { type: 'FeatureCollection', features: [geoData] };
         } else if (geoData.type === 'GeometryCollection') {
-          // Converter GeometryCollection para FeatureCollection
           geoData = {
             type: 'FeatureCollection',
             features: geoData.geometries.map((geom: any, idx: number) => ({
@@ -134,13 +374,17 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         throw new Error('Nenhuma feição encontrada no arquivo');
       }
 
-      // Verificar se as coordenadas parecem estar em lat/lng (WGS84)
-      // Coordenadas UTM geralmente têm valores muito altos (> 100000)
+      // Verificar e converter de UTM para WGS84 se necessário
       const firstCoord = getFirstCoordinate(geoData);
-      if (firstCoord && (Math.abs(firstCoord[0]) > 1000 || Math.abs(firstCoord[1]) > 1000)) {
-        console.warn('Coordenadas parecem estar em sistema projetado (UTM), não em lat/lng');
-        toast.warning('Atenção: As coordenadas podem estar em sistema UTM. O mapa pode não exibir corretamente.');
+      if (firstCoord && isUTM(firstCoord)) {
+        console.log('Coordenadas em UTM detectadas, convertendo para WGS84...');
+        geoData = convertGeoJSONToWGS84(geoData);
+        setWasConverted(true);
+        toast.info('Coordenadas UTM detectadas e convertidas automaticamente para WGS84');
       }
+
+      // Corrigir encoding dos textos (Latin-1 -> UTF-8)
+      geoData = fixGeoJSONEncoding(geoData);
 
       // Salvar preview
       setGeojsonPreview(geoData);
@@ -150,7 +394,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         setNome(file.name.replace(/\.(zip|geojson|json)$/i, '').replace(/_/g, ' '));
       }
 
-      toast.success(`${geoData.features.length} feições carregadas`);
+      toast.success(`${geoData.features.length} feições carregadas com sucesso!`);
       
     } catch (error: any) {
       console.error('Erro ao processar arquivo:', error);
@@ -162,26 +406,9 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     }
   };
 
-  // Função auxiliar para obter primeira coordenada do GeoJSON
-  const getFirstCoordinate = (geoData: any): number[] | null => {
-    try {
-      const feature = geoData.features?.[0];
-      if (!feature?.geometry?.coordinates) return null;
-      
-      let coords = feature.geometry.coordinates;
-      // Navegar até encontrar um par de números
-      while (Array.isArray(coords) && Array.isArray(coords[0])) {
-        coords = coords[0];
-      }
-      return coords;
-    } catch {
-      return null;
-    }
-  };
-
   const handleConfirm = () => {
     if (!geojsonPreview) {
-      toast.error('Nenhum shapefile carregado');
+      toast.error('Nenhum arquivo carregado');
       return;
     }
 
@@ -208,6 +435,18 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     return Object.keys(geojsonPreview.features[0].properties);
   };
 
+  // Obter nome de exemplo da primeira feature
+  const getExampleName = () => {
+    const props = geojsonPreview?.features?.[0]?.properties;
+    if (!props) return null;
+    
+    const nameFields = ['NOME', 'nome', 'NAME', 'name', 'NM_BAIRRO', 'BAIRRO', 'NM_MUNICIP'];
+    for (const field of nameFields) {
+      if (props[field]) return props[field];
+    }
+    return null;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -220,10 +459,10 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapIcon className="h-5 w-5" />
-            Importar Shapefile
+            Importar Camada Geográfica
           </DialogTitle>
           <DialogDescription>
-            Importe um arquivo shapefile (.zip) para adicionar uma camada geográfica ao mapa.
+            Importe um arquivo shapefile (.zip) ou GeoJSON para adicionar uma camada ao mapa.
           </DialogDescription>
         </DialogHeader>
 
@@ -261,6 +500,11 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
                     <span className="text-xs text-green-600">
                       {geojsonPreview.features.length} feições carregadas
                     </span>
+                    {wasConverted && (
+                      <span className="text-xs text-blue-600">
+                        ✓ Convertido de UTM para WGS84
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground mt-1">
                       Clique para trocar o arquivo
                     </span>
@@ -285,9 +529,14 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                <strong>Propriedades encontradas:</strong>{' '}
+                <strong>Propriedades:</strong>{' '}
                 {getFeatureProperties().slice(0, 5).join(', ')}
-                {getFeatureProperties().length > 5 && ` e mais ${getFeatureProperties().length - 5}...`}
+                {getFeatureProperties().length > 5 && ` (+${getFeatureProperties().length - 5})`}
+                {getExampleName() && (
+                  <span className="block mt-1">
+                    <strong>Exemplo:</strong> {getExampleName()}
+                  </span>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -359,8 +608,8 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
             <p className="font-medium mb-1">📌 Dica:</p>
             <p>
-              Você pode importar um arquivo .zip (shapefile com .shp, .dbf e .shx) ou 
-              diretamente um arquivo .geojson. Baixe shapefiles no site do IBGE, TSE ou da prefeitura.
+              Arquivos em UTM são convertidos automaticamente. 
+              Baixe shapefiles no site do IBGE, TSE ou da prefeitura.
             </p>
           </div>
         </div>
