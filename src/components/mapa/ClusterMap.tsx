@@ -264,6 +264,7 @@ interface ClusterMapProps {
   zoom?: number;
   onDemandaClick?: (demanda: DemandaMapa) => void;
   onMunicipeClick?: (municipe: MunicipeMapa) => void;
+  onClusterClick?: (dados: { demandas: DemandaMapa[]; municipes: MunicipeMapa[] }) => void;
   mostrarDemandas?: boolean;
   mostrarMunicipes?: boolean;
   heatmapVisible?: boolean;
@@ -277,6 +278,7 @@ export function ClusterMap({
   zoom = 13,
   onDemandaClick,
   onMunicipeClick,
+  onClusterClick,
   mostrarDemandas = true,
   mostrarMunicipes = true,
   heatmapVisible = false,
@@ -307,6 +309,26 @@ export function ClusterMap({
     if (!telefone) return null;
     const numero = telefone.replace(/\D/g, '');
     return `https://wa.me/55${numero}`;
+  };
+
+  // Handler para clique no cluster
+  const handleClusterClick = (e: any) => {
+    if (!onClusterClick) return;
+    
+    const markers = e.layer.getAllChildMarkers();
+    const clusterDemandas: DemandaMapa[] = [];
+    const clusterMunicipes: MunicipeMapa[] = [];
+    
+    markers.forEach((marker: any) => {
+      const data = marker.options?.data;
+      if (data?.tipo === 'demanda' && data?.item) {
+        clusterDemandas.push(data.item);
+      } else if (data?.tipo === 'municipe' && data?.item) {
+        clusterMunicipes.push(data.item);
+      }
+    });
+    
+    onClusterClick({ demandas: clusterDemandas, municipes: clusterMunicipes });
   };
 
   return (
@@ -353,9 +375,13 @@ export function ClusterMap({
         <MarkerClusterGroup
           chunkedLoading
           maxClusterRadius={60}
+          zoomToBoundsOnClick={false}
           spiderfyOnMaxZoom
           showCoverageOnHover={false}
           spiderfyDistanceMultiplier={1.5}
+          eventHandlers={{
+            clusterclick: handleClusterClick
+          }}
           iconCreateFunction={(cluster) => {
             const markers = cluster.getAllChildMarkers();
             let demandasCount = 0;
@@ -392,6 +418,7 @@ export function ClusterMap({
                   font-size: ${fontSize}px;
                   border: 3px solid white;
                   box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                  cursor: pointer;
                 ">${total}</div>`,
                 className: 'custom-cluster-icon',
                 iconSize: L.point(size, size)
