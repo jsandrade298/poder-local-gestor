@@ -92,6 +92,10 @@ export default function MapaUnificado() {
 
   // Estados de seleção
   const [itemSelecionado, setItemSelecionado] = useState<DemandaMapa | MunicipeMapa | null>(null);
+  const [clusterSelecionado, setClusterSelecionado] = useState<{
+    demandas: DemandaMapa[];
+    municipes: MunicipeMapa[];
+  } | null>(null);
 
   // Estados de rota
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
@@ -298,8 +302,8 @@ export default function MapaUnificado() {
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Sidebar Esquerda - Filtros */}
-      <div className="w-80 border-r bg-background flex flex-col">
-        <div className="p-4 border-b">
+      <div className="w-80 border-r bg-background flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b flex-shrink-0">
           <div className="flex items-center gap-2 mb-1">
             <MapPin className="h-5 w-5 text-primary" />
             <h1 className="font-semibold text-lg">Gestão Territorial</h1>
@@ -309,8 +313,8 @@ export default function MapaUnificado() {
           </p>
         </div>
 
-        <Tabs defaultValue="filtros" className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 px-4 pt-2">
+        <Tabs defaultValue="filtros" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-3 px-4 pt-2 flex-shrink-0">
             <TabsTrigger value="filtros" className="text-xs">
               <Filter className="h-3 w-3 mr-1" />
               Filtros
@@ -325,7 +329,7 @@ export default function MapaUnificado() {
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto">
             {/* Tab Filtros */}
             <TabsContent value="filtros" className="p-4 space-y-4 mt-0">
               {/* Busca */}
@@ -821,7 +825,7 @@ export default function MapaUnificado() {
                 </Card>
               )}
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </div>
 
@@ -843,8 +847,18 @@ export default function MapaUnificado() {
           mostrarMunicipes={tipoFiltro !== 'demandas'}
           heatmapVisible={heatmapVisible}
           heatmapType={heatmapType}
-          onDemandaClick={(d) => setItemSelecionado(d)}
-          onMunicipeClick={(m) => setItemSelecionado(m)}
+          onDemandaClick={(d) => {
+            setItemSelecionado(d);
+            setClusterSelecionado(null);
+          }}
+          onMunicipeClick={(m) => {
+            setItemSelecionado(m);
+            setClusterSelecionado(null);
+          }}
+          onClusterClick={(dados) => {
+            setClusterSelecionado(dados);
+            setItemSelecionado(null);
+          }}
         />
       </div>
 
@@ -1032,6 +1046,235 @@ export default function MapaUnificado() {
               </div>
             </div>
           </ScrollArea>
+        </div>
+      )}
+
+      {/* Sidebar Direita - Cluster Selecionado */}
+      {clusterSelecionado && (
+        <div className="w-96 border-l bg-background flex flex-col">
+          <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
+            <div>
+              <h2 className="font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Cluster Selecionado
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {clusterSelecionado.demandas.length} demandas · {clusterSelecionado.municipes.length} munícipes
+              </p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setClusterSelecionado(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              {/* Ações em lote */}
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    const todos = [...clusterSelecionado.demandas, ...clusterSelecionado.municipes];
+                    let adicionados = 0;
+                    todos.forEach(item => {
+                      if (!pontosRota.find(p => p.id === item.id)) {
+                        adicionados++;
+                      }
+                    });
+                    setPontosRota([...pontosRota, ...todos.filter(item => !pontosRota.find(p => p.id === item.id))]);
+                    toast.success(`${adicionados} itens adicionados à rota`);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar todos à rota
+                </Button>
+              </div>
+
+              {/* Lista de Demandas */}
+              {clusterSelecionado.demandas.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-600">
+                    <FileText className="h-4 w-4" />
+                    Demandas ({clusterSelecionado.demandas.length})
+                  </div>
+                  <div className="space-y-2">
+                    {clusterSelecionado.demandas.map((demanda) => (
+                      <Card key={demanda.id} className="p-3">
+                        <div className="flex items-start gap-3">
+                          <div 
+                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: (demanda.area_cor || '#ef4444') + '20' }}
+                          >
+                            <FileText 
+                              className="h-4 w-4" 
+                              style={{ color: demanda.area_cor || '#ef4444' }}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                            <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {demanda.status && (
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs h-5"
+                                  style={{ 
+                                    backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                                    borderColor: STATUS_COLORS[demanda.status],
+                                    color: STATUS_COLORS[demanda.status]
+                                  }}
+                                >
+                                  {STATUS_LABELS[demanda.status] || demanda.status}
+                                </Badge>
+                              )}
+                            </div>
+                            {demanda.municipe_nome && (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {demanda.municipe_nome}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2 pt-2 border-t">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs flex-1"
+                            onClick={() => adicionarARota(demanda)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Rota
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs flex-1"
+                            onClick={() => {
+                              setItemSelecionado(demanda);
+                              setClusterSelecionado(null);
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Detalhes
+                          </Button>
+                          {demanda.municipe_telefone && (
+                            <a
+                              href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
+                            >
+                              <Phone className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de Munícipes */}
+              {clusterSelecionado.municipes.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-purple-600">
+                    <Users className="h-4 w-4" />
+                    Munícipes ({clusterSelecionado.municipes.length})
+                  </div>
+                  <div className="space-y-2">
+                    {clusterSelecionado.municipes.map((municipe) => (
+                      <Card key={municipe.id} className="p-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{municipe.nome}</p>
+                            {municipe.telefone && (
+                              <p className="text-xs text-muted-foreground">{municipe.telefone}</p>
+                            )}
+                            {municipe.bairro && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                <MapPin className="h-3 w-3" />
+                                {municipe.bairro}
+                              </p>
+                            )}
+                            {municipe.demandas_count > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {municipe.demandas_count} demanda(s)
+                              </p>
+                            )}
+                            {municipe.tags && municipe.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {municipe.tags.slice(0, 2).map(tag => (
+                                  <Badge 
+                                    key={tag.id} 
+                                    variant="outline"
+                                    className="text-xs h-5"
+                                    style={{
+                                      backgroundColor: (tag.cor || '#6b7280') + '20',
+                                      borderColor: tag.cor || '#6b7280',
+                                    }}
+                                  >
+                                    {tag.nome}
+                                  </Badge>
+                                ))}
+                                {municipe.tags.length > 2 && (
+                                  <Badge variant="outline" className="text-xs h-5">
+                                    +{municipe.tags.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2 pt-2 border-t">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs flex-1"
+                            onClick={() => adicionarARota(municipe)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Rota
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs flex-1"
+                            onClick={() => {
+                              setItemSelecionado(municipe);
+                              setClusterSelecionado(null);
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Detalhes
+                          </Button>
+                          {municipe.telefone && (
+                            <a
+                              href={formatWhatsAppLink(municipe.telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
+                            >
+                              <Phone className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
