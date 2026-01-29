@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,15 +37,28 @@ import {
   CheckCircle2, 
   AlertCircle,
   AlertTriangle,
-  X
+  X,
+  Download,
+  Layers,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDadosEleitorais, encontrarMelhorMatch } from '@/hooks/useDadosEleitorais';
 
+// Interface para camada geográfica
+interface CamadaGeografica {
+  id: string;
+  nome: string;
+  geojson: {
+    features: Array<{
+      properties: Record<string, any>;
+    }>;
+  };
+}
+
 interface VotosUploadProps {
-  camadaId: string;
-  camadaNome: string;
-  regioesDisponiveis: string[]; // Nomes das regiões do GeoJSON
+  camadas: CamadaGeografica[];
+  getFeatureName: (properties: Record<string, any>) => string;
   onComplete?: () => void;
 }
 
@@ -72,20 +85,40 @@ const CARGOS = [
 ];
 
 export function VotosUpload({ 
-  camadaId, 
-  camadaNome, 
-  regioesDisponiveis,
+  camadas,
+  getFeatureName,
   onComplete 
 }: VotosUploadProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [camadaSelecionada, setCamadaSelecionada] = useState<string>('');
   const [eleicao, setEleicao] = useState(ANOS_ELEICAO[0]);
   const [cargo, setCargo] = useState('vereador');
   const [dadosPreview, setDadosPreview] = useState<DadoPreview[]>([]);
   const [fileName, setFileName] = useState('');
+  const [etapa, setEtapa] = useState<'selecao' | 'upload'>('selecao');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { importarDados } = useDadosEleitorais(camadaId);
+  // Hook para importar dados (usa camada selecionada)
+  const { importarDados } = useDadosEleitorais(camadaSelecionada || undefined);
+
+  // Obter regiões da camada selecionada
+  const regioesDisponiveis = useMemo(() => {
+    if (!camadaSelecionada) return [];
+    const camada = camadas.find(c => c.id === camadaSelecionada);
+    if (!camada?.geojson?.features) return [];
+    
+    return camada.geojson.features
+      .map(f => getFeatureName(f.properties))
+      .filter(nome => nome && nome.trim() !== '')
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [camadaSelecionada, camadas, getFeatureName]);
+
+  // Nome da camada selecionada
+  const camadaNome = useMemo(() => {
+    if (!camadaSelecionada) return '';
+    return camadas.find(c => c.id === camadaSelecionada)?.nome || '';
+  }, [camadaSelecionada, camadas]);
 
   // Estatísticas do preview
   const estatisticas = useMemo(() => {
@@ -96,6 +129,18 @@ export function VotosUpload({
 
     return { encontrados, sugestoes, naoEncontrados, totalVotos };
   }, [dadosPreview]);
+
+  // Reset ao abrir
+  useEffect(() => {
+    if (isOpen) {
+      setEtapa('selecao');
+      setCamadaSelecionada('');
+      setDadosPreview([]);
+      setFileName('');
+      setEleicao(ANOS_ELEICAO[0]);
+      setCargo('vereador');
+    }
+  }, [isOpen]);
 
   const resetForm = () => {
     setDadosPreview([]);
@@ -111,7 +156,55 @@ export function VotosUpload({
     setIsOpen(open);
     if (!open) {
       resetForm();
+      setEtapa('selecao');
+      setCamadaSelecionada('');
     }
+  };
+
+  // Gerar e baixar template CSV
+  const handleDownloadTemplate = () => {
+    if (regioesDisponiveis.length === 0) {
+      toast.error('Nenhuma região disponível nesta camada');
+      return;
+    }
+
+    // Criar conteúdo CSV com BOM para UTF-8
+    const bom = '\uFEFF';
+    const header = 'Região;Votos';
+    const rows = regioesDisponiveis.map(regiao => `${regiao};`);
+    const csvContent = bom + [header, ...rows].join('\n');
+
+    // Criar blob e download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Nome do arquivo baseado na camada
+    const nomeArquivo = `template_votos_${camadaNome.toLowerCase().replace(/\s+/g, '_')}.csv`;
+    link.download = nomeArquivo;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Template baixado com ${regioesDisponiveis.length} regiões`);
+  };
+
+  // Avançar para etapa de upload
+  const handleAvancar = () => {
+    if (!camadaSelecionada) {
+      toast.error('Selecione uma camada');
+      return;
+    }
+    setEtapa('upload');
+  };
+
+  // Voltar para seleção
+  const handleVoltar = () => {
+    setEtapa('selecao');
+    resetForm();
   };
 
   // Processar arquivo CSV/Excel
@@ -237,7 +330,7 @@ export function VotosUpload({
 
     try {
       await importarDados.mutateAsync({
-        camadaId,
+        camadaId: camadaSelecionada,
         dados: dadosValidos,
         eleicao,
         cargo,
@@ -246,250 +339,372 @@ export function VotosUpload({
 
       setIsOpen(false);
       resetForm();
+      setEtapa('selecao');
+      setCamadaSelecionada('');
       onComplete?.();
+
     } catch (error) {
-      // Erro já tratado pelo hook
+      console.error('Erro ao importar:', error);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2 w-full">
-          <Vote className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+          <Vote className="h-3 w-3" />
           Importar Votos
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Vote className="h-5 w-5" />
-            Importar Dados de Votação
+            Importar Dados Eleitorais
           </DialogTitle>
           <DialogDescription>
-            Importe uma planilha com votos por região para a camada "{camadaNome}"
+            {etapa === 'selecao' 
+              ? 'Selecione a camada geográfica e baixe o template para preenchimento'
+              : `Importando votos para: ${camadaNome}`
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-          {/* Seletores de Eleição e Cargo */}
-          <div className="grid grid-cols-2 gap-4">
+        {/* ETAPA 1: Seleção de Camada */}
+        {etapa === 'selecao' && (
+          <div className="flex-1 space-y-4 py-4">
+            {/* Seletor de Camada */}
             <div className="space-y-2">
-              <Label>Eleição</Label>
-              <Select value={eleicao} onValueChange={setEleicao}>
+              <Label className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Camada Geográfica
+              </Label>
+              <Select value={camadaSelecionada} onValueChange={setCamadaSelecionada}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione a camada..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {ANOS_ELEICAO.map(ano => (
-                    <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                  ))}
+                  {camadas.length === 0 ? (
+                    <SelectItem value="_empty" disabled>
+                      Nenhuma camada disponível
+                    </SelectItem>
+                  ) : (
+                    camadas.map(camada => (
+                      <SelectItem key={camada.id} value={camada.id}>
+                        {camada.nome} ({camada.geojson?.features?.length || 0} regiões)
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Cargo</Label>
-              <Select value={cargo} onValueChange={setCargo}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CARGOS.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          {/* Upload de Arquivo */}
-          <div className="space-y-2">
-            <Label>Arquivo de Votos</Label>
-            <div 
-              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                dadosPreview.length > 0 
-                  ? 'border-green-500 bg-green-50/50' 
-                  : 'border-muted-foreground/25 hover:border-primary/50'
-              }`}
-            >
-              <input
+            {/* Info da camada selecionada */}
+            {camadaSelecionada && regioesDisponiveis.length > 0 && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  A camada <strong>{camadaNome}</strong> possui{' '}
+                  <strong>{regioesDisponiveis.length} regiões</strong>.
+                  Baixe o template abaixo para garantir que os nomes estejam corretos.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Configurações de Eleição */}
+            {camadaSelecionada && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Ano da Eleição</Label>
+                  <Select value={eleicao} onValueChange={setEleicao}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ANOS_ELEICAO.map(ano => (
+                        <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Cargo</Label>
+                  <Select value={cargo} onValueChange={setCargo}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CARGOS.map(c => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Botão Download Template */}
+            {camadaSelecionada && regioesDisponiveis.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm">Template para Preenchimento</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Baixe a planilha com os nomes das regiões já preenchidos. 
+                      Você só precisa adicionar os votos na segunda coluna.
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2"
+                  onClick={handleDownloadTemplate}
+                >
+                  <Download className="h-4 w-4" />
+                  Baixar Template CSV ({regioesDisponiveis.length} regiões)
+                </Button>
+              </div>
+            )}
+
+            {/* Lista de regiões (preview) */}
+            {camadaSelecionada && regioesDisponiveis.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Regiões na camada (primeiras 10):
+                </Label>
+                <div className="flex flex-wrap gap-1">
+                  {regioesDisponiveis.slice(0, 10).map((regiao, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      {regiao}
+                    </Badge>
+                  ))}
+                  {regioesDisponiveis.length > 10 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{regioesDisponiveis.length - 10} mais
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ETAPA 2: Upload */}
+        {etapa === 'upload' && (
+          <div className="flex-1 space-y-4 py-4 flex flex-col min-h-0">
+            {/* Info resumida */}
+            <div className="flex items-center gap-4 text-sm">
+              <Badge variant="outline" className="gap-1">
+                <Layers className="h-3 w-3" />
+                {camadaNome}
+              </Badge>
+              <Badge variant="outline">{eleicao}</Badge>
+              <Badge variant="outline">
+                {CARGOS.find(c => c.value === cargo)?.label}
+              </Badge>
+            </div>
+
+            {/* Upload de arquivo */}
+            <div className="space-y-2">
+              <Label>Arquivo de Votos</Label>
+              <Input
                 ref={fileInputRef}
                 type="file"
                 accept=".csv,.xlsx,.xls,.txt"
                 onChange={handleFileChange}
-                className="hidden"
-                id="votos-input"
                 disabled={isLoading}
+                className="hidden"
+                id="votos-file-input"
               />
               <label
-                htmlFor="votos-input"
-                className="cursor-pointer flex flex-col items-center gap-2"
+                htmlFor="votos-file-input"
+                className={`
+                  flex flex-col items-center justify-center w-full h-24
+                  border-2 border-dashed rounded-lg cursor-pointer
+                  ${isLoading ? 'bg-muted' : 'hover:bg-muted/50'}
+                  ${fileName ? 'border-green-500 bg-green-50' : 'border-muted-foreground/25'}
+                `}
               >
                 {isLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                ) : fileName ? (
                   <>
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">Processando arquivo...</span>
-                  </>
-                ) : dadosPreview.length > 0 ? (
-                  <>
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">{fileName}</span>
+                    <CheckCircle2 className="h-6 w-6 text-green-600 mb-1" />
+                    <span className="text-sm font-medium">{fileName}</span>
                     <span className="text-xs text-muted-foreground">
-                      Clique para trocar o arquivo
+                      Clique para trocar
                     </span>
                   </>
                 ) : (
                   <>
-                    <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+                    <Upload className="h-6 w-6 text-muted-foreground mb-1" />
                     <span className="text-sm text-muted-foreground">
-                      Clique para selecionar arquivo CSV ou Excel
+                      Clique para enviar arquivo
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      Formato: Nome da região | Votos
+                      CSV ou Excel
                     </span>
                   </>
                 )}
               </label>
             </div>
-          </div>
 
-          {/* Estatísticas do Preview */}
-          {dadosPreview.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              <Badge variant="default" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {estatisticas.encontrados} encontrados
-              </Badge>
-              {estatisticas.sugestoes > 0 && (
-                <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800">
-                  <AlertTriangle className="h-3 w-3" />
-                  {estatisticas.sugestoes} sugestões
+            {/* Estatísticas do Preview */}
+            {dadosPreview.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {estatisticas.encontrados} encontrados
                 </Badge>
-              )}
-              {estatisticas.naoEncontrados > 0 && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {estatisticas.naoEncontrados} não encontrados
+                {estatisticas.sugestoes > 0 && (
+                  <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800">
+                    <AlertTriangle className="h-3 w-3" />
+                    {estatisticas.sugestoes} sugestões
+                  </Badge>
+                )}
+                {estatisticas.naoEncontrados > 0 && (
+                  <Badge variant="destructive" className="gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {estatisticas.naoEncontrados} não encontrados
+                  </Badge>
+                )}
+                <Badge variant="outline" className="gap-1 ml-auto">
+                  🗳️ {estatisticas.totalVotos.toLocaleString('pt-BR')} votos
                 </Badge>
-              )}
-              <Badge variant="outline" className="gap-1 ml-auto">
-                🗳️ {estatisticas.totalVotos.toLocaleString('pt-BR')} votos
-              </Badge>
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Tabela de Preview */}
-          {dadosPreview.length > 0 && (
-            <ScrollArea className="flex-1 border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">Região (Planilha)</TableHead>
-                    <TableHead className="w-[30%]">Match</TableHead>
-                    <TableHead className="text-right">Votos</TableHead>
-                    <TableHead className="w-[80px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dadosPreview.map((item, index) => (
-                    <TableRow key={index} className={
-                      item.status === 'nao_encontrado' ? 'bg-red-50' :
-                      item.status === 'sugestao' ? 'bg-yellow-50' : ''
-                    }>
-                      <TableCell className="font-medium">{item.nome}</TableCell>
-                      <TableCell>
-                        {item.status === 'encontrado' && (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            {item.sugestao}
-                          </span>
-                        )}
-                        {item.status === 'sugestao' && (
-                          <span className="text-yellow-700 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                            {item.sugestao}
-                            <span className="text-xs text-muted-foreground">
-                              ({Math.round((item.similaridade || 0) * 100)}%)
+            {/* Tabela de Preview */}
+            {dadosPreview.length > 0 && (
+              <ScrollArea className="flex-1 border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40%]">Região (Planilha)</TableHead>
+                      <TableHead className="w-[30%]">Match</TableHead>
+                      <TableHead className="text-right">Votos</TableHead>
+                      <TableHead className="w-[80px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dadosPreview.map((item, index) => (
+                      <TableRow key={index} className={
+                        item.status === 'nao_encontrado' ? 'bg-red-50' :
+                        item.status === 'sugestao' ? 'bg-yellow-50' : ''
+                      }>
+                        <TableCell className="font-medium">{item.nome}</TableCell>
+                        <TableCell>
+                          {item.status === 'encontrado' && (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {item.sugestao}
                             </span>
-                          </span>
-                        )}
-                        {item.status === 'nao_encontrado' && (
-                          <span className="text-red-600 flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Não encontrado
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {item.votos.toLocaleString('pt-BR')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
+                          )}
                           {item.status === 'sugestao' && (
+                            <span className="text-yellow-700 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              {item.sugestao}
+                              <span className="text-xs text-muted-foreground">
+                                ({Math.round((item.similaridade || 0) * 100)}%)
+                              </span>
+                            </span>
+                          )}
+                          {item.status === 'nao_encontrado' && (
+                            <span className="text-red-600 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Não encontrado
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {item.votos.toLocaleString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {item.status === 'sugestao' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-green-600"
+                                onClick={() => aceitarSugestao(index)}
+                                title="Aceitar sugestão"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-green-600"
-                              onClick={() => aceitarSugestao(index)}
-                              title="Aceitar sugestão"
+                              className="h-6 w-6 text-red-600"
+                              onClick={() => rejeitarItem(index)}
+                              title="Remover"
                             >
-                              <CheckCircle2 className="h-3 w-3" />
+                              <X className="h-3 w-3" />
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-red-600"
-                            onClick={() => rejeitarItem(index)}
-                            title="Remover"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          )}
-
-          {/* Dica */}
-          {dadosPreview.length === 0 && (
-            <Alert>
-              <FileSpreadsheet className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                <strong>Formato esperado:</strong> A planilha deve ter colunas com o nome da região 
-                (bairro, município, etc.) e a quantidade de votos. O sistema tentará fazer o match 
-                automaticamente com as {regioesDisponiveis.length} regiões da camada.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleConfirm} 
-            disabled={
-              dadosPreview.filter(d => d.status === 'encontrado').length === 0 || 
-              importarDados.isPending
-            }
-          >
-            {importarDados.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Importando...
-              </>
-            ) : (
-              <>
-                <Vote className="h-4 w-4 mr-2" />
-                Importar {estatisticas.encontrados} regiões
-              </>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             )}
-          </Button>
+
+            {/* Dica */}
+            {dadosPreview.length === 0 && (
+              <Alert>
+                <FileSpreadsheet className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Dica:</strong> Use o template baixado na etapa anterior 
+                  para garantir que os nomes das regiões estejam corretos.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {etapa === 'selecao' ? (
+            <>
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAvancar} 
+                disabled={!camadaSelecionada || regioesDisponiveis.length === 0}
+              >
+                Avançar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleVoltar}>
+                Voltar
+              </Button>
+              <Button 
+                onClick={handleConfirm} 
+                disabled={
+                  dadosPreview.filter(d => d.status === 'encontrado').length === 0 || 
+                  importarDados.isPending
+                }
+              >
+                {importarDados.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <Vote className="h-4 w-4 mr-2" />
+                    Importar {estatisticas.encontrados} regiões
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
