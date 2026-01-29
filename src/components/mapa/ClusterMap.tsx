@@ -271,11 +271,14 @@ interface ClusterMapProps {
   mostrarMunicipes?: boolean;
   heatmapVisible?: boolean;
   heatmapType?: 'demandas' | 'municipes' | 'ambos';
-  // Novas props para camadas geográficas
+  // Props para camadas geográficas
   camadasGeograficas?: CamadaGeografica[];
   estatisticasPorRegiao?: Map<string, Map<string, { demandas: number; municipes: number }>>;
   colorirPorDensidade?: boolean;
   onRegiaoClick?: (camadaId: string, feature: any, nomeRegiao: string) => void;
+  // Props para dados eleitorais
+  votosPorCamada?: Map<string, Map<string, number>>;
+  modoVisualizacao?: 'padrao' | 'atendimento' | 'votos' | 'comparativo';
 }
 
 export function ClusterMap({
@@ -293,7 +296,9 @@ export function ClusterMap({
   camadasGeograficas = [],
   estatisticasPorRegiao,
   colorirPorDensidade = false,
-  onRegiaoClick
+  onRegiaoClick,
+  votosPorCamada,
+  modoVisualizacao = 'padrao'
 }: ClusterMapProps) {
   // Calcular centro do mapa baseado nos pontos
   const centroCalculado = useMemo(() => {
@@ -382,6 +387,8 @@ export function ClusterMap({
           opacidade={camada.opacidade}
           nome={camada.nome}
           estatisticas={estatisticasPorRegiao?.get(camada.id)}
+          votosPorRegiao={votosPorCamada?.get(camada.id)}
+          modoVisualizacao={modoVisualizacao}
           colorirPorDensidade={colorirPorDensidade}
           onFeatureClick={(feature, nomeRegiao) => {
             if (onRegiaoClick) {
