@@ -22,7 +22,6 @@ import { Slider } from '@/components/ui/slider';
 import { Upload, Loader2, Map, FileUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import shp from 'shpjs';
 
 interface ShapefileUploadProps {
   onUploadComplete: (geojson: any, nome: string, tipo: string, cor: string, opacidade: number) => void;
@@ -56,8 +55,8 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     if (!file) return;
 
     // Validar extensão
-    if (!file.name.endsWith('.zip')) {
-      toast.error('Por favor, envie um arquivo .zip contendo os arquivos do shapefile');
+    if (!file.name.endsWith('.zip') && !file.name.endsWith('.geojson') && !file.name.endsWith('.json')) {
+      toast.error('Por favor, envie um arquivo .zip (shapefile) ou .geojson');
       return;
     }
 
@@ -65,22 +64,29 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     setFileName(file.name);
 
     try {
-      // Ler o arquivo como ArrayBuffer
-      const arrayBuffer = await file.arrayBuffer();
+      let geoData: any;
       
-      // Converter shapefile para GeoJSON usando shpjs
-      const geojson = await shp(arrayBuffer);
+      // Se for GeoJSON, ler diretamente
+      if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
+        const text = await file.text();
+        geoData = JSON.parse(text);
+      } else {
+        // Se for shapefile (.zip), usar shpjs dinamicamente
+        const shp = (await import('shpjs')).default;
+        const arrayBuffer = await file.arrayBuffer();
+        const geojson = await shp(arrayBuffer);
+        
+        // Se retornou múltiplas camadas, pegar a primeira
+        geoData = Array.isArray(geojson) ? geojson[0] : geojson;
+      }
       
       // Validar se é um GeoJSON válido
-      if (!geojson) {
-        throw new Error('Arquivo shapefile inválido');
+      if (!geoData) {
+        throw new Error('Arquivo inválido');
       }
 
-      // Se retornou múltiplas camadas, pegar a primeira
-      const geoData = Array.isArray(geojson) ? geojson[0] : geojson;
-
       if (!geoData.features || geoData.features.length === 0) {
-        throw new Error('Nenhuma feição encontrada no shapefile');
+        throw new Error('Nenhuma feição encontrada no arquivo');
       }
 
       // Salvar preview
@@ -88,14 +94,14 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
       
       // Sugerir nome baseado no arquivo
       if (!nome) {
-        setNome(file.name.replace('.zip', '').replace(/_/g, ' '));
+        setNome(file.name.replace(/\.(zip|geojson|json)$/i, '').replace(/_/g, ' '));
       }
 
-      toast.success(`${geoData.features.length} feições carregadas do shapefile`);
+      toast.success(`${geoData.features.length} feições carregadas`);
       
     } catch (error: any) {
-      console.error('Erro ao processar shapefile:', error);
-      toast.error('Erro ao processar o shapefile: ' + (error.message || 'Verifique se o arquivo está correto'));
+      console.error('Erro ao processar arquivo:', error);
+      toast.error('Erro ao processar o arquivo: ' + (error.message || 'Verifique se o arquivo está correto'));
       setGeojsonPreview(null);
       setFileName('');
     } finally {
@@ -154,7 +160,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         <div className="space-y-4 py-4">
           {/* Upload de Arquivo */}
           <div className="space-y-2">
-            <Label>Arquivo Shapefile (.zip)</Label>
+            <Label>Arquivo (.zip ou .geojson)</Label>
             <div 
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 geojsonPreview ? 'border-green-500 bg-green-50/50' : 'border-muted-foreground/25 hover:border-primary/50'
@@ -163,7 +169,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".zip"
+                accept=".zip,.geojson,.json"
                 onChange={handleFileChange}
                 className="hidden"
                 id="shapefile-input"
@@ -176,7 +182,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">Processando shapefile...</span>
+                    <span className="text-sm text-muted-foreground">Processando arquivo...</span>
                   </>
                 ) : geojsonPreview ? (
                   <>
@@ -196,7 +202,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
                       Clique para selecionar ou arraste o arquivo
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      Arquivo .zip contendo .shp, .dbf e .shx
+                      Shapefile (.zip) ou GeoJSON (.geojson)
                     </span>
                   </>
                 )}
@@ -283,8 +289,8 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
             <p className="font-medium mb-1">📌 Dica:</p>
             <p>
-              O arquivo .zip deve conter os arquivos .shp, .dbf e .shx.
-              Você pode baixar shapefiles no site do IBGE, TSE ou da prefeitura.
+              Você pode importar um arquivo .zip (shapefile com .shp, .dbf e .shx) ou 
+              diretamente um arquivo .geojson. Baixe shapefiles no site do IBGE, TSE ou da prefeitura.
             </p>
           </div>
         </div>
