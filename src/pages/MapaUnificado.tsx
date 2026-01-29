@@ -372,12 +372,22 @@ export default function MapaUnificado() {
           const estatistica = stats?.get(nome);
           const votosRegiao = votos?.get(nome) || 0;
           
+          // Calcular total baseado no tipoFiltro
+          let total = 0;
+          if (tipoFiltro === 'demandas') {
+            total = estatistica?.demandas || 0;
+          } else if (tipoFiltro === 'municipes') {
+            total = estatistica?.municipes || 0;
+          } else {
+            total = (estatistica?.demandas || 0) + (estatistica?.municipes || 0);
+          }
+          
           return {
             nome,
             demandas: estatistica?.demandas || 0,
             municipes: estatistica?.municipes || 0,
             votos: votosRegiao,
-            total: (estatistica?.demandas || 0) + (estatistica?.municipes || 0)
+            total
           };
         })
         .filter(item => item.total > 0 || item.votos > 0)
@@ -392,7 +402,7 @@ export default function MapaUnificado() {
       console.warn('Erro ao ordenar estatísticas:', err);
       return [];
     }
-  }, [estatisticasPorRegiao, votosPorCamada, modoVisualizacao]);
+  }, [estatisticasPorRegiao, votosPorCamada, modoVisualizacao, tipoFiltro]);
 
   // Handler para upload de shapefile
   const handleShapefileUpload = useCallback((
@@ -1313,14 +1323,18 @@ export default function MapaUnificado() {
                                 {item.votos.toLocaleString('pt-BR')}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="h-5 text-xs gap-0.5">
-                              <FileText className="h-2.5 w-2.5" />
-                              {item.demandas}
-                            </Badge>
-                            <Badge variant="outline" className="h-5 text-xs gap-0.5">
-                              <Users className="h-2.5 w-2.5" />
-                              {item.municipes}
-                            </Badge>
+                            {(tipoFiltro === 'todos' || tipoFiltro === 'demandas') && (
+                              <Badge variant="outline" className="h-5 text-xs gap-0.5">
+                                <FileText className="h-2.5 w-2.5" />
+                                {item.demandas}
+                              </Badge>
+                            )}
+                            {(tipoFiltro === 'todos' || tipoFiltro === 'municipes') && (
+                              <Badge variant="outline" className="h-5 text-xs gap-0.5">
+                                <Users className="h-2.5 w-2.5" />
+                                {item.municipes}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1462,6 +1476,7 @@ export default function MapaUnificado() {
           estatisticasPorRegiao={estatisticasPorRegiao}
           votosPorCamada={votosPorCamada}
           modoVisualizacao={modoVisualizacao}
+          tipoFiltro={tipoFiltro}
           colorirPorDensidade={colorirPorDensidade}
           onRegiaoClick={handleRegiaoClick}
           onDemandaClick={(d) => {
