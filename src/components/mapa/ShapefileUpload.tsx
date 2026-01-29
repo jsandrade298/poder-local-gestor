@@ -19,7 +19,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Upload, Loader2, Map, FileUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, Loader2, Map as MapIcon, FileUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -149,7 +149,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Map className="h-5 w-5" />
+            <MapIcon className="h-5 w-5" />
             Importar Shapefile
           </DialogTitle>
           <DialogDescription>
