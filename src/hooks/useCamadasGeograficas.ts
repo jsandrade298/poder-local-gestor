@@ -30,18 +30,32 @@ export interface NovaCamada {
 export function useCamadasGeograficas() {
   const queryClient = useQueryClient();
 
-  // Buscar todas as camadas
+  // Buscar todas as camadas - com tratamento de erro para tabela inexistente
   const { data: camadas = [], isLoading, error } = useQuery({
     queryKey: ['camadas-geograficas'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('camadas_geograficas')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as CamadaGeografica[];
-    }
+      try {
+        const { data, error } = await supabase
+          .from('camadas_geograficas')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        // Se a tabela não existir, retornar array vazio
+        if (error) {
+          console.warn('Tabela camadas_geograficas não encontrada ou erro:', error.message);
+          return [];
+        }
+        
+        return (data || []) as CamadaGeografica[];
+      } catch (err) {
+        console.warn('Erro ao buscar camadas geográficas:', err);
+        return [];
+      }
+    },
+    // Não mostrar erro se a tabela não existir
+    retry: false,
+    // Retornar array vazio em caso de erro
+    placeholderData: []
   });
 
   // Adicionar nova camada
@@ -67,7 +81,11 @@ export function useCamadasGeograficas() {
     },
     onError: (error: any) => {
       console.error('Erro ao adicionar camada:', error);
-      toast.error('Erro ao importar camada: ' + (error.message || 'Erro desconhecido'));
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        toast.error('Tabela de camadas não configurada. Execute o SQL no Supabase.');
+      } else {
+        toast.error('Erro ao importar camada: ' + (error.message || 'Erro desconhecido'));
+      }
     }
   });
 
@@ -148,11 +166,11 @@ export function useCamadasGeograficas() {
     }
   });
 
-  // Camadas visíveis para renderização
-  const camadasVisiveis = camadas.filter(c => c.visivel);
+  // Camadas visíveis para renderização (com fallback seguro)
+  const camadasVisiveis = Array.isArray(camadas) ? camadas.filter(c => c.visivel) : [];
 
   return {
-    camadas,
+    camadas: Array.isArray(camadas) ? camadas : [],
     camadasVisiveis,
     isLoading,
     error,
