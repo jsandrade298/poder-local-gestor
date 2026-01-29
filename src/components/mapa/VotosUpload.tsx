@@ -59,7 +59,7 @@ interface CamadaGeografica {
 interface VotosUploadProps {
   camadas: CamadaGeografica[];
   getFeatureName: (properties: Record<string, any>) => string;
-  onComplete?: () => void;
+  onComplete?: (camadaId: string, eleicao: string) => void;
 }
 
 interface DadoPreview {
@@ -337,11 +337,17 @@ export function VotosUpload({
         regioesDisponiveis
       });
 
+      // Guardar valores antes de resetar
+      const camadaImportada = camadaSelecionada;
+      const eleicaoImportada = eleicao;
+
       setIsOpen(false);
       resetForm();
       setEtapa('selecao');
       setCamadaSelecionada('');
-      onComplete?.();
+      
+      // Callback com camada e eleição importadas
+      onComplete?.(camadaImportada, eleicaoImportada);
 
     } catch (error) {
       console.error('Erro ao importar:', error);
