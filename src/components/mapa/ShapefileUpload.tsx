@@ -66,18 +66,36 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
     try {
       let geoData: any;
       
-      // Se for GeoJSON, ler diretamente
+      // Se for GeoJSON ou JSON, ler diretamente
       if (file.name.endsWith('.geojson') || file.name.endsWith('.json')) {
         const text = await file.text();
-        geoData = JSON.parse(text);
+        let parsed = JSON.parse(text);
+        
+        // Tratar caso de JSON duplamente escapado (string dentro de string)
+        // Alguns sistemas exportam assim: "{\"type\":\"FeatureCollection\"...}"
+        if (typeof parsed === 'string') {
+          console.log('JSON estava escapado, decodificando...');
+          parsed = JSON.parse(parsed);
+        }
+        
+        geoData = parsed;
       } else {
         // Se for shapefile (.zip), usar shpjs dinamicamente
-        const shp = (await import('shpjs')).default;
-        const arrayBuffer = await file.arrayBuffer();
-        const geojson = await shp(arrayBuffer);
-        
-        // Se retornou múltiplas camadas, pegar a primeira
-        geoData = Array.isArray(geojson) ? geojson[0] : geojson;
+        try {
+          const shp = (await import('shpjs')).default;
+          const arrayBuffer = await file.arrayBuffer();
+          const geojson = await shp(arrayBuffer);
+          
+          // Se retornou múltiplas camadas, pegar a primeira
+          geoData = Array.isArray(geojson) ? geojson[0] : geojson;
+        } catch (shpError: any) {
+          console.error('Erro shpjs:', shpError);
+          // Mensagem mais amigável para erros comuns de shapefile
+          if (shpError.message?.includes('proj4')) {
+            throw new Error('Shapefile sem arquivo de projeção (.prj). Tente converter para GeoJSON primeiro.');
+          }
+          throw new Error('Erro ao processar shapefile. Verifique se o .zip contém .shp, .dbf e .shx válidos.');
+        }
       }
       
       // Validar se é um GeoJSON válido
@@ -85,8 +103,43 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
         throw new Error('Arquivo inválido');
       }
 
-      if (!geoData.features || geoData.features.length === 0) {
+      // Verificar estrutura do GeoJSON
+      if (!geoData.type) {
+        throw new Error('Arquivo não é um GeoJSON válido (falta propriedade "type")');
+      }
+
+      if (!geoData.features) {
+        // Se for uma Feature única, converter para FeatureCollection
+        if (geoData.type === 'Feature') {
+          geoData = {
+            type: 'FeatureCollection',
+            features: [geoData]
+          };
+        } else if (geoData.type === 'GeometryCollection') {
+          // Converter GeometryCollection para FeatureCollection
+          geoData = {
+            type: 'FeatureCollection',
+            features: geoData.geometries.map((geom: any, idx: number) => ({
+              type: 'Feature',
+              properties: { id: idx },
+              geometry: geom
+            }))
+          };
+        } else {
+          throw new Error('Estrutura GeoJSON não reconhecida');
+        }
+      }
+
+      if (geoData.features.length === 0) {
         throw new Error('Nenhuma feição encontrada no arquivo');
+      }
+
+      // Verificar se as coordenadas parecem estar em lat/lng (WGS84)
+      // Coordenadas UTM geralmente têm valores muito altos (> 100000)
+      const firstCoord = getFirstCoordinate(geoData);
+      if (firstCoord && (Math.abs(firstCoord[0]) > 1000 || Math.abs(firstCoord[1]) > 1000)) {
+        console.warn('Coordenadas parecem estar em sistema projetado (UTM), não em lat/lng');
+        toast.warning('Atenção: As coordenadas podem estar em sistema UTM. O mapa pode não exibir corretamente.');
       }
 
       // Salvar preview
@@ -106,6 +159,23 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
       setFileName('');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Função auxiliar para obter primeira coordenada do GeoJSON
+  const getFirstCoordinate = (geoData: any): number[] | null => {
+    try {
+      const feature = geoData.features?.[0];
+      if (!feature?.geometry?.coordinates) return null;
+      
+      let coords = feature.geometry.coordinates;
+      // Navegar até encontrar um par de números
+      while (Array.isArray(coords) && Array.isArray(coords[0])) {
+        coords = coords[0];
+      }
+      return coords;
+    } catch {
+      return null;
     }
   };
 
