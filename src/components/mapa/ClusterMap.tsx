@@ -279,6 +279,8 @@ interface ClusterMapProps {
   // Props para dados eleitorais
   votosPorCamada?: Map<string, Map<string, number>>;
   modoVisualizacao?: 'padrao' | 'atendimento' | 'votos' | 'comparativo';
+  // Filtro de tipo para coloração
+  tipoFiltro?: 'todos' | 'demandas' | 'municipes';
 }
 
 export function ClusterMap({
@@ -298,7 +300,8 @@ export function ClusterMap({
   colorirPorDensidade = false,
   onRegiaoClick,
   votosPorCamada,
-  modoVisualizacao = 'padrao'
+  modoVisualizacao = 'padrao',
+  tipoFiltro = 'todos'
 }: ClusterMapProps) {
   // Calcular centro do mapa baseado nos pontos
   const centroCalculado = useMemo(() => {
@@ -389,6 +392,7 @@ export function ClusterMap({
           estatisticas={estatisticasPorRegiao?.get(camada.id)}
           votosPorRegiao={votosPorCamada?.get(camada.id)}
           modoVisualizacao={modoVisualizacao}
+          tipoFiltro={tipoFiltro}
           colorirPorDensidade={colorirPorDensidade}
           onFeatureClick={(feature, nomeRegiao) => {
             if (onRegiaoClick) {
