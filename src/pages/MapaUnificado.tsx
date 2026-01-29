@@ -5,8 +5,9 @@ import { HeatmapControls } from '@/components/mapa/HeatmapControls';
 import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
 import { EditDemandaDialog } from '@/components/forms/EditDemandaDialog';
 // Nota: Se os modais de Munícipe existirem no projeto, descomente as linhas abaixo:
-import { ViewMunicipeDialog } from '@/components/forms/MunicipeDetailsDialog';
+import { MunicipeDetailsDialog } from '@/components/forms/MunicipeDetailsDialog';
 import { EditMunicipeDialog } from '@/components/forms/EditMunicipeDialog';
+
 import { 
   MapPin, 
   Filter, 
@@ -1413,21 +1414,12 @@ export default function MapaUnificado() {
         }}
       />
 
-      {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
-      { 
+      {/* Modais de Munícipe */}
       <MunicipeDetailsDialog
         municipe={municipeModalId ? municipesRaw.find(m => m.id === municipeModalId) || null : null}
         open={!!municipeModalId}
         onOpenChange={(open) => {
           if (!open) setMunicipeModalId(null);
-        }}
-        onEdit={() => {
-          const municipe = municipesRaw.find(m => m.id === municipeModalId);
-          if (municipe) {
-            setMunicipeParaEditar(municipe);
-            setMunicipeModalId(null);
-            setIsEditMunicipeOpen(true);
-          }
         }}
       />
 
@@ -1441,7 +1433,6 @@ export default function MapaUnificado() {
           }
         }}
       />
-      }
     </div>
   );
 }
