@@ -40,7 +40,7 @@ import {
   Eye,
   EyeOff,
   Palette,
-  Map
+  Map as MapIcon
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -945,7 +945,7 @@ export default function MapaUnificado() {
                     </div>
                   ) : camadas.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
-                      <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <MapIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-xs">Nenhuma camada importada</p>
                       <p className="text-xs">Importe um shapefile para começar</p>
                     </div>
