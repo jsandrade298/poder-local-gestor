@@ -288,14 +288,23 @@ export default function MapaUnificado() {
   const estatisticasPorRegiao = useMemo(() => {
     const stats = new Map<string, Map<string, { demandas: number; municipes: number }>>();
     
+    // Proteção: verificar se camadasVisiveis é um array válido
+    if (!Array.isArray(camadasVisiveis) || camadasVisiveis.length === 0) {
+      return stats;
+    }
+    
     camadasVisiveis.forEach(camada => {
-      if (camada.geojson) {
-        const camadaStats = calcularEstatisticasPorRegiao(
-          camada.geojson,
-          demandasFiltradas,
-          municipesFiltrados
-        );
-        stats.set(camada.id, camadaStats);
+      if (camada?.geojson) {
+        try {
+          const camadaStats = calcularEstatisticasPorRegiao(
+            camada.geojson,
+            demandasFiltradas || [],
+            municipesFiltrados || []
+          );
+          stats.set(camada.id, camadaStats);
+        } catch (err) {
+          console.warn('Erro ao calcular estatísticas para camada:', camada.id, err);
+        }
       }
     });
     
@@ -303,19 +312,26 @@ export default function MapaUnificado() {
   }, [camadasVisiveis, demandasFiltradas, municipesFiltrados]);
 
   // Obter estatísticas ordenadas de uma camada específica
-  const getEstatisticasCamadaOrdenadas = useCallback((camadaId: string) => {
+  const getEstatisticasCamadaOrdenadas = useCallback((camadaId: string | null | undefined) => {
+    if (!camadaId) return [];
+    
     const stats = estatisticasPorRegiao.get(camadaId);
     if (!stats) return [];
     
-    return Array.from(stats.entries())
-      .map(([nome, valores]) => ({
-        nome,
-        demandas: valores.demandas,
-        municipes: valores.municipes,
-        total: valores.demandas + valores.municipes
-      }))
-      .filter(item => item.total > 0)
-      .sort((a, b) => b.total - a.total);
+    try {
+      return Array.from(stats.entries())
+        .map(([nome, valores]) => ({
+          nome,
+          demandas: valores.demandas,
+          municipes: valores.municipes,
+          total: valores.demandas + valores.municipes
+        }))
+        .filter(item => item.total > 0)
+        .sort((a, b) => b.total - a.total);
+    } catch (err) {
+      console.warn('Erro ao ordenar estatísticas:', err);
+      return [];
+    }
   }, [estatisticasPorRegiao]);
 
   // Handler para upload de shapefile
