@@ -6,6 +6,8 @@ import 'leaflet/dist/leaflet.css';
 import { DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
 import { Badge } from '@/components/ui/badge';
 import { Phone, MapPin, FileText, User, ExternalLink } from 'lucide-react';
+import { GeoJSONLayer } from './GeoJSONLayer';
+import { CamadaGeografica } from '@/hooks/useCamadasGeograficas';
 
 // Declaração de tipos para leaflet.heat (carregado via CDN)
 declare global {
@@ -269,6 +271,11 @@ interface ClusterMapProps {
   mostrarMunicipes?: boolean;
   heatmapVisible?: boolean;
   heatmapType?: 'demandas' | 'municipes' | 'ambos';
+  // Novas props para camadas geográficas
+  camadasGeograficas?: CamadaGeografica[];
+  estatisticasPorRegiao?: Map<string, Map<string, { demandas: number; municipes: number }>>;
+  colorirPorDensidade?: boolean;
+  onRegiaoClick?: (camadaId: string, feature: any, nomeRegiao: string) => void;
 }
 
 export function ClusterMap({
@@ -282,7 +289,11 @@ export function ClusterMap({
   mostrarDemandas = true,
   mostrarMunicipes = true,
   heatmapVisible = false,
-  heatmapType = 'demandas'
+  heatmapType = 'demandas',
+  camadasGeograficas = [],
+  estatisticasPorRegiao,
+  colorirPorDensidade = false,
+  onRegiaoClick
 }: ClusterMapProps) {
   // Calcular centro do mapa baseado nos pontos
   const centroCalculado = useMemo(() => {
@@ -361,6 +372,24 @@ export function ClusterMap({
           />
         </LayersControl.BaseLayer>
       </LayersControl>
+
+      {/* Camadas Geográficas (Shapefiles) */}
+      {camadasGeograficas.map(camada => (
+        <GeoJSONLayer
+          key={camada.id}
+          data={camada.geojson}
+          cor={camada.cor_padrao}
+          opacidade={camada.opacidade}
+          nome={camada.nome}
+          estatisticas={estatisticasPorRegiao?.get(camada.id)}
+          colorirPorDensidade={colorirPorDensidade}
+          onFeatureClick={(feature, nomeRegiao) => {
+            if (onRegiaoClick) {
+              onRegiaoClick(camada.id, feature, nomeRegiao);
+            }
+          }}
+        />
+      ))}
 
       {/* Camada de Heatmap */}
       <HeatmapControl 
