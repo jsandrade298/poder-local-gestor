@@ -1138,15 +1138,10 @@ export default function MapaUnificado() {
                     </Select>
 
                     {/* Botão Importar Votos */}
-                    {(camadaSelecionadaStats || camadasVisiveis[0]?.id) && (
+                    {camadas.length > 0 && (
                       <VotosUpload
-                        camadaId={camadaSelecionadaStats || camadasVisiveis[0]?.id}
-                        camadaNome={camadasVisiveis.find(c => c.id === (camadaSelecionadaStats || camadasVisiveis[0]?.id))?.nome || ''}
-                        regioesDisponiveis={
-                          camadasVisiveis
-                            .find(c => c.id === (camadaSelecionadaStats || camadasVisiveis[0]?.id))
-                            ?.geojson?.features?.map((f: any) => getFeatureName(f.properties)) || []
-                        }
+                        camadas={camadas}
+                        getFeatureName={getFeatureName}
                       />
                     )}
 
