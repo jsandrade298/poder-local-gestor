@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { QrCode, Smartphone, CheckCircle, XCircle, RefreshCw, Loader, Send, Wifi, WifiOff } from 'lucide-react';
+import { QrCode, Smartphone, CheckCircle, XCircle, RefreshCw, Loader, Send, Wifi, WifiOff, Settings, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -11,24 +11,26 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface WhatsAppInstance {
+  id?: string;
   name: string;
   displayName: string;
   status: 'connected' | 'disconnected' | 'connecting';
   profileName?: string;
   number?: string;
+  instanceId?: string;
+  instanceToken?: string;
 }
 
 export function WhatsAppManager() {
   const { toast } = useToast();
-  const [instances, setInstances] = useState<WhatsAppInstance[]>([
-    { name: 'gabinete-whats-01', displayName: 'WhatsApp Principal', status: 'disconnected' },
-    { name: 'gabinete-whats-02', displayName: 'WhatsApp Secundário', status: 'disconnected' },
-    { name: 'gabinete-whats-03', displayName: 'WhatsApp Terceiro', status: 'disconnected' }
-  ]);
+  const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(true);
   
   const [qrCodeData, setQrCodeData] = useState<string>('');
   const [currentInstance, setCurrentInstance] = useState<string>('');
@@ -36,6 +38,7 @@ export function WhatsAppManager() {
   const [showQRModal, setShowQRModal] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Form para enviar mensagem
   const [messageForm, setMessageForm] = useState({
@@ -43,6 +46,51 @@ export function WhatsAppManager() {
     phone: '',
     message: ''
   });
+
+  // Carregar instâncias do banco de dados
+  const loadInstancesFromDB = async () => {
+    setLoadingInstances(true);
+    try {
+      const { data: dbInstances, error } = await supabase
+        .from('whatsapp_instances')
+        .select('*')
+        .eq('active', true)
+        .order('display_name');
+
+      if (error) throw error;
+
+      if (dbInstances && dbInstances.length > 0) {
+        const mappedInstances: WhatsAppInstance[] = dbInstances.map(inst => ({
+          id: inst.id,
+          name: inst.instance_name,
+          displayName: inst.display_name,
+          status: (inst.status as 'connected' | 'disconnected' | 'connecting') || 'disconnected',
+          profileName: inst.profile_name || undefined,
+          number: inst.phone_number || undefined,
+          instanceId: inst.instance_id || undefined,
+          instanceToken: inst.instance_token || undefined
+        }));
+        setInstances(mappedInstances);
+      } else {
+        // Criar instância padrão se não existir nenhuma
+        setInstances([{
+          name: 'gabinete-whats-01',
+          displayName: 'WhatsApp Principal (Z-API)',
+          status: 'disconnected'
+        }]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instâncias:', error);
+      // Fallback para instância padrão
+      setInstances([{
+        name: 'gabinete-whats-01',
+        displayName: 'WhatsApp Principal (Z-API)',
+        status: 'disconnected'
+      }]);
+    } finally {
+      setLoadingInstances(false);
+    }
+  };
 
   const callEdgeFunction = async (action: string, instanceName?: string, additionalData?: any) => {
     try {
@@ -74,15 +122,28 @@ export function WhatsAppManager() {
     }
   };
 
-  // Verificar todas as instâncias (chamado manualmente)
+  // Verificar todas as instâncias
   const checkAllInstances = async () => {
     setLoading(prev => ({ ...prev, 'check-all': true }));
+    setErrorMessage('');
     
     try {
       const result = await callEdgeFunction('list_instances');
       
       if (result?.instances) {
         setInstances(prevInstances => {
+          // Se não há instâncias no banco, criar a partir da resposta
+          if (prevInstances.length === 0 && result.instances.length > 0) {
+            return result.instances.map((inst: any) => ({
+              name: inst.instanceName,
+              displayName: inst.displayName,
+              status: inst.status,
+              profileName: inst.profileName,
+              number: inst.number
+            }));
+          }
+          
+          // Atualizar instâncias existentes
           return prevInstances.map(prevInst => {
             const updatedInst = result.instances.find(
               (inst: any) => inst.instanceName === prevInst.name
@@ -102,15 +163,16 @@ export function WhatsAppManager() {
         });
         
         // Contar quantas estão conectadas
-        const connectedCount = result.instances.filter(i => i.status === 'connected').length;
+        const connectedCount = result.instances.filter((i: any) => i.status === 'connected').length;
         const totalCount = result.instances.length;
         
         toast({
           title: 'Status atualizado',
-          description: `${connectedCount} de ${totalCount} instâncias conectadas`,
+          description: `${connectedCount} de ${totalCount} instância(s) conectada(s)`,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Não foi possível verificar as instâncias');
       toast({
         title: 'Erro',
         description: 'Não foi possível verificar as instâncias',
@@ -173,9 +235,12 @@ export function WhatsAppManager() {
   // Conectar instância
   const connectInstance = async (instanceName: string) => {
     setLoading(prev => ({ ...prev, [`connect-${instanceName}`]: true }));
+    setErrorMessage('');
     
     try {
       const result = await callEdgeFunction('connect_instance', instanceName);
+      
+      console.log('Connect result:', result);
       
       if (result?.status === 'connected') {
         // Já está conectado
@@ -196,6 +261,7 @@ export function WhatsAppManager() {
         });
       } else if (result?.qrcode) {
         // Mostrar QR Code
+        console.log('QR Code recebido, tamanho:', result.qrcode.length);
         setQrCodeData(result.qrcode);
         setCurrentInstance(instanceName);
         setShowQRModal(true);
@@ -215,12 +281,15 @@ export function WhatsAppManager() {
           description: `Use este código no WhatsApp: ${result.pairingCode}`,
         });
       } else {
-        throw new Error('Não foi possível obter o QR Code');
+        const errorMsg = result?.error || 'Não foi possível obter o QR Code. Tente novamente.';
+        setErrorMessage(errorMsg);
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
+      console.error('Erro ao conectar:', error);
       toast({
         title: 'Erro ao conectar',
-        description: error.message || 'Verifique a configuração',
+        description: error.message || 'Verifique a configuração da Z-API',
         variant: 'destructive'
       });
     } finally {
@@ -369,7 +438,15 @@ export function WhatsAppManager() {
 
   // Verificar status inicial ao carregar
   useEffect(() => {
-    checkAllInstances();
+    const init = async () => {
+      await loadInstancesFromDB();
+      // Aguardar um pouco e verificar status
+      setTimeout(() => {
+        checkAllInstances();
+      }, 500);
+    };
+    
+    init();
     
     // Limpar polling ao desmontar componente
     return () => {
@@ -401,13 +478,22 @@ export function WhatsAppManager() {
     ));
   };
 
+  if (loadingInstances) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader className="h-8 w-8 animate-spin mr-2" />
+        <span>Carregando instâncias...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <Smartphone className="h-6 w-6" />
-          Gerenciar Instâncias WhatsApp
+          Gerenciar WhatsApp Z-API
         </h2>
         <Button 
           onClick={checkAllInstances} 
@@ -419,15 +505,21 @@ export function WhatsAppManager() {
           ) : (
             <RefreshCw className="h-4 w-4 mr-2" />
           )}
-          Verificar Todas
+          Atualizar Status
         </Button>
       </div>
 
+      {/* Mensagem de erro se houver */}
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
 
-      {/* Grid de Instâncias */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Grid de Instâncias - Apenas uma instância */}
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
         {instances.map((instance) => (
-          <Card key={instance.name} className={instance.status === 'connecting' ? 'border-blue-500' : ''}>
+          <Card key={instance.name} className={`${instance.status === 'connecting' ? 'border-blue-500 border-2' : ''}`}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="text-lg">{instance.displayName}</span>
@@ -448,19 +540,18 @@ export function WhatsAppManager() {
                   </Badge>
                 )}
               </CardTitle>
+              <CardDescription>{instance.name}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">{instance.name}</p>
-                
                 {instance.profileName && (
-                  <div className="text-sm bg-gray-50 p-2 rounded">
+                  <div className="text-sm bg-gray-50 dark:bg-gray-800 p-2 rounded">
                     <strong>Perfil:</strong> {instance.profileName}
                   </div>
                 )}
                 
                 {instance.number && (
-                  <div className="text-sm bg-gray-50 p-2 rounded">
+                  <div className="text-sm bg-gray-50 dark:bg-gray-800 p-2 rounded">
                     <strong>Número:</strong> {instance.number}
                   </div>
                 )}
@@ -490,7 +581,10 @@ export function WhatsAppManager() {
                       {loading[`connect-${instance.name}`] ? (
                         <Loader className="h-4 w-4 animate-spin" />
                       ) : (
-                        'Conectar'
+                        <>
+                          <QrCode className="h-4 w-4 mr-1" />
+                          Conectar
+                        </>
                       )}
                     </Button>
                   ) : instance.status === 'connecting' ? (
@@ -529,14 +623,17 @@ export function WhatsAppManager() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" />
-            Enviar Mensagem
+            Enviar Mensagem de Teste
           </CardTitle>
+          <CardDescription>
+            Envie uma mensagem de teste para verificar se a conexão está funcionando
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <select
             value={messageForm.instance}
             onChange={(e) => setMessageForm(prev => ({ ...prev, instance: e.target.value }))}
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border rounded-md bg-background"
           >
             <option value="">Selecione uma instância conectada</option>
             {instances
@@ -548,6 +645,12 @@ export function WhatsAppManager() {
               ))
             }
           </select>
+          
+          {instances.filter(i => i.status === 'connected').length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma instância conectada. Conecte uma instância acima para enviar mensagens.
+            </p>
+          )}
           
           <Input
             placeholder="Número (com código do país, ex: 5511999999999)"
@@ -581,14 +684,16 @@ export function WhatsAppManager() {
       <Dialog open={showQRModal} onOpenChange={(open) => !open && closeQRModal()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Escaneie o QR Code</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Escaneie o QR Code
+            </DialogTitle>
+            <DialogDescription>
+              Conectando: <strong>{instances.find(i => i.name === currentInstance)?.displayName}</strong>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="flex flex-col items-center space-y-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Conectando: <strong>{instances.find(i => i.name === currentInstance)?.displayName}</strong>
-            </p>
-            
             <div className="relative">
               <div className="bg-white p-4 rounded-lg border-2">
                 {qrCodeData ? (
@@ -596,6 +701,10 @@ export function WhatsAppManager() {
                     src={qrCodeData} 
                     alt="QR Code" 
                     className="w-64 h-64"
+                    onError={(e) => {
+                      console.error('Erro ao carregar imagem do QR Code');
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="w-64 h-64 flex items-center justify-center">
@@ -614,9 +723,17 @@ export function WhatsAppManager() {
               )}
             </div>
             
-            <p className="text-xs text-center text-muted-foreground">
-              Abra o WhatsApp no seu celular, vá em <strong>Dispositivos Conectados</strong> → <strong>Conectar dispositivo</strong> e escaneie o código
-            </p>
+            <div className="text-sm text-center text-muted-foreground space-y-2">
+              <p>
+                Abra o <strong>WhatsApp</strong> no seu celular
+              </p>
+              <p>
+                Vá em <strong>Dispositivos Conectados</strong> → <strong>Conectar dispositivo</strong>
+              </p>
+              <p>
+                Escaneie este código QR
+              </p>
+            </div>
             
             <Button
               onClick={closeQRModal}
