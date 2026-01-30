@@ -7,6 +7,155 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Configuração padrão Z-API (pode ser sobrescrita pela tabela whatsapp_instances)
+const ZAPI_DEFAULT_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
+const ZAPI_DEFAULT_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
+
+/**
+ * Normaliza número de telefone brasileiro para formato Z-API
+ * Formato esperado: 5511999999999 (DDI + DDD + número com 9)
+ */
+function normalizePhone(phone: string): string {
+  let digits = String(phone).replace(/\D/g, "");
+  
+  // Remove código do país se presente
+  if (digits.startsWith("55")) {
+    digits = digits.slice(2);
+  }
+  
+  // Adiciona 9 para celular se necessário (números de 10 dígitos começando com 9, 8 ou 7)
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const numero = digits.slice(2);
+    if (/^[987]/.test(numero)) {
+      digits = ddd + "9" + numero;
+    }
+  }
+  
+  // Retorna com DDI 55
+  return "55" + digits;
+}
+
+/**
+ * Constrói URL da Z-API
+ */
+function buildZApiUrl(instanceId: string, token: string, endpoint: string): string {
+  return `https://api.z-api.io/instances/${instanceId}/token/${token}/${endpoint}`;
+}
+
+/**
+ * Chama endpoint da Z-API
+ */
+async function callZApi(
+  instanceId: string, 
+  token: string, 
+  endpoint: string, 
+  payload: any,
+  method: "GET" | "POST" = "POST"
+): Promise<{ ok: boolean; status: number; body: any; error?: string }> {
+  const url = buildZApiUrl(instanceId, token, endpoint);
+  
+  try {
+    console.log(`🔄 Z-API ${method}: ${endpoint}`);
+    
+    const options: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "Client-Token": token
+      }
+    };
+    
+    if (method === "POST" && payload) {
+      options.body = JSON.stringify(payload);
+    }
+    
+    const response = await fetch(url, options);
+    const text = await response.text();
+    let body: any = text;
+    
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // Mantém como texto
+    }
+    
+    console.log(`📡 Z-API Response: ${response.status}`);
+    
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        body,
+        error: body?.error || body?.message || `HTTP ${response.status}`
+      };
+    }
+    
+    return { ok: true, status: response.status, body };
+    
+  } catch (error: any) {
+    console.error("❌ Erro Z-API:", error);
+    return {
+      ok: false,
+      status: 500,
+      body: null,
+      error: error.message || 'Erro desconhecido'
+    };
+  }
+}
+
+/**
+ * Simula digitação antes de enviar (humanização)
+ * Calcula tempo baseado no tamanho da mensagem
+ */
+async function simulateTyping(
+  instanceId: string, 
+  token: string, 
+  phone: string, 
+  messageLength: number
+): Promise<void> {
+  try {
+    // Calcular tempo de digitação: ~50ms por caractere, mínimo 2s, máximo 8s
+    const typingTimeMs = Math.min(Math.max(messageLength * 50, 2000), 8000);
+    
+    console.log(`⌨️ Simulando digitação por ${typingTimeMs}ms para mensagem de ${messageLength} caracteres`);
+    
+    // Enviar status "digitando"
+    await callZApi(instanceId, token, 'send-typing', { phone, value: true });
+    
+    // Aguardar o tempo calculado
+    await new Promise(resolve => setTimeout(resolve, typingTimeMs));
+    
+    // Parar status "digitando"
+    await callZApi(instanceId, token, 'send-typing', { phone, value: false });
+    
+    // Pequena pausa antes de enviar (simula pessoa conferindo mensagem)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+  } catch (error) {
+    console.warn("⚠️ Erro ao simular digitação (continuando envio):", error);
+  }
+}
+
+/**
+ * Detecta tipo de mídia pelo mimetype ou extensão
+ */
+function detectMediaType(media: any): 'image' | 'video' | 'audio' | 'document' {
+  const mimeType = media.mimetype || media.type || '';
+  const filename = (media.filename || media.fileName || '').toLowerCase();
+  
+  if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/.test(filename)) {
+    return 'image';
+  }
+  if (mimeType.startsWith('video/') || /\.(mp4|avi|mov|webm)$/.test(filename)) {
+    return 'video';
+  }
+  if (mimeType.startsWith('audio/') || /\.(mp3|ogg|wav|m4a|opus)$/.test(filename)) {
+    return 'audio';
+  }
+  return 'document';
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,20 +183,13 @@ serve(async (req) => {
       customMessages = {},
     } = requestData;
 
-    console.log("=== INICIANDO ENVIO WHATSAPP ===");
+    console.log("=== INICIANDO ENVIO WHATSAPP VIA Z-API ===");
     console.log("Instância:", instanceName);
     console.log("Total telefones:", telefones.length);
     console.log("Incluir todos:", incluirTodos);
     console.log("Mídias:", mediaFiles.length);
 
     // Validações
-    if (!instanceName) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Instância WhatsApp é obrigatória" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     if (!mensagem && mediaFiles.length === 0 && Object.keys(customMessages).length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: "Envie uma mensagem ou arquivo de mídia" }),
@@ -55,29 +197,31 @@ serve(async (req) => {
       );
     }
 
-    // Buscar configuração da instância
-    const { data: instance, error: instErr } = await supabase
-      .from("whatsapp_instances")
-      .select("*")
-      .eq("instance_name", instanceName)
-      .eq("active", true)
-      .single();
+    // Buscar configuração da instância (ou usar padrão)
+    let instanceId = ZAPI_DEFAULT_INSTANCE_ID;
+    let token = ZAPI_DEFAULT_TOKEN;
 
-    if (instErr || !instance) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Instância ${instanceName} não encontrada ou inativa`
-        }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (instanceName) {
+      const { data: instance } = await supabase
+        .from("whatsapp_instances")
+        .select("*")
+        .eq("instance_name", instanceName)
+        .eq("active", true)
+        .single();
+
+      if (instance) {
+        instanceId = instance.instance_id || instanceId;
+        token = instance.instance_token || token;
+        console.log("✅ Usando instância do banco:", instance.display_name);
+      } else {
+        console.log("⚠️ Instância não encontrada, usando configuração padrão");
+      }
     }
 
-    console.log("Instância encontrada:", instance.display_name);
-    console.log("Instance ID:", instance.instance_id);
+    console.log("Instance ID:", instanceId);
 
     // Montar lista de telefones
-    let phoneList = [...telefones];
+    let phoneList: string[] = [];
     
     if (incluirTodos) {
       const { data: municipes } = await supabase
@@ -88,6 +232,8 @@ serve(async (req) => {
       if (municipes) {
         phoneList = municipes.map(m => m.telefone).filter(Boolean);
       }
+    } else {
+      phoneList = telefones.map((t: any) => typeof t === 'object' ? t.telefone : t).filter(Boolean);
     }
     
     // Remover duplicatas
@@ -100,81 +246,25 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Enviando para ${phoneList.length} números`);
+    console.log(`📱 Total de números para envio: ${phoneList.length}`);
 
-    const results = [];
+    const results: any[] = [];
     let successCount = 0;
     let errorCount = 0;
 
-    // Headers para Evolution API
-    const apiHeaders = {
-      'Content-Type': 'application/json',
-      'apikey': instance.instance_token,
-    };
-    
-    console.log('API URL:', instance.api_url);
-    console.log('Instance ID:', instance.instance_id);
-    console.log('Token configurado:', instance.instance_token ? 'Sim' : 'Não');
-
-    // Função auxiliar para converter formatos de áudio
-    const convertAudioFormat = (mimeType: string): string => {
-      const audioMap: Record<string, string> = {
-        'audio/x-m4a': 'audio/mp4',
-        'audio/m4a': 'audio/mp4',
-        'audio/mp4a-latm': 'audio/mp4',
-        'audio/aac': 'audio/aac',
-        'audio/mpeg': 'audio/mpeg',
-        'audio/ogg': 'audio/ogg',
-        'audio/wav': 'audio/wav',
-        'audio/webm': 'audio/webm'
-      };
-      
-      return audioMap[mimeType] || mimeType;
-    };
-
-    // Função para normalizar número brasileiro
-    const normalizePhone = (phone) => {
-      let digits = String(phone).replace(/\D/g, "");
-      
-      // Remove código do país se presente
-      if (digits.startsWith("55")) {
-        digits = digits.slice(2);
-      }
-      
-      // Adiciona 9 para celular se necessário
-      if (digits.length === 10) {
-        const ddd = digits.slice(0, 2);
-        const numero = digits.slice(2);
-        if (/^[987]/.test(numero)) {
-          digits = ddd + "9" + numero;
-        }
-      }
-      
-      // Adiciona código do país
-      return "55" + digits;
-    };
-
     // Processar cada telefone
     for (let i = 0; i < phoneList.length; i++) {
-      // Se phoneList contém objetos, extrair o telefone
-      const telefoneItem = phoneList[i];
-      const rawPhone = typeof telefoneItem === 'object' ? telefoneItem.telefone : telefoneItem;
+      const rawPhone = phoneList[i];
       const normalizedPhone = normalizePhone(rawPhone);
       
-      console.log(`\n📱 [${i + 1}/${phoneList.length}] Processando: ${normalizedPhone}`);
+      console.log(`\n📱 [${i + 1}/${phoneList.length}] Processando: ${rawPhone} → ${normalizedPhone}`);
       
-      // IMPORTANTE: Aplicar delay ANTES de processar (exceto no primeiro)
+      // Delay entre envios (exceto no primeiro)
       if (i > 0) {
-        // Calcular delay aleatório entre min e max
         const delaySeconds = Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo;
         const delayMs = Math.round(delaySeconds * 1000);
-        
-        console.log(`⏳ Aguardando ${delayMs}ms (${delaySeconds.toFixed(1)}s) antes do próximo envio...`);
-        
-        // Aguardar o delay configurado
+        console.log(`⏳ Aguardando ${(delayMs/1000).toFixed(1)}s antes do próximo envio...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        
-        console.log('✅ Delay concluído, enviando próxima mensagem...');
       }
       
       try {
@@ -183,272 +273,73 @@ serve(async (req) => {
         
         // Enviar mídias se houver
         for (const media of mediaFiles) {
-          // Delay entre mídias (exceto na primeira)
           if (mediaIndex > 0) {
-            const mediaDelay = 1000; // 1 segundo entre mídias
-            console.log(`⏱️ Aguardando ${mediaDelay}ms entre mídias...`);
-            await new Promise(r => setTimeout(r, mediaDelay));
+            await new Promise(r => setTimeout(r, 1000));
           }
           
-          // Compatibilidade: suporte tanto para 'mimetype' quanto para 'type'
-          // Se não tem mimetype mas tem type, construir mimetype baseado no type e filename
-          let mimeType = media.mimetype;
-          if (!mimeType && media.type) {
-            if (media.type === 'video') {
-              mimeType = 'video/mp4'; // default para vídeos
-              if (media.filename) {
-                if (media.filename.toLowerCase().includes('.webm')) mimeType = 'video/webm';
-                else if (media.filename.toLowerCase().includes('.avi')) mimeType = 'video/avi';
-                else if (media.filename.toLowerCase().includes('.mov')) mimeType = 'video/quicktime';
-              }
-            } else if (media.type === 'image') {
-              mimeType = 'image/jpeg'; // default para imagens
-              if (media.filename) {
-                if (media.filename.toLowerCase().includes('.png')) mimeType = 'image/png';
-                else if (media.filename.toLowerCase().includes('.gif')) mimeType = 'image/gif';
-                else if (media.filename.toLowerCase().includes('.webp')) mimeType = 'image/webp';
-              }
-            } else if (media.type === 'audio') {
-              mimeType = 'audio/mp3'; // default para áudios
-              if (media.filename) {
-                if (media.filename.toLowerCase().includes('.ogg')) mimeType = 'audio/ogg';
-                else if (media.filename.toLowerCase().includes('.wav')) mimeType = 'audio/wav';
-                else if (media.filename.toLowerCase().includes('.m4a')) mimeType = 'audio/mp4';
-              }
-            }
-          }
-          if (!mimeType) {
-            mimeType = 'application/octet-stream';
-          }
-          console.log(`📎 Enviando mídia ${mimeType} (${mediaIndex + 1}/${mediaFiles.length})`);
-          console.log(`📋 Dados da mídia:`, { 
-            type: media.type, 
-            mimetype: media.mimetype, 
-            filename: media.filename, 
-            url: media.url ? 'presente' : 'ausente',
-            data: media.data ? 'presente' : 'ausente'
-          });
+          const mediaType = detectMediaType(media);
+          console.log(`📎 Enviando ${mediaType} (${mediaIndex + 1}/${mediaFiles.length})`);
           
-          // Se media tem URL, baixar o arquivo primeiro
-          let mediaData = media.data;
-          if (media.url && !mediaData) {
-            console.log(`📥 Baixando arquivo de: ${media.url}`);
-            try {
-              const response = await fetch(media.url);
-              if (!response.ok) {
-                throw new Error(`Erro ao baixar arquivo: ${response.status}`);
+          let endpoint: string;
+          let payload: any = { phone: normalizedPhone };
+          const mediaData = media.url || media.data || media.media;
+          
+          switch (mediaType) {
+            case 'image':
+              endpoint = 'send-image';
+              payload.image = mediaData;
+              if (!messageSent) {
+                const caption = customMessages[rawPhone] || mensagem;
+                if (caption) {
+                  payload.caption = caption;
+                  messageSent = true;
+                }
               }
-              const arrayBuffer = await response.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              // Converter para base64
-              let binary = '';
-              uint8Array.forEach(byte => binary += String.fromCharCode(byte));
-              mediaData = btoa(binary);
-              console.log(`✅ Arquivo baixado e convertido para base64 (${mediaData.length} caracteres)`);
-              console.log(`📊 Tamanho do arquivo: ${arrayBuffer.byteLength} bytes`);
-            } catch (error) {
-              console.error(`❌ Erro ao baixar arquivo:`, error);
-              errorCount++;
-              results.push({
-                telefone: rawPhone,
-                tipo: 'media',
-                status: 'erro',
-                erro: `Erro ao baixar arquivo: ${error.message}`
-              });
-              continue;
-            }
+              break;
+              
+            case 'video':
+              endpoint = 'send-video';
+              payload.video = mediaData;
+              if (!messageSent) {
+                const caption = customMessages[rawPhone] || mensagem;
+                if (caption) {
+                  payload.caption = caption;
+                  messageSent = true;
+                }
+              }
+              break;
+              
+            case 'audio':
+              endpoint = 'send-audio';
+              payload.audio = mediaData;
+              break;
+              
+            default:
+              endpoint = 'send-document/pdf';
+              payload.document = mediaData;
+              payload.fileName = media.filename || media.fileName || 'documento.pdf';
+              break;
           }
           
-          if (!mediaData) {
-            console.error(`❌ Dados de mídia não encontrados`);
-            errorCount++;
+          const resp = await callZApi(instanceId, token, endpoint, payload);
+          
+          if (resp.ok) {
+            console.log(`✅ ${mediaType} enviado com sucesso`);
+            successCount++;
             results.push({
               telefone: rawPhone,
-              tipo: 'media',
-              status: 'erro',
-              erro: 'Dados de mídia não encontrados'
+              tipo: mediaType,
+              status: 'sucesso',
+              zapiId: resp.body?.zapiId
             });
-            continue;
-          }
-          
-          // Detectar tipo de mídia pelo mimetype/type
-          let mediaType = 'document'; // padrão
-          if (mimeType.startsWith('image/')) {
-            mediaType = 'image';
-          } else if (mimeType.startsWith('video/')) {
-            mediaType = 'video';
-          } else if (mimeType.startsWith('audio/')) {
-            mediaType = 'audio';
-          }
-          
-          console.log(`🎯 DETECÇÃO DE TIPO:`);
-          console.log(`   mimeType: ${mimeType}`);
-          console.log(`   mediaType detectado: ${mediaType}`);
-          console.log(`   filename: ${media.filename}`);
-          console.log(`   Vai para o branch: ${mediaType === 'video' ? 'VIDEO (correto)' : mediaType === 'document' ? 'DOCUMENT (errado para video)' : mediaType}`);
-          
-          try {
-            if (mediaType === 'audio') {
-              // Tratamento especial para áudio
-              const audioUrl = `${instance.api_url}/message/sendWhatsAppAudio/${instance.instance_id}`;
-              
-              // Detectar formato correto do áudio
-              if (media.filename && (media.filename.endsWith('.m4a') || media.filename.includes('m4a'))) {
-                console.log('🎵 Detectado arquivo M4A, tratando como audio/mp4');
-              }
-              
-              const audioPayload = {
-                number: normalizedPhone,
-                audio: mediaData, // Enviar só o base64 sem prefixo
-                encoding: true,
-                delay: 1200
-              };
-              
-              const audioResponse = await fetch(audioUrl, {
-                method: 'POST',
-                headers: apiHeaders,
-                body: JSON.stringify(audioPayload)
-              });
-              
-              const audioResult = await audioResponse.text();
-              console.log('Resposta do envio de áudio:', audioResult);
-              
-              if (audioResponse.ok) {
-                console.log('✅ Áudio enviado com sucesso');
-                successCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: 'audio',
-                  status: 'sucesso',
-                  mensagem: 'Áudio enviado'
-                });
-              } else {
-                console.error('❌ Erro ao enviar áudio:', audioResult);
-                errorCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: 'audio',
-                  status: 'erro',
-                  erro: `Erro no áudio: ${audioResponse.status}`
-                });
-              }
-            } else if (mediaType === 'document') {
-              // Documentos (PDF, DOC, etc)
-              const docUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
-              const docPayload = {
-                number: normalizedPhone,
-                mediatype: 'document',
-                media: mediaData, // Usar dados baixados
-                fileName: media.filename || 'documento.pdf',
-                delay: 1200
-              };
-              
-              if (!messageSent && mensagem) {
-                docPayload.caption = mensagem;
-                messageSent = true;
-              }
-              
-              const docResponse = await fetch(docUrl, {
-                method: 'POST',
-                headers: apiHeaders,
-                body: JSON.stringify(docPayload)
-              });
-              
-              if (docResponse.ok) {
-                console.log('✅ Documento enviado com sucesso');
-                successCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: 'document',
-                  status: 'sucesso',
-                  mensagem: 'Documento enviado'
-                });
-              } else {
-                errorCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: 'document',
-                  status: 'erro',
-                  erro: `Erro no documento: ${docResponse.status}`
-                });
-              }
-            } else {
-              // Imagens e vídeos
-              const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
-              
-              // Para vídeos, usar endpoint específico se necessário
-              let finalUrl = mediaUrl;
-              let finalPayload = {
-                number: normalizedPhone,
-                mediatype: mediaType,
-                media: mediaData, // Usar dados baixados
-                delay: 1200
-              };
-              
-              // Tratamento especial para vídeos grandes ou específicos
-              if (mediaType === 'video') {
-                console.log(`🎬 Enviando vídeo - mimetype: ${mimeType}, filename: ${media.filename}`);
-                
-                // Para alguns tipos de vídeo, pode ser necessário especificar o formato
-                if (media.filename) {
-                  finalPayload.fileName = media.filename;
-                }
-                
-                // Garantir que vídeos sejam enviados como mídia visual
-                finalPayload.mediatype = 'video';
-              }
-              
-               // Adicionar caption na primeira mídia visual
-               const mensagemParaEnviar = customMessages[rawPhone] || mensagem || '';
-               if (!messageSent && mensagemParaEnviar && (mediaType === 'image' || mediaType === 'video')) {
-                 finalPayload.caption = mensagemParaEnviar;
-                 messageSent = true;
-               }
-              
-              console.log(`📤 Enviando ${mediaType} para ${normalizedPhone}`, {
-                url: finalUrl,
-                mediatype: finalPayload.mediatype,
-                hasCaption: !!finalPayload.caption,
-                dataSize: mediaData.length
-              });
-              
-              const mediaResponse = await fetch(finalUrl, {
-                method: 'POST',
-                headers: apiHeaders,
-                body: JSON.stringify(finalPayload)
-              });
-              
-              const responseText = await mediaResponse.text();
-              console.log(`📱 Resposta da API (${mediaResponse.status}):`, responseText);
-              
-              if (mediaResponse.ok) {
-                console.log(`✅ ${mediaType} enviado com sucesso`);
-                successCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: mediaType,
-                  status: 'sucesso',
-                  mensagem: `${mediaType} enviado`
-                });
-              } else {
-                console.error(`❌ Erro ao enviar ${mediaType}:`, responseText);
-                errorCount++;
-                results.push({
-                  telefone: rawPhone,
-                  tipo: mediaType,
-                  status: 'erro',
-                  erro: `Erro na ${mediaType}: ${mediaResponse.status} - ${responseText}`
-                });
-              }
-            }
-          } catch (mediaError) {
-            console.error(`❌ Erro ao processar mídia ${mediaType}:`, mediaError);
+          } else {
+            console.error(`❌ Erro ao enviar ${mediaType}: ${resp.error}`);
             errorCount++;
             results.push({
               telefone: rawPhone,
               tipo: mediaType,
               status: 'erro',
-              erro: mediaError.message
+              erro: resp.error
             });
           }
           
@@ -458,74 +349,47 @@ serve(async (req) => {
         // Enviar texto se houver e ainda não foi enviado como caption
         const mensagemParaEnviar = customMessages[rawPhone] || mensagem || '';
         if (mensagemParaEnviar && !messageSent) {
-          // Pequeno delay se já enviou mídia
           if (mediaFiles.length > 0) {
             await new Promise(r => setTimeout(r, 1000));
           }
           
           console.log('💬 Enviando mensagem de texto');
-          console.log('Custom messages disponíveis:', Object.keys(customMessages));
-          console.log('Telefone atual:', rawPhone);
-          console.log('Mensagem personalizada:', customMessages[rawPhone]);
-          console.log('Mensagem final:', mensagemParaEnviar);
           
-          const textUrl = `${instance.api_url}/message/sendText/${instance.instance_id}`;
-          console.log('URL da API:', textUrl);
-          console.log('Headers da API:', JSON.stringify(apiHeaders, null, 2));
-          console.log('Payload:', JSON.stringify({
-            number: normalizedPhone,
-            text: mensagemParaEnviar,
-            linkPreview: false,
-            delay: 1200
-          }, null, 2));
+          // 🎯 SIMULAR DIGITAÇÃO ANTES DE ENVIAR
+          await simulateTyping(instanceId, token, normalizedPhone, mensagemParaEnviar.length);
           
-          const textResponse = await fetch(textUrl, {
-            method: 'POST',
-            headers: apiHeaders,
-            body: JSON.stringify({
-              number: normalizedPhone,
-              text: mensagemParaEnviar,
-              linkPreview: false,
-              delay: 1200
-            })
-          });
+          const resp = await callZApi(
+            instanceId, 
+            token, 
+            'send-text',
+            {
+              phone: normalizedPhone,
+              message: mensagemParaEnviar
+            }
+          );
           
-          const responseText = await textResponse.text();
-          console.log('Status da resposta:', textResponse.status);
-          console.log('Resposta completa da API:', responseText);
-          
-          if (textResponse.ok) {
+          if (resp.ok) {
             console.log('✅ Texto enviado com sucesso');
             successCount++;
             results.push({
               telefone: rawPhone,
               tipo: 'texto',
               status: 'sucesso',
-              mensagem: 'Texto enviado'
+              zapiId: resp.body?.zapiId
             });
           } else {
-            console.error('❌ Erro ao enviar texto:', responseText);
+            console.error('❌ Erro ao enviar texto:', resp.error);
             errorCount++;
             results.push({
               telefone: rawPhone,
               tipo: 'texto',
               status: 'erro',
-              erro: `Erro no texto: ${textResponse.status} - ${responseText}`
+              erro: resp.error
             });
           }
         }
         
-        // Se não teve mensagem nem mídia mas chegou aqui, registrar como processado
-        if (!mensagemParaEnviar && mediaFiles.length === 0) {
-          results.push({
-            telefone: rawPhone,
-            status: 'erro',
-            erro: 'Nenhum conteúdo para enviar'
-          });
-          errorCount++;
-        }
-        
-      } catch (error) {
+      } catch (error: any) {
         console.error(`❌ Erro geral ao enviar para ${rawPhone}:`, error);
         errorCount++;
         results.push({
@@ -536,7 +400,9 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Envio concluído: ${successCount} sucessos, ${errorCount} erros`);
+    console.log(`\n📊 === RESUMO ===`);
+    console.log(`✅ Sucessos: ${successCount}`);
+    console.log(`❌ Erros: ${errorCount}`);
 
     return new Response(
       JSON.stringify({
@@ -554,17 +420,11 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
-    console.error("Erro na função:", error);
+  } catch (error: any) {
+    console.error("💥 Erro na função:", error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message 
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
