@@ -7,10 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
-// Configuração padrão Z-API - Altere para suas credenciais
-const ZAPI_DEFAULT_INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID') || "3E6B64573148D1AB699D4A0A02232B3D";
-const ZAPI_DEFAULT_TOKEN = Deno.env.get('ZAPI_TOKEN') || "8FBCD627DCF04CA3F24CD5EC";
-const ZAPI_DEFAULT_CLIENT_TOKEN = Deno.env.get('ZAPI_CLIENT_TOKEN') || "";
+// Configuração Z-API - Suas credenciais
+const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
+const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
+const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
 
 /**
  * Constrói URL da Z-API
@@ -37,12 +37,8 @@ async function callZApi(
     
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "Client-Token": clientToken || ZAPI_CLIENT_TOKEN
     };
-    
-    // Adicionar Client-Token se disponível (necessário para algumas operações)
-    if (clientToken) {
-      headers["Client-Token"] = clientToken;
-    }
     
     const options: RequestInit = {
       method,
@@ -114,6 +110,30 @@ serve(async (req) => {
     console.log('Action:', action);
     console.log('Instance:', instanceName);
 
+    // Usar credenciais padrão
+    let instanceId = ZAPI_INSTANCE_ID;
+    let token = ZAPI_TOKEN;
+    let clientToken = ZAPI_CLIENT_TOKEN;
+    let instanceConfig: any = null;
+
+    // Buscar configuração da instância no banco (se existir)
+    if (instanceName) {
+      const { data: config } = await supabase
+        .from('whatsapp_instances')
+        .select('*')
+        .eq('instance_name', instanceName)
+        .single();
+
+      if (config) {
+        instanceConfig = config;
+        instanceId = config.instance_id || instanceId;
+        token = config.instance_token || token;
+        clientToken = config.client_token || clientToken;
+      }
+    }
+
+    console.log('Instance ID:', instanceId);
+
     // ========== LISTAR INSTÂNCIAS ==========
     if (action === 'list_instances') {
       try {
@@ -122,75 +142,46 @@ serve(async (req) => {
           .select('*')
           .eq('active', true);
 
-        if (!dbInstances || dbInstances.length === 0) {
-          // Se não há instâncias no banco, usar a padrão e verificar status
-          const resp = await callZApi(ZAPI_DEFAULT_INSTANCE_ID, ZAPI_DEFAULT_TOKEN, 'status');
-          
-          if (resp.ok && resp.data) {
-            return new Response(
-              JSON.stringify({ 
-                instances: [{
-                  instanceName: 'gabinete-whats-01',
-                  displayName: 'WhatsApp Principal (Z-API)',
-                  status: resp.data.connected ? 'connected' : 'disconnected',
-                  profileName: resp.data.name,
-                  number: resp.data.phone
-                }]
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+        // Verificar status da instância padrão
+        const resp = await callZApi(instanceId, token, 'status', 'GET', null, clientToken);
+        
+        if (resp.ok && resp.data) {
+          const instanceStatus = {
+            instanceName: dbInstances?.[0]?.instance_name || 'gabinete-whats-01',
+            displayName: dbInstances?.[0]?.display_name || 'WhatsApp Principal (Z-API)',
+            status: resp.data.connected ? 'connected' : 'disconnected',
+            profileName: resp.data.name,
+            number: resp.data.phone
+          };
+
+          // Atualizar no banco se existir
+          if (dbInstances && dbInstances.length > 0) {
+            await supabase
+              .from('whatsapp_instances')
+              .update({ 
+                status: resp.data.connected ? 'connected' : 'disconnected',
+                profile_name: resp.data.name || null,
+                phone_number: resp.data.phone || null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', dbInstances[0].id);
           }
-          
+
           return new Response(
-            JSON.stringify({ instances: [] }),
+            JSON.stringify({ instances: [instanceStatus] }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
-        // Verificar status de cada instância
-        const instancesWithStatus = await Promise.all(
-          dbInstances.map(async (dbInst) => {
-            const instId = dbInst.instance_id || ZAPI_DEFAULT_INSTANCE_ID;
-            const instToken = dbInst.instance_token || ZAPI_DEFAULT_TOKEN;
-            
-            try {
-              const resp = await callZApi(instId, instToken, 'status');
-              
-              if (resp.ok && resp.data) {
-                // Atualizar status no banco
-                await supabase
-                  .from('whatsapp_instances')
-                  .update({ 
-                    status: resp.data.connected ? 'connected' : 'disconnected',
-                    profile_name: resp.data.name || null,
-                    phone_number: resp.data.phone || null,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', dbInst.id);
-                
-                return {
-                  instanceName: dbInst.instance_name,
-                  displayName: dbInst.display_name,
-                  status: resp.data.connected ? 'connected' : 'disconnected',
-                  profileName: resp.data.name,
-                  number: resp.data.phone,
-                  smartphoneConnected: resp.data.smartphoneConnected
-                };
-              }
-            } catch (e) {
-              console.error(`Erro ao verificar ${dbInst.instance_name}:`, e);
-            }
-            
-            return {
-              instanceName: dbInst.instance_name,
-              displayName: dbInst.display_name,
-              status: 'disconnected'
-            };
-          })
-        );
-
+        
         return new Response(
-          JSON.stringify({ instances: instancesWithStatus }),
+          JSON.stringify({ 
+            instances: [{
+              instanceName: 'gabinete-whats-01',
+              displayName: 'WhatsApp Principal (Z-API)',
+              status: 'disconnected'
+            }],
+            error: resp.error
+          }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
         
@@ -203,37 +194,12 @@ serve(async (req) => {
       }
     }
 
-    // Buscar configuração da instância ou usar padrão
-    let instanceId = ZAPI_DEFAULT_INSTANCE_ID;
-    let token = ZAPI_DEFAULT_TOKEN;
-    let clientToken = ZAPI_DEFAULT_CLIENT_TOKEN;
-    let instanceConfig: any = null;
-
-    if (instanceName) {
-      const { data: config } = await supabase
-        .from('whatsapp_instances')
-        .select('*')
-        .eq('instance_name', instanceName)
-        .single();
-
-      if (config) {
-        instanceConfig = config;
-        instanceId = config.instance_id || instanceId;
-        token = config.instance_token || token;
-        // O client_token pode ser armazenado no campo api_url ou em um campo separado
-        clientToken = config.client_token || clientToken;
-      }
-    }
-
-    console.log('Instance ID:', instanceId);
-    console.log('Has Client Token:', !!clientToken);
-
     let result: any;
 
     switch (action) {
       // ========== STATUS DA INSTÂNCIA ==========
       case 'instance_status': {
-        const resp = await callZApi(instanceId, token, 'status');
+        const resp = await callZApi(instanceId, token, 'status', 'GET', null, clientToken);
         
         if (resp.ok && resp.data) {
           const isConnected = resp.data.connected === true;
@@ -269,7 +235,7 @@ serve(async (req) => {
       // ========== CONECTAR (OBTER QR CODE) ==========
       case 'connect_instance': {
         // Verificar se já está conectado
-        const statusResp = await callZApi(instanceId, token, 'status');
+        const statusResp = await callZApi(instanceId, token, 'status', 'GET', null, clientToken);
         
         if (statusResp.ok && statusResp.data?.connected === true) {
           result = {
@@ -282,28 +248,26 @@ serve(async (req) => {
           break;
         }
 
-        // CORREÇÃO: Usar endpoint correto da Z-API para QR Code
-        // Tentar primeiro o endpoint qr-code/image que retorna base64
-        console.log('🔄 Tentando obter QR Code via qr-code/image...');
-        let qrResp = await callZApi(instanceId, token, 'qr-code/image');
+        // Obter QR Code como imagem base64
+        console.log('🔄 Obtendo QR Code via qr-code/image...');
+        const qrResp = await callZApi(instanceId, token, 'qr-code/image', 'GET', null, clientToken);
+        
+        console.log('QR Response:', JSON.stringify(qrResp, null, 2));
         
         if (qrResp.ok && qrResp.data) {
-          // A Z-API pode retornar o QR em diferentes formatos
           let qrBase64 = '';
           
+          // A Z-API retorna o QR em diferentes formatos possíveis
           if (qrResp.data.value) {
-            // Formato: { value: "base64string" }
             qrBase64 = qrResp.data.value;
           } else if (qrResp.data.qrcode) {
-            // Formato: { qrcode: "base64string" }
             qrBase64 = qrResp.data.qrcode;
-          } else if (typeof qrResp.data === 'string') {
-            // Retornou direto a string base64
+          } else if (typeof qrResp.data === 'string' && qrResp.data.length > 100) {
             qrBase64 = qrResp.data;
           }
           
           if (qrBase64) {
-            // Garantir que está no formato data:image
+            // Garantir formato data:image
             const formattedQr = qrBase64.startsWith('data:image') 
               ? qrBase64 
               : `data:image/png;base64,${qrBase64}`;
@@ -330,73 +294,32 @@ serve(async (req) => {
           }
         }
         
-        // Se não conseguiu com qr-code/image, tentar com qr-code (retorna texto do QR)
-        console.log('🔄 Tentando endpoint alternativo qr-code...');
-        const qrTextResp = await callZApi(instanceId, token, 'qr-code');
+        // Se não conseguiu, tentar restart e depois QR novamente
+        console.log('🔄 Tentando restart da instância...');
+        await callZApi(instanceId, token, 'restart', 'POST', null, clientToken);
         
-        if (qrTextResp.ok && qrTextResp.data) {
-          // Este endpoint pode retornar o valor do QR Code para ser gerado
-          if (qrTextResp.data.value || qrTextResp.data.qrcode) {
-            const qrValue = qrTextResp.data.value || qrTextResp.data.qrcode;
-            
-            // Se for base64 de imagem
-            if (qrValue.startsWith('data:image') || qrValue.length > 1000) {
-              const formattedQr = qrValue.startsWith('data:image') 
-                ? qrValue 
-                : `data:image/png;base64,${qrValue}`;
-              
-              result = {
-                success: true,
-                status: 'connecting',
-                qrcode: formattedQr,
-                message: 'QR Code gerado com sucesso'
-              };
-            } else {
-              // É um texto/valor do QR, não uma imagem
-              result = {
-                success: false,
-                error: 'QR Code retornado não é uma imagem válida',
-                qrValue: qrValue.substring(0, 100) + '...'
-              };
-            }
-          } else {
-            result = {
-              success: false,
-              error: 'Formato de resposta do QR Code não reconhecido',
-              rawResponse: JSON.stringify(qrTextResp.data).substring(0, 200)
-            };
-          }
-        } else {
-          // Verificar se precisa reiniciar a instância primeiro
-          console.log('🔄 QR Code não disponível, verificando se precisa restart...');
-          
-          const restartResp = await callZApi(instanceId, token, 'restart', 'POST');
-          
-          if (restartResp.ok) {
-            // Aguardar um pouco e tentar novamente
-            await new Promise(r => setTimeout(r, 3000));
-            
-            const retryQrResp = await callZApi(instanceId, token, 'qr-code/image');
-            
-            if (retryQrResp.ok && retryQrResp.data?.value) {
-              const qrBase64 = retryQrResp.data.value;
-              const formattedQr = qrBase64.startsWith('data:image') 
-                ? qrBase64 
-                : `data:image/png;base64,${qrBase64}`;
-              
-              result = {
-                success: true,
-                status: 'connecting',
-                qrcode: formattedQr,
-                message: 'QR Code gerado após restart'
-              };
-              break;
-            }
-          }
+        // Aguardar um pouco
+        await new Promise(r => setTimeout(r, 3000));
+        
+        // Tentar QR novamente
+        const retryQrResp = await callZApi(instanceId, token, 'qr-code/image', 'GET', null, clientToken);
+        
+        if (retryQrResp.ok && retryQrResp.data?.value) {
+          const qrBase64 = retryQrResp.data.value;
+          const formattedQr = qrBase64.startsWith('data:image') 
+            ? qrBase64 
+            : `data:image/png;base64,${qrBase64}`;
           
           result = {
+            success: true,
+            status: 'connecting',
+            qrcode: formattedQr,
+            message: 'QR Code gerado após restart'
+          };
+        } else {
+          result = {
             success: false,
-            error: qrResp.error || qrTextResp.error || 'Falha ao gerar QR Code. Tente novamente em alguns segundos.'
+            error: qrResp.error || retryQrResp.error || 'Não foi possível gerar o QR Code. Verifique se a instância está ativa no painel da Z-API.'
           };
         }
         break;
@@ -404,8 +327,7 @@ serve(async (req) => {
 
       // ========== DESCONECTAR ==========
       case 'disconnect_instance': {
-        // Na Z-API o endpoint é 'disconnect' com POST
-        const resp = await callZApi(instanceId, token, 'disconnect', 'POST');
+        const resp = await callZApi(instanceId, token, 'disconnect', 'POST', null, clientToken);
         
         if (resp.ok || resp.status === 200) {
           if (instanceConfig) {
@@ -432,39 +354,24 @@ serve(async (req) => {
         break;
       }
 
-      // ========== ENVIAR MENSAGEM DE TESTE ==========
+      // ========== ENVIAR MENSAGEM ==========
       case 'send_message': {
         if (!phone || !message) {
           result = { success: false, error: 'phone e message são obrigatórios' };
           break;
         }
 
-        // Normalizar número para formato brasileiro
+        // Normalizar número
         let normalizedPhone = String(phone).replace(/\D/g, '');
         if (!normalizedPhone.startsWith('55')) {
           normalizedPhone = '55' + normalizedPhone;
         }
 
-        // Simular digitação primeiro (opcional, melhora a experiência)
-        console.log('⌨️ Simulando digitação...');
-        try {
-          await callZApi(instanceId, token, 'typing', 'POST', { phone: normalizedPhone });
-          
-          // Calcular tempo de digitação baseado no tamanho da mensagem
-          const typingTime = Math.min(Math.max(message.length * 50, 2000), 8000);
-          await new Promise(r => setTimeout(r, typingTime));
-          
-          await callZApi(instanceId, token, 'typing', 'POST', { phone: normalizedPhone, duration: 0 });
-          await new Promise(r => setTimeout(r, 500));
-        } catch (e) {
-          console.log('Typing simulation skipped:', e);
-        }
-
-        // Enviar mensagem - endpoint correto da Z-API
+        // Enviar mensagem
         const resp = await callZApi(instanceId, token, 'send-text', 'POST', { 
           phone: normalizedPhone, 
           message 
-        });
+        }, clientToken);
 
         if (resp.ok) {
           result = { 
@@ -493,7 +400,7 @@ serve(async (req) => {
           normalizedPhone = '55' + normalizedPhone;
         }
 
-        const resp = await callZApi(instanceId, token, `phone-exists/${normalizedPhone}`);
+        const resp = await callZApi(instanceId, token, `phone-exists/${normalizedPhone}`, 'GET', null, clientToken);
 
         result = {
           success: resp.ok,
@@ -505,19 +412,13 @@ serve(async (req) => {
 
       // ========== REINICIAR INSTÂNCIA ==========
       case 'restart_instance': {
-        const resp = await callZApi(instanceId, token, 'restart', 'POST');
+        const resp = await callZApi(instanceId, token, 'restart', 'POST', null, clientToken);
         
-        if (resp.ok) {
-          result = {
-            success: true,
-            message: 'Instância reiniciada com sucesso'
-          };
-        } else {
-          result = {
-            success: false,
-            error: resp.error || 'Erro ao reiniciar instância'
-          };
-        }
+        result = {
+          success: resp.ok,
+          message: resp.ok ? 'Instância reiniciada' : 'Erro ao reiniciar',
+          error: resp.error
+        };
         break;
       }
 
