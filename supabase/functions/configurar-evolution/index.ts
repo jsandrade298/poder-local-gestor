@@ -20,6 +20,33 @@ function buildZApiUrl(instanceId: string, token: string, endpoint: string): stri
 }
 
 /**
+ * Normaliza número de telefone para formato Z-API
+ * Formato esperado: 5511999999999 (DDI + DDD + número)
+ */
+function normalizePhone(phone: string): string {
+  // Remove tudo que não é número
+  let cleaned = String(phone).replace(/\D/g, '');
+  
+  // Se começar com 0, remove
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
+  
+  // Se não começar com 55 (Brasil), adiciona
+  if (!cleaned.startsWith('55')) {
+    cleaned = '55' + cleaned;
+  }
+  
+  // Validação básica: deve ter entre 12 e 13 dígitos (55 + DDD + 8 ou 9 dígitos)
+  // 5511999999999 = 13 dígitos (celular com 9)
+  // 551199999999 = 12 dígitos (fixo ou celular antigo)
+  
+  console.log(`📱 Telefone normalizado: ${phone} -> ${cleaned}`);
+  
+  return cleaned;
+}
+
+/**
  * Faz requisição para Z-API
  */
 async function callZApi(
@@ -61,14 +88,14 @@ async function callZApi(
     }
     
     console.log(`📡 Response Status: ${response.status}`);
-    console.log(`📋 Response Data:`, JSON.stringify(data, null, 2).substring(0, 500));
+    console.log(`📋 Response Data:`, JSON.stringify(data, null, 2).substring(0, 1000));
     
     if (!response.ok) {
       return {
         ok: false,
         status: response.status,
         data,
-        error: data?.error || data?.message || `HTTP ${response.status}`
+        error: data?.error || data?.message || data?.detailedError || `HTTP ${response.status}`
       };
     }
     
@@ -109,6 +136,8 @@ serve(async (req) => {
     console.log('=== Z-API Config Request ===');
     console.log('Action:', action);
     console.log('Instance:', instanceName);
+    console.log('Phone:', phone);
+    console.log('Message:', message);
 
     // Usar credenciais padrão
     let instanceId = ZAPI_INSTANCE_ID;
@@ -132,7 +161,7 @@ serve(async (req) => {
       }
     }
 
-    console.log('Instance ID:', instanceId);
+    console.log('Using Instance ID:', instanceId);
 
     // ========== LISTAR INSTÂNCIAS ==========
     if (action === 'list_instances') {
@@ -361,28 +390,52 @@ serve(async (req) => {
           break;
         }
 
-        // Normalizar número
-        let normalizedPhone = String(phone).replace(/\D/g, '');
-        if (!normalizedPhone.startsWith('55')) {
-          normalizedPhone = '55' + normalizedPhone;
-        }
+        // Normalizar número para formato Z-API
+        const normalizedPhone = normalizePhone(phone);
+        
+        console.log(`📤 Enviando mensagem para: ${normalizedPhone}`);
+        console.log(`📝 Mensagem: ${message}`);
 
-        // Enviar mensagem
-        const resp = await callZApi(instanceId, token, 'send-text', 'POST', { 
+        // Payload com delayTyping para mostrar "digitando..."
+        // delayTyping: tempo em segundos que mostra "digitando" (1-15)
+        const payload = { 
           phone: normalizedPhone, 
-          message 
-        }, clientToken);
+          message: message,
+          delayTyping: 3  // Mostra "digitando..." por 3 segundos antes de enviar
+        };
 
-        if (resp.ok) {
-          result = { 
-            success: true, 
-            message: 'Mensagem enviada com sucesso',
-            zapiId: resp.data?.zapiId || resp.data?.messageId
-          };
+        // Enviar mensagem via send-text
+        const resp = await callZApi(instanceId, token, 'send-text', 'POST', payload, clientToken);
+
+        console.log('📨 Resposta do envio:', JSON.stringify(resp, null, 2));
+
+        if (resp.ok && resp.data) {
+          // Verificar se tem ID da mensagem (indica sucesso real)
+          const messageId = resp.data.zaapId || resp.data.messageId || resp.data.id;
+          
+          if (messageId) {
+            result = { 
+              success: true, 
+              message: 'Mensagem enviada com sucesso',
+              messageId: messageId,
+              zapiResponse: resp.data
+            };
+          } else {
+            // Resposta OK mas sem ID - pode indicar problema
+            result = { 
+              success: true, 
+              message: 'Mensagem processada',
+              warning: 'Sem ID de confirmação',
+              zapiResponse: resp.data
+            };
+          }
         } else {
+          // Erro no envio
           result = { 
             success: false, 
-            error: resp.error || 'Erro ao enviar mensagem'
+            error: resp.error || 'Erro ao enviar mensagem',
+            details: resp.data,
+            phoneUsed: normalizedPhone
           };
         }
         break;
@@ -395,17 +448,14 @@ serve(async (req) => {
           break;
         }
 
-        let normalizedPhone = String(phone).replace(/\D/g, '');
-        if (!normalizedPhone.startsWith('55')) {
-          normalizedPhone = '55' + normalizedPhone;
-        }
-
+        const normalizedPhone = normalizePhone(phone);
         const resp = await callZApi(instanceId, token, `phone-exists/${normalizedPhone}`, 'GET', null, clientToken);
 
         result = {
           success: resp.ok,
           phone: normalizedPhone,
-          exists: resp.data?.exists === true
+          exists: resp.data?.exists === true,
+          zapiResponse: resp.data
         };
         break;
       }
