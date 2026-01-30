@@ -7,9 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Configuração padrão Z-API (pode ser sobrescrita pela tabela whatsapp_instances)
-const ZAPI_DEFAULT_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
-const ZAPI_DEFAULT_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
+// Configuração Z-API - Suas credenciais
+const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
+const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
+const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS"; // ← TOKEN DE SEGURANÇA DA CONTA
 
 /**
  * Normaliza número de telefone brasileiro para formato Z-API
@@ -23,10 +24,11 @@ function normalizePhone(phone: string): string {
     digits = digits.slice(2);
   }
   
-  // Adiciona 9 para celular se necessário (números de 10 dígitos começando com 9, 8 ou 7)
+  // Adiciona 9 para celular se necessário (números de 10 dígitos)
   if (digits.length === 10) {
     const ddd = digits.slice(0, 2);
     const numero = digits.slice(2);
+    // Se o número começa com 9, 8 ou 7, provavelmente é celular
     if (/^[987]/.test(numero)) {
       digits = ddd + "9" + numero;
     }
@@ -44,11 +46,12 @@ function buildZApiUrl(instanceId: string, token: string, endpoint: string): stri
 }
 
 /**
- * Chama endpoint da Z-API
+ * Chama endpoint da Z-API com Client-Token correto
  */
 async function callZApi(
   instanceId: string, 
   token: string, 
+  clientToken: string,
   endpoint: string, 
   payload: any,
   method: "GET" | "POST" = "POST"
@@ -57,12 +60,13 @@ async function callZApi(
   
   try {
     console.log(`🔄 Z-API ${method}: ${endpoint}`);
+    console.log(`📦 Payload:`, JSON.stringify(payload));
     
     const options: RequestInit = {
       method,
       headers: {
         "Content-Type": "application/json",
-        "Client-Token": token
+        "Client-Token": clientToken  // ← USA O CLIENT-TOKEN DE SEGURANÇA
       }
     };
     
@@ -80,14 +84,15 @@ async function callZApi(
       // Mantém como texto
     }
     
-    console.log(`📡 Z-API Response: ${response.status}`);
+    console.log(`📡 Z-API Response Status: ${response.status}`);
+    console.log(`📋 Z-API Response Body:`, JSON.stringify(body).substring(0, 500));
     
     if (!response.ok) {
       return {
         ok: false,
         status: response.status,
         body,
-        error: body?.error || body?.message || `HTTP ${response.status}`
+        error: body?.error || body?.message || body?.detailedError || `HTTP ${response.status}`
       };
     }
     
@@ -101,39 +106,6 @@ async function callZApi(
       body: null,
       error: error.message || 'Erro desconhecido'
     };
-  }
-}
-
-/**
- * Simula digitação antes de enviar (humanização)
- * Calcula tempo baseado no tamanho da mensagem
- */
-async function simulateTyping(
-  instanceId: string, 
-  token: string, 
-  phone: string, 
-  messageLength: number
-): Promise<void> {
-  try {
-    // Calcular tempo de digitação: ~50ms por caractere, mínimo 2s, máximo 8s
-    const typingTimeMs = Math.min(Math.max(messageLength * 50, 2000), 8000);
-    
-    console.log(`⌨️ Simulando digitação por ${typingTimeMs}ms para mensagem de ${messageLength} caracteres`);
-    
-    // Enviar status "digitando"
-    await callZApi(instanceId, token, 'send-typing', { phone, value: true });
-    
-    // Aguardar o tempo calculado
-    await new Promise(resolve => setTimeout(resolve, typingTimeMs));
-    
-    // Parar status "digitando"
-    await callZApi(instanceId, token, 'send-typing', { phone, value: false });
-    
-    // Pequena pausa antes de enviar (simula pessoa conferindo mensagem)
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-  } catch (error) {
-    console.warn("⚠️ Erro ao simular digitação (continuando envio):", error);
   }
 }
 
@@ -188,6 +160,7 @@ serve(async (req) => {
     console.log("Total telefones:", telefones.length);
     console.log("Incluir todos:", incluirTodos);
     console.log("Mídias:", mediaFiles.length);
+    console.log("Mensagem:", mensagem?.substring(0, 100));
 
     // Validações
     if (!mensagem && mediaFiles.length === 0 && Object.keys(customMessages).length === 0) {
@@ -197,10 +170,12 @@ serve(async (req) => {
       );
     }
 
-    // Buscar configuração da instância (ou usar padrão)
-    let instanceId = ZAPI_DEFAULT_INSTANCE_ID;
-    let token = ZAPI_DEFAULT_TOKEN;
+    // Usar credenciais padrão
+    let instanceId = ZAPI_INSTANCE_ID;
+    let token = ZAPI_TOKEN;
+    let clientToken = ZAPI_CLIENT_TOKEN;
 
+    // Buscar configuração da instância do banco (se existir)
     if (instanceName) {
       const { data: instance } = await supabase
         .from("whatsapp_instances")
@@ -212,13 +187,15 @@ serve(async (req) => {
       if (instance) {
         instanceId = instance.instance_id || instanceId;
         token = instance.instance_token || token;
+        clientToken = instance.client_token || clientToken;
         console.log("✅ Usando instância do banco:", instance.display_name);
       } else {
-        console.log("⚠️ Instância não encontrada, usando configuração padrão");
+        console.log("⚠️ Instância não encontrada no banco, usando configuração padrão");
       }
     }
 
     console.log("Instance ID:", instanceId);
+    console.log("Client Token (primeiros 10 chars):", clientToken?.substring(0, 10) + "...");
 
     // Montar lista de telefones
     let phoneList: string[] = [];
@@ -321,7 +298,7 @@ serve(async (req) => {
               break;
           }
           
-          const resp = await callZApi(instanceId, token, endpoint, payload);
+          const resp = await callZApi(instanceId, token, clientToken, endpoint, payload);
           
           if (resp.ok) {
             console.log(`✅ ${mediaType} enviado com sucesso`);
@@ -330,7 +307,7 @@ serve(async (req) => {
               telefone: rawPhone,
               tipo: mediaType,
               status: 'sucesso',
-              zapiId: resp.body?.zapiId
+              zapiId: resp.body?.zapiId || resp.body?.messageId
             });
           } else {
             console.error(`❌ Erro ao enviar ${mediaType}: ${resp.error}`);
@@ -353,29 +330,45 @@ serve(async (req) => {
             await new Promise(r => setTimeout(r, 1000));
           }
           
-          console.log('💬 Enviando mensagem de texto');
+          console.log('💬 Enviando mensagem de texto...');
           
-          // 🎯 SIMULAR DIGITAÇÃO ANTES DE ENVIAR
-          await simulateTyping(instanceId, token, normalizedPhone, mensagemParaEnviar.length);
+          // 🎯 ENVIAR COM delayTyping para mostrar "digitando..."
+          // Calcula tempo baseado no tamanho da mensagem: 1 segundo a cada 50 caracteres, mínimo 2s, máximo 8s
+          const typingTime = Math.min(Math.max(Math.ceil(mensagemParaEnviar.length / 50), 2), 8);
+          
+          console.log(`⌨️ delayTyping: ${typingTime}s para mensagem de ${mensagemParaEnviar.length} caracteres`);
           
           const resp = await callZApi(
             instanceId, 
-            token, 
+            token,
+            clientToken,
             'send-text',
             {
               phone: normalizedPhone,
-              message: mensagemParaEnviar
+              message: mensagemParaEnviar,
+              delayTyping: typingTime  // ← MOSTRA "DIGITANDO..." POR X SEGUNDOS
             }
           );
           
-          if (resp.ok) {
-            console.log('✅ Texto enviado com sucesso');
+          if (resp.ok && (resp.body?.zapiId || resp.body?.messageId || resp.body?.id)) {
+            console.log('✅ Texto enviado com sucesso! ID:', resp.body?.zapiId || resp.body?.messageId);
             successCount++;
             results.push({
               telefone: rawPhone,
               tipo: 'texto',
               status: 'sucesso',
-              zapiId: resp.body?.zapiId
+              zapiId: resp.body?.zapiId || resp.body?.messageId || resp.body?.id
+            });
+          } else if (resp.ok) {
+            // Resposta OK mas sem ID - pode ser problema
+            console.warn('⚠️ Resposta OK mas sem ID de confirmação:', resp.body);
+            successCount++;
+            results.push({
+              telefone: rawPhone,
+              tipo: 'texto',
+              status: 'sucesso',
+              warning: 'Sem ID de confirmação',
+              zapiResponse: resp.body
             });
           } else {
             console.error('❌ Erro ao enviar texto:', resp.error);
@@ -384,7 +377,8 @@ serve(async (req) => {
               telefone: rawPhone,
               tipo: 'texto',
               status: 'erro',
-              erro: resp.error
+              erro: resp.error,
+              details: resp.body
             });
           }
         }
