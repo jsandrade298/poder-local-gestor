@@ -333,8 +333,8 @@ serve(async (req) => {
           console.log('💬 Enviando mensagem de texto...');
           
           // 🎯 ENVIAR COM delayTyping para mostrar "digitando..."
-          // Calcula tempo baseado no tamanho da mensagem: 1 segundo a cada 50 caracteres, mínimo 2s, máximo 8s
-          const typingTime = Math.min(Math.max(Math.ceil(mensagemParaEnviar.length / 50), 2), 8);
+          // Calcula tempo baseado no tamanho da mensagem: 1 segundo a cada 50 caracteres, mínimo 2s, máximo 50s
+          const typingTime = Math.min(Math.max(Math.ceil(mensagemParaEnviar.length / 50), 2), 50);
           
           console.log(`⌨️ delayTyping: ${typingTime}s para mensagem de ${mensagemParaEnviar.length} caracteres`);
           
