@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Configuração Z-API padrão
 const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
 const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
 const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
@@ -23,11 +22,24 @@ function normalizePhone(phone: string): string {
   return "55" + digits;
 }
 
+/**
+ * Substitui TODAS as variáveis no texto
+ */
 function substituirVariaveis(texto: string, variaveis: Record<string, string>): string {
+  if (!texto) return texto;
   let resultado = texto;
+  
+  // Log para debug
+  console.log("📝 Substituindo variáveis:", Object.keys(variaveis));
+  
   Object.entries(variaveis).forEach(([chave, valor]) => {
-    resultado = resultado.replace(new RegExp(`\\{${chave}\\}`, 'gi'), valor || '');
+    // Usa replaceAll para garantir substituição de todas as ocorrências
+    const regex = new RegExp(`\\{${chave}\\}`, 'gi');
+    const valorStr = valor !== null && valor !== undefined ? String(valor) : '';
+    resultado = resultado.replace(regex, valorStr);
   });
+  
+  console.log("📝 Resultado:", resultado.substring(0, 100));
   return resultado;
 }
 
@@ -139,6 +151,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const requestData = await req.json();
     
+    console.log("📥 Request recebido:", JSON.stringify(requestData).substring(0, 500));
+    
     const {
       telefones = [],
       mensagem = "",
@@ -154,15 +168,20 @@ serve(async (req) => {
       contato,
       enquete,
       ordemAleatoria = false,
-      variaveis = {},
-      salvarHistorico = false,
+      reacaoAutomatica = null,
+      salvarHistorico = true, // Agora default é true
       tituloEnvio = '',
       usuarioId = null,
-      usuarioNome = ''
+      usuarioNome = '',
+      // NOVO: destinatários completos com dados
+      destinatarios = []
     } = requestData;
 
     console.log("=== ENVIO WHATSAPP Z-API ===");
-    console.log("Tipo:", tipo, "| Instância:", instanceName, "| Telefones:", telefones.length);
+    console.log("Tipo:", tipo, "| Instância:", instanceName);
+    console.log("Telefones:", telefones.length, "| Destinatarios:", destinatarios.length);
+    console.log("Reação automática:", reacaoAutomatica);
+    console.log("Salvar histórico:", salvarHistorico);
 
     let instanceId = ZAPI_INSTANCE_ID;
     let token = ZAPI_TOKEN;
@@ -186,37 +205,109 @@ serve(async (req) => {
       }
     }
 
-    let phoneList: string[] = [];
+    // Montar lista de destinatários com dados completos
+    let listaDestinatarios: Array<{
+      telefone: string;
+      nome: string;
+      municipe_id?: string;
+      variaveis: Record<string, string>;
+    }> = [];
     
-    if (incluirTodos) {
-      const { data: municipes } = await supabase.from("municipes").select("telefone").not("telefone", "is", null);
-      if (municipes) phoneList = municipes.map(m => m.telefone).filter(Boolean);
+    if (destinatarios.length > 0) {
+      // Usar destinatários passados pelo frontend (já com dados)
+      listaDestinatarios = destinatarios.map((d: any) => ({
+        telefone: d.telefone,
+        nome: d.nome || '',
+        municipe_id: d.id || d.municipe_id,
+        variaveis: {
+          nome: d.nome || '',
+          primeiro_nome: (d.nome || '').split(' ')[0],
+          telefone: d.telefone || '',
+          protocolo: d.protocolo || '',
+          assunto: d.assunto || '',
+          status: d.status || '',
+          data: new Date().toLocaleDateString('pt-BR'),
+          hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        }
+      }));
+    } else if (incluirTodos) {
+      // Buscar todos os munícipes
+      const { data: municipes } = await supabase
+        .from("municipes")
+        .select("id, nome, telefone")
+        .not("telefone", "is", null);
+      
+      if (municipes) {
+        listaDestinatarios = municipes.map(m => ({
+          telefone: m.telefone,
+          nome: m.nome,
+          municipe_id: m.id,
+          variaveis: {
+            nome: m.nome || '',
+            primeiro_nome: (m.nome || '').split(' ')[0],
+            telefone: m.telefone || '',
+            protocolo: '',
+            assunto: '',
+            status: '',
+            data: new Date().toLocaleDateString('pt-BR'),
+            hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          }
+        }));
+      }
     } else {
-      phoneList = telefones.map((t: any) => typeof t === 'object' ? t.telefone : t).filter(Boolean);
+      // Lista simples de telefones (fallback)
+      listaDestinatarios = telefones.map((t: any) => {
+        const tel = typeof t === 'object' ? t.telefone : t;
+        const nome = typeof t === 'object' ? t.nome : '';
+        return {
+          telefone: tel,
+          nome: nome,
+          variaveis: {
+            nome: nome,
+            primeiro_nome: (nome || '').split(' ')[0],
+            telefone: tel,
+            protocolo: '',
+            assunto: '',
+            status: '',
+            data: new Date().toLocaleDateString('pt-BR'),
+            hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          }
+        };
+      });
     }
     
-    phoneList = [...new Set(phoneList)];
+    // Remover duplicatas por telefone
+    const telefonesUnicos = new Set<string>();
+    listaDestinatarios = listaDestinatarios.filter(d => {
+      if (!d.telefone || telefonesUnicos.has(d.telefone)) return false;
+      telefonesUnicos.add(d.telefone);
+      return true;
+    });
     
-    if (phoneList.length === 0) {
+    if (listaDestinatarios.length === 0) {
       return new Response(JSON.stringify({ success: false, error: "Nenhum telefone válido" }), 
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    console.log(`📱 Total destinatários: ${listaDestinatarios.length}`);
+
     if (ordemAleatoria) {
-      phoneList = embaralharArray(phoneList);
-      console.log("🔀 Ordem aleatória");
+      listaDestinatarios = embaralharArray(listaDestinatarios);
+      console.log("🔀 Ordem aleatória aplicada");
     }
 
+    // Criar registro de envio no histórico
     let envioId = null;
     if (salvarHistorico) {
-      const { data: envio } = await supabase.from('whatsapp_envios').insert({
-        titulo: tituloEnvio || `Envio ${new Date().toLocaleDateString('pt-BR')}`,
+      const { data: envio, error: envioError } = await supabase.from('whatsapp_envios').insert({
+        titulo: tituloEnvio || `Envio ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}`,
         tipo,
         conteudo: { mensagem, ...conteudo, localizacao, contato, enquete },
-        total_destinatarios: phoneList.length,
+        total_destinatarios: listaDestinatarios.length,
         ordem_aleatoria: ordemAleatoria,
         delay_min: tempoMinimo,
         delay_max: tempoMaximo,
+        reacao_automatica: reacaoAutomatica, // ✅ SALVAR REAÇÃO AUTOMÁTICA
         usuario_id: usuarioId,
         usuario_nome: usuarioNome,
         instancia_id: instanciaDbId,
@@ -225,34 +316,34 @@ serve(async (req) => {
         iniciado_em: new Date().toISOString()
       }).select().single();
       
-      if (envio) envioId = envio.id;
+      if (envioError) {
+        console.error("❌ Erro ao criar envio:", envioError);
+      } else if (envio) {
+        envioId = envio.id;
+        console.log("📝 Histórico criado:", envioId);
+      }
     }
 
     const results: any[] = [];
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < phoneList.length; i++) {
-      const rawPhone = phoneList[i];
-      const normalizedPhone = normalizePhone(rawPhone);
+    for (let i = 0; i < listaDestinatarios.length; i++) {
+      const dest = listaDestinatarios[i];
+      const normalizedPhone = normalizePhone(dest.telefone);
       
-      console.log(`\n📱 [${i + 1}/${phoneList.length}] ${rawPhone}`);
+      console.log(`\n📱 [${i + 1}/${listaDestinatarios.length}] ${dest.nome || dest.telefone}`);
+      console.log(`   Variáveis:`, JSON.stringify(dest.variaveis));
       
       if (i > 0) {
         const delayMs = Math.round((Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo) * 1000);
+        console.log(`   ⏳ Aguardando ${(delayMs/1000).toFixed(1)}s...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
       
-      const varsDestinatario = {
-        ...variaveis,
-        telefone: rawPhone,
-        data: new Date().toLocaleDateString('pt-BR'),
-        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      const mensagemFinal = customMessages[rawPhone] 
-        ? substituirVariaveis(customMessages[rawPhone], varsDestinatario)
-        : substituirVariaveis(mensagem, varsDestinatario);
+      // ✅ Substituir variáveis na mensagem
+      const mensagemFinal = substituirVariaveis(mensagem, dest.variaveis);
+      console.log(`   💬 Mensagem: "${mensagemFinal.substring(0, 50)}..."`);
       
       let resp: any;
       
@@ -266,21 +357,25 @@ serve(async (req) => {
             break;
           case 'enquete':
             if (enquete) {
-              const perguntaFinal = substituirVariaveis(enquete.pergunta, varsDestinatario);
+              const perguntaFinal = substituirVariaveis(enquete.pergunta, dest.variaveis);
               resp = await enviarEnquete(instanceId, token, clientToken, normalizedPhone, perguntaFinal, enquete.opcoes, enquete.multiplas);
             }
             break;
           case 'imagem':
             if (mediaFiles.length > 0 || conteudo?.url) {
               const url = conteudo?.url || mediaFiles[0]?.url;
-              const caption = conteudo?.legenda ? substituirVariaveis(conteudo.legenda, varsDestinatario) : mensagemFinal;
+              const caption = conteudo?.legenda 
+                ? substituirVariaveis(conteudo.legenda, dest.variaveis) 
+                : mensagemFinal;
               resp = await enviarImagem(instanceId, token, clientToken, normalizedPhone, url, caption);
             }
             break;
           case 'video':
             if (mediaFiles.length > 0 || conteudo?.url) {
               const url = conteudo?.url || mediaFiles[0]?.url;
-              const caption = conteudo?.legenda ? substituirVariaveis(conteudo.legenda, varsDestinatario) : mensagemFinal;
+              const caption = conteudo?.legenda 
+                ? substituirVariaveis(conteudo.legenda, dest.variaveis) 
+                : mensagemFinal;
               resp = await enviarVideo(instanceId, token, clientToken, normalizedPhone, url, caption);
             }
             break;
@@ -293,11 +388,11 @@ serve(async (req) => {
           case 'documento':
             if (mediaFiles.length > 0 || conteudo?.url) {
               const url = conteudo?.url || mediaFiles[0]?.url;
-              const fileName = substituirVariaveis(conteudo?.nomeArquivo || mediaFiles[0]?.filename || 'documento.pdf', varsDestinatario);
+              const fileName = substituirVariaveis(conteudo?.nomeArquivo || mediaFiles[0]?.filename || 'documento.pdf', dest.variaveis);
               resp = await enviarDocumento(instanceId, token, clientToken, normalizedPhone, url, fileName);
             }
             break;
-          default:
+          default: // texto
             let textSent = false;
             for (const media of mediaFiles) {
               const mediaType = detectMediaType(media);
@@ -324,18 +419,28 @@ serve(async (req) => {
         }
         
         if (resp?.ok) {
-          console.log('✅ OK');
+          console.log('   ✅ Enviado!');
           successCount++;
-          results.push({ telefone: rawPhone, status: 'sucesso', zapiId: resp.body?.zapiId || resp.body?.messageId || resp.body?.id });
+          const zapiId = resp.body?.zapiId || resp.body?.messageId || resp.body?.id;
+          
+          results.push({ 
+            telefone: dest.telefone, 
+            nome: dest.nome,
+            status: 'sucesso', 
+            zapiId 
+          });
           
           if (envioId) {
             await supabase.from('whatsapp_envios_destinatarios').insert({
               envio_id: envioId,
-              telefone: rawPhone,
+              telefone: dest.telefone,
               telefone_formatado: normalizedPhone,
+              nome: dest.nome,
+              municipe_id: dest.municipe_id,
+              variaveis: dest.variaveis,
               status: 'enviado',
               mensagem_enviada: mensagemFinal,
-              zapi_message_id: resp.body?.zapiId || resp.body?.messageId,
+              zapi_message_id: zapiId,
               enviado_em: new Date().toISOString(),
               ordem: i
             });
@@ -345,15 +450,23 @@ serve(async (req) => {
         }
         
       } catch (error: any) {
-        console.error(`❌ Erro:`, error.message);
+        console.error(`   ❌ Erro:`, error.message);
         errorCount++;
-        results.push({ telefone: rawPhone, status: 'erro', erro: error.message });
+        results.push({ 
+          telefone: dest.telefone, 
+          nome: dest.nome,
+          status: 'erro', 
+          erro: error.message 
+        });
         
         if (envioId) {
           await supabase.from('whatsapp_envios_destinatarios').insert({
             envio_id: envioId,
-            telefone: rawPhone,
+            telefone: dest.telefone,
             telefone_formatado: normalizedPhone,
+            nome: dest.nome,
+            municipe_id: dest.municipe_id,
+            variaveis: dest.variaveis,
             status: 'erro',
             erro_mensagem: error.message,
             ordem: i
@@ -362,9 +475,10 @@ serve(async (req) => {
       }
     }
 
+    // Finalizar histórico
     if (envioId) {
       await supabase.from('whatsapp_envios').update({
-        status: errorCount === phoneList.length ? 'erro' : 'concluido',
+        status: errorCount === listaDestinatarios.length ? 'erro' : 'concluido',
         total_enviados: successCount,
         total_erros: errorCount,
         concluido_em: new Date().toISOString()
@@ -376,7 +490,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       envioId,
-      resumo: { total: phoneList.length, sucessos: successCount, erros: errorCount },
+      resumo: { total: listaDestinatarios.length, sucessos: successCount, erros: errorCount },
       resultados: results
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
