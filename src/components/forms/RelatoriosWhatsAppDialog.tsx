@@ -7,7 +7,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +29,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+
+interface RelatoriosWhatsAppDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  highlightEnvioId?: string | null;
+}
 
 interface EnvioResumo {
   id: string;
@@ -77,12 +82,10 @@ const STATUS_DEST_CONFIG: Record<string, { label: string; variant: "default" | "
   erro: { label: 'Erro', variant: 'destructive' },
 };
 
-export function RelatoriosWhatsAppDialog() {
-  const [open, setOpen] = useState(false);
+export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId }: RelatoriosWhatsAppDialogProps) {
   const [selectedEnvio, setSelectedEnvio] = useState<string | null>(null);
   const [expandedEnvios, setExpandedEnvios] = useState<Set<string>>(new Set());
 
-  // Buscar lista de envios
   const { data: envios, isLoading, refetch } = useQuery({
     queryKey: ["whatsapp-envios"],
     queryFn: async () => {
@@ -98,7 +101,6 @@ export function RelatoriosWhatsAppDialog() {
     enabled: open,
   });
 
-  // Buscar destinatários do envio selecionado
   const { data: destinatarios, isLoading: loadingDest } = useQuery({
     queryKey: ["whatsapp-envio-destinatarios", selectedEnvio],
     queryFn: async () => {
@@ -131,11 +133,8 @@ export function RelatoriosWhatsAppDialog() {
   const formatDate = (date: string | null) => {
     if (!date) return '-';
     return new Date(date).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: '2-digit',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
@@ -145,28 +144,18 @@ export function RelatoriosWhatsAppDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <BarChart3 className="h-4 w-4 mr-2" />
-          Relatórios de Envio
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-blue-500" />
             Relatórios de Envio WhatsApp
           </DialogTitle>
-          <DialogDescription>
-            Histórico e status dos envios em massa
-          </DialogDescription>
+          <DialogDescription>Histórico e status dos envios</DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-muted-foreground">
-            {envios?.length || 0} envios encontrados
-          </div>
+          <div className="text-sm text-muted-foreground">{envios?.length || 0} envios</div>
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
@@ -181,171 +170,157 @@ export function RelatoriosWhatsAppDialog() {
           ) : envios?.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhum envio registrado ainda</p>
-              <p className="text-sm">Os envios aparecerão aqui após você enviar mensagens</p>
+              <p>Nenhum envio registrado</p>
             </div>
           ) : (
             <div className="space-y-3">
               {envios?.map(envio => {
                 const statusConfig = STATUS_CONFIG[envio.status] || STATUS_CONFIG.pendente;
                 const isExpanded = expandedEnvios.has(envio.id);
+                const isHighlighted = envio.id === highlightEnvioId;
                 
                 return (
                   <Collapsible key={envio.id} open={isExpanded}>
-                    <div className="border rounded-lg overflow-hidden">
-                      {/* Header do envio */}
+                    <div className={`border rounded-lg overflow-hidden ${isHighlighted ? 'ring-2 ring-blue-500' : ''}`}>
                       <CollapsibleTrigger asChild>
-                        <button 
-                          className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                        <button
                           onClick={() => toggleExpand(envio.id)}
+                          className="w-full p-4 text-left hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full ${statusConfig.color}`} />
-                            <div className="text-left">
-                              <div className="font-medium">
-                                {envio.titulo || `Envio de ${formatDate(envio.created_at)}`}
-                              </div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(envio.created_at)}
-                                <span className="mx-1">•</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {envio.tipo}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge className={`${statusConfig.color} text-white text-xs`}>
+                                  {statusConfig.label}
                                 </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {envio.tipo}
+                                </span>
                                 {envio.reacao_automatica && (
                                   <span title="Reação automática">
                                     {envio.reacao_automatica}
                                   </span>
                                 )}
                               </div>
+                              <div className="font-medium truncate">{envio.titulo}</div>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDate(envio.created_at)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {envio.total_destinatarios} destinatários
+                                </span>
+                                <span>{envio.instancia_nome}</span>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-4">
-                            {/* Estatísticas resumidas */}
-                            <div className="flex items-center gap-3 text-sm">
-                              <div className="flex items-center gap-1" title="Total">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                <span>{envio.total_destinatarios}</span>
+                            
+                            <div className="flex items-center gap-4">
+                              {/* Mini estatísticas */}
+                              <div className="flex gap-2 text-xs">
+                                <span className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-3 w-3" />
+                                  {envio.total_enviados}
+                                </span>
+                                <span className="flex items-center gap-1 text-blue-600">
+                                  <Eye className="h-3 w-3" />
+                                  {envio.total_lidos}
+                                </span>
+                                <span className="flex items-center gap-1 text-red-600">
+                                  <XCircle className="h-3 w-3" />
+                                  {envio.total_erros}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-1 text-green-600" title="Enviados">
-                                <CheckCircle className="h-4 w-4" />
-                                <span>{envio.total_enviados}</span>
-                              </div>
-                              {envio.total_erros > 0 && (
-                                <div className="flex items-center gap-1 text-red-600" title="Erros">
-                                  <XCircle className="h-4 w-4" />
-                                  <span>{envio.total_erros}</span>
-                                </div>
+                              
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
                               )}
                             </div>
-                            
-                            <Badge className={statusConfig.color}>
-                              {statusConfig.label}
-                            </Badge>
-                            
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </div>
                         </button>
                       </CollapsibleTrigger>
-
-                      {/* Detalhes expandidos */}
+                      
                       <CollapsibleContent>
                         <div className="border-t p-4 bg-muted/30">
-                          {/* Barra de progresso */}
+                          {/* Barra de progresso visual */}
                           <div className="mb-4">
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>Progresso do envio</span>
-                              <span>{calcPercentage(envio.total_enviados, envio.total_destinatarios)}%</span>
-                            </div>
-                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-gray-200">
                               <div 
-                                className="h-full bg-green-500 transition-all"
+                                className="bg-green-500" 
                                 style={{ width: `${calcPercentage(envio.total_enviados, envio.total_destinatarios)}%` }}
                               />
+                              <div 
+                                className="bg-blue-500" 
+                                style={{ width: `${calcPercentage(envio.total_lidos, envio.total_destinatarios)}%` }}
+                              />
+                              <div 
+                                className="bg-red-500" 
+                                style={{ width: `${calcPercentage(envio.total_erros, envio.total_destinatarios)}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <span>Enviados: {envio.total_enviados} ({calcPercentage(envio.total_enviados, envio.total_destinatarios)}%)</span>
+                              <span>Lidos: {envio.total_lidos}</span>
+                              <span>Erros: {envio.total_erros}</span>
                             </div>
                           </div>
 
-                          {/* Grid de estatísticas */}
-                          <div className="grid grid-cols-5 gap-3 mb-4">
-                            <div className="bg-white rounded-lg p-3 text-center border">
-                              <div className="text-2xl font-bold">{envio.total_destinatarios}</div>
-                              <div className="text-xs text-muted-foreground">Total</div>
+                          {/* Lista de destinatários */}
+                          {loadingDest ? (
+                            <div className="flex items-center justify-center py-4">
+                              <RefreshCw className="h-4 w-4 animate-spin" />
                             </div>
-                            <div className="bg-white rounded-lg p-3 text-center border">
-                              <div className="text-2xl font-bold text-blue-600">{envio.total_enviados}</div>
-                              <div className="text-xs text-muted-foreground">Enviados</div>
-                            </div>
-                            <div className="bg-white rounded-lg p-3 text-center border">
-                              <div className="text-2xl font-bold text-green-600">{envio.total_entregues}</div>
-                              <div className="text-xs text-muted-foreground">Entregues</div>
-                            </div>
-                            <div className="bg-white rounded-lg p-3 text-center border">
-                              <div className="text-2xl font-bold text-purple-600">{envio.total_lidos}</div>
-                              <div className="text-xs text-muted-foreground">Lidos</div>
-                            </div>
-                            <div className="bg-white rounded-lg p-3 text-center border">
-                              <div className="text-2xl font-bold text-red-600">{envio.total_erros}</div>
-                              <div className="text-xs text-muted-foreground">Erros</div>
-                            </div>
-                          </div>
-
-                          {/* Tabela de destinatários */}
-                          <div className="border rounded-lg bg-white">
-                            <div className="p-3 border-b flex items-center justify-between">
-                              <span className="font-medium text-sm">Destinatários</span>
-                              {loadingDest && selectedEnvio === envio.id && (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              )}
-                            </div>
-                            <ScrollArea className="h-[200px]">
+                          ) : destinatarios && destinatarios.length > 0 ? (
+                            <div className="border rounded overflow-hidden">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead className="w-[50px]">#</TableHead>
-                                    <TableHead>Nome</TableHead>
-                                    <TableHead>Telefone</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Enviado em</TableHead>
-                                    <TableHead>Erro</TableHead>
+                                    <TableHead className="text-xs">Nome</TableHead>
+                                    <TableHead className="text-xs">Telefone</TableHead>
+                                    <TableHead className="text-xs">Status</TableHead>
+                                    <TableHead className="text-xs">Enviado</TableHead>
+                                    <TableHead className="text-xs">Lido</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {destinatarios?.map((dest, idx) => {
+                                  {destinatarios.map((dest) => {
                                     const destStatus = STATUS_DEST_CONFIG[dest.status] || STATUS_DEST_CONFIG.pendente;
                                     return (
                                       <TableRow key={dest.id}>
-                                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                                        <TableCell className="font-medium">{dest.nome || '-'}</TableCell>
-                                        <TableCell>{dest.telefone}</TableCell>
-                                        <TableCell>
-                                          <Badge variant={destStatus.variant}>{destStatus.label}</Badge>
+                                        <TableCell className="text-xs font-medium">
+                                          {dest.nome || '-'}
                                         </TableCell>
-                                        <TableCell className="text-sm">{formatDate(dest.enviado_em)}</TableCell>
-                                        <TableCell className="text-sm text-red-600 max-w-[150px] truncate" title={dest.erro_mensagem || ''}>
-                                          {dest.erro_mensagem || '-'}
+                                        <TableCell className="text-xs">{dest.telefone}</TableCell>
+                                        <TableCell>
+                                          <Badge variant={destStatus.variant} className="text-xs">
+                                            {destStatus.label}
+                                          </Badge>
+                                          {dest.erro_mensagem && (
+                                            <div className="text-xs text-red-600 mt-1 truncate max-w-[150px]" title={dest.erro_mensagem}>
+                                              {dest.erro_mensagem}
+                                            </div>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                          {formatDate(dest.enviado_em)}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                          {formatDate(dest.lido_em)}
                                         </TableCell>
                                       </TableRow>
                                     );
                                   })}
-                                  {(!destinatarios || destinatarios.length === 0) && !loadingDest && (
-                                    <TableRow>
-                                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                        Nenhum destinatário encontrado
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
                                 </TableBody>
                               </Table>
-                            </ScrollArea>
-                          </div>
-
-                          {/* Info adicional */}
-                          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-4">
-                            {envio.usuario_nome && <span>Por: {envio.usuario_nome}</span>}
-                            {envio.instancia_nome && <span>Instância: {envio.instancia_nome}</span>}
-                            {envio.concluido_em && <span>Concluído: {formatDate(envio.concluido_em)}</span>}
-                          </div>
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-sm text-muted-foreground">
+                              Nenhum destinatário registrado
+                            </div>
+                          )}
                         </div>
                       </CollapsibleContent>
                     </div>
