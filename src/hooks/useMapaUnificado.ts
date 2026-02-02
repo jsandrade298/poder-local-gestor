@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { geocodificarEndereco } from './useBrasilAPI';
 
 export interface AreaMapa {
   id: string;
@@ -430,10 +431,145 @@ export function useMapaUnificado() {
     municipes: municipesRaw.filter(m => !isValidCoordinate(m.latitude, m.longitude)).length
   };
 
-  // Função para geocodificar (placeholder)
+  // Função para geocodificar todos os registros sem coordenadas
   const geocodificarTodos = useCallback(async () => {
-    toast.info("Funcionalidade de geocodificação em lote será implementada.");
-  }, []);
+    const demandasSemCoord = demandasRaw.filter(d => !isValidCoordinate(d.latitude, d.longitude));
+    const municipesSemCoord = municipesRaw.filter(m => !isValidCoordinate(m.latitude, m.longitude));
+    
+    const total = demandasSemCoord.length + municipesSemCoord.length;
+    
+    if (total === 0) {
+      toast.info("Todos os registros já possuem coordenadas!");
+      return;
+    }
+
+    setGeocodificando(true);
+    setProgressoGeocodificacao({ atual: 0, total });
+    
+    let processados = 0;
+    let sucesso = 0;
+    let falhas = 0;
+
+    toast.info(`Iniciando geocodificação de ${total} registros...`);
+
+    // Geocodificar demandas
+    for (const demanda of demandasSemCoord) {
+      try {
+        // Construir endereço para geocodificação
+        const logradouro = demanda.logradouro || '';
+        const numero = demanda.numero || '';
+        const bairro = demanda.bairro || '';
+        const cidade = demanda.cidade || 'São Paulo';
+        const estado = 'SP'; // TODO: pegar do registro
+
+        // Só geocodificar se tiver pelo menos bairro ou logradouro
+        if (logradouro || bairro) {
+          const coord = await geocodificarEndereco(logradouro, numero, bairro, cidade, estado);
+
+          if (coord) {
+            // Atualizar no banco
+            const { error } = await supabase
+              .from('demandas')
+              .update({
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                geocodificado: true
+              })
+              .eq('id', demanda.id);
+
+            if (!error) {
+              sucesso++;
+            } else {
+              console.error('Erro ao atualizar demanda:', error);
+              falhas++;
+            }
+          } else {
+            falhas++;
+          }
+        } else {
+          falhas++;
+        }
+
+        processados++;
+        setProgressoGeocodificacao({ atual: processados, total });
+
+        // Delay entre requisições para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        console.error('Erro ao geocodificar demanda:', err);
+        falhas++;
+        processados++;
+        setProgressoGeocodificacao({ atual: processados, total });
+      }
+    }
+
+    // Geocodificar munícipes
+    for (const municipe of municipesSemCoord) {
+      try {
+        // Extrair dados do endereço (campo 'endereco' pode conter logradouro e número)
+        const enderecoCompleto = municipe.endereco || '';
+        const bairro = municipe.bairro || '';
+        const cidade = municipe.cidade || 'São Paulo';
+        const estado = 'SP';
+
+        // Tentar extrair número do endereço
+        const matchNumero = enderecoCompleto.match(/,?\s*(\d+)\s*$/);
+        const numero = matchNumero ? matchNumero[1] : '';
+        const logradouro = matchNumero 
+          ? enderecoCompleto.replace(/,?\s*\d+\s*$/, '').trim()
+          : enderecoCompleto;
+
+        if (logradouro || bairro) {
+          const coord = await geocodificarEndereco(logradouro, numero, bairro, cidade, estado);
+
+          if (coord) {
+            const { error } = await supabase
+              .from('municipes')
+              .update({
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                geocodificado: true
+              })
+              .eq('id', municipe.id);
+
+            if (!error) {
+              sucesso++;
+            } else {
+              console.error('Erro ao atualizar munícipe:', error);
+              falhas++;
+            }
+          } else {
+            falhas++;
+          }
+        } else {
+          falhas++;
+        }
+
+        processados++;
+        setProgressoGeocodificacao({ atual: processados, total });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        console.error('Erro ao geocodificar munícipe:', err);
+        falhas++;
+        processados++;
+        setProgressoGeocodificacao({ atual: processados, total });
+      }
+    }
+
+    setGeocodificando(false);
+    
+    // Recarregar dados
+    await refetchDemandas();
+    await refetchMunicipes();
+
+    if (sucesso > 0) {
+      toast.success(`Geocodificação concluída! ${sucesso} registros atualizados.`);
+    }
+    if (falhas > 0) {
+      toast.warning(`${falhas} registros não puderam ser geocodificados (endereço incompleto ou não encontrado).`);
+    }
+  }, [demandasRaw, municipesRaw, refetchDemandas, refetchMunicipes]);
 
   // Bairros únicos
   const bairrosUnicos = Array.from(new Set([
