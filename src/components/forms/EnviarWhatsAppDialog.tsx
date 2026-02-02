@@ -26,10 +26,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 import { 
   MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText,
-  MapPin, User, BarChart3, Eye, Shuffle, Smile, Plus, Trash2, RefreshCw
+  MapPin, User, BarChart3, Eye, Shuffle, Smile, Plus, Trash2, RefreshCw, CheckCircle
 } from "lucide-react";
+import { RelatoriosWhatsAppDialog } from "./RelatoriosWhatsAppDialog";
 
 interface EnviarWhatsAppDialogProps {
   municipesSelecionados?: string[];
@@ -71,6 +76,8 @@ const VARIAVEIS = [
 export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }: EnviarWhatsAppDialogProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TipoMensagem>('texto');
+  const [envioFinalizado, setEnvioFinalizado] = useState(false);
+  const [ultimoEnvioId, setUltimoEnvioId] = useState<string | null>(null);
   
   // Estados de conteúdo
   const [conteudoTexto, setConteudoTexto] = useState({ mensagem: "" });
@@ -233,6 +240,22 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
     }
   };
 
+  const resetForm = () => {
+    setConteudoTexto({ mensagem: "" });
+    setConteudoImagem({ url: "", legenda: "" });
+    setConteudoVideo({ url: "", legenda: "" });
+    setConteudoAudio({ url: "" });
+    setConteudoDocumento({ url: "", nomeArquivo: "" });
+    setConteudoLocalizacao({ latitude: "", longitude: "", nome: "", endereco: "" });
+    setConteudoContato({ nome: "", telefone: "", descricao: "" });
+    setConteudoEnquete({ pergunta: "", opcoes: ["", ""], multiplas: false });
+    setMediaFiles([]);
+    setTitulo("");
+    setReacaoAutomatica(null);
+    setEnvioFinalizado(false);
+    setUltimoEnvioId(null);
+  };
+
   // Mutation
   const enviarWhatsApp = useMutation({
     mutationFn: async () => {
@@ -241,22 +264,27 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
       if (!selectedInstance) throw new Error('Selecione uma instância');
       if (!incluirTodos && selectedMunicipes.length === 0) throw new Error('Selecione destinatários');
 
-      const recipients = incluirTodos 
-        ? (municipes || []).map(m => ({ id: m.id, nome: m.nome, telefone: m.telefone }))
+      // ✅ Preparar destinatários COMPLETOS com todos os dados
+      const destinatariosCompletos = incluirTodos 
+        ? (municipes || []).map(m => ({ 
+            id: m.id, 
+            nome: m.nome, 
+            telefone: m.telefone,
+            protocolo: demandaData?.protocolo || '',
+            assunto: demandaData?.assunto || '',
+            status: demandaData?.status || ''
+          }))
         : selectedMunicipes.map(id => {
             const m = municipes?.find(m => m.id === id);
-            return m ? { id: m.id, nome: m.nome, telefone: m.telefone } : null;
-          }).filter(Boolean) as { id: string; nome: string; telefone: string }[];
-
-      startSending({
-        recipients,
-        message: activeTab === 'texto' ? conteudoTexto.mensagem : `[${activeTab.toUpperCase()}]`,
-        instanceName: selectedInstance,
-        tempoMinimo,
-        tempoMaximo,
-      });
-
-      setOpen(false);
+            return m ? { 
+              id: m.id, 
+              nome: m.nome, 
+              telefone: m.telefone,
+              protocolo: demandaData?.protocolo || '',
+              assunto: demandaData?.assunto || '',
+              status: demandaData?.status || ''
+            } : null;
+          }).filter(Boolean) as Array<{ id: string; nome: string; telefone: string; protocolo: string; assunto: string; status: string }>;
 
       // Upload mídias
       const uploadedMedia = [];
@@ -273,95 +301,79 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
         uploadedMedia.push({ type: media.type, url: urlData.publicUrl, filename: media.file.name });
       }
 
-      // Processar envios
-      for (let i = 0; i < recipients.length; i++) {
-        const recipient = recipients[i];
-        const cancelled = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
-        if (cancelled === 'true') break;
-        
-        updateRecipientStatus(recipient.id, 'sending');
-        
-        const delay = Math.floor(Math.random() * (tempoMaximo - tempoMinimo + 1)) + tempoMinimo;
-        for (let j = delay; j > 0; j--) {
-          const c = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
-          if (c === 'true') return;
-          updateCountdown(recipient.id, j);
-          await new Promise(r => setTimeout(r, 1000));
-        }
+      // ✅ Preparar payload com TODOS os parâmetros necessários
+      const payload: any = {
+        instanceName: selectedInstance,
+        tempoMinimo,
+        tempoMaximo,
+        tipo: activeTab,
+        ordemAleatoria,
+        reacaoAutomatica, // ✅ Passar reação automática
+        salvarHistorico: true, // ✅ Sempre salvar histórico
+        tituloEnvio: titulo,
+        destinatarios: destinatariosCompletos, // ✅ Passar destinatários completos
+      };
 
-        try {
-          const varsDestinatario = {
-            nome: recipient.nome,
-            primeiro_nome: recipient.nome.split(' ')[0],
-            telefone: recipient.telefone,
-            protocolo: demandaData?.protocolo || '',
-            assunto: demandaData?.assunto || '',
-            status: demandaData?.status || '',
+      switch (activeTab) {
+        case 'texto':
+          payload.mensagem = conteudoTexto.mensagem;
+          payload.mediaFiles = uploadedMedia;
+          break;
+        case 'imagem':
+          payload.mensagem = conteudoImagem.legenda;
+          payload.conteudo = conteudoImagem;
+          payload.mediaFiles = conteudoImagem.url ? [] : uploadedMedia.filter(m => m.type === 'image');
+          break;
+        case 'video':
+          payload.mensagem = conteudoVideo.legenda;
+          payload.conteudo = conteudoVideo;
+          payload.mediaFiles = conteudoVideo.url ? [] : uploadedMedia.filter(m => m.type === 'video');
+          break;
+        case 'audio':
+          payload.conteudo = conteudoAudio;
+          payload.mediaFiles = conteudoAudio.url ? [] : uploadedMedia.filter(m => m.type === 'audio');
+          break;
+        case 'documento':
+          payload.conteudo = conteudoDocumento;
+          payload.mediaFiles = conteudoDocumento.url ? [] : uploadedMedia.filter(m => m.type === 'document');
+          break;
+        case 'localizacao':
+          payload.localizacao = {
+            latitude: parseFloat(conteudoLocalizacao.latitude),
+            longitude: parseFloat(conteudoLocalizacao.longitude),
+            nome: conteudoLocalizacao.nome,
+            endereco: conteudoLocalizacao.endereco
           };
-
-          const payload: any = {
-            telefones: [recipient.telefone],
-            instanceName: selectedInstance,
-            tempoMinimo: 0,
-            tempoMaximo: 0,
-            tipo: activeTab,
-            variaveis: varsDestinatario,
-            ordemAleatoria: false,
+          break;
+        case 'contato':
+          payload.contato = conteudoContato;
+          break;
+        case 'enquete':
+          payload.enquete = {
+            pergunta: conteudoEnquete.pergunta,
+            opcoes: conteudoEnquete.opcoes.filter(o => o.trim()),
+            multiplas: conteudoEnquete.multiplas
           };
-
-          switch (activeTab) {
-            case 'texto':
-              payload.mensagem = conteudoTexto.mensagem;
-              payload.mediaFiles = uploadedMedia;
-              break;
-            case 'imagem':
-              payload.conteudo = conteudoImagem;
-              payload.mediaFiles = conteudoImagem.url ? [] : uploadedMedia.filter(m => m.type === 'image');
-              break;
-            case 'video':
-              payload.conteudo = conteudoVideo;
-              payload.mediaFiles = conteudoVideo.url ? [] : uploadedMedia.filter(m => m.type === 'video');
-              break;
-            case 'audio':
-              payload.conteudo = conteudoAudio;
-              payload.mediaFiles = conteudoAudio.url ? [] : uploadedMedia.filter(m => m.type === 'audio');
-              break;
-            case 'documento':
-              payload.conteudo = conteudoDocumento;
-              payload.mediaFiles = conteudoDocumento.url ? [] : uploadedMedia.filter(m => m.type === 'document');
-              break;
-            case 'localizacao':
-              payload.localizacao = {
-                latitude: parseFloat(conteudoLocalizacao.latitude),
-                longitude: parseFloat(conteudoLocalizacao.longitude),
-                nome: conteudoLocalizacao.nome,
-                endereco: conteudoLocalizacao.endereco
-              };
-              break;
-            case 'contato':
-              payload.contato = conteudoContato;
-              break;
-            case 'enquete':
-              payload.enquete = {
-                pergunta: conteudoEnquete.pergunta,
-                opcoes: conteudoEnquete.opcoes.filter(o => o.trim()),
-                multiplas: conteudoEnquete.multiplas
-              };
-              break;
-          }
-
-          const { error } = await supabase.functions.invoke("enviar-whatsapp", { body: payload });
-          if (error) throw error;
-          updateRecipientStatus(recipient.id, 'sent');
-        } catch (error) {
-          updateRecipientStatus(recipient.id, 'error', error instanceof Error ? error.message : 'Erro');
-        }
+          break;
       }
 
-      return { total: recipients.length };
+      console.log("📤 Enviando payload:", JSON.stringify(payload).substring(0, 500));
+
+      // ✅ Chamar a Edge Function UMA vez (ela processa todos os destinatários)
+      const { data, error } = await supabase.functions.invoke("enviar-whatsapp", { body: payload });
+      
+      if (error) throw error;
+      
+      return data;
     },
     onSuccess: (data) => {
-      toast({ title: "✅ Envio iniciado!", description: `Processando ${data.total} destinatários` });
+      setEnvioFinalizado(true);
+      setUltimoEnvioId(data?.envioId);
+      
+      toast({ 
+        title: "✅ Envio concluído!", 
+        description: `${data?.resumo?.sucessos || 0} enviados, ${data?.resumo?.erros || 0} erros`,
+      });
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -467,6 +479,37 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
     );
   };
 
+  // Tela de sucesso após envio
+  if (envioFinalizado) {
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
+        <DialogTrigger asChild>
+          <Button><MessageSquare className="h-4 w-4 mr-2" />Enviar WhatsApp</Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Envio Concluído!</h3>
+            <p className="text-muted-foreground mb-6">
+              As mensagens foram enviadas. Você pode acompanhar o status nos relatórios.
+            </p>
+            <div className="flex flex-col gap-2">
+              <RelatoriosWhatsAppDialog />
+              <Button variant="outline" onClick={() => { resetForm(); }}>
+                Novo Envio
+              </Button>
+              <Button variant="ghost" onClick={() => { setOpen(false); resetForm(); }}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -474,8 +517,12 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
       </DialogTrigger>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-green-500" />Enviar WhatsApp
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-green-500" />
+              Enviar WhatsApp
+            </div>
+            <RelatoriosWhatsAppDialog />
           </DialogTitle>
           <DialogDescription>Envie mensagens para munícipes selecionados</DialogDescription>
         </DialogHeader>
@@ -672,7 +719,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
                     <span className="text-sm text-muted-foreground">seg</span>
                   </div>
                   <div>
-                    <Label className="flex items-center gap-2 mb-2"><Smile className="h-4 w-4" />Reação automática</Label>
+                    <Label className="flex items-center gap-2 mb-2"><Smile className="h-4 w-4" />Reação automática (quando responderem)</Label>
                     <div className="flex flex-wrap gap-2">
                       {EMOJIS_REACAO.map(e => (
                         <button key={e} type="button" onClick={() => setReacaoAutomatica(reacaoAutomatica === e ? null : e)} 
@@ -681,6 +728,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
                         </button>
                       ))}
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1">Se ativado, quando a pessoa responder, ela receberá essa reação automaticamente</p>
                   </div>
                 </div>
               )}
@@ -744,7 +792,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={() => enviarWhatsApp.mutate()} disabled={enviarWhatsApp.isPending || !selectedInstance || totalDestinatarios === 0}>
-              {enviarWhatsApp.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Iniciando...</> : <><Send className="h-4 w-4 mr-2" />Enviar ({totalDestinatarios})</>}
+              {enviarWhatsApp.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</> : <><Send className="h-4 w-4 mr-2" />Enviar ({totalDestinatarios})</>}
             </Button>
           </div>
         </div>
