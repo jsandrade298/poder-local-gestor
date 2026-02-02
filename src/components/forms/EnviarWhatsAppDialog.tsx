@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,9 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText, AlertCircle, Minimize2, BarChart3, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -30,15 +29,15 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
-import { 
-  MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, FileText,
-  MapPin, User, BarChart3, Eye, Shuffle, Smile, Plus, Trash2, RefreshCw, CheckCircle
-} from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { RelatoriosWhatsAppDialog } from "./RelatoriosWhatsAppDialog";
 
 interface EnviarWhatsAppDialogProps {
   municipesSelecionados?: string[];
-  demandaData?: { protocolo?: string; assunto?: string; status?: string; };
 }
 
 interface MediaFile {
@@ -47,181 +46,459 @@ interface MediaFile {
   url: string;
 }
 
-type TipoMensagem = 'texto' | 'imagem' | 'video' | 'audio' | 'documento' | 'localizacao' | 'contato' | 'enquete';
-
-const TABS_CONFIG = [
-  { id: 'texto' as TipoMensagem, label: 'Texto', icon: MessageSquare },
-  { id: 'imagem' as TipoMensagem, label: 'Imagem', icon: Image },
-  { id: 'video' as TipoMensagem, label: 'Vídeo', icon: Video },
-  { id: 'audio' as TipoMensagem, label: 'Áudio', icon: FileAudio },
-  { id: 'documento' as TipoMensagem, label: 'Doc', icon: FileText },
-  { id: 'localizacao' as TipoMensagem, label: 'Local', icon: MapPin },
-  { id: 'contato' as TipoMensagem, label: 'Contato', icon: User },
-  { id: 'enquete' as TipoMensagem, label: 'Enquete', icon: BarChart3 },
-];
-
-const EMOJIS_REACAO = ['👍', '❤️', '😂', '😮', '😢', '🙏', '👏', '🔥'];
-
+// Variáveis disponíveis para substituição
 const VARIAVEIS = [
-  { chave: 'nome', desc: 'Nome completo' },
-  { chave: 'primeiro_nome', desc: 'Primeiro nome' },
-  { chave: 'telefone', desc: 'Telefone' },
-  { chave: 'protocolo', desc: 'Protocolo' },
-  { chave: 'assunto', desc: 'Assunto' },
-  { chave: 'status', desc: 'Status' },
-  { chave: 'data', desc: 'Data atual' },
-  { chave: 'hora', desc: 'Hora atual' },
+  { codigo: "{nome}", descricao: "Nome completo", campo: "nome" },
+  { codigo: "{primeiro_nome}", descricao: "Primeiro nome", campo: "primeiro_nome" },
+  { codigo: "{telefone}", descricao: "Telefone", campo: "telefone" },
+  { codigo: "{email}", descricao: "E-mail", campo: "email" },
+  { codigo: "{bairro}", descricao: "Bairro", campo: "bairro" },
+  { codigo: "{protocolo}", descricao: "Protocolo da demanda", campo: "protocolo" },
+  { codigo: "{assunto}", descricao: "Assunto da demanda", campo: "assunto" },
+  { codigo: "{status}", descricao: "Status da demanda", campo: "status" },
+  { codigo: "{data}", descricao: "Data atual", campo: "data" },
+  { codigo: "{hora}", descricao: "Hora atual", campo: "hora" },
 ];
 
-export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }: EnviarWhatsAppDialogProps) {
+export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhatsAppDialogProps) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TipoMensagem>('texto');
-  const [envioFinalizado, setEnvioFinalizado] = useState(false);
-  const [ultimoEnvioId, setUltimoEnvioId] = useState<string | null>(null);
-  
-  // Estados de conteúdo
-  const [conteudoTexto, setConteudoTexto] = useState({ mensagem: "" });
-  const [conteudoImagem, setConteudoImagem] = useState({ url: "", legenda: "" });
-  const [conteudoVideo, setConteudoVideo] = useState({ url: "", legenda: "" });
-  const [conteudoAudio, setConteudoAudio] = useState({ url: "" });
-  const [conteudoDocumento, setConteudoDocumento] = useState({ url: "", nomeArquivo: "" });
-  const [conteudoLocalizacao, setConteudoLocalizacao] = useState({ latitude: "", longitude: "", nome: "", endereco: "" });
-  const [conteudoContato, setConteudoContato] = useState({ nome: "", telefone: "", descricao: "" });
-  const [conteudoEnquete, setConteudoEnquete] = useState({ pergunta: "", opcoes: ["", ""], multiplas: false });
-  
-  // Estados gerais
+  const [mensagem, setMensagem] = useState("");
   const [incluirTodos, setIncluirTodos] = useState(false);
   const [selectedMunicipes, setSelectedMunicipes] = useState<string[]>(municipesSelecionados);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
   const [tempoMinimo, setTempoMinimo] = useState(2);
   const [tempoMaximo, setTempoMaximo] = useState(5);
-  const [ordemAleatoria, setOrdemAleatoria] = useState(false);
-  const [reacaoAutomatica, setReacaoAutomatica] = useState<string | null>(null);
-  const [titulo, setTitulo] = useState("");
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [searchMunicipe, setSearchMunicipe] = useState("");
-  const [mostrarOpcoes, setMostrarOpcoes] = useState(false);
+  const [sendingStatus, setSendingStatus] = useState<any>(null);
+  const [lastEnvioId, setLastEnvioId] = useState<string | null>(null);
+  const [showRelatorios, setShowRelatorios] = useState(false);
+  
+  // Opções avançadas
+  const [ordemAleatoria, setOrdemAleatoria] = useState(false);
+  const [reacaoAutomatica, setReacaoAutomatica] = useState<string>("");
   
   const { toast } = useToast();
-  const { startSending, updateRecipientStatus, updateCountdown } = useWhatsAppSending();
+  const { startSending, updateRecipientStatus, updateCountdown, setMinimized, finishSending } = useWhatsAppSending();
 
+  // Sincronizar munícipes selecionados quando a prop mudar
   useEffect(() => {
     setSelectedMunicipes(municipesSelecionados);
   }, [municipesSelecionados]);
 
-  // Buscar munícipes
+  // Buscar munícipes em lotes (com dados completos para variáveis)
   const { data: municipes } = useQuery({
-    queryKey: ["municipes-whatsapp"],
+    queryKey: ["municipes-whatsapp-completo"],
     queryFn: async () => {
-      let all: Array<{ id: string; nome: string; telefone: string }> = [];
+      console.log('🔄 Carregando munícipes com dados completos...');
+      
+      let allMunicipes: Array<{ 
+        id: string; 
+        nome: string; 
+        telefone: string;
+        email?: string;
+        bairro?: string;
+      }> = [];
       let from = 0;
       const pageSize = 1000;
       let hasMore = true;
       
       while (hasMore) {
+        console.log(`📦 Carregando lote ${Math.floor(from / pageSize) + 1}...`);
+        
         const { data, error } = await supabase
           .from("municipes")
-          .select("id, nome, telefone")
+          .select("id, nome, telefone, email, bairro")
           .not("telefone", "is", null)
           .order("nome")
           .range(from, from + pageSize - 1);
-        if (error) throw error;
+          
+        if (error) {
+          console.error('❌ Erro ao buscar munícipes:', error);
+          throw error;
+        }
+        
         if (data && data.length > 0) {
-          all = [...all, ...data];
+          allMunicipes = [...allMunicipes, ...data];
           hasMore = data.length === pageSize;
           from += pageSize;
         } else {
           hasMore = false;
         }
       }
-      return all;
+      
+      console.log(`🎯 Total: ${allMunicipes.length} munícipes carregados`);
+      return allMunicipes;
     },
     enabled: open,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // Buscar instâncias do banco
-  const { data: instances, isLoading: loadingInstances, refetch: refetchInstances } = useQuery({
-    queryKey: ["whatsapp-instances-db"],
+  // Buscar instâncias conectadas
+  const { data: instances, isLoading: loadingInstances } = useQuery({
+    queryKey: ["whatsapp-instances-status"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("whatsapp_instances")
-        .select("*")
-        .eq("active", true);
-      if (error) throw error;
-      return data || [];
+      const specificInstances = ["gabinete-whats-01", "gabinete-whats-02", "gabinete-whats-03"];
+      const connectedInstances = [];
+
+      for (const instanceName of specificInstances) {
+        try {
+          const { data, error } = await supabase.functions.invoke("configurar-evolution", {
+            body: { action: "instance_status", instanceName }
+          });
+
+          if (!error && data?.status === 'connected') {
+            connectedInstances.push({
+              instanceName,
+              displayName: instanceName.replace('gabinete-whats-', 'Gabinete WhatsApp '),
+              status: 'connected',
+              number: data.phoneNumber
+            });
+          }
+        } catch (error) {
+          console.error(`Erro ao verificar instância ${instanceName}:`, error);
+        }
+      }
+
+      return connectedInstances;
     },
     enabled: open,
+    staleTime: 0,
   });
 
-  const filteredMunicipes = useMemo(() => {
-    if (!searchMunicipe.trim() || !municipes) return [];
-    const search = searchMunicipe.toLowerCase();
-    return municipes.filter(m => m.nome.toLowerCase().includes(search) || m.telefone?.includes(search)).slice(0, 20);
-  }, [searchMunicipe, municipes]);
-
-  const totalDestinatarios = incluirTodos ? (municipes?.length || 0) : selectedMunicipes.length;
-
-  // Substituir variáveis para preview
-  const substituirPreview = (texto: string): string => {
-    const m = municipes?.find(m => selectedMunicipes.includes(m.id));
-    const vars: Record<string, string> = {
-      nome: m?.nome || 'João Silva',
-      primeiro_nome: (m?.nome || 'João Silva').split(' ')[0],
-      telefone: m?.telefone || '(11) 99999-0000',
-      protocolo: demandaData?.protocolo || '2024-00123',
-      assunto: demandaData?.assunto || 'Iluminação pública',
-      status: demandaData?.status || 'Em andamento',
-      data: new Date().toLocaleDateString('pt-BR'),
-      hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    };
-    let result = texto;
-    Object.entries(vars).forEach(([k, v]) => {
-      result = result.replace(new RegExp(`\\{${k}\\}`, 'gi'), v);
-    });
-    return result;
-  };
-
-  const inserirVariavel = (v: string) => {
-    const tag = `{${v}}`;
-    switch (activeTab) {
-      case 'texto': setConteudoTexto(p => ({ ...p, mensagem: p.mensagem + tag })); break;
-      case 'imagem': setConteudoImagem(p => ({ ...p, legenda: p.legenda + tag })); break;
-      case 'video': setConteudoVideo(p => ({ ...p, legenda: p.legenda + tag })); break;
-      case 'documento': setConteudoDocumento(p => ({ ...p, nomeArquivo: p.nomeArquivo + tag })); break;
-      case 'enquete': setConteudoEnquete(p => ({ ...p, pergunta: p.pergunta + tag })); break;
+  // Função para embaralhar array (Fisher-Yates)
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    return shuffled;
   };
 
-  const validarConteudo = (): string | null => {
-    switch (activeTab) {
-      case 'texto': if (!conteudoTexto.mensagem.trim()) return 'Digite uma mensagem'; break;
-      case 'imagem': if (!conteudoImagem.url.trim() && mediaFiles.filter(m => m.type === 'image').length === 0) return 'Informe URL ou faça upload'; break;
-      case 'video': if (!conteudoVideo.url.trim() && mediaFiles.filter(m => m.type === 'video').length === 0) return 'Informe URL ou faça upload'; break;
-      case 'audio': if (!conteudoAudio.url.trim() && mediaFiles.filter(m => m.type === 'audio').length === 0) return 'Informe URL ou faça upload'; break;
-      case 'documento': if (!conteudoDocumento.url.trim() && mediaFiles.filter(m => m.type === 'document').length === 0) return 'Informe URL ou faça upload'; break;
-      case 'localizacao': if (!conteudoLocalizacao.latitude || !conteudoLocalizacao.longitude) return 'Informe latitude e longitude'; break;
-      case 'contato': if (!conteudoContato.nome.trim() || !conteudoContato.telefone.trim()) return 'Informe nome e telefone'; break;
-      case 'enquete': if (!conteudoEnquete.pergunta.trim()) return 'Digite a pergunta'; if (conteudoEnquete.opcoes.filter(o => o.trim()).length < 2) return 'Mínimo 2 opções'; break;
+  // Mutation para enviar mensagens
+  const enviarWhatsApp = useMutation({
+    mutationFn: async (dados: any) => {
+      // Preparar lista de destinatários com dados completos
+      let recipients = incluirTodos 
+        ? (municipes || []).map(m => ({ 
+            id: m.id, 
+            nome: m.nome, 
+            telefone: m.telefone,
+            email: m.email || '',
+            bairro: m.bairro || ''
+          }))
+        : selectedMunicipes
+            .map(id => {
+              const municipe = municipes?.find(m => m.id === id);
+              return municipe ? { 
+                id: municipe.id, 
+                nome: municipe.nome, 
+                telefone: municipe.telefone,
+                email: municipe.email || '',
+                bairro: municipe.bairro || ''
+              } : null;
+            })
+            .filter(Boolean) as { id: string; nome: string; telefone: string; email: string; bairro: string }[];
+
+      // Aplicar ordem aleatória se configurado
+      if (ordemAleatoria) {
+        recipients = shuffleArray(recipients);
+        console.log('🔀 Ordem aleatória aplicada');
+      }
+
+      // Iniciar tracking do progresso (MODAL APARECE AQUI)
+      startSending({
+        recipients: recipients.map(r => ({ id: r.id, nome: r.nome, telefone: r.telefone })),
+        message: mensagem,
+        instanceName: selectedInstance,
+        tempoMinimo,
+        tempoMaximo,
+      });
+
+      // Minimizar dialog principal e mostrar modal de progresso
+      setOpen(false);
+      
+      // Upload de mídias para o Storage
+      const uploadedMedia = [];
+      
+      for (const media of mediaFiles) {
+        const fileName = `whatsapp/${Date.now()}-${media.file.name}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('whatsapp-media')
+          .upload(fileName, media.file);
+
+        if (uploadError) {
+          if (uploadError.message.includes('not found')) {
+            await supabase.storage.createBucket('whatsapp-media', { public: true });
+            const { error: retryError } = await supabase.storage
+              .from('whatsapp-media')
+              .upload(fileName, media.file);
+            if (retryError) throw retryError;
+          } else {
+            throw uploadError;
+          }
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('whatsapp-media')
+          .getPublicUrl(fileName);
+
+        uploadedMedia.push({
+          type: media.type,
+          url: urlData.publicUrl,
+          filename: media.file.name
+        });
+      }
+
+      // Criar registro de envio no banco ANTES de começar
+      let envioId: string | null = null;
+      
+      try {
+        const { data: envioData, error: envioError } = await supabase
+          .from('whatsapp_envios')
+          .insert({
+            titulo: mensagem.substring(0, 100) || 'Envio de mídia',
+            tipo: uploadedMedia.length > 0 ? uploadedMedia[0].type : 'texto',
+            mensagem: mensagem,
+            instancia_nome: selectedInstance,
+            total_destinatarios: recipients.length,
+            total_enviados: 0,
+            total_entregues: 0,
+            total_lidos: 0,
+            total_erros: 0,
+            status: 'enviando',
+            reacao_automatica: reacaoAutomatica || null,
+          })
+          .select('id')
+          .single();
+        
+        if (!envioError && envioData) {
+          envioId = envioData.id;
+          setLastEnvioId(envioId);
+          console.log('📋 Envio criado no banco:', envioId);
+        }
+      } catch (err) {
+        console.warn('⚠️ Não foi possível criar registro de envio:', err);
+      }
+
+      // Contadores para estatísticas
+      let totalEnviados = 0;
+      let totalErros = 0;
+
+      // ENVIO SEQUENCIAL COM COUNTDOWN
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+        
+        // Verificar se o envio foi cancelado
+        const currentState = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+        if (currentState === 'true') {
+          console.log('❌ Envio cancelado pelo usuário');
+          break;
+        }
+        
+        // Marcar como enviando
+        updateRecipientStatus(recipient.id, 'sending');
+        
+        // COUNTDOWN REAL antes do envio
+        const delay = Math.floor(Math.random() * (tempoMaximo - tempoMinimo + 1)) + tempoMinimo;
+        for (let countdown = delay; countdown > 0; countdown--) {
+          // Verificar cancelamento durante countdown
+          const cancelledDuringCountdown = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+          if (cancelledDuringCountdown === 'true') {
+            return { resumo: { total: recipients.length, sucessos: totalEnviados, erros: totalErros }, envioId };
+          }
+          
+          updateCountdown(recipient.id, countdown);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Verificar cancelamento antes do envio
+        const cancelledBeforeSend = document.querySelector('[data-whatsapp-sending-state]')?.getAttribute('data-cancelled');
+        if (cancelledBeforeSend === 'true') {
+          return { resumo: { total: recipients.length, sucessos: totalEnviados, erros: totalErros }, envioId };
+        }
+        
+        try {
+          // Preparar dados completos do destinatário para variáveis
+          const now = new Date();
+          const destinatarioCompleto = {
+            id: recipient.id,
+            telefone: recipient.telefone,
+            nome: recipient.nome,
+            primeiro_nome: recipient.nome.split(' ')[0],
+            email: recipient.email,
+            bairro: recipient.bairro,
+            data: now.toLocaleDateString('pt-BR'),
+            hora: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          // Envio individual com dados completos
+          const sendResult = await supabase.functions.invoke("enviar-whatsapp", {
+            body: {
+              // Passar destinatário completo com variáveis
+              destinatarios: [destinatarioCompleto],
+              mensagem,
+              incluirTodos: false,
+              instanceName: selectedInstance,
+              tempoMinimo: 0, // Já fizemos o delay no frontend
+              tempoMaximo: 0,
+              mediaFiles: uploadedMedia,
+              // Vincular ao registro de envio
+              envioId: envioId,
+              salvarHistorico: !!envioId, // Só salvar se temos envioId
+              reacaoAutomatica: reacaoAutomatica || null,
+            }
+          });
+
+          if (sendResult.error) {
+            throw new Error(sendResult.error.message);
+          }
+
+          updateRecipientStatus(recipient.id, 'sent');
+          totalEnviados++;
+          
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+          updateRecipientStatus(recipient.id, 'error', errorMsg);
+          totalErros++;
+          
+          // Registrar erro no destinatário se temos envioId
+          if (envioId) {
+            try {
+              await supabase
+                .from('whatsapp_envios_destinatarios')
+                .update({ 
+                  status: 'erro',
+                  erro_mensagem: errorMsg 
+                })
+                .eq('envio_id', envioId)
+                .eq('telefone', recipient.telefone);
+            } catch (e) {
+              console.warn('Não foi possível atualizar status de erro');
+            }
+          }
+        }
+      }
+
+      // Atualizar estatísticas finais do envio
+      if (envioId) {
+        try {
+          await supabase
+            .from('whatsapp_envios')
+            .update({
+              status: 'concluido',
+              total_enviados: totalEnviados,
+              total_erros: totalErros,
+              concluido_em: new Date().toISOString(),
+            })
+            .eq('id', envioId);
+            
+          console.log('✅ Estatísticas do envio atualizadas');
+        } catch (err) {
+          console.warn('⚠️ Não foi possível atualizar estatísticas:', err);
+        }
+      }
+
+      return {
+        resumo: {
+          total: recipients.length,
+          sucessos: totalEnviados,
+          erros: totalErros
+        },
+        envioId
+      };
+    },
+    onSuccess: (data) => {
+      setSendingStatus(data);
+      finishSending();
+      
+      toast({
+        title: "✅ Envio concluído!",
+        description: `${data.resumo.sucessos} enviadas com sucesso, ${data.resumo.erros} erros.`,
+      });
+    },
+    onError: (error: any) => {
+      finishSending();
+      toast({
+        title: "Erro ao enviar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEnviar = () => {
+    if (!mensagem.trim() && mediaFiles.length === 0) {
+      toast({
+        title: "Atenção",
+        description: "Digite uma mensagem ou adicione um arquivo",
+        variant: "destructive",
+      });
+      return;
     }
-    return null;
+
+    if (!selectedInstance) {
+      toast({
+        title: "Atenção",
+        description: "Selecione uma instância WhatsApp",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!incluirTodos && selectedMunicipes.length === 0) {
+      toast({
+        title: "Atenção",
+        description: "Selecione destinatários ou marque 'Enviar para todos'",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    enviarWhatsApp.mutate({});
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     if (!files) return;
+
     Array.from(files).forEach(file => {
       if (file.size > 100 * 1024 * 1024) {
-        toast({ title: "Arquivo muito grande", description: `${file.name} excede 100MB`, variant: "destructive" });
+        toast({
+          title: "Arquivo muito grande",
+          description: `${file.name} excede 100MB`,
+          variant: "destructive",
+        });
         return;
       }
-      let type: MediaFile['type'] = 'document';
-      if (file.type.startsWith('image/')) type = 'image';
-      else if (file.type.startsWith('video/')) type = 'video';
-      else if (file.type.startsWith('audio/')) type = 'audio';
-      setMediaFiles(prev => [...prev, { file, type, url: URL.createObjectURL(file) }]);
+
+      let type: MediaFile['type'];
+      
+      if (file.type.startsWith('image/')) {
+        type = 'image';
+      } else if (file.type.startsWith('video/')) {
+        type = 'video';
+      } else if (
+        file.type.startsWith('audio/') || 
+        file.name.endsWith('.m4a') || 
+        file.name.endsWith('.mp3') || 
+        file.name.endsWith('.wav') ||
+        file.name.endsWith('.ogg') ||
+        file.name.endsWith('.aac')
+      ) {
+        type = 'audio';
+      } else {
+        type = 'document';
+      }
+
+      const url = URL.createObjectURL(file);
+      setMediaFiles(prev => [...prev, { file, type, url }]);
     });
-    e.target.value = '';
+
+    event.target.value = '';
   };
 
   const removeMediaFile = (index: number) => {
@@ -233,570 +510,433 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [], demandaData }
 
   const getMediaIcon = (type: MediaFile['type']) => {
     switch (type) {
-      case 'image': return <Image className="h-4 w-4 text-blue-500" />;
-      case 'video': return <Video className="h-4 w-4 text-purple-500" />;
-      case 'audio': return <FileAudio className="h-4 w-4 text-green-500" />;
-      default: return <FileText className="h-4 w-4 text-orange-500" />;
+      case 'image': return <Image className="h-4 w-4" />;
+      case 'video': return <Video className="h-4 w-4" />;
+      case 'audio': return <FileAudio className="h-4 w-4" />;
+      default: return <FileText className="h-4 w-4" />;
     }
   };
 
-  const resetForm = () => {
-    setConteudoTexto({ mensagem: "" });
-    setConteudoImagem({ url: "", legenda: "" });
-    setConteudoVideo({ url: "", legenda: "" });
-    setConteudoAudio({ url: "" });
-    setConteudoDocumento({ url: "", nomeArquivo: "" });
-    setConteudoLocalizacao({ latitude: "", longitude: "", nome: "", endereco: "" });
-    setConteudoContato({ nome: "", telefone: "", descricao: "" });
-    setConteudoEnquete({ pergunta: "", opcoes: ["", ""], multiplas: false });
-    setMediaFiles([]);
-    setTitulo("");
-    setReacaoAutomatica(null);
-    setEnvioFinalizado(false);
-    setUltimoEnvioId(null);
+  // Inserir variável na mensagem
+  const inserirVariavel = (codigo: string) => {
+    setMensagem(prev => prev + codigo);
   };
 
-  // Mutation
-  const enviarWhatsApp = useMutation({
-    mutationFn: async () => {
-      const erro = validarConteudo();
-      if (erro) throw new Error(erro);
-      if (!selectedInstance) throw new Error('Selecione uma instância');
-      if (!incluirTodos && selectedMunicipes.length === 0) throw new Error('Selecione destinatários');
-
-      // ✅ Preparar destinatários COMPLETOS com todos os dados
-      const destinatariosCompletos = incluirTodos 
-        ? (municipes || []).map(m => ({ 
-            id: m.id, 
-            nome: m.nome, 
-            telefone: m.telefone,
-            protocolo: demandaData?.protocolo || '',
-            assunto: demandaData?.assunto || '',
-            status: demandaData?.status || ''
-          }))
-        : selectedMunicipes.map(id => {
-            const m = municipes?.find(m => m.id === id);
-            return m ? { 
-              id: m.id, 
-              nome: m.nome, 
-              telefone: m.telefone,
-              protocolo: demandaData?.protocolo || '',
-              assunto: demandaData?.assunto || '',
-              status: demandaData?.status || ''
-            } : null;
-          }).filter(Boolean) as Array<{ id: string; nome: string; telefone: string; protocolo: string; assunto: string; status: string }>;
-
-      // Upload mídias
-      const uploadedMedia = [];
-      for (const media of mediaFiles) {
-        const fileName = `whatsapp/${Date.now()}-${media.file.name}`;
-        const { error } = await supabase.storage.from('whatsapp-media').upload(fileName, media.file);
-        if (error && !error.message.includes('already exists')) {
-          if (error.message.includes('not found')) {
-            await supabase.storage.createBucket('whatsapp-media', { public: true });
-            await supabase.storage.from('whatsapp-media').upload(fileName, media.file);
-          }
-        }
-        const { data: urlData } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName);
-        uploadedMedia.push({ type: media.type, url: urlData.publicUrl, filename: media.file.name });
-      }
-
-      // ✅ Preparar payload com TODOS os parâmetros necessários
-      const payload: any = {
-        instanceName: selectedInstance,
-        tempoMinimo,
-        tempoMaximo,
-        tipo: activeTab,
-        ordemAleatoria,
-        reacaoAutomatica, // ✅ Passar reação automática
-        salvarHistorico: true, // ✅ Sempre salvar histórico
-        tituloEnvio: titulo,
-        destinatarios: destinatariosCompletos, // ✅ Passar destinatários completos
-      };
-
-      switch (activeTab) {
-        case 'texto':
-          payload.mensagem = conteudoTexto.mensagem;
-          payload.mediaFiles = uploadedMedia;
-          break;
-        case 'imagem':
-          payload.mensagem = conteudoImagem.legenda;
-          payload.conteudo = conteudoImagem;
-          payload.mediaFiles = conteudoImagem.url ? [] : uploadedMedia.filter(m => m.type === 'image');
-          break;
-        case 'video':
-          payload.mensagem = conteudoVideo.legenda;
-          payload.conteudo = conteudoVideo;
-          payload.mediaFiles = conteudoVideo.url ? [] : uploadedMedia.filter(m => m.type === 'video');
-          break;
-        case 'audio':
-          payload.conteudo = conteudoAudio;
-          payload.mediaFiles = conteudoAudio.url ? [] : uploadedMedia.filter(m => m.type === 'audio');
-          break;
-        case 'documento':
-          payload.conteudo = conteudoDocumento;
-          payload.mediaFiles = conteudoDocumento.url ? [] : uploadedMedia.filter(m => m.type === 'document');
-          break;
-        case 'localizacao':
-          payload.localizacao = {
-            latitude: parseFloat(conteudoLocalizacao.latitude),
-            longitude: parseFloat(conteudoLocalizacao.longitude),
-            nome: conteudoLocalizacao.nome,
-            endereco: conteudoLocalizacao.endereco
-          };
-          break;
-        case 'contato':
-          payload.contato = conteudoContato;
-          break;
-        case 'enquete':
-          payload.enquete = {
-            pergunta: conteudoEnquete.pergunta,
-            opcoes: conteudoEnquete.opcoes.filter(o => o.trim()),
-            multiplas: conteudoEnquete.multiplas
-          };
-          break;
-      }
-
-      console.log("📤 Enviando payload:", JSON.stringify(payload).substring(0, 500));
-
-      // ✅ Chamar a Edge Function UMA vez (ela processa todos os destinatários)
-      const { data, error } = await supabase.functions.invoke("enviar-whatsapp", { body: payload });
-      
-      if (error) throw error;
-      
-      return data;
-    },
-    onSuccess: (data) => {
-      setEnvioFinalizado(true);
-      setUltimoEnvioId(data?.envioId);
-      
-      toast({ 
-        title: "✅ Envio concluído!", 
-        description: `${data?.resumo?.sucessos || 0} enviados, ${data?.resumo?.erros || 0} erros`,
-      });
-    },
-    onError: (error: any) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Render variáveis
-  const renderVariaveis = () => (
-    <div className="flex flex-wrap gap-1 mt-2">
-      {VARIAVEIS.map(v => (
-        <Button key={v.chave} type="button" variant="outline" size="sm" className="h-6 text-xs" onClick={() => inserirVariavel(v.chave)} title={v.desc}>
-          {`{${v.chave}}`}
-        </Button>
-      ))}
-    </div>
-  );
-
-  // Render preview
-  const renderPreview = () => {
-    const msg = activeTab === 'texto' ? substituirPreview(conteudoTexto.mensagem) : 
-                activeTab === 'imagem' ? substituirPreview(conteudoImagem.legenda) :
-                activeTab === 'video' ? substituirPreview(conteudoVideo.legenda) : '';
-
-    return (
-      <div className="bg-[#e5ddd5] rounded-lg p-3 min-h-[180px]">
-        <div className="flex justify-end">
-          <div className="bg-[#dcf8c6] rounded-lg p-3 max-w-[85%] shadow">
-            {activeTab === 'texto' && <p className="text-sm whitespace-pre-wrap">{msg || 'Sua mensagem aqui...'}</p>}
-            {activeTab === 'imagem' && (
-              <div>
-                <div className="w-full h-20 bg-gray-200 rounded flex items-center justify-center mb-2">
-                  <Image size={28} className="text-gray-400" />
-                </div>
-                {msg && <p className="text-sm">{msg}</p>}
-              </div>
-            )}
-            {activeTab === 'video' && (
-              <div>
-                <div className="w-full h-20 bg-gray-800 rounded flex items-center justify-center mb-2">
-                  <Video size={28} className="text-white" />
-                </div>
-                {msg && <p className="text-sm">{msg}</p>}
-              </div>
-            )}
-            {activeTab === 'audio' && (
-              <div className="flex items-center gap-2 bg-white/50 rounded-full px-3 py-2">
-                <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                  <FileAudio size={14} className="text-white" />
-                </div>
-                <div className="flex-1 h-1 bg-gray-300 rounded"><div className="w-1/3 h-full bg-emerald-500 rounded" /></div>
-                <span className="text-xs text-gray-500">0:15</span>
-              </div>
-            )}
-            {activeTab === 'documento' && (
-              <div className="flex items-center gap-3 bg-white/50 rounded p-2">
-                <FileText size={28} className="text-red-500" />
-                <div>
-                  <p className="text-sm font-medium">{substituirPreview(conteudoDocumento.nomeArquivo) || 'documento.pdf'}</p>
-                  <p className="text-xs text-gray-500">PDF</p>
-                </div>
-              </div>
-            )}
-            {activeTab === 'localizacao' && (
-              <div>
-                <div className="w-full h-16 bg-blue-100 rounded flex items-center justify-center mb-2">
-                  <MapPin size={24} className="text-red-500" />
-                </div>
-                <p className="text-sm font-medium">{conteudoLocalizacao.nome || 'Local'}</p>
-                <p className="text-xs text-gray-500">{conteudoLocalizacao.endereco || 'Endereço'}</p>
-              </div>
-            )}
-            {activeTab === 'contato' && (
-              <div className="flex items-center gap-3 bg-white/50 rounded p-2">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                  <User size={18} className="text-gray-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{conteudoContato.nome || 'Nome'}</p>
-                  <p className="text-xs text-gray-500">{conteudoContato.telefone || 'Telefone'}</p>
-                </div>
-              </div>
-            )}
-            {activeTab === 'enquete' && (
-              <div>
-                <p className="text-sm font-medium mb-2">📊 {substituirPreview(conteudoEnquete.pergunta) || 'Pergunta'}</p>
-                <div className="space-y-1">
-                  {conteudoEnquete.opcoes.filter(o => o).map((op, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-white/50 rounded px-2 py-1">
-                      <div className="w-4 h-4 border-2 border-emerald-500 rounded-full" />
-                      <span className="text-sm">{op}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-1 mt-1">
-              <span className="text-[10px] text-gray-500">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-              <span className="text-emerald-500 text-xs">✓✓</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  // Preview da mensagem com variáveis substituídas (exemplo)
+  const getPreviewMensagem = () => {
+    let preview = mensagem;
+    preview = preview.replace(/{nome}/g, 'João Silva');
+    preview = preview.replace(/{primeiro_nome}/g, 'João');
+    preview = preview.replace(/{telefone}/g, '(11) 99999-9999');
+    preview = preview.replace(/{email}/g, 'joao@email.com');
+    preview = preview.replace(/{bairro}/g, 'Centro');
+    preview = preview.replace(/{protocolo}/g, 'DEM-2024-001');
+    preview = preview.replace(/{assunto}/g, 'Iluminação Pública');
+    preview = preview.replace(/{status}/g, 'Em Andamento');
+    preview = preview.replace(/{data}/g, new Date().toLocaleDateString('pt-BR'));
+    preview = preview.replace(/{hora}/g, new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    return preview;
   };
 
-  // Tela de sucesso após envio
-  if (envioFinalizado) {
-    return (
-      <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
-        <DialogTrigger asChild>
-          <Button><MessageSquare className="h-4 w-4 mr-2" />Enviar WhatsApp</Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-md">
-          <div className="text-center py-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Envio Concluído!</h3>
-            <p className="text-muted-foreground mb-6">
-              As mensagens foram enviadas. Você pode acompanhar o status nos relatórios.
-            </p>
-            <div className="flex flex-col gap-2">
-              <RelatoriosWhatsAppDialog />
-              <Button variant="outline" onClick={() => { resetForm(); }}>
-                Novo Envio
-              </Button>
-              <Button variant="ghost" onClick={() => { setOpen(false); resetForm(); }}>
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const filteredMunicipes = municipes?.filter(m => {
+    if (!searchMunicipe.trim()) return true;
+    return m.nome.toLowerCase().includes(searchMunicipe.toLowerCase()) ||
+           m.telefone?.includes(searchMunicipe);
+  }) || [];
+
+  const totalDestinatarios = incluirTodos 
+    ? (municipes?.length || 0)
+    : selectedMunicipes.length;
+
+  // Verificar se a mensagem contém variáveis
+  const temVariaveis = VARIAVEIS.some(v => mensagem.includes(v.codigo));
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button><MessageSquare className="h-4 w-4 mr-2" />Enviar WhatsApp</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-green-500" />
-              Enviar WhatsApp
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Enviar WhatsApp
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Enviar Mensagem WhatsApp</DialogTitle>
+                <DialogDescription>
+                  Configure e envie mensagens para os munícipes selecionados
+                </DialogDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRelatorios(true)}
+                  className="gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Relatórios
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMinimized(true)}
+                  className="gap-2"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <RelatoriosWhatsAppDialog />
-          </DialogTitle>
-          <DialogDescription>Envie mensagens para munícipes selecionados</DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-1">
-            {/* Instância */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label>Instância WhatsApp</Label>
+          <div className="space-y-4">
+            {/* Seleção de Instância */}
+            <div>
+              <Label>Instância WhatsApp *</Label>
+              {loadingInstances ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Verificando instâncias...</span>
+                </div>
+              ) : instances && instances.length > 0 ? (
                 <Select value={selectedInstance} onValueChange={setSelectedInstance}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione a instância para envio" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {instances?.map(inst => (
-                      <SelectItem key={inst.id} value={inst.instance_name}>
-                        {inst.display_name}{inst.phone_number && ` (${inst.phone_number})`}
+                    {instances.map((inst) => (
+                      <SelectItem key={inst.instanceName} value={inst.instanceName}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <span>{inst.displayName}</span>
+                          {inst.number && (
+                            <span className="text-muted-foreground">({inst.number})</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <Button variant="outline" size="icon" className="mt-6" onClick={() => refetchInstances()} disabled={loadingInstances}>
-                <RefreshCw className={`h-4 w-4 ${loadingInstances ? 'animate-spin' : ''}`} />
-              </Button>
+              ) : (
+                <Alert className="mt-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Nenhuma instância conectada. Configure em Configurações → WhatsApp.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
-            {/* Abas */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TipoMensagem)}>
-              <TabsList className="grid grid-cols-8 h-auto">
-                {TABS_CONFIG.map(tab => (
-                  <TabsTrigger key={tab.id} value={tab.id} className="flex flex-col items-center gap-1 py-2 text-xs">
-                    <tab.icon className="h-4 w-4" />{tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            {/* Seleção de Destinatários */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Checkbox
+                  id="todos"
+                  checked={incluirTodos}
+                  onCheckedChange={(checked) => {
+                    setIncluirTodos(!!checked);
+                    if (checked) setSelectedMunicipes([]);
+                  }}
+                />
+                <Label htmlFor="todos">
+                  Enviar para todos os munícipes com telefone ({municipes?.length || 0})
+                </Label>
+              </div>
 
-              <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Formulário */}
-                <div className="space-y-3">
-                  <TabsContent value="texto" className="mt-0 space-y-2">
-                    <Label>Mensagem</Label>
-                    <Textarea value={conteudoTexto.mensagem} onChange={(e) => setConteudoTexto({ mensagem: e.target.value })} placeholder="Digite..." rows={5} />
-                    <p className="text-xs text-muted-foreground">*negrito* _itálico_ ~tachado~ • {conteudoTexto.mensagem.length} chars</p>
-                    {renderVariaveis()}
-                  </TabsContent>
-
-                  <TabsContent value="imagem" className="mt-0 space-y-2">
-                    <Label>URL da Imagem</Label>
-                    <Input value={conteudoImagem.url} onChange={(e) => setConteudoImagem(p => ({ ...p, url: e.target.value }))} placeholder="https://..." />
-                    <Label>Legenda</Label>
-                    <Textarea value={conteudoImagem.legenda} onChange={(e) => setConteudoImagem(p => ({ ...p, legenda: e.target.value }))} rows={2} />
-                    {renderVariaveis()}
-                  </TabsContent>
-
-                  <TabsContent value="video" className="mt-0 space-y-2">
-                    <Label>URL do Vídeo</Label>
-                    <Input value={conteudoVideo.url} onChange={(e) => setConteudoVideo(p => ({ ...p, url: e.target.value }))} placeholder="https://..." />
-                    <Label>Legenda</Label>
-                    <Textarea value={conteudoVideo.legenda} onChange={(e) => setConteudoVideo(p => ({ ...p, legenda: e.target.value }))} rows={2} />
-                  </TabsContent>
-
-                  <TabsContent value="audio" className="mt-0 space-y-2">
-                    <Label>URL do Áudio</Label>
-                    <Input value={conteudoAudio.url} onChange={(e) => setConteudoAudio({ url: e.target.value })} placeholder="https://..." />
-                    <p className="text-xs text-muted-foreground">MP3, OGG, WAV - Enviado como voz</p>
-                  </TabsContent>
-
-                  <TabsContent value="documento" className="mt-0 space-y-2">
-                    <Label>URL do Documento</Label>
-                    <Input value={conteudoDocumento.url} onChange={(e) => setConteudoDocumento(p => ({ ...p, url: e.target.value }))} placeholder="https://..." />
-                    <Label>Nome do Arquivo</Label>
-                    <Input value={conteudoDocumento.nomeArquivo} onChange={(e) => setConteudoDocumento(p => ({ ...p, nomeArquivo: e.target.value }))} placeholder="Relatorio_{protocolo}.pdf" />
-                    {renderVariaveis()}
-                  </TabsContent>
-
-                  <TabsContent value="localizacao" className="mt-0 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><Label>Latitude</Label><Input value={conteudoLocalizacao.latitude} onChange={(e) => setConteudoLocalizacao(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" /></div>
-                      <div><Label>Longitude</Label><Input value={conteudoLocalizacao.longitude} onChange={(e) => setConteudoLocalizacao(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" /></div>
-                    </div>
-                    <Label>Nome do Local</Label>
-                    <Input value={conteudoLocalizacao.nome} onChange={(e) => setConteudoLocalizacao(p => ({ ...p, nome: e.target.value }))} placeholder="Prefeitura" />
-                    <Label>Endereço</Label>
-                    <Input value={conteudoLocalizacao.endereco} onChange={(e) => setConteudoLocalizacao(p => ({ ...p, endereco: e.target.value }))} placeholder="Av. Brasil, 1000" />
-                  </TabsContent>
-
-                  <TabsContent value="contato" className="mt-0 space-y-2">
-                    <Label>Nome</Label>
-                    <Input value={conteudoContato.nome} onChange={(e) => setConteudoContato(p => ({ ...p, nome: e.target.value }))} placeholder="Central de Atendimento" />
-                    <Label>Telefone</Label>
-                    <Input value={conteudoContato.telefone} onChange={(e) => setConteudoContato(p => ({ ...p, telefone: e.target.value }))} placeholder="(11) 3333-4444" />
-                    <Label>Descrição</Label>
-                    <Input value={conteudoContato.descricao} onChange={(e) => setConteudoContato(p => ({ ...p, descricao: e.target.value }))} placeholder="Atendimento 8h-17h" />
-                  </TabsContent>
-
-                  <TabsContent value="enquete" className="mt-0 space-y-2">
-                    <Label>Pergunta</Label>
-                    <Input value={conteudoEnquete.pergunta} onChange={(e) => setConteudoEnquete(p => ({ ...p, pergunta: e.target.value }))} placeholder="Como avalia nosso atendimento?" />
-                    {renderVariaveis()}
-                    <Label>Opções</Label>
-                    <div className="space-y-1">
-                      {conteudoEnquete.opcoes.map((op, i) => (
-                        <div key={i} className="flex gap-2">
-                          <Input value={op} onChange={(e) => {
-                            const novas = [...conteudoEnquete.opcoes];
-                            novas[i] = e.target.value;
-                            setConteudoEnquete(p => ({ ...p, opcoes: novas }));
-                          }} placeholder={`Opção ${i + 1}`} />
-                          {conteudoEnquete.opcoes.length > 2 && (
-                            <Button variant="ghost" size="icon" onClick={() => setConteudoEnquete(p => ({ ...p, opcoes: p.opcoes.filter((_, idx) => idx !== i) }))}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
+              {!incluirTodos && (
+                <div className="space-y-2">
+                  <Label>Selecionar Munícipes</Label>
+                  
+                  <div className="min-h-[80px] max-h-48 overflow-y-auto p-3 bg-muted rounded-lg border">
+                    {selectedMunicipes.length > 0 ? (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedMunicipes.map(id => {
+                            const municipe = municipes?.find(m => m.id === id);
+                            return municipe ? (
+                              <Badge key={id} variant="secondary" className="gap-1 text-xs">
+                                {municipe.nome}
+                                <button
+                                  onClick={() => setSelectedMunicipes(prev => prev.filter(mid => mid !== id))}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ) : null;
+                          })}
                         </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => setConteudoEnquete(p => ({ ...p, opcoes: [...p.opcoes, ''] }))}>
-                        <Plus className="h-4 w-4 mr-1" />Opção
-                      </Button>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox checked={conteudoEnquete.multiplas} onCheckedChange={(c) => setConteudoEnquete(p => ({ ...p, multiplas: c as boolean }))} />
-                      <span className="text-sm">Múltiplas respostas</span>
-                    </label>
-                  </TabsContent>
-
-                  {/* Upload (para imagem/video/audio/doc) */}
-                  {['imagem', 'video', 'audio', 'documento'].includes(activeTab) && (
-                    <div className="border-t pt-3">
-                      <Label>Upload</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <input type="file" accept={activeTab === 'imagem' ? 'image/*' : activeTab === 'video' ? 'video/*' : activeTab === 'audio' ? 'audio/*' : '.pdf,.doc,.docx,.xls,.xlsx'} onChange={handleFileUpload} className="hidden" id="media-upload" />
-                        <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('media-upload')?.click()}>
-                          <Upload className="h-4 w-4 mr-2" />Escolher
-                        </Button>
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {selectedMunicipes.length} munícipe(s) selecionado(s)
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum munícipe selecionado. Use a busca abaixo para adicionar.
                       </div>
-                      {mediaFiles.length > 0 && (
-                        <div className="space-y-1 mt-2">
-                          {mediaFiles.map((m, i) => (
-                            <div key={i} className="flex items-center gap-2 p-2 bg-muted rounded">
-                              {getMediaIcon(m.type)}
-                              <span className="flex-1 text-sm truncate">{m.file.name}</span>
-                              <Button variant="ghost" size="icon" onClick={() => removeMediaFile(i)}><X className="h-3 w-3" /></Button>
-                            </div>
-                          ))}
+                    )}
+                  </div>
+
+                  <Input
+                    placeholder="Buscar munícipe por nome ou telefone..."
+                    value={searchMunicipe}
+                    onChange={(e) => setSearchMunicipe(e.target.value)}
+                  />
+
+                  {searchMunicipe && (
+                    <div className="max-h-48 overflow-y-auto border rounded-lg">
+                      {filteredMunicipes.length > 0 ? (
+                        filteredMunicipes.slice(0, 50).map(municipe => {
+                          const isSelected = selectedMunicipes.includes(municipe.id);
+                          return (
+                            <button
+                              key={municipe.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedMunicipes(prev => prev.filter(id => id !== municipe.id));
+                                } else {
+                                  setSelectedMunicipes(prev => [...prev, municipe.id]);
+                                }
+                                setSearchMunicipe("");
+                              }}
+                              className={`w-full text-left px-3 py-2 transition-colors border-b last:border-b-0 ${
+                                isSelected 
+                                  ? 'bg-primary/10 text-primary border-primary/20' 
+                                  : 'hover:bg-muted border-border'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium">{municipe.nome}</div>
+                                  <div className="text-sm text-muted-foreground">{municipe.telefone}</div>
+                                </div>
+                                {isSelected ? (
+                                  <Badge variant="destructive" className="text-xs">Remover</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">Adicionar</Badge>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-3 text-center text-muted-foreground">
+                          Nenhum munícipe encontrado
                         </div>
                       )}
                     </div>
                   )}
                 </div>
+              )}
+            </div>
 
-                {/* Preview */}
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><Eye className="h-4 w-4" />Preview</Label>
-                  {renderPreview()}
-                  <div className="mt-3 p-3 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Destinatários</span>
-                      <Badge variant="secondary">{totalDestinatarios}</Badge>
-                    </div>
-                    {selectedMunicipes.length > 0 && (
-                      <ScrollArea className="h-16">
-                        <div className="space-y-1">
-                          {selectedMunicipes.slice(0, 4).map(id => {
-                            const m = municipes?.find(m => m.id === id);
-                            return m ? <div key={id} className="text-xs text-muted-foreground">✓ {m.nome}</div> : null;
-                          })}
-                          {selectedMunicipes.length > 4 && <div className="text-xs text-muted-foreground">+{selectedMunicipes.length - 4} mais</div>}
-                        </div>
-                      </ScrollArea>
-                    )}
-                  </div>
+            {/* Upload de Mídia */}
+            <div>
+              <Label>Arquivos de Mídia (opcional)</Label>
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="media-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('media-upload')?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Adicionar Arquivos
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Máx. 100MB por arquivo
+                  </span>
                 </div>
-              </div>
-            </Tabs>
 
-            {/* Opções avançadas */}
-            <div className="border rounded-lg">
-              <button type="button" className="w-full p-3 flex items-center justify-between hover:bg-muted/50" onClick={() => setMostrarOpcoes(!mostrarOpcoes)}>
-                <span className="text-sm font-medium">Opções Avançadas</span>
-                <span className="text-xs">{mostrarOpcoes ? '▼' : '▶'}</span>
-              </button>
-              {mostrarOpcoes && (
-                <div className="p-3 pt-0 space-y-3 border-t">
-                  <div><Label>Título (histórico)</Label><Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Campanha Janeiro" /></div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox checked={ordemAleatoria} onCheckedChange={(c) => setOrdemAleatoria(c as boolean)} />
-                    <Shuffle className="h-4 w-4" /><span className="text-sm">Ordem aleatória</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Delay:</span>
-                    <Input type="number" value={tempoMinimo} onChange={(e) => setTempoMinimo(parseInt(e.target.value) || 2)} min={1} max={60} className="w-14" />
-                    <span className="text-sm">a</span>
-                    <Input type="number" value={tempoMaximo} onChange={(e) => setTempoMaximo(parseInt(e.target.value) || 5)} min={1} max={60} className="w-14" />
-                    <span className="text-sm text-muted-foreground">seg</span>
+                {mediaFiles.length > 0 && (
+                  <div className="space-y-1">
+                    {mediaFiles.map((media, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                        {getMediaIcon(media.type)}
+                        <span className="flex-1 text-sm truncate">{media.file.name}</span>
+                        <Badge variant="outline" className="text-xs">{media.type}</Badge>
+                        <button onClick={() => removeMediaFile(index)}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2"><Smile className="h-4 w-4" />Reação automática (quando responderem)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {EMOJIS_REACAO.map(e => (
-                        <button key={e} type="button" onClick={() => setReacaoAutomatica(reacaoAutomatica === e ? null : e)} 
-                          className={`w-9 h-9 text-lg rounded-lg border-2 ${reacaoAutomatica === e ? 'border-primary bg-primary/10' : 'border-border hover:border-muted-foreground'}`}>
-                          {e}
+                )}
+              </div>
+            </div>
+
+            {/* Mensagem com Variáveis */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label htmlFor="mensagem">Mensagem de Texto</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Inserir Variável
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="end">
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        Clique para inserir:
+                      </div>
+                      {VARIAVEIS.map((v) => (
+                        <button
+                          key={v.codigo}
+                          onClick={() => inserirVariavel(v.codigo)}
+                          className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex justify-between items-center"
+                        >
+                          <span>{v.descricao}</span>
+                          <code className="text-xs bg-muted px-1 rounded">{v.codigo}</code>
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Se ativado, quando a pessoa responder, ela receberá essa reação automaticamente</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Destinatários */}
-            <div className="border rounded-lg p-3">
-              <div className="flex items-center justify-between mb-3">
-                <Label>Destinatários</Label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={incluirTodos} onCheckedChange={(c) => setIncluirTodos(c as boolean)} />
-                  <span className="text-sm">Todos ({municipes?.length || 0})</span>
-                </label>
+                  </PopoverContent>
+                </Popover>
               </div>
-              {!incluirTodos && (
-                <>
-                  {selectedMunicipes.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3 max-h-20 overflow-y-auto">
-                      {selectedMunicipes.map(id => {
-                        const m = municipes?.find(m => m.id === id);
-                        return m ? (
-                          <Badge key={id} variant="secondary" className="pr-1">
-                            {m.nome}
-                            <button type="button" onClick={() => setSelectedMunicipes(p => p.filter(mid => mid !== id))} className="ml-1 hover:text-destructive">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
+              <Textarea
+                id="mensagem"
+                placeholder="Digite sua mensagem... Use variáveis como {nome} para personalizar"
+                value={mensagem}
+                onChange={(e) => setMensagem(e.target.value)}
+                rows={4}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {mensagem.length} caracteres
+                {temVariaveis && " • Contém variáveis que serão substituídas"}
+              </p>
+            </div>
+
+            {/* Preview da mensagem */}
+            {temVariaveis && mensagem.trim() && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-xs font-medium text-green-700 mb-1">
+                  📱 Preview (exemplo):
+                </div>
+                <div className="text-sm text-green-900 whitespace-pre-wrap">
+                  {getPreviewMensagem()}
+                </div>
+              </div>
+            )}
+
+            {/* Configurações Avançadas */}
+            <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+              <div className="text-sm font-medium">Configurações Avançadas</div>
+              
+              {/* Delay */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="tempo-min" className="text-xs">Tempo mínimo (seg)</Label>
+                  <Input
+                    id="tempo-min"
+                    type="number"
+                    min="2"
+                    max="60"
+                    value={tempoMinimo}
+                    onChange={(e) => setTempoMinimo(Math.max(2, Number(e.target.value)))}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tempo-max" className="text-xs">Tempo máximo (seg)</Label>
+                  <Input
+                    id="tempo-max"
+                    type="number"
+                    min="2"
+                    max="60"
+                    value={tempoMaximo}
+                    onChange={(e) => setTempoMaximo(Math.max(tempoMinimo, Number(e.target.value)))}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              {/* Ordem aleatória */}
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ordem-aleatoria"
+                  checked={ordemAleatoria}
+                  onCheckedChange={(checked) => setOrdemAleatoria(!!checked)}
+                />
+                <Label htmlFor="ordem-aleatoria" className="text-sm">
+                  Enviar em ordem aleatória (humanização)
+                </Label>
+              </div>
+
+              {/* Reação automática */}
+              <div>
+                <Label className="text-xs">Reação automática ao receber resposta</Label>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  {['', '❤️', '👍', '🙏', '😊', '✅', '🎉', '👏', '🤝'].map((emoji) => (
+                    <button
+                      key={emoji || 'none'}
+                      onClick={() => setReacaoAutomatica(emoji)}
+                      className={`px-3 py-1.5 rounded border text-lg transition-all ${
+                        reacaoAutomatica === emoji
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'hover:bg-muted border-border'
+                      }`}
+                    >
+                      {emoji || <span className="text-xs text-muted-foreground">Nenhuma</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Resumo e Botões */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                {totalDestinatarios} destinatário(s) selecionado(s)
+                {ordemAleatoria && " • Ordem aleatória"}
+                {reacaoAutomatica && ` • Reação: ${reacaoAutomatica}`}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleEnviar}
+                  disabled={enviarWhatsApp.isPending || !selectedInstance}
+                >
+                  {enviarWhatsApp.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar Mensagem
+                    </>
                   )}
-                  <Input placeholder="Buscar..." value={searchMunicipe} onChange={(e) => setSearchMunicipe(e.target.value)} />
-                  {searchMunicipe && (
-                    <ScrollArea className="h-32 mt-2 border rounded">
-                      {filteredMunicipes.length > 0 ? filteredMunicipes.map(m => {
-                        const sel = selectedMunicipes.includes(m.id);
-                        return (
-                          <button key={m.id} type="button" onClick={() => {
-                            if (sel) setSelectedMunicipes(p => p.filter(id => id !== m.id));
-                            else setSelectedMunicipes(p => [...p, m.id]);
-                            setSearchMunicipe("");
-                          }} className={`w-full text-left px-3 py-2 border-b last:border-b-0 ${sel ? 'bg-primary/10' : 'hover:bg-muted'}`}>
-                            <div className="flex items-center justify-between">
-                              <div><div className="font-medium text-sm">{m.nome}</div><div className="text-xs text-muted-foreground">{m.telefone}</div></div>
-                              <Badge variant={sel ? "destructive" : "secondary"} className="text-xs">{sel ? 'Remover' : 'Add'}</Badge>
-                            </div>
-                          </button>
-                        );
-                      }) : <div className="p-3 text-center text-muted-foreground text-sm">Nenhum encontrado</div>}
-                    </ScrollArea>
-                  )}
-                </>
-              )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t">
-          <div className="text-sm text-muted-foreground">{totalDestinatarios} destinatário(s)</div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => enviarWhatsApp.mutate()} disabled={enviarWhatsApp.isPending || !selectedInstance || totalDestinatarios === 0}>
-              {enviarWhatsApp.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</> : <><Send className="h-4 w-4 mr-2" />Enviar ({totalDestinatarios})</>}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Dialog de Relatórios */}
+      <RelatoriosWhatsAppDialog 
+        open={showRelatorios} 
+        onOpenChange={setShowRelatorios}
+        highlightEnvioId={lastEnvioId}
+      />
+    </>
   );
 }
