@@ -278,9 +278,12 @@ interface ClusterMapProps {
   onRegiaoClick?: (camadaId: string, feature: any, nomeRegiao: string) => void;
   // Props para dados eleitorais
   votosPorCamada?: Map<string, Map<string, number>>;
+  totalEleitoresPorCamada?: Map<string, Map<string, number>>;
   modoVisualizacao?: 'padrao' | 'atendimento' | 'votos' | 'comparativo';
   // Filtro de tipo para coloração
   tipoFiltro?: 'todos' | 'demandas' | 'municipes';
+  // Controle de clustering
+  clusterEnabled?: boolean;
 }
 
 export function ClusterMap({
@@ -300,8 +303,10 @@ export function ClusterMap({
   colorirPorDensidade = false,
   onRegiaoClick,
   votosPorCamada,
+  totalEleitoresPorCamada,
   modoVisualizacao = 'padrao',
-  tipoFiltro = 'todos'
+  tipoFiltro = 'todos',
+  clusterEnabled = true
 }: ClusterMapProps) {
   // Calcular centro do mapa baseado nos pontos
   const centroCalculado = useMemo(() => {
@@ -418,8 +423,8 @@ export function ClusterMap({
         heatmapVisible={heatmapVisible}
       />
 
-      {/* Cluster Unificado de Demandas e Munícipes */}
-      {!heatmapVisible && (
+      {/* Marcadores de Demandas e Munícipes */}
+      {!heatmapVisible && clusterEnabled && (
         <MarkerClusterGroup
           chunkedLoading
           maxClusterRadius={60}
@@ -550,7 +555,7 @@ export function ClusterMap({
             });
           }}
         >
-          {/* Marcadores de Demandas */}
+          {/* Marcadores de Demandas (com cluster) */}
           {mostrarDemandas && demandas.map((demanda) => (
             demanda.latitude && demanda.longitude && (
               <Marker
@@ -727,6 +732,165 @@ export function ClusterMap({
             )
           ))}
         </MarkerClusterGroup>
+      )}
+
+      {/* Marcadores SEM Cluster (quando cluster desabilitado) */}
+      {!heatmapVisible && !clusterEnabled && (
+        <>
+          {/* Marcadores de Demandas (sem cluster) */}
+          {mostrarDemandas && demandas.map((demanda) => (
+            demanda.latitude && demanda.longitude && (
+              <Marker
+                key={`demanda-nc-${demanda.id}`}
+                position={[demanda.latitude, demanda.longitude]}
+                icon={createDemandaIcon(demanda.status, demanda.area_cor)}
+                eventHandlers={{
+                  click: () => onDemandaClick?.(demanda)
+                }}
+              >
+                <Popup>
+                  <div className="min-w-[220px]">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div>
+                        <span className="font-semibold text-sm block">{demanda.titulo}</span>
+                        <span className="text-xs text-gray-500">{demanda.protocolo}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1.5 text-xs text-gray-600">
+                      {demanda.status && (
+                        <div className="flex items-center gap-1">
+                          <strong>Status:</strong>
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs h-5"
+                            style={{ 
+                              backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                              borderColor: STATUS_COLORS[demanda.status],
+                              color: STATUS_COLORS[demanda.status]
+                            }}
+                          >
+                            {demanda.status.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      )}
+                      
+                      {demanda.area_nome && (
+                        <p><strong>Área:</strong> {demanda.area_nome}</p>
+                      )}
+                      
+                      {demanda.municipe_nome && (
+                        <p><strong>Solicitante:</strong> {demanda.municipe_nome}</p>
+                      )}
+                      
+                      {demanda.bairro && (
+                        <p className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {demanda.bairro}
+                          {demanda.cidade && `, ${demanda.cidade}`}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="mt-2 pt-2 border-t flex gap-2">
+                      {demanda.municipe_telefone && (
+                        <a
+                          href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                        >
+                          <Phone className="h-3 w-3" />
+                          WhatsApp
+                        </a>
+                      )}
+                      <button
+                        onClick={() => onDemandaClick?.(demanda)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver detalhes
+                      </button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          ))}
+
+          {/* Marcadores de Munícipes (sem cluster) */}
+          {mostrarMunicipes && municipes.map((municipe) => (
+            municipe.latitude && municipe.longitude && (
+              <Marker
+                key={`municipe-nc-${municipe.id}`}
+                position={[municipe.latitude, municipe.longitude]}
+                icon={createMunicipeIcon()}
+                eventHandlers={{
+                  click: () => onMunicipeClick?.(municipe)
+                }}
+              >
+                <Popup>
+                  <div className="min-w-[200px]">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <User className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <span className="font-semibold text-sm">{municipe.nome}</span>
+                    </div>
+                    
+                    <div className="space-y-1.5 text-xs text-gray-600">
+                      {municipe.telefone && (
+                        <p className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {municipe.telefone}
+                        </p>
+                      )}
+                      
+                      {municipe.bairro && (
+                        <p className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {municipe.bairro}
+                          {municipe.cidade && `, ${municipe.cidade}`}
+                        </p>
+                      )}
+                      
+                      {municipe.total_demandas !== undefined && municipe.total_demandas > 0 && (
+                        <div className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          <span>{municipe.total_demandas} demanda{municipe.total_demandas !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-2 pt-2 border-t flex gap-2">
+                      {municipe.telefone && (
+                        <a
+                          href={formatWhatsAppLink(municipe.telefone) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                        >
+                          <Phone className="h-3 w-3" />
+                          WhatsApp
+                        </a>
+                      )}
+                      <button
+                        onClick={() => onMunicipeClick?.(municipe)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver detalhes
+                      </button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          ))}
+        </>
       )}
     </MapContainer>
   );
