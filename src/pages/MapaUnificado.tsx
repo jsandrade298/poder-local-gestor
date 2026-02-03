@@ -128,7 +128,9 @@ export default function MapaUnificado() {
     dadosEleitorais,
     eleicoesDisponiveis,
     getVotosPorRegiao,
-    getTotalVotos
+    getTotalEleitoresPorRegiao,
+    getTotalVotos,
+    getTotalEleitores
   } = useDadosEleitorais(camadaSelecionadaStats);
 
   // Estados de filtro
@@ -354,6 +356,19 @@ export default function MapaUnificado() {
     
     return votosMap;
   }, [dadosEleitorais, camadaSelecionadaStats, eleicaoSelecionada, getVotosPorRegiao]);
+
+  // Calcular total de eleitores por camada para todas as camadas visíveis
+  const totalEleitoresPorCamada = useMemo(() => {
+    const eleitoresMap = new Map<string, Map<string, number>>();
+    
+    // Se temos dados eleitorais e uma camada selecionada
+    if (dadosEleitorais.length > 0 && camadaSelecionadaStats) {
+      const eleitoresCamada = getTotalEleitoresPorRegiao(eleicaoSelecionada || undefined);
+      eleitoresMap.set(camadaSelecionadaStats, eleitoresCamada);
+    }
+    
+    return eleitoresMap;
+  }, [dadosEleitorais, camadaSelecionadaStats, eleicaoSelecionada, getTotalEleitoresPorRegiao]);
 
   // Obter estatísticas ordenadas de uma camada específica (agora inclui votos)
   const getEstatisticasCamadaOrdenadas = useCallback((camadaId: string | null | undefined) => {
@@ -1489,6 +1504,7 @@ export default function MapaUnificado() {
           camadasGeograficas={camadasVisiveis}
           estatisticasPorRegiao={estatisticasPorRegiao}
           votosPorCamada={votosPorCamada}
+          totalEleitoresPorCamada={totalEleitoresPorCamada}
           modoVisualizacao={modoVisualizacao}
           tipoFiltro={tipoFiltro}
           colorirPorDensidade={colorirPorDensidade}
