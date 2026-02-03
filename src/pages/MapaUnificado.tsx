@@ -188,6 +188,9 @@ export default function MapaUnificado() {
     nome: string;
   } | null>(null);
 
+  // Estado da aba da região
+  const [abaRegiao, setAbaRegiao] = useState<'dados' | 'demandas' | 'municipes'>('dados');
+
   // Estados para dados eleitorais
   const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'atendimento' | 'votos' | 'comparativo'>('padrao');
   const [eleicaoSelecionada, setEleicaoSelecionada] = useState<string | null>(null);
@@ -443,8 +446,136 @@ export default function MapaUnificado() {
   // Handler para clique em uma região
   const handleRegiaoClick = useCallback((camadaId: string, feature: any, nomeRegiao: string) => {
     setRegiaoSelecionada({ camadaId, feature, nome: nomeRegiao });
-    toast.info(`Região selecionada: ${nomeRegiao}`);
+    setAbaRegiao('dados'); // Resetar para aba de dados
+    // Limpar outras seleções
+    setItemSelecionado(null);
+    setClusterSelecionado(null);
   }, []);
+
+  // Dados da região selecionada
+  const dadosRegiaoSelecionada = useMemo(() => {
+    if (!regiaoSelecionada) return null;
+
+    const nomeRegiao = regiaoSelecionada.nome;
+    const camadaId = regiaoSelecionada.camadaId;
+
+    // Filtrar demandas do bairro (comparação case-insensitive)
+    const demandasDaRegiao = demandasFiltradas.filter(d => 
+      d.bairro?.toLowerCase().trim() === nomeRegiao.toLowerCase().trim()
+    );
+
+    // Filtrar munícipes do bairro
+    const municipesDaRegiao = municipesFiltrados.filter(m => 
+      m.bairro?.toLowerCase().trim() === nomeRegiao.toLowerCase().trim()
+    );
+
+    // Obter estatísticas da camada
+    const statsRegiao = estatisticasPorRegiao.get(camadaId)?.get(nomeRegiao);
+    const votosRegiao = votosPorCamada.get(camadaId)?.get(nomeRegiao) || 0;
+    const eleitoresRegiao = totalEleitoresPorCamada.get(camadaId)?.get(nomeRegiao) || 0;
+
+    // Calcular totais gerais
+    let totalVotosCandidato = 0;
+    let totalEleitoresGeral = 0;
+
+    votosPorCamada.get(camadaId)?.forEach(v => totalVotosCandidato += v);
+    totalEleitoresPorCamada.get(camadaId)?.forEach(e => totalEleitoresGeral += e);
+
+    // Calcular percentuais
+    const percentualSobreTotalEleitores = totalEleitoresGeral > 0 
+      ? (votosRegiao / totalEleitoresGeral) * 100 
+      : 0;
+    
+    const percentualSobreEleitoresRegiao = eleitoresRegiao > 0 
+      ? (votosRegiao / eleitoresRegiao) * 100 
+      : 0;
+    
+    const percentualSobreTotalVotos = totalVotosCandidato > 0 
+      ? (votosRegiao / totalVotosCandidato) * 100 
+      : 0;
+
+    // Preparar dados para rankings (todas as regiões da camada)
+    const todasRegioes: Array<{
+      nome: string;
+      votos: number;
+      eleitores: number;
+      pctTotalEleitores: number;
+      pctEleitoresRegiao: number;
+      pctTotalVotos: number;
+    }> = [];
+
+    const camada = camadasVisiveis.find(c => c.id === camadaId);
+    if (camada?.geojson?.features) {
+      camada.geojson.features.forEach((f: any) => {
+        const nome = getFeatureNameFromProps(f.properties);
+        const votos = votosPorCamada.get(camadaId)?.get(nome) || 0;
+        const eleitores = totalEleitoresPorCamada.get(camadaId)?.get(nome) || 0;
+
+        todasRegioes.push({
+          nome,
+          votos,
+          eleitores,
+          pctTotalEleitores: totalEleitoresGeral > 0 ? (votos / totalEleitoresGeral) * 100 : 0,
+          pctEleitoresRegiao: eleitores > 0 ? (votos / eleitores) * 100 : 0,
+          pctTotalVotos: totalVotosCandidato > 0 ? (votos / totalVotosCandidato) * 100 : 0
+        });
+      });
+    }
+
+    // Calcular rankings
+    const rankingTotalEleitores = [...todasRegioes]
+      .sort((a, b) => b.pctTotalEleitores - a.pctTotalEleitores)
+      .findIndex(r => r.nome === nomeRegiao) + 1;
+
+    const rankingEleitoresRegiao = [...todasRegioes]
+      .sort((a, b) => b.pctEleitoresRegiao - a.pctEleitoresRegiao)
+      .findIndex(r => r.nome === nomeRegiao) + 1;
+
+    const rankingTotalVotos = [...todasRegioes]
+      .sort((a, b) => b.pctTotalVotos - a.pctTotalVotos)
+      .findIndex(r => r.nome === nomeRegiao) + 1;
+
+    const totalRegioes = todasRegioes.length;
+
+    return {
+      nome: nomeRegiao,
+      demandas: demandasDaRegiao,
+      municipes: municipesDaRegiao,
+      totalMunicipes: statsRegiao?.municipes || municipesDaRegiao.length,
+      totalDemandas: statsRegiao?.demandas || demandasDaRegiao.length,
+      votos: votosRegiao,
+      eleitores: eleitoresRegiao,
+      totalVotosCandidato,
+      totalEleitoresGeral,
+      percentualSobreTotalEleitores,
+      percentualSobreEleitoresRegiao,
+      percentualSobreTotalVotos,
+      rankingTotalEleitores,
+      rankingEleitoresRegiao,
+      rankingTotalVotos,
+      totalRegioes
+    };
+  }, [regiaoSelecionada, demandasFiltradas, municipesFiltrados, estatisticasPorRegiao, votosPorCamada, totalEleitoresPorCamada, camadasVisiveis]);
+
+  // Função auxiliar para obter nome da feature
+  function getFeatureNameFromProps(properties: any): string {
+    const campos = [
+      'NOME', 'nome', 'NAME', 'name', 
+      'NM_BAIRRO', 'nm_bairro', 'NM_MUNICIP', 'nm_municip',
+      'NOME_BAIRR', 'nome_bairr', 'BAIRRO', 'bairro',
+      'NM_ZONA', 'nm_zona', 'ZONA', 'zona',
+      'NM_DISTRIT', 'nm_distrit', 'DISTRITO', 'distrito',
+      'LABEL', 'label', 'DESCRICAO', 'descricao'
+    ];
+    
+    for (const campo of campos) {
+      if (properties?.[campo]) {
+        return String(properties[campo]);
+      }
+    }
+    
+    return 'Sem nome';
+  }
 
   // Obter geolocalização
   const obterLocalizacao = () => {
@@ -1512,14 +1643,17 @@ export default function MapaUnificado() {
           onDemandaClick={(d) => {
             setItemSelecionado(d);
             setClusterSelecionado(null);
+            setRegiaoSelecionada(null);
           }}
           onMunicipeClick={(m) => {
             setItemSelecionado(m);
             setClusterSelecionado(null);
+            setRegiaoSelecionada(null);
           }}
           onClusterClick={(dados) => {
             setClusterSelecionado(dados);
             setItemSelecionado(null);
+            setRegiaoSelecionada(null);
           }}
         />
       </div>
@@ -1917,6 +2051,322 @@ export default function MapaUnificado() {
                                 </Badge>
                               )}
                             </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2 pt-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => adicionarARota(municipe)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Rota
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => setMunicipeModalId(municipe.id)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Detalhes
+                        </Button>
+                        {municipe.telefone && (
+                          <a
+                            href={formatWhatsAppLink(municipe.telefone) || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
+                          >
+                            <Phone className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      )}
+
+      {/* Sidebar Direita - Região Selecionada */}
+      {regiaoSelecionada && dadosRegiaoSelecionada && (
+        <div className="w-96 border-l bg-background flex flex-col">
+          <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
+            <div>
+              <h2 className="font-semibold flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" />
+                {dadosRegiaoSelecionada.nome}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Região do shapefile
+              </p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setRegiaoSelecionada(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Abas: Dados, Demandas, Munícipes */}
+          <Tabs value={abaRegiao} onValueChange={(v) => setAbaRegiao(v as 'dados' | 'demandas' | 'municipes')} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-3 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
+              <TabsTrigger value="dados" className="text-xs gap-1">
+                <BarChart3 className="h-3 w-3" />
+                Dados
+              </TabsTrigger>
+              <TabsTrigger value="demandas" className="text-xs gap-1">
+                <FileText className="h-3 w-3" />
+                Demandas ({dadosRegiaoSelecionada.totalDemandas})
+              </TabsTrigger>
+              <TabsTrigger value="municipes" className="text-xs gap-1">
+                <Users className="h-3 w-3" />
+                Munícipes ({dadosRegiaoSelecionada.totalMunicipes})
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* Tab Dados */}
+              <TabsContent value="dados" className="mt-0 space-y-4">
+                {/* Card Atendimento */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4 text-purple-500" />
+                      Atendimento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Munícipes</span>
+                      <Badge variant="secondary">{dadosRegiaoSelecionada.totalMunicipes}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Demandas</span>
+                      <Badge variant="secondary">{dadosRegiaoSelecionada.totalDemandas}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card Dados Eleitorais */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Vote className="h-4 w-4 text-blue-500" />
+                      Dados Eleitorais
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Votos na região</span>
+                      <Badge variant="outline" className="font-mono">
+                        {dadosRegiaoSelecionada.votos.toLocaleString('pt-BR')}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total de eleitores</span>
+                      <Badge variant="outline" className="font-mono">
+                        {dadosRegiaoSelecionada.eleitores.toLocaleString('pt-BR')}
+                      </Badge>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="text-xs text-muted-foreground">
+                      <p>Total de votos (candidato): {dadosRegiaoSelecionada.totalVotosCandidato.toLocaleString('pt-BR')}</p>
+                      <p>Total de eleitores (geral): {dadosRegiaoSelecionada.totalEleitoresGeral.toLocaleString('pt-BR')}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card Análise de Desempenho */}
+                <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-blue-600" />
+                      Análise de Desempenho
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Rankings entre {dadosRegiaoSelecionada.totalRegioes} regiões
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* % sobre Total de Eleitores */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">% Eleitorado</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-blue-700">
+                            {dadosRegiaoSelecionada.percentualSobreTotalEleitores.toFixed(2)}%
+                          </span>
+                          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                            {dadosRegiaoSelecionada.rankingTotalEleitores}º
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Votos da região / Total de eleitores de TODAS as regiões
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    {/* % sobre Eleitores da Região */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">% na Região</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-green-700">
+                            {dadosRegiaoSelecionada.percentualSobreEleitoresRegiao.toFixed(2)}%
+                          </span>
+                          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                            {dadosRegiaoSelecionada.rankingEleitoresRegiao}º
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Votos da região / Eleitores DESTA região
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    {/* % sobre Total de Votos */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">% Votação</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-amber-700">
+                            {dadosRegiaoSelecionada.percentualSobreTotalVotos.toFixed(2)}%
+                          </span>
+                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                            {dadosRegiaoSelecionada.rankingTotalVotos}º
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Votos da região / Total de votos do candidato
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Tab Demandas */}
+              <TabsContent value="demandas" className="mt-0 space-y-2">
+                {dadosRegiaoSelecionada.demandas.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma demanda nesta região</p>
+                    <p className="text-xs mt-1">Verifique se o bairro das demandas corresponde ao nome da região</p>
+                  </div>
+                ) : (
+                  dadosRegiaoSelecionada.demandas.map((demanda) => (
+                    <Card key={demanda.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: (demanda.area_cor || '#ef4444') + '20' }}
+                        >
+                          <FileText 
+                            className="h-4 w-4" 
+                            style={{ color: demanda.area_cor || '#ef4444' }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                          <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {demanda.status && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs h-5"
+                                style={{ 
+                                  backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                                  borderColor: STATUS_COLORS[demanda.status],
+                                  color: STATUS_COLORS[demanda.status]
+                                }}
+                              >
+                                {STATUS_LABELS[demanda.status] || demanda.status}
+                              </Badge>
+                            )}
+                          </div>
+                          {demanda.municipe_nome && (
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {demanda.municipe_nome}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2 pt-2 border-t">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => adicionarARota(demanda)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Rota
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs flex-1"
+                          onClick={() => setDemandaModalId(demanda.id)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Detalhes
+                        </Button>
+                        {demanda.municipe_telefone && (
+                          <a
+                            href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md"
+                          >
+                            <Phone className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+
+              {/* Tab Munícipes */}
+              <TabsContent value="municipes" className="mt-0 space-y-2">
+                {dadosRegiaoSelecionada.municipes.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum munícipe nesta região</p>
+                    <p className="text-xs mt-1">Verifique se o bairro dos munícipes corresponde ao nome da região</p>
+                  </div>
+                ) : (
+                  dadosRegiaoSelecionada.municipes.map((municipe) => (
+                    <Card key={municipe.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <Users className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{municipe.nome}</p>
+                          {municipe.telefone && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {municipe.telefone}
+                            </p>
+                          )}
+                          {municipe.total_demandas !== undefined && municipe.total_demandas > 0 && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <FileText className="h-3 w-3" />
+                              {municipe.total_demandas} demanda{municipe.total_demandas !== 1 ? 's' : ''}
+                            </p>
                           )}
                         </div>
                       </div>
