@@ -404,6 +404,7 @@ export function ClusterMap({
           nome={camada.nome}
           estatisticas={estatisticasPorRegiao?.get(camada.id)}
           votosPorRegiao={votosPorCamada?.get(camada.id)}
+          totalEleitoresPorRegiao={totalEleitoresPorCamada?.get(camada.id)}
           modoVisualizacao={modoVisualizacao}
           tipoFiltro={tipoFiltro}
           colorirPorDensidade={colorirPorDensidade}
