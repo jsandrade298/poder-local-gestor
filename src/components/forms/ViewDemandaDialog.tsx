@@ -19,6 +19,27 @@ interface ViewDemandaDialogProps {
 
 export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewDemandaDialogProps) {
   const navigate = useNavigate();
+  
+  // Buscar dados do munícipe se não vier na demanda
+  const { data: municipeData } = useQuery({
+    queryKey: ['municipe-demanda', demanda?.municipe_id],
+    queryFn: async () => {
+      if (!demanda?.municipe_id) return null;
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('id, nome, telefone, email')
+        .eq('id', demanda.municipe_id)
+        .single();
+      
+      if (error) return null;
+      return data;
+    },
+    enabled: !!demanda?.municipe_id && open
+  });
+
+  // Nome do munícipe vindo da demanda ou buscado separadamente
+  const municipeNome = demanda?.municipes?.nome || municipeData?.nome || 'N/A';
+  
   const { data: responsaveis = [] } = useQuery({
     queryKey: ['responsaveis'],
     queryFn: async () => {
@@ -143,7 +164,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       descricao: demanda.descricao,
       endereco: enderecoCompleto,
       area: demanda.areas?.nome,
-      municipe: demanda.municipes?.nome,
+      municipe: municipeNome,
       protocolo: demanda.protocolo,
       observacoes: demanda.observacoes
     };
@@ -248,7 +269,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <strong>Munícipe:</strong> {demanda.municipes?.nome || 'N/A'}
+                        <strong>Munícipe:</strong> {municipeNome}
                       </span>
                     </div>
 
