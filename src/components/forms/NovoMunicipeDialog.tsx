@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { CriarDemandaAposCadastroDialog } from "./CriarDemandaAposCadastroDialog";
-import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
 
 export function NovoMunicipeDialog() {
@@ -79,14 +79,10 @@ export function NovoMunicipeDialog() {
         cidade: resultado.cidade || prev.cidade
       }));
       
-      // Atualizar coordenadas se disponíveis
-      if (resultado.latitude && resultado.longitude) {
-        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
-      }
-      
+      // Coordenadas serão obtidas ao SALVAR (quando o número estiver preenchido)
       toast({
         title: "Endereço encontrado!",
-        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}`
+        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}. Preencha o número para localização precisa no mapa.`
       });
     } else {
       toast({
@@ -148,6 +144,32 @@ export function NovoMunicipeDialog() {
 
   const createMunicipe = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // ========== GEOCODIFICAR ANTES DE SALVAR ==========
+      // Usa o endereço completo COM número para precisão máxima
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let geocodificado = false;
+
+      if (data.logradouro || data.bairro) {
+        console.log('🗺️ Geocodificando endereço do munícipe antes de salvar...');
+        const coordResult = await geocodificarEndereco(
+          data.logradouro || '',
+          data.numero || '',
+          data.bairro || '',
+          data.cidade || 'São Paulo',
+          'SP'
+        );
+
+        if (coordResult) {
+          latitude = coordResult.latitude;
+          longitude = coordResult.longitude;
+          geocodificado = true;
+          console.log(`✅ Coordenadas obtidas via ${coordResult.fonte}:`, latitude, longitude);
+        } else {
+          console.log('⚠️ Não foi possível geocodificar o endereço');
+        }
+      }
+
       const { data: municipe, error } = await supabase
         .from('municipes')
         .insert({
@@ -160,9 +182,10 @@ export function NovoMunicipeDialog() {
           cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
-          latitude: coordenadas.lat,
-          longitude: coordenadas.lng,
-          geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
+          // Coordenadas obtidas pela geocodificação
+          latitude,
+          longitude,
+          geocodificado
         })
         .select('id, nome')
         .single();
