@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
-import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
 
 interface EditDemandaDialogProps {
@@ -136,12 +136,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         cidade: resultado.cidade || prev.cidade
       }));
       
-      // Atualizar coordenadas se disponíveis
-      if (resultado.latitude && resultado.longitude) {
-        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
-      }
-      
-      toast.success('Endereço encontrado!');
+      // Coordenadas serão obtidas ao SALVAR (quando o número estiver preenchido)
+      toast.success('Endereço encontrado! Preencha o número para localização precisa no mapa.');
     }
   };
 
@@ -277,6 +273,39 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       
       if (!userId) throw new Error('Usuário não autenticado');
 
+      // ========== GEOCODIFICAR ANTES DE SALVAR ==========
+      // Usa o endereço completo COM número para precisão máxima
+      let latitude: number | null = coordenadas.lat;
+      let longitude: number | null = coordenadas.lng;
+      let geocodificado = coordenadas.lat !== null && coordenadas.lng !== null;
+
+      // Só regeocodificar se não tiver coordenadas ou se o endereço mudou
+      const enderecoMudou = 
+        data.logradouro !== demanda?.logradouro ||
+        data.numero !== demanda?.numero ||
+        data.bairro !== demanda?.bairro ||
+        data.cidade !== demanda?.cidade;
+
+      if ((data.logradouro || data.bairro) && (!geocodificado || enderecoMudou)) {
+        console.log('🗺️ Geocodificando endereço antes de salvar...');
+        const coordResult = await geocodificarEndereco(
+          data.logradouro || '',
+          data.numero || '',
+          data.bairro || '',
+          data.cidade || 'São Paulo',
+          'SP'
+        );
+
+        if (coordResult) {
+          latitude = coordResult.latitude;
+          longitude = coordResult.longitude;
+          geocodificado = true;
+          console.log(`✅ Coordenadas obtidas via ${coordResult.fonte}:`, latitude, longitude);
+        } else {
+          console.log('⚠️ Não foi possível geocodificar o endereço');
+        }
+      }
+
       // Buscar dados anteriores e do editor
       const [demandaAnteriorResponse, editorResponse] = await Promise.all([
         supabase
@@ -311,9 +340,10 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
         resolucao: data.resolucao || null,
-        latitude: coordenadas.lat,
-        longitude: coordenadas.lng,
-        geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
+        // Coordenadas atualizadas pela geocodificação
+        latitude,
+        longitude,
+        geocodificado
       };
 
       const { error } = await supabase
