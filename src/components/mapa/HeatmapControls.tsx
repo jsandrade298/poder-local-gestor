@@ -1,4 +1,4 @@
-import { Flame, MapPin, Users, FileText, Layers, Link2, ArrowRight } from 'lucide-react';
+import { Flame, MapPin, Users, FileText, Layers, Link2, ArrowRight, CircleDot } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -21,6 +21,9 @@ interface HeatmapControlsProps {
     municipesPorDemandas: number;
     demandasComFiltro: number;
   } | null;
+  // Controle de Cluster
+  clusterEnabled?: boolean;
+  setClusterEnabled?: (value: boolean) => void;
 }
 
 export function HeatmapControls({
@@ -32,10 +35,48 @@ export function HeatmapControls({
   municipesCount,
   filtroCruzado = false,
   setFiltroCruzado,
-  estatisticasCruzado
+  estatisticasCruzado,
+  clusterEnabled = true,
+  setClusterEnabled
 }: HeatmapControlsProps) {
   return (
     <div className="space-y-4">
+      {/* Card Agrupamento de Pontos */}
+      {setClusterEnabled && (
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-5 w-5 text-emerald-500" />
+              Agrupamento
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Agrupe ou visualize todos os pontos
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="cluster-toggle" className="text-sm font-medium flex items-center gap-2">
+                <CircleDot className="h-4 w-4" />
+                Agrupar Pontos
+              </Label>
+              <Switch
+                id="cluster-toggle"
+                checked={clusterEnabled}
+                onCheckedChange={setClusterEnabled}
+              />
+            </div>
+            
+            <div className="bg-white/60 rounded-md p-2 text-xs text-muted-foreground">
+              {clusterEnabled ? (
+                <span><strong>Ativado:</strong> Pontos próximos são agrupados em clusters para melhor visualização.</span>
+              ) : (
+                <span><strong>Desativado:</strong> Todos os {demandasCount + municipesCount} pontos são exibidos individualmente.</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Card Filtro Cruzado */}
       {setFiltroCruzado && (
         <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
