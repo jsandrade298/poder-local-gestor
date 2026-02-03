@@ -10,7 +10,7 @@ import { Edit, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useBrasilAPI } from "@/hooks/useBrasilAPI";
+import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
 
 interface EditMunicipeDialogProps {
@@ -115,14 +115,10 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         cidade: resultado.cidade || prev.cidade
       }));
       
-      // Atualizar coordenadas se disponíveis
-      if (resultado.latitude && resultado.longitude) {
-        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
-      }
-      
+      // Coordenadas serão obtidas ao SALVAR (quando o número estiver preenchido)
       toast({
         title: "Endereço encontrado!",
-        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}`
+        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}. Preencha o número para localização precisa no mapa.`
       });
     } else {
       toast({
@@ -256,6 +252,39 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         if (data.complemento) endereco += ` - ${data.complemento}`;
       }
 
+      // ========== GEOCODIFICAR ANTES DE SALVAR ==========
+      // Usa o endereço completo COM número para precisão máxima
+      let latitude: number | null = coordenadas.lat;
+      let longitude: number | null = coordenadas.lng;
+      let geocodificado = coordenadas.lat !== null && coordenadas.lng !== null;
+
+      // Só regeocodificar se não tiver coordenadas ou se o endereço mudou
+      const enderecoMudou = 
+        data.logradouro !== '' || // Se preencheu logradouro novo
+        data.numero !== '' ||     // Se preencheu número novo
+        data.bairro !== municipe?.bairro ||
+        data.cidade !== municipe?.cidade;
+
+      if ((data.logradouro || data.bairro) && (!geocodificado || enderecoMudou)) {
+        console.log('🗺️ Geocodificando endereço do munícipe antes de salvar...');
+        const coordResult = await geocodificarEndereco(
+          data.logradouro || '',
+          data.numero || '',
+          data.bairro || '',
+          data.cidade || 'São Paulo',
+          'SP'
+        );
+
+        if (coordResult) {
+          latitude = coordResult.latitude;
+          longitude = coordResult.longitude;
+          geocodificado = true;
+          console.log(`✅ Coordenadas obtidas via ${coordResult.fonte}:`, latitude, longitude);
+        } else {
+          console.log('⚠️ Não foi possível geocodificar o endereço');
+        }
+      }
+
       // Atualizar dados do munícipe
       const { error: updateError, data: updateData } = await supabase
         .from('municipes')
@@ -269,9 +298,10 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
-          latitude: coordenadas.lat,
-          longitude: coordenadas.lng,
-          geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
+          // Coordenadas atualizadas pela geocodificação
+          latitude,
+          longitude,
+          geocodificado
         })
         .eq('id', municipe.id)
         .select();
