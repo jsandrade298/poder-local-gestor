@@ -27,6 +27,9 @@ interface GeoJSONLayerProps {
   // Dados de votação
   votosPorRegiao?: Map<string, number>;
   
+  // Total de eleitores por região
+  totalEleitoresPorRegiao?: Map<string, number>;
+  
   // Modo de visualização
   modoVisualizacao?: ModoVisualizacao;
   
@@ -135,6 +138,7 @@ export function GeoJSONLayer({
   onFeatureHover,
   estatisticas,
   votosPorRegiao,
+  totalEleitoresPorRegiao,
   modoVisualizacao = 'padrao',
   tipoFiltro = 'todos',
   colorirPorDensidade = false // Legacy support
@@ -181,6 +185,90 @@ export function GeoJSONLayer({
       });
     }
 
+    // =============================================
+    // CÁLCULOS PARA O TOOLTIP AVANÇADO
+    // =============================================
+    
+    // Total geral de votos do candidato
+    let totalVotosCandidato = 0;
+    if (votosPorRegiao) {
+      votosPorRegiao.forEach((votos) => {
+        totalVotosCandidato += votos;
+      });
+    }
+
+    // Total geral de eleitores (todas as regiões)
+    let totalEleitoresGeral = 0;
+    if (totalEleitoresPorRegiao) {
+      totalEleitoresPorRegiao.forEach((eleitores) => {
+        totalEleitoresGeral += eleitores;
+      });
+    }
+
+    // Preparar dados para rankings
+    interface DadosRegiao {
+      nome: string;
+      votos: number;
+      eleitores: number;
+      percentualSobreTotalEleitores: number;  // votos / total eleitores geral
+      percentualSobreEleitoresRegiao: number; // votos / eleitores da região
+      percentualSobreTotalVotos: number;      // votos / total votos candidato
+    }
+
+    const dadosRegioes: DadosRegiao[] = [];
+
+    // Coletar dados de todas as features
+    data.features.forEach((feature: any) => {
+      const featureName = getFeatureName(feature.properties);
+      const votos = votosPorRegiao?.get(featureName) || 0;
+      const eleitores = totalEleitoresPorRegiao?.get(featureName) || 0;
+
+      const percentualSobreTotalEleitores = totalEleitoresGeral > 0 
+        ? (votos / totalEleitoresGeral) * 100 
+        : 0;
+      
+      const percentualSobreEleitoresRegiao = eleitores > 0 
+        ? (votos / eleitores) * 100 
+        : 0;
+      
+      const percentualSobreTotalVotos = totalVotosCandidato > 0 
+        ? (votos / totalVotosCandidato) * 100 
+        : 0;
+
+      dadosRegioes.push({
+        nome: featureName,
+        votos,
+        eleitores,
+        percentualSobreTotalEleitores,
+        percentualSobreEleitoresRegiao,
+        percentualSobreTotalVotos
+      });
+    });
+
+    // Calcular rankings (ordenar do maior para menor)
+    const rankingSobreTotalEleitores = [...dadosRegioes]
+      .sort((a, b) => b.percentualSobreTotalEleitores - a.percentualSobreTotalEleitores)
+      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
+
+    const rankingSobreEleitoresRegiao = [...dadosRegioes]
+      .sort((a, b) => b.percentualSobreEleitoresRegiao - a.percentualSobreEleitoresRegiao)
+      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
+
+    const rankingSobreTotalVotos = [...dadosRegioes]
+      .sort((a, b) => b.percentualSobreTotalVotos - a.percentualSobreTotalVotos)
+      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
+
+    // Função para obter ranking de uma região
+    const getRanking = (nome: string, rankingList: { nome: string; ranking: number }[]): number => {
+      const found = rankingList.find(r => r.nome === nome);
+      return found ? found.ranking : 0;
+    };
+
+    // Função para formatar posição do ranking
+    const formatarRanking = (posicao: number): string => {
+      return `${posicao}º`;
+    };
+
     // Criar camada GeoJSON
     const layer = L.geoJSON(data, {
       style: (feature) => {
@@ -224,42 +312,92 @@ export function GeoJSONLayer({
         // Obter dados para tooltip
         const stats = estatisticas?.get(featureName);
         const votos = votosPorRegiao?.get(featureName) || 0;
+        const eleitores = totalEleitoresPorRegiao?.get(featureName) || 0;
         const atendimento = calcularAtendimento(stats);
         
+        // Obter dados calculados da região
+        const dadosRegiao = dadosRegioes.find(d => d.nome === featureName);
+        
         // Construir conteúdo do tooltip
-        let tooltipContent = `<strong>${featureName}</strong>`;
+        let tooltipContent = `<div style="min-width: 220px;">`;
+        tooltipContent += `<strong style="font-size: 14px; border-bottom: 1px solid #ddd; display: block; padding-bottom: 4px; margin-bottom: 6px;">${featureName}</strong>`;
         
-        if (votos > 0) {
-          tooltipContent += `<br/>🗳️ ${votos.toLocaleString('pt-BR')} votos`;
+        // Seção: Atendimento
+        tooltipContent += `<div style="margin-bottom: 6px;">`;
+        tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Atendimento</span><br/>`;
+        tooltipContent += `👥 Munícipes: <strong>${stats?.municipes || 0}</strong><br/>`;
+        tooltipContent += `📋 Demandas: <strong>${stats?.demandas || 0}</strong>`;
+        tooltipContent += `</div>`;
+        
+        // Seção: Dados Eleitorais
+        tooltipContent += `<div style="margin-bottom: 6px; padding-top: 6px; border-top: 1px solid #eee;">`;
+        tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Dados Eleitorais</span><br/>`;
+        tooltipContent += `🗳️ Votos: <strong>${votos.toLocaleString('pt-BR')}</strong><br/>`;
+        tooltipContent += `👤 Eleitores: <strong>${eleitores.toLocaleString('pt-BR')}</strong>`;
+        tooltipContent += `</div>`;
+        
+        // Seção: Percentuais e Rankings (apenas se houver votos)
+        if (dadosRegiao && (totalVotosCandidato > 0 || totalEleitoresGeral > 0)) {
+          tooltipContent += `<div style="padding-top: 6px; border-top: 1px solid #eee;">`;
+          tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Análise</span><br/>`;
+          
+          // % sobre total de eleitores (geral)
+          if (totalEleitoresGeral > 0) {
+            const pctTotalEleitores = dadosRegiao.percentualSobreTotalEleitores;
+            const rankTotalEleitores = getRanking(featureName, rankingSobreTotalEleitores);
+            tooltipContent += `<span title="Votos / Total de Eleitores (todas regiões)">`;
+            tooltipContent += `📊 % Eleitorado: <strong>${pctTotalEleitores.toFixed(2)}%</strong> `;
+            tooltipContent += `<span style="background: #e0e7ff; color: #4f46e5; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankTotalEleitores)}</span>`;
+            tooltipContent += `</span><br/>`;
+          }
+          
+          // % sobre eleitores da região
+          if (eleitores > 0) {
+            const pctEleitoresRegiao = dadosRegiao.percentualSobreEleitoresRegiao;
+            const rankEleitoresRegiao = getRanking(featureName, rankingSobreEleitoresRegiao);
+            tooltipContent += `<span title="Votos / Eleitores desta região">`;
+            tooltipContent += `🎯 % na Região: <strong>${pctEleitoresRegiao.toFixed(2)}%</strong> `;
+            tooltipContent += `<span style="background: #dcfce7; color: #166534; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankEleitoresRegiao)}</span>`;
+            tooltipContent += `</span><br/>`;
+          }
+          
+          // % sobre total de votos do candidato
+          if (totalVotosCandidato > 0) {
+            const pctTotalVotos = dadosRegiao.percentualSobreTotalVotos;
+            const rankTotalVotos = getRanking(featureName, rankingSobreTotalVotos);
+            tooltipContent += `<span title="Votos da região / Total de votos do candidato">`;
+            tooltipContent += `🏆 % Votação: <strong>${pctTotalVotos.toFixed(2)}%</strong> `;
+            tooltipContent += `<span style="background: #fef3c7; color: #92400e; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankTotalVotos)}</span>`;
+            tooltipContent += `</span>`;
+          }
+          
+          tooltipContent += `</div>`;
         }
         
-        if (stats) {
-          // Mostrar apenas os dados relevantes ao filtro
-          if (tipoFiltro === 'todos' || tipoFiltro === 'demandas') {
-            tooltipContent += `<br/>📋 ${stats.demandas} demanda(s)`;
-          }
-          if (tipoFiltro === 'todos' || tipoFiltro === 'municipes') {
-            tooltipContent += `<br/>👥 ${stats.municipes} munícipe(s)`;
-          }
-        }
-        
-        // Adicionar indicador de oportunidade no modo comparativo
+        // Indicador de oportunidade no modo comparativo
         if (modoEfetivo === 'comparativo' && votos > 0) {
-          if (votos > 0 && atendimento === 0) {
-            tooltipContent += `<br/><span style="color: #ef4444">⚠️ Sem atendimentos</span>`;
-          } else if (atendimento > 0) {
+          tooltipContent += `<div style="padding-top: 6px; border-top: 1px solid #eee;">`;
+          if (atendimento === 0) {
+            tooltipContent += `<span style="color: #ef4444; font-weight: bold;">⚠️ Sem atendimentos - Oportunidade!</span>`;
+          } else {
             const ratio = votos / atendimento;
             if (ratio > 10) {
-              tooltipContent += `<br/><span style="color: #f97316">💡 ${Math.round(ratio)}x mais votos</span>`;
+              tooltipContent += `<span style="color: #f97316;">💡 ${Math.round(ratio)}x mais votos que atendimentos</span>`;
+            } else if (ratio > 5) {
+              tooltipContent += `<span style="color: #eab308;">📈 ${Math.round(ratio)}x mais votos que atendimentos</span>`;
             }
           }
+          tooltipContent += `</div>`;
         }
+        
+        tooltipContent += `</div>`;
         
         // Adicionar tooltip
         featureLayer.bindTooltip(tooltipContent, {
           permanent: mostrarLabels,
-          direction: 'center',
-          className: 'leaflet-tooltip-custom'
+          direction: 'auto',
+          className: 'leaflet-tooltip-custom',
+          sticky: true
         });
 
         // Evento de clique
@@ -317,7 +455,7 @@ export function GeoJSONLayer({
         layerRef.current = null;
       }
     };
-  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, modoEfetivo, tipoFiltro]);
+  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, totalEleitoresPorRegiao, modoEfetivo, tipoFiltro]);
 
   return null;
 }
