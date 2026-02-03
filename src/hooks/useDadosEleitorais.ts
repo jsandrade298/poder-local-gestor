@@ -11,6 +11,7 @@ export interface DadoEleitoral {
   camada_id: string;
   nome_regiao: string;
   votos: number;
+  total_eleitores?: number | null;
   eleicao: string;
   cargo?: string | null;
   created_at?: string;
@@ -22,6 +23,7 @@ export interface DadoEleitoralInput {
   camada_id: string;
   nome_regiao: string;
   votos: number;
+  total_eleitores?: number | null;
   eleicao: string;
   cargo?: string;
 }
@@ -102,7 +104,7 @@ export function useDadosEleitorais(camadaId?: string | null) {
       regioesDisponiveis
     }: {
       camadaId: string;
-      dados: Array<{ nome: string; votos: number }>;
+      dados: Array<{ nome: string; votos: number; totalEleitores?: number }>;
       eleicao: string;
       cargo?: string;
       regioesDisponiveis: string[];
@@ -131,6 +133,7 @@ export function useDadosEleitorais(camadaId?: string | null) {
             camada_id: camadaId,
             nome_regiao: nomeOriginal,
             votos: item.votos,
+            total_eleitores: item.totalEleitores || null,
             eleicao,
             cargo
           });
@@ -219,6 +222,23 @@ export function useDadosEleitorais(camadaId?: string | null) {
     return map;
   };
 
+  // Função para obter total de eleitores por região
+  const getTotalEleitoresPorRegiao = (eleicao?: string): Map<string, number> => {
+    const map = new Map<string, number>();
+    
+    const dadosFiltrados = eleicao 
+      ? dadosEleitorais.filter(d => d.eleicao === eleicao)
+      : dadosEleitorais;
+
+    dadosFiltrados.forEach(d => {
+      if (d.total_eleitores) {
+        map.set(d.nome_regiao, d.total_eleitores);
+      }
+    });
+
+    return map;
+  };
+
   // Função para obter total de votos
   const getTotalVotos = (eleicao?: string): number => {
     const dadosFiltrados = eleicao 
@@ -226,6 +246,15 @@ export function useDadosEleitorais(camadaId?: string | null) {
       : dadosEleitorais;
 
     return dadosFiltrados.reduce((sum, d) => sum + d.votos, 0);
+  };
+
+  // Função para obter total geral de eleitores
+  const getTotalEleitores = (eleicao?: string): number => {
+    const dadosFiltrados = eleicao 
+      ? dadosEleitorais.filter(d => d.eleicao === eleicao)
+      : dadosEleitorais;
+
+    return dadosFiltrados.reduce((sum, d) => sum + (d.total_eleitores || 0), 0);
   };
 
   return {
@@ -236,7 +265,9 @@ export function useDadosEleitorais(camadaId?: string | null) {
     importarDados,
     deletarEleicao,
     getVotosPorRegiao,
-    getTotalVotos
+    getTotalEleitoresPorRegiao,
+    getTotalVotos,
+    getTotalEleitores
   };
 }
 
