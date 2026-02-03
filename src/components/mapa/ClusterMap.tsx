@@ -379,6 +379,14 @@ export function ClusterMap({
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
           />
         </LayersControl.BaseLayer>
+
+        <LayersControl.BaseLayer name="⬜ Em Branco">
+          <TileLayer
+            attribution=''
+            url=""
+            opacity={0}
+          />
+        </LayersControl.BaseLayer>
       </LayersControl>
 
       {/* Camadas Geográficas (Shapefiles) */}
