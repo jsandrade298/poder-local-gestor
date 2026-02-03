@@ -250,18 +250,21 @@ async function geocodificarComNominatim(
 }
 
 /**
- * Hook para consultar CEP e obter coordenadas
+ * Hook para consultar CEP e obter dados do endereço
+ * 
+ * IMPORTANTE: Este hook NÃO faz geocodificação automática!
+ * A geocodificação deve ser feita no momento de SALVAR o registro,
+ * quando o número já estiver preenchido, usando a função geocodificarEndereco()
  * 
  * Fluxo:
- * 1. BrasilAPI → preenche endereço + tenta coordenadas
- * 2. Mapbox → geocodificação precisa (PRINCIPAL)
- * 3. Nominatim → fallback se Mapbox falhar
+ * 1. BrasilAPI → retorna dados do endereço (logradouro, bairro, cidade, estado)
+ * 2. Geocodificação → deve ser chamada separadamente com geocodificarEndereco()
  */
 export function useBrasilAPI(): UseBrasilAPIReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const buscarCep = useCallback(async (cep: string, numero?: string): Promise<EnderecoCompleto | null> => {
+  const buscarCep = useCallback(async (cep: string): Promise<EnderecoCompleto | null> => {
     const cepLimpo = cep.replace(/\D/g, '');
 
     if (cepLimpo.length !== 8) {
@@ -273,7 +276,7 @@ export function useBrasilAPI(): UseBrasilAPIReturn {
     setError(null);
 
     try {
-      // ========== PASSO 1: Buscar na BrasilAPI ==========
+      // Buscar na BrasilAPI - apenas dados do endereço
       const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cepLimpo}`);
 
       if (!response.ok) {
@@ -286,71 +289,21 @@ export function useBrasilAPI(): UseBrasilAPIReturn {
 
       const data: BrasilAPICepResponse = await response.json();
 
+      // Retornar apenas dados do endereço, SEM coordenadas
+      // A geocodificação será feita no momento de salvar, com o número preenchido
       const endereco: EnderecoCompleto = {
         cep: data.cep,
         logradouro: data.street || '',
         bairro: data.neighborhood || '',
         cidade: data.city || '',
         estado: data.state || '',
-        latitude: null,
-        longitude: null,
+        latitude: null,  // Sempre null - geocodificação feita ao salvar
+        longitude: null, // Sempre null - geocodificação feita ao salvar
         fonteGeo: null
       };
 
-      // ========== PASSO 2: Verificar coordenadas da BrasilAPI ==========
-      if (data.location?.coordinates) {
-        const lat = parseFloat(data.location.coordinates.latitude);
-        const lng = parseFloat(data.location.coordinates.longitude);
-        
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          endereco.latitude = lat;
-          endereco.longitude = lng;
-          endereco.fonteGeo = 'brasilapi';
-          console.log('✅ Coordenadas da BrasilAPI:', lat, lng);
-          return endereco;
-        }
-      }
-
-      // ========== PASSO 3: Geocodificar com Mapbox (PRINCIPAL) ==========
-      console.log('BrasilAPI sem coordenadas, usando Mapbox...');
-      
-      const coordMapbox = await geocodificarComMapbox(
-        endereco.logradouro,
-        numero || '',
-        endereco.bairro,
-        endereco.cidade,
-        endereco.estado
-      );
-
-      if (coordMapbox) {
-        endereco.latitude = coordMapbox.latitude;
-        endereco.longitude = coordMapbox.longitude;
-        endereco.fonteGeo = 'mapbox';
-        console.log('✅ Coordenadas do Mapbox:', coordMapbox.latitude, coordMapbox.longitude);
-        return endereco;
-      }
-
-      // ========== PASSO 4: Fallback Nominatim ==========
-      console.log('Mapbox falhou, tentando Nominatim como fallback...');
-      
-      await new Promise(resolve => setTimeout(resolve, 300)); // Rate limit
-      
-      const coordNominatim = await geocodificarComNominatim(
-        endereco.logradouro,
-        numero || '',
-        endereco.bairro,
-        endereco.cidade,
-        endereco.estado
-      );
-
-      if (coordNominatim) {
-        endereco.latitude = coordNominatim.latitude;
-        endereco.longitude = coordNominatim.longitude;
-        endereco.fonteGeo = 'nominatim';
-        console.log('✅ Coordenadas do Nominatim:', coordNominatim.latitude, coordNominatim.longitude);
-      } else {
-        console.log('❌ Nenhum serviço conseguiu geocodificar');
-      }
+      console.log('✅ CEP encontrado:', endereco.logradouro, '-', endereco.bairro, '-', endereco.cidade);
+      console.log('ℹ️ Geocodificação será feita ao salvar o registro (com número)');
 
       return endereco;
     } catch (err) {
