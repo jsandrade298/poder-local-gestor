@@ -318,77 +318,23 @@ export function GeoJSONLayer({
         // Obter dados calculados da região
         const dadosRegiao = dadosRegioes.find(d => d.nome === featureName);
         
-        // Construir conteúdo do tooltip
-        let tooltipContent = `<div style="min-width: 220px;">`;
-        tooltipContent += `<strong style="font-size: 14px; border-bottom: 1px solid #ddd; display: block; padding-bottom: 4px; margin-bottom: 6px;">${featureName}</strong>`;
+        // Construir conteúdo do tooltip (simplificado - detalhes na sidebar)
+        let tooltipContent = `<div style="min-width: 160px;">`;
+        tooltipContent += `<strong style="font-size: 13px; display: block; margin-bottom: 6px;">${featureName}</strong>`;
         
-        // Seção: Atendimento
-        tooltipContent += `<div style="margin-bottom: 6px;">`;
-        tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Atendimento</span><br/>`;
-        tooltipContent += `👥 Munícipes: <strong>${stats?.municipes || 0}</strong><br/>`;
-        tooltipContent += `📋 Demandas: <strong>${stats?.demandas || 0}</strong>`;
+        // Resumo rápido
+        tooltipContent += `<div style="font-size: 11px; line-height: 1.4;">`;
+        tooltipContent += `👥 ${stats?.municipes || 0} munícipes &nbsp;·&nbsp; 📋 ${stats?.demandas || 0} demandas<br/>`;
+        tooltipContent += `🗳️ ${votos.toLocaleString('pt-BR')} votos`;
+        if (eleitores > 0) {
+          tooltipContent += ` &nbsp;·&nbsp; 👤 ${eleitores.toLocaleString('pt-BR')} eleitores`;
+        }
         tooltipContent += `</div>`;
         
-        // Seção: Dados Eleitorais
-        tooltipContent += `<div style="margin-bottom: 6px; padding-top: 6px; border-top: 1px solid #eee;">`;
-        tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Dados Eleitorais</span><br/>`;
-        tooltipContent += `🗳️ Votos: <strong>${votos.toLocaleString('pt-BR')}</strong><br/>`;
-        tooltipContent += `👤 Eleitores: <strong>${eleitores.toLocaleString('pt-BR')}</strong>`;
+        // Dica para clicar
+        tooltipContent += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; font-size: 10px; color: #666;">`;
+        tooltipContent += `<em>Clique para ver detalhes →</em>`;
         tooltipContent += `</div>`;
-        
-        // Seção: Percentuais e Rankings (apenas se houver votos)
-        if (dadosRegiao && (totalVotosCandidato > 0 || totalEleitoresGeral > 0)) {
-          tooltipContent += `<div style="padding-top: 6px; border-top: 1px solid #eee;">`;
-          tooltipContent += `<span style="color: #666; font-size: 10px; text-transform: uppercase;">Análise</span><br/>`;
-          
-          // % sobre total de eleitores (geral)
-          if (totalEleitoresGeral > 0) {
-            const pctTotalEleitores = dadosRegiao.percentualSobreTotalEleitores;
-            const rankTotalEleitores = getRanking(featureName, rankingSobreTotalEleitores);
-            tooltipContent += `<span title="Votos / Total de Eleitores (todas regiões)">`;
-            tooltipContent += `📊 % Eleitorado: <strong>${pctTotalEleitores.toFixed(2)}%</strong> `;
-            tooltipContent += `<span style="background: #e0e7ff; color: #4f46e5; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankTotalEleitores)}</span>`;
-            tooltipContent += `</span><br/>`;
-          }
-          
-          // % sobre eleitores da região
-          if (eleitores > 0) {
-            const pctEleitoresRegiao = dadosRegiao.percentualSobreEleitoresRegiao;
-            const rankEleitoresRegiao = getRanking(featureName, rankingSobreEleitoresRegiao);
-            tooltipContent += `<span title="Votos / Eleitores desta região">`;
-            tooltipContent += `🎯 % na Região: <strong>${pctEleitoresRegiao.toFixed(2)}%</strong> `;
-            tooltipContent += `<span style="background: #dcfce7; color: #166534; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankEleitoresRegiao)}</span>`;
-            tooltipContent += `</span><br/>`;
-          }
-          
-          // % sobre total de votos do candidato
-          if (totalVotosCandidato > 0) {
-            const pctTotalVotos = dadosRegiao.percentualSobreTotalVotos;
-            const rankTotalVotos = getRanking(featureName, rankingSobreTotalVotos);
-            tooltipContent += `<span title="Votos da região / Total de votos do candidato">`;
-            tooltipContent += `🏆 % Votação: <strong>${pctTotalVotos.toFixed(2)}%</strong> `;
-            tooltipContent += `<span style="background: #fef3c7; color: #92400e; padding: 1px 4px; border-radius: 3px; font-size: 10px;">${formatarRanking(rankTotalVotos)}</span>`;
-            tooltipContent += `</span>`;
-          }
-          
-          tooltipContent += `</div>`;
-        }
-        
-        // Indicador de oportunidade no modo comparativo
-        if (modoEfetivo === 'comparativo' && votos > 0) {
-          tooltipContent += `<div style="padding-top: 6px; border-top: 1px solid #eee;">`;
-          if (atendimento === 0) {
-            tooltipContent += `<span style="color: #ef4444; font-weight: bold;">⚠️ Sem atendimentos - Oportunidade!</span>`;
-          } else {
-            const ratio = votos / atendimento;
-            if (ratio > 10) {
-              tooltipContent += `<span style="color: #f97316;">💡 ${Math.round(ratio)}x mais votos que atendimentos</span>`;
-            } else if (ratio > 5) {
-              tooltipContent += `<span style="color: #eab308;">📈 ${Math.round(ratio)}x mais votos que atendimentos</span>`;
-            }
-          }
-          tooltipContent += `</div>`;
-        }
         
         tooltipContent += `</div>`;
         
