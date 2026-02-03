@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { CriarDemandaAposCadastroDialog } from "./CriarDemandaAposCadastroDialog";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
-import { useGeocoding } from "@/hooks/useGeocoding";
 
 export function NovoMunicipeDialog() {
   const [open, setOpen] = useState(false);
@@ -38,7 +37,7 @@ export function NovoMunicipeDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
-  const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const [isGeocodificando, setIsGeocodificando] = useState(false);
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
     lng: null
@@ -94,37 +93,40 @@ export function NovoMunicipeDialog() {
   };
 
   const handleAtualizarGeolocalizacao = async () => {
-    const enderecoCompleto = [
-      formData.logradouro,
-      formData.numero,
-      formData.bairro,
-      formData.cidade,
-      'SP',
-      'Brasil'
-    ].filter(Boolean).join(', ');
-
-    if (!formData.logradouro || !formData.cidade) {
+    if (!formData.logradouro && !formData.bairro) {
       toast({
         title: "Endereço incompleto",
-        description: "Preencha ao menos o logradouro e a cidade para geocodificar",
+        description: "Preencha ao menos o logradouro ou bairro para geocodificar",
         variant: "destructive"
       });
       return;
     }
 
-    const resultado = await geocodificarEndereco(enderecoCompleto);
-    if (resultado) {
-      setCoordenadas({ lat: resultado.lat, lng: resultado.lng });
-      toast({
-        title: "Coordenadas atualizadas!",
-        description: `Lat: ${resultado.lat.toFixed(6)}, Lng: ${resultado.lng.toFixed(6)}`
-      });
-    } else {
-      toast({
-        title: "Erro na geocodificação",
-        description: "Não foi possível encontrar as coordenadas para este endereço",
-        variant: "destructive"
-      });
+    setIsGeocodificando(true);
+    try {
+      const resultado = await geocodificarEndereco(
+        formData.logradouro || '',
+        formData.numero || '',
+        formData.bairro || '',
+        formData.cidade || 'São Paulo',
+        'SP'
+      );
+      
+      if (resultado) {
+        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude });
+        toast({
+          title: "Coordenadas atualizadas!",
+          description: `Via ${resultado.fonte}: ${resultado.latitude.toFixed(6)}, ${resultado.longitude.toFixed(6)}`
+        });
+      } else {
+        toast({
+          title: "Erro na geocodificação",
+          description: "Não foi possível encontrar as coordenadas para este endereço",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsGeocodificando(false);
     }
   };
 
