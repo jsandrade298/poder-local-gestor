@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
-import { useBrasilAPI, formatarCep, validarCep } from "@/hooks/useBrasilAPI";
+import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
@@ -76,7 +76,8 @@ export function NovaDemandaDialog() {
     }
   });
 
-  // Função para buscar CEP e preencher endereço automaticamente
+  // Função para buscar CEP e preencher endereço automaticamente (SEM geocodificar)
+  // A geocodificação será feita no momento de salvar, quando o número já estiver preenchido
   const handleBuscarCep = async () => {
     if (!validarCep(formData.cep)) {
       toast({
@@ -98,21 +99,12 @@ export function NovaDemandaDialog() {
         estado: resultado.estado || prev.estado
       }));
 
-      if (resultado.latitude && resultado.longitude) {
-        setCoordenadas({ lat: resultado.latitude, lng: resultado.longitude, fonte: resultado.fonteGeo });
-        setEnderecoPreenchido(true);
-        toast({
-          title: "Endereço encontrado!",
-          description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}/${resultado.estado}. Localização mapeada!`,
-        });
-      } else {
-        setCoordenadas({ lat: null, lng: null });
-        setEnderecoPreenchido(true);
-        toast({
-          title: "Endereço encontrado!",
-          description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}/${resultado.estado}. (Coordenadas não disponíveis para este CEP)`,
-        });
-      }
+      // Não salvar coordenadas aqui - será feito ao salvar com o número preenchido
+      setEnderecoPreenchido(true);
+      toast({
+        title: "Endereço encontrado!",
+        description: `${resultado.logradouro}, ${resultado.bairro} - ${resultado.cidade}/${resultado.estado}. Preencha o número para localização precisa.`,
+      });
     } else {
       toast({
         title: "CEP não encontrado",
@@ -186,6 +178,32 @@ export function NovaDemandaDialog() {
         .eq('id', user.user.id)
         .maybeSingle();
 
+      // ========== GEOCODIFICAR ANTES DE SALVAR ==========
+      // Usa o endereço completo COM número para precisão máxima
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let geocodificado = false;
+
+      if (data.logradouro || data.bairro) {
+        console.log('🗺️ Geocodificando endereço antes de salvar...');
+        const coordResult = await geocodificarEndereco(
+          data.logradouro || '',
+          data.numero || '',
+          data.bairro || '',
+          data.cidade || 'São Paulo',
+          data.estado || 'SP'
+        );
+
+        if (coordResult) {
+          latitude = coordResult.latitude;
+          longitude = coordResult.longitude;
+          geocodificado = true;
+          console.log(`✅ Coordenadas obtidas via ${coordResult.fonte}:`, latitude, longitude);
+        } else {
+          console.log('⚠️ Não foi possível geocodificar o endereço');
+        }
+      }
+
       const cleanData = {
         ...data,
         area_id: data.area_id || null,
@@ -198,10 +216,10 @@ export function NovaDemandaDialog() {
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
         criado_por: user.user.id,
-        // Campos de geolocalização
-        latitude: coordenadas.lat,
-        longitude: coordenadas.lng,
-        geocodificado: coordenadas.lat !== null && coordenadas.lng !== null
+        // Campos de geolocalização - preenchidos pela geocodificação acima
+        latitude,
+        longitude,
+        geocodificado
       };
 
       // Remover campo estado que não existe na tabela
