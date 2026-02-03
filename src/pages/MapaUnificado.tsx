@@ -142,6 +142,9 @@ export default function MapaUnificado() {
   const [heatmapVisible, setHeatmapVisible] = useState(false);
   const [heatmapType, setHeatmapType] = useState<'demandas' | 'municipes' | 'ambos'>('demandas');
 
+  // Estado de clustering
+  const [clusterEnabled, setClusterEnabled] = useState(true);
+
   // Estado do Filtro Cruzado
   const [filtroCruzado, setFiltroCruzado] = useState(false);
 
@@ -525,6 +528,14 @@ export default function MapaUnificado() {
             <Separator className="w-8" />
             <div className="flex flex-col items-center gap-3">
               <Button 
+                variant={clusterEnabled ? "default" : "ghost"} 
+                size="icon"
+                onClick={() => setClusterEnabled(!clusterEnabled)}
+                title={clusterEnabled ? "Desagrupar Pontos" : "Agrupar Pontos"}
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
+              <Button 
                 variant={heatmapVisible ? "default" : "ghost"} 
                 size="icon"
                 onClick={() => setHeatmapVisible(!heatmapVisible)}
@@ -842,6 +853,8 @@ export default function MapaUnificado() {
                 filtroCruzado={filtroCruzado}
                 setFiltroCruzado={setFiltroCruzado}
                 estatisticasCruzado={estatisticasCruzado}
+                clusterEnabled={clusterEnabled}
+                setClusterEnabled={setClusterEnabled}
               />
 
               <Separator />
@@ -1472,6 +1485,7 @@ export default function MapaUnificado() {
           mostrarMunicipes={tipoFiltro !== 'demandas'}
           heatmapVisible={heatmapVisible}
           heatmapType={heatmapType}
+          clusterEnabled={clusterEnabled}
           camadasGeograficas={camadasVisiveis}
           estatisticasPorRegiao={estatisticasPorRegiao}
           votosPorCamada={votosPorCamada}
