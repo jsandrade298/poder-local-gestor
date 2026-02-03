@@ -65,6 +65,7 @@ interface VotosUploadProps {
 interface DadoPreview {
   nome: string;
   votos: number;
+  totalEleitores?: number;
   status: 'encontrado' | 'sugestao' | 'nao_encontrado';
   sugestao?: string;
   similaridade?: number;
@@ -126,8 +127,9 @@ export function VotosUpload({
     const sugestoes = dadosPreview.filter(d => d.status === 'sugestao').length;
     const naoEncontrados = dadosPreview.filter(d => d.status === 'nao_encontrado').length;
     const totalVotos = dadosPreview.reduce((sum, d) => sum + d.votos, 0);
+    const totalEleitores = dadosPreview.reduce((sum, d) => sum + (d.totalEleitores || 0), 0);
 
-    return { encontrados, sugestoes, naoEncontrados, totalVotos };
+    return { encontrados, sugestoes, naoEncontrados, totalVotos, totalEleitores };
   }, [dadosPreview]);
 
   // Reset ao abrir
@@ -170,8 +172,8 @@ export function VotosUpload({
 
     // Criar conteúdo CSV com BOM para UTF-8
     const bom = '\uFEFF';
-    const header = 'Região;Votos';
-    const rows = regioesDisponiveis.map(regiao => `${regiao};`);
+    const header = 'Região;Votos;Total de Eleitores';
+    const rows = regioesDisponiveis.map(regiao => `${regiao};;`);
     const csvContent = bom + [header, ...rows].join('\n');
 
     // Criar blob e download
@@ -224,7 +226,7 @@ export function VotosUpload({
     setFileName(file.name);
 
     try {
-      let dados: Array<{ nome: string; votos: number }> = [];
+      let dados: Array<{ nome: string; votos: number; totalEleitores?: number }> = [];
 
       if (extension === '.csv' || extension === '.txt') {
         // Processar CSV
@@ -261,6 +263,7 @@ export function VotosUpload({
           return {
             nome: item.nome,
             votos: item.votos,
+            totalEleitores: item.totalEleitores,
             status: 'encontrado' as const,
             sugestao: matchExato
           };
@@ -273,6 +276,7 @@ export function VotosUpload({
           return {
             nome: item.nome,
             votos: item.votos,
+            totalEleitores: item.totalEleitores,
             status: 'sugestao' as const,
             sugestao: match,
             similaridade
@@ -282,6 +286,7 @@ export function VotosUpload({
         return {
           nome: item.nome,
           votos: item.votos,
+          totalEleitores: item.totalEleitores,
           status: 'nao_encontrado' as const
         };
       });
@@ -320,7 +325,8 @@ export function VotosUpload({
       .filter(d => d.status === 'encontrado' && d.sugestao)
       .map(d => ({
         nome: d.sugestao!,
-        votos: d.votos
+        votos: d.votos,
+        totalEleitores: d.totalEleitores
       }));
 
     if (dadosValidos.length === 0) {
@@ -580,6 +586,11 @@ export function VotosUpload({
                 <Badge variant="outline" className="gap-1 ml-auto">
                   🗳️ {estatisticas.totalVotos.toLocaleString('pt-BR')} votos
                 </Badge>
+                {estatisticas.totalEleitores > 0 && (
+                  <Badge variant="outline" className="gap-1">
+                    👥 {estatisticas.totalEleitores.toLocaleString('pt-BR')} eleitores
+                  </Badge>
+                )}
               </div>
             )}
 
@@ -589,10 +600,11 @@ export function VotosUpload({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Região (Planilha)</TableHead>
-                      <TableHead className="w-[30%]">Match</TableHead>
+                      <TableHead className="w-[35%]">Região (Planilha)</TableHead>
+                      <TableHead className="w-[25%]">Match</TableHead>
                       <TableHead className="text-right">Votos</TableHead>
-                      <TableHead className="w-[80px]">Ações</TableHead>
+                      <TableHead className="text-right">Eleitores</TableHead>
+                      <TableHead className="w-[70px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -627,6 +639,9 @@ export function VotosUpload({
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {item.votos.toLocaleString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {item.totalEleitores ? item.totalEleitores.toLocaleString('pt-BR') : '-'}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -737,35 +752,58 @@ function normalizarNome(nome: string): string {
 /**
  * Parse CSV text para array de dados
  */
-function parseCSV(text: string): Array<{ nome: string; votos: number }> {
+function parseCSV(text: string): Array<{ nome: string; votos: number; totalEleitores?: number }> {
   const lines = text.split(/\r?\n/).filter(line => line.trim());
   if (lines.length < 2) return [];
 
-  const result: Array<{ nome: string; votos: number }> = [];
+  const result: Array<{ nome: string; votos: number; totalEleitores?: number }> = [];
   
   // Detectar separador (vírgula, ponto-e-vírgula ou tab)
-  const firstLine = lines[0];
+  const firstLine = lines[0].toLowerCase();
   const separator = firstLine.includes(';') ? ';' : 
                    firstLine.includes('\t') ? '\t' : ',';
+
+  // Identificar colunas do header
+  const headerCols = lines[0].split(separator).map(c => c.trim().replace(/^["']|["']$/g, '').toLowerCase());
+  
+  // Encontrar índices das colunas
+  const indexRegiao = headerCols.findIndex(c => /região|regiao|nome|bairro|local/i.test(c));
+  const indexVotos = headerCols.findIndex(c => /votos|voto|qtd|quantidade/i.test(c));
+  const indexEleitores = headerCols.findIndex(c => /eleitores|eleitor|total.*eleitores/i.test(c));
 
   // Pular header
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(separator).map(c => c.trim().replace(/^["']|["']$/g, ''));
     
     if (cols.length >= 2) {
-      const nome = cols[0];
-      // Tentar encontrar coluna numérica para votos
+      const nome = cols[indexRegiao >= 0 ? indexRegiao : 0];
+      
+      // Ler votos da coluna correta ou tentar encontrar primeira coluna numérica
       let votos = 0;
-      for (let j = 1; j < cols.length; j++) {
-        const num = parseInt(cols[j].replace(/\D/g, ''), 10);
-        if (!isNaN(num) && num > 0) {
-          votos = num;
-          break;
+      if (indexVotos >= 0 && cols[indexVotos]) {
+        votos = parseInt(cols[indexVotos].replace(/\D/g, ''), 10) || 0;
+      } else {
+        // Fallback: primeira coluna numérica após nome
+        for (let j = 1; j < cols.length; j++) {
+          const num = parseInt(cols[j].replace(/\D/g, ''), 10);
+          if (!isNaN(num) && num > 0) {
+            votos = num;
+            break;
+          }
+        }
+      }
+
+      // Ler total de eleitores se a coluna existir
+      let totalEleitores: number | undefined;
+      if (indexEleitores >= 0 && cols[indexEleitores]) {
+        const numEleitores = parseInt(cols[indexEleitores].replace(/\D/g, ''), 10);
+        if (!isNaN(numEleitores) && numEleitores > 0) {
+          totalEleitores = numEleitores;
         }
       }
 
       if (nome && votos > 0) {
-        result.push({ nome, votos });
+        result.push({ nome, votos, totalEleitores });
       }
     }
   }
@@ -776,10 +814,10 @@ function parseCSV(text: string): Array<{ nome: string; votos: number }> {
 /**
  * Parse dados do Excel para array de dados
  */
-function parseExcelData(jsonData: any[]): Array<{ nome: string; votos: number }> {
+function parseExcelData(jsonData: any[]): Array<{ nome: string; votos: number; totalEleitores?: number }> {
   if (!jsonData.length) return [];
 
-  const result: Array<{ nome: string; votos: number }> = [];
+  const result: Array<{ nome: string; votos: number; totalEleitores?: number }> = [];
   
   // Detectar colunas (procurar por nome e votos)
   const primeiraLinha = jsonData[0];
@@ -790,14 +828,22 @@ function parseExcelData(jsonData: any[]): Array<{ nome: string; votos: number }>
     /nome|região|regiao|bairro|municipio|município|cidade|local|zona|seção|secao/i.test(c)
   ) || colunas[0];
 
-  // Encontrar coluna de votos
+  // Encontrar coluna de votos (não inclui "eleitores" para evitar confusão)
   const colunaVotos = colunas.find(c => 
-    /voto|votos|qtd|quantidade|total|eleitores/i.test(c)
+    /^voto|^votos|qtd.*voto|quantidade.*voto/i.test(c)
+  ) || colunas.find(c => 
+    /voto|votos/i.test(c) && !/eleitor/i.test(c)
   ) || colunas.find(c => {
-    // Se não encontrar por nome, procurar primeira coluna numérica
+    // Se não encontrar por nome, procurar primeira coluna numérica que não seja eleitores
+    if (/eleitor/i.test(c)) return false;
     const valor = primeiraLinha[c];
     return typeof valor === 'number' || /^\d+$/.test(String(valor));
   }) || colunas[1];
+
+  // Encontrar coluna de total de eleitores
+  const colunaEleitores = colunas.find(c => 
+    /eleitores|eleitor|total.*eleitores/i.test(c)
+  );
 
   for (const row of jsonData) {
     const nome = String(row[colunaRegiao] || '').trim();
@@ -806,8 +852,20 @@ function parseExcelData(jsonData: any[]): Array<{ nome: string; votos: number }>
       ? votosRaw 
       : parseInt(String(votosRaw).replace(/\D/g, ''), 10);
 
+    // Ler total de eleitores se a coluna existir
+    let totalEleitores: number | undefined;
+    if (colunaEleitores && row[colunaEleitores]) {
+      const eleitoresRaw = row[colunaEleitores];
+      const numEleitores = typeof eleitoresRaw === 'number'
+        ? eleitoresRaw
+        : parseInt(String(eleitoresRaw).replace(/\D/g, ''), 10);
+      if (!isNaN(numEleitores) && numEleitores > 0) {
+        totalEleitores = numEleitores;
+      }
+    }
+
     if (nome && !isNaN(votos) && votos > 0) {
-      result.push({ nome, votos });
+      result.push({ nome, votos, totalEleitores });
     }
   }
 
