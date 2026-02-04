@@ -17,6 +17,13 @@ export interface TagMapa {
   cor: string | null;
 }
 
+export interface CategoriaMapa {
+  id: string;
+  nome: string;
+  cor: string;
+  icone: string;
+}
+
 export interface DemandaMapa {
   id: string;
   titulo: string;
@@ -58,6 +65,7 @@ export interface MunicipeMapa {
   cep: string | null;
   endereco_completo: string | null;
   tags: { id: string; nome: string; cor: string | null }[];
+  categoria_id: string | null;
   demandas_count: number;
   geocodificado: boolean;
   tipo: 'municipe';
@@ -183,6 +191,27 @@ export function useMapaUnificado() {
       
       console.log(`✅ [MAPA] Tags encontradas: ${tagsComCor.length}`);
       return tagsComCor as TagMapa[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Buscar TODAS as categorias
+  const { data: categorias = [], isLoading: isLoadingCategorias } = useQuery({
+    queryKey: ['mapa-categorias-todas'],
+    queryFn: async () => {
+      console.log('🔄 [MAPA] Buscando todas as categorias...');
+      const { data, error } = await supabase
+        .from('municipe_categorias')
+        .select('id, nome, cor, icone')
+        .order('ordem');
+      
+      if (error) {
+        console.error('❌ [MAPA] Erro ao buscar categorias:', error);
+        return [];
+      }
+      
+      console.log(`✅ [MAPA] Categorias encontradas: ${data?.length || 0}`);
+      return (data || []) as CategoriaMapa[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -313,7 +342,8 @@ export function useMapaUnificado() {
           bairro,
           endereco,
           cidade,
-          cep
+          cep,
+          categoria_id
         `);
       
       if (error) {
@@ -382,6 +412,7 @@ export function useMapaUnificado() {
             m.cep
           ),
           tags: tagsPorMunicipe[m.id] || [],
+          categoria_id: m.categoria_id || null,
           demandas_count: contagemDemandas[m.id] || 0,
           geocodificado: isValidCoordinate(latNum, lngNum),
           tipo: 'municipe' as const
@@ -521,13 +552,14 @@ export function useMapaUnificado() {
   return {
     areas,
     tags,
+    categorias,
     demandas,
     municipes,
     demandasRaw,
     municipesRaw,
     bairrosUnicos,
     semCoordenadas,
-    isLoading: isLoadingAreas || isLoadingTags || isLoadingDemandas || isLoadingMunicipes,
+    isLoading: isLoadingAreas || isLoadingTags || isLoadingCategorias || isLoadingDemandas || isLoadingMunicipes,
     geocodificando,
     progressoGeocodificacao,
     geocodificarTodos,
