@@ -6,11 +6,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, X, Search, Loader2, MapPin } from "lucide-react";
+import { Edit, X, Search, Loader2, MapPin, Star, Circle, Square, Triangle, Hexagon, Heart, Pentagon, Diamond, Cross, RectangleHorizontal } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Mapeamento de ícones de categoria
+const categoriaIcons: Record<string, any> = {
+  star: Star,
+  circle: Circle,
+  square: Square,
+  triangle: Triangle,
+  hexagon: Hexagon,
+  pentagon: Pentagon,
+  diamond: Diamond,
+  rectangle: RectangleHorizontal,
+  cross: Cross,
+  heart: Heart,
+};
 
 interface EditMunicipeDialogProps {
   municipe: any;
@@ -37,7 +52,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     complemento: "",
     data_nascimento: "",
     observacoes: "",
-    tag_ids: [] as string[]
+    tag_ids: [] as string[],
+    categoria_id: "" as string
   });
 
   // Atualizar formData quando municipe muda
@@ -55,7 +71,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         complemento: "",
         data_nascimento: municipe.data_nascimento || "",
         observacoes: municipe.observacoes || "",
-        tag_ids: []
+        tag_ids: [],
+        categoria_id: municipe.categoria_id || ""
       });
     }
   }, [municipe]);
@@ -215,6 +232,20 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     }
   });
 
+  // Buscar categorias disponíveis
+  const { data: categorias = [] } = useQuery({
+    queryKey: ['categorias'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipe_categorias')
+        .select('id, nome, cor, icone')
+        .order('ordem');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Buscar tags atuais do munícipe
   const { data: currentTags = [] } = useQuery({
     queryKey: ['municipe-tags', municipe?.id],
@@ -300,6 +331,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
+          categoria_id: data.categoria_id || null,
           // Coordenadas atualizadas pela geocodificação
           latitude,
           longitude,
@@ -580,9 +612,41 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
             </div>
           </div>
 
-          {/* Tag e Observações */}
+          {/* Categoria, Tags e Observações */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações Adicionais</h3>
+            
+            {/* Categoria */}
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select 
+                value={formData.categoria_id} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, categoria_id: value === "none" ? "" : value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Sem categoria</span>
+                  </SelectItem>
+                  {categorias.map((categoria: any) => {
+                    const IconComponent = categoriaIcons[categoria.icone] || Circle;
+                    return (
+                      <SelectItem key={categoria.id} value={categoria.id}>
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="h-4 w-4" style={{ color: categoria.cor }} />
+                          {categoria.nome}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                A categoria define o ícone do munícipe no mapa
+              </p>
+            </div>
             
             <div className="space-y-2">
               <Label>Tags</Label>
