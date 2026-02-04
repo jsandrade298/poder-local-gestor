@@ -1324,18 +1324,18 @@ export default function MapaUnificado() {
                           </label>
                           
                           <TooltipProvider delayDuration={300}>
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               {/* 1. Taxa de Resolutividade */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
                                     size="sm"
-                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    className="h-20 flex flex-col items-center justify-center gap-2"
                                     onClick={() => setModoVisualizacao('resolutividade')}
                                   >
-                                    <CheckCircle className="h-5 w-5" />
-                                    <span className="text-[10px] font-medium leading-tight">Resolutividade</span>
+                                    <CheckCircle className="h-6 w-6" />
+                                    <span className="text-xs font-medium">Resolutividade</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-xs p-3">
@@ -1358,12 +1358,12 @@ export default function MapaUnificado() {
                                   <Button
                                     variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
                                     size="sm"
-                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    className="h-20 flex flex-col items-center justify-center gap-2"
                                     onClick={() => setModoVisualizacao('votos')}
                                     disabled={eleicoesDisponiveis.length === 0}
                                   >
-                                    <Vote className="h-5 w-5" />
-                                    <span className="text-[10px] font-medium leading-tight">Votos</span>
+                                    <Vote className="h-6 w-6" />
+                                    <span className="text-xs font-medium">Votos</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-xs p-3">
@@ -1388,11 +1388,11 @@ export default function MapaUnificado() {
                                   <Button
                                     variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
                                     size="sm"
-                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    className="h-20 flex flex-col items-center justify-center gap-2"
                                     onClick={() => setModoVisualizacao('predominancia')}
                                   >
-                                    <PieChart className="h-5 w-5" />
-                                    <span className="text-[10px] font-medium leading-tight">DNA</span>
+                                    <PieChart className="h-6 w-6" />
+                                    <span className="text-xs font-medium">DNA do Bairro</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-xs p-3">
@@ -1416,12 +1416,12 @@ export default function MapaUnificado() {
                                   <Button
                                     variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
                                     size="sm"
-                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    className="h-20 flex flex-col items-center justify-center gap-2"
                                     onClick={() => setModoVisualizacao('comparativo')}
                                     disabled={eleicoesDisponiveis.length === 0}
                                   >
-                                    <TrendingUp className="h-5 w-5" />
-                                    <span className="text-[10px] font-medium leading-tight">Oportunidade</span>
+                                    <TrendingUp className="h-6 w-6" />
+                                    <span className="text-xs font-medium">Oportunidade</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-xs p-3">
