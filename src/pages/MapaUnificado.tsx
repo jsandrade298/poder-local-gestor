@@ -3036,58 +3036,93 @@ export default function MapaUnificado() {
         open={gerenciarRotasOpen}
         onOpenChange={setGerenciarRotasOpen}
         onVisualizarRota={(rota) => {
-          try {
-            // Carregar pontos da rota no mapa
-            if (rota.rota_pontos && rota.rota_pontos.length > 0) {
-              const pontosParaMapa: Array<DemandaMapa | MunicipeMapa> = [];
-              
-              for (const p of rota.rota_pontos) {
-                if (p.tipo === 'demanda') {
-                  const demanda = demandasRaw.find(d => d.id === p.referencia_id);
-                  if (demanda) {
-                    pontosParaMapa.push(demanda);
-                    continue;
-                  }
-                } else {
-                  const municipe = municipesRaw.find(m => m.id === p.referencia_id);
-                  if (municipe) {
-                    pontosParaMapa.push(municipe);
-                    continue;
-                  }
-                }
-                // Fallback: criar objeto mínimo se não encontrou o original
+          console.log('📍 Iniciando visualização da rota:', rota.titulo);
+          
+          if (!rota.rota_pontos || rota.rota_pontos.length === 0) {
+            toast.error('Esta rota não possui pontos de parada');
+            return;
+          }
+
+          // Buscar os objetos originais das demandas/munícipes
+          const pontosParaMapa: Array<DemandaMapa | MunicipeMapa> = [];
+          
+          for (const p of rota.rota_pontos) {
+            if (p.tipo === 'demanda') {
+              const demanda = demandasRaw.find(d => d.id === p.referencia_id);
+              if (demanda) {
+                pontosParaMapa.push(demanda);
+              } else {
+                // Criar objeto DemandaMapa completo com dados salvos
                 pontosParaMapa.push({
-                  id: p.referencia_id,
-                  nome: p.nome,
+                  id: p.referencia_id || `temp-demanda-${p.ordem}`,
+                  titulo: p.nome,
+                  descricao: null,
+                  status: 'pendente',
+                  prioridade: null,
+                  protocolo: '',
                   latitude: p.latitude,
                   longitude: p.longitude,
-                  bairro: p.endereco || ''
-                } as MunicipeMapa);
+                  bairro: p.endereco || null,
+                  logradouro: null,
+                  numero: null,
+                  cidade: null,
+                  cep: null,
+                  endereco_completo: p.endereco || null,
+                  area_id: null,
+                  area_nome: null,
+                  area_cor: null,
+                  municipe_id: null,
+                  municipe_nome: null,
+                  municipe_telefone: null,
+                  responsavel_id: null,
+                  data_prazo: null,
+                  created_at: null,
+                  geocodificado: true,
+                  tipo: 'demanda'
+                });
               }
-              
-              setPontosRota(pontosParaMapa);
-              
-              if (rota.origem_lat && rota.origem_lng) {
-                setOrigemRota({ lat: rota.origem_lat, lng: rota.origem_lng });
-              } else {
-                setOrigemRota(null);
-              }
-              
-              if (rota.destino_lat && rota.destino_lng) {
-                setDestinoRota({ lat: rota.destino_lat, lng: rota.destino_lng });
-              } else {
-                setDestinoRota(null);
-              }
-              
-              setOtimizarRota(rota.otimizar || false);
-              toast.success('Rota carregada no mapa');
             } else {
-              toast.error('Esta rota não possui pontos de parada');
+              const municipe = municipesRaw.find(m => m.id === p.referencia_id);
+              if (municipe) {
+                pontosParaMapa.push(municipe);
+              } else {
+                // Criar objeto MunicipeMapa completo com dados salvos
+                pontosParaMapa.push({
+                  id: p.referencia_id || `temp-municipe-${p.ordem}`,
+                  nome: p.nome,
+                  telefone: null,
+                  email: null,
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  bairro: p.endereco || null,
+                  endereco: p.endereco || null,
+                  cidade: null,
+                  cep: null,
+                  endereco_completo: p.endereco || null,
+                  tags: [],
+                  demandas_count: 0,
+                  geocodificado: true,
+                  tipo: 'municipe'
+                });
+              }
             }
-          } catch (error) {
-            console.error('Erro ao carregar rota:', error);
-            toast.error('Erro ao carregar rota no mapa');
           }
+
+          console.log('📍 Total de pontos carregados:', pontosParaMapa.length);
+          
+          // Atualizar estados
+          setPontosRota(pontosParaMapa);
+          setOrigemRota(rota.origem_lat && rota.origem_lng 
+            ? { lat: rota.origem_lat, lng: rota.origem_lng } 
+            : null
+          );
+          setDestinoRota(rota.destino_lat && rota.destino_lng 
+            ? { lat: rota.destino_lat, lng: rota.destino_lng } 
+            : null
+          );
+          setOtimizarRota(rota.otimizar || false);
+          
+          toast.success(`Rota "${rota.titulo}" carregada com ${pontosParaMapa.length} pontos`);
         }}
         onConcluirRota={(rota) => {
           setRotaParaConcluir(rota);
