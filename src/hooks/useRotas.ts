@@ -36,10 +36,7 @@ export interface Rota {
   updated_at: string;
   // Relacionamentos
   rota_pontos?: RotaPonto[];
-  profiles?: {
-    id: string;
-    nome: string;
-  };
+  usuario_nome?: string;
 }
 
 export interface CriarRotaInput {
@@ -82,7 +79,10 @@ export function useRotas() {
   } = useQuery({
     queryKey: ['rotas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      console.log('🔍 Buscando rotas...');
+      
+      // Primeiro buscar as rotas
+      const { data: rotasData, error: rotasError } = await supabase
         .from('rotas')
         .select(`
           *,
@@ -97,24 +97,42 @@ export function useRotas() {
             longitude,
             visitado,
             observacao_visita
-          ),
-          profiles:usuario_id (
-            id,
-            nome
           )
         `)
-        .order('data_programada', { ascending: true })
-        .order('created_at', { ascending: false });
+        .order('data_programada', { ascending: true });
 
-      if (error) throw error;
-      
-      // Ordenar os pontos de cada rota
-      return (data || []).map(rota => ({
+      if (rotasError) {
+        console.error('❌ Erro ao buscar rotas:', rotasError);
+        throw rotasError;
+      }
+
+      console.log('✅ Rotas encontradas:', rotasData?.length || 0);
+
+      if (!rotasData || rotasData.length === 0) {
+        return [];
+      }
+
+      // Buscar os nomes dos usuários
+      const usuarioIds = [...new Set(rotasData.map(r => r.usuario_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .in('id', usuarioIds);
+
+      const profilesMap = new Map(profilesData?.map(p => [p.id, p.nome]) || []);
+
+      // Combinar dados
+      const rotasComUsuarios = rotasData.map(rota => ({
         ...rota,
+        usuario_nome: profilesMap.get(rota.usuario_id) || 'Usuário',
         rota_pontos: (rota.rota_pontos || []).sort((a: RotaPonto, b: RotaPonto) => a.ordem - b.ordem)
-      })) as Rota[];
+      }));
+
+      return rotasComUsuarios as Rota[];
     },
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 30000, // Cache por 30 segundos
+    refetchOnWindowFocus: false
   });
 
   // Buscar uma rota específica
@@ -134,10 +152,6 @@ export function useRotas() {
           longitude,
           visitado,
           observacao_visita
-        ),
-        profiles:usuario_id (
-          id,
-          nome
         )
       `)
       .eq('id', id)
@@ -148,8 +162,16 @@ export function useRotas() {
       return null;
     }
 
+    // Buscar nome do usuário
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('nome')
+      .eq('id', data.usuario_id)
+      .single();
+
     return {
       ...data,
+      usuario_nome: profile?.nome || 'Usuário',
       rota_pontos: (data.rota_pontos || []).sort((a: RotaPonto, b: RotaPonto) => a.ordem - b.ordem)
     } as Rota;
   };
@@ -158,6 +180,8 @@ export function useRotas() {
   const criarRota = useMutation({
     mutationFn: async (input: CriarRotaInput) => {
       if (!user) throw new Error('Usuário não autenticado');
+
+      console.log('📝 Criando rota:', input.titulo);
 
       // 1. Criar a rota
       const { data: rota, error: rotaError } = await supabase
@@ -176,7 +200,12 @@ export function useRotas() {
         .select()
         .single();
 
-      if (rotaError) throw rotaError;
+      if (rotaError) {
+        console.error('❌ Erro ao criar rota:', rotaError);
+        throw rotaError;
+      }
+
+      console.log('✅ Rota criada:', rota.id);
 
       // 2. Criar os pontos da rota
       if (input.pontos.length > 0) {
@@ -195,7 +224,12 @@ export function useRotas() {
           .from('rota_pontos')
           .insert(pontosParaInserir);
 
-        if (pontosError) throw pontosError;
+        if (pontosError) {
+          console.error('❌ Erro ao criar pontos:', pontosError);
+          throw pontosError;
+        }
+
+        console.log('✅ Pontos criados:', pontosParaInserir.length);
       }
 
       return rota;
