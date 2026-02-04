@@ -56,6 +56,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { 
@@ -190,6 +191,9 @@ export default function MapaUnificado() {
 
   // Estado da aba da região
   const [abaRegiao, setAbaRegiao] = useState<'dados' | 'demandas' | 'municipes'>('dados');
+
+  // Estado do modal de rankings
+  const [modalRankingsAberto, setModalRankingsAberto] = useState(false);
 
   // Estados para dados eleitorais
   const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'atendimento' | 'votos' | 'comparativo'>('padrao');
@@ -556,6 +560,85 @@ export default function MapaUnificado() {
       totalRegioes
     };
   }, [regiaoSelecionada, demandasFiltradas, municipesFiltrados, estatisticasPorRegiao, votosPorCamada, totalEleitoresPorCamada, camadasVisiveis]);
+
+  // Rankings completos para o modal
+  const rankingsCompletos = useMemo(() => {
+    if (!regiaoSelecionada) return null;
+
+    const camadaId = regiaoSelecionada.camadaId;
+    const camada = camadasVisiveis.find(c => c.id === camadaId);
+    
+    if (!camada?.geojson?.features) return null;
+
+    // Calcular totais gerais
+    let totalVotosCandidato = 0;
+    let totalEleitoresGeral = 0;
+
+    votosPorCamada.get(camadaId)?.forEach(v => totalVotosCandidato += v);
+    totalEleitoresPorCamada.get(camadaId)?.forEach(e => totalEleitoresGeral += e);
+
+    // Coletar dados de todas as regiões
+    const todasRegioes: Array<{
+      nome: string;
+      votos: number;
+      eleitores: number;
+      pctTotalEleitores: number;
+      pctEleitoresRegiao: number;
+      pctTotalVotos: number;
+    }> = [];
+
+    camada.geojson.features.forEach((f: any) => {
+      const nome = getFeatureNameFromProps(f.properties);
+      const votos = votosPorCamada.get(camadaId)?.get(nome) || 0;
+      const eleitores = totalEleitoresPorCamada.get(camadaId)?.get(nome) || 0;
+
+      todasRegioes.push({
+        nome,
+        votos,
+        eleitores,
+        pctTotalEleitores: totalEleitoresGeral > 0 ? (votos / totalEleitoresGeral) * 100 : 0,
+        pctEleitoresRegiao: eleitores > 0 ? (votos / eleitores) * 100 : 0,
+        pctTotalVotos: totalVotosCandidato > 0 ? (votos / totalVotosCandidato) * 100 : 0
+      });
+    });
+
+    // Ranking por % do Eleitorado (votos/total eleitores geral)
+    const rankingPctEleitorado = [...todasRegioes]
+      .sort((a, b) => b.pctTotalEleitores - a.pctTotalEleitores)
+      .map((r, i) => ({ ...r, posicao: i + 1 }));
+
+    // Ranking por % na Região (votos/eleitores da região)
+    const rankingPctRegiao = [...todasRegioes]
+      .sort((a, b) => b.pctEleitoresRegiao - a.pctEleitoresRegiao)
+      .map((r, i) => ({ ...r, posicao: i + 1 }));
+
+    // Ranking por % Votação (votos/total votos candidato)
+    const rankingPctVotacao = [...todasRegioes]
+      .sort((a, b) => b.pctTotalVotos - a.pctTotalVotos)
+      .map((r, i) => ({ ...r, posicao: i + 1 }));
+
+    // Ranking por votos absolutos
+    const rankingVotosAbsolutos = [...todasRegioes]
+      .sort((a, b) => b.votos - a.votos)
+      .map((r, i) => ({ ...r, posicao: i + 1 }));
+
+    // Ranking por eleitores absolutos
+    const rankingEleitoresAbsolutos = [...todasRegioes]
+      .sort((a, b) => b.eleitores - a.eleitores)
+      .map((r, i) => ({ ...r, posicao: i + 1 }));
+
+    return {
+      regiaoAtual: regiaoSelecionada.nome,
+      totalRegioes: todasRegioes.length,
+      totalVotosCandidato,
+      totalEleitoresGeral,
+      rankingPctEleitorado,
+      rankingPctRegiao,
+      rankingPctVotacao,
+      rankingVotosAbsolutos,
+      rankingEleitoresAbsolutos
+    };
+  }, [regiaoSelecionada, camadasVisiveis, votosPorCamada, totalEleitoresPorCamada]);
 
   // Função auxiliar para obter nome da feature
   function getFeatureNameFromProps(properties: any): string {
@@ -2255,6 +2338,16 @@ export default function MapaUnificado() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Botão para ver rankings completos */}
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setModalRankingsAberto(true)}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Ver Rankings Completos
+                </Button>
               </TabsContent>
 
               {/* Tab Demandas */}
@@ -2436,6 +2529,259 @@ export default function MapaUnificado() {
           }
         }}
       />
+
+      {/* Modal de Rankings Completos */}
+      <Dialog open={modalRankingsAberto} onOpenChange={setModalRankingsAberto}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Rankings Completos - {rankingsCompletos?.regiaoAtual}
+            </DialogTitle>
+            <DialogDescription>
+              Comparativo entre {rankingsCompletos?.totalRegioes || 0} regiões da camada selecionada
+            </DialogDescription>
+          </DialogHeader>
+          
+          {rankingsCompletos && (
+            <Tabs defaultValue="pct-eleitorado" className="flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="pct-eleitorado" className="text-xs">% Eleitorado</TabsTrigger>
+                <TabsTrigger value="pct-regiao" className="text-xs">% na Região</TabsTrigger>
+                <TabsTrigger value="pct-votacao" className="text-xs">% Votação</TabsTrigger>
+                <TabsTrigger value="votos-abs" className="text-xs">Votos</TabsTrigger>
+                <TabsTrigger value="eleitores-abs" className="text-xs">Eleitores</TabsTrigger>
+              </TabsList>
+
+              <ScrollArea className="flex-1 mt-4">
+                {/* Tab % Eleitorado */}
+                <TabsContent value="pct-eleitorado" className="mt-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        Ranking por % do Eleitorado
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        <strong>Fórmula:</strong> Votos da região / Total de eleitores de TODAS as regiões ({rankingsCompletos.totalEleitoresGeral.toLocaleString('pt-BR')} eleitores)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {rankingsCompletos.rankingPctEleitorado.map((r) => (
+                          <div 
+                            key={r.nome}
+                            className={`flex items-center justify-between py-2 px-3 rounded-md text-sm ${
+                              r.nome === rankingsCompletos.regiaoAtual 
+                                ? 'bg-blue-100 border border-blue-300 font-medium' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="w-10 justify-center font-mono">
+                                {r.posicao}º
+                              </Badge>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-blue-700' : ''}>
+                                {r.nome}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="text-muted-foreground text-xs">
+                                {r.votos.toLocaleString('pt-BR')} votos
+                              </span>
+                              <span className="font-mono font-bold w-20 text-right">
+                                {r.pctTotalEleitores.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Tab % na Região */}
+                <TabsContent value="pct-regiao" className="mt-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                        Ranking por % na Região
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        <strong>Fórmula:</strong> Votos da região / Eleitores DA PRÓPRIA região (penetração local)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {rankingsCompletos.rankingPctRegiao.map((r) => (
+                          <div 
+                            key={r.nome}
+                            className={`flex items-center justify-between py-2 px-3 rounded-md text-sm ${
+                              r.nome === rankingsCompletos.regiaoAtual 
+                                ? 'bg-green-100 border border-green-300 font-medium' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="w-10 justify-center font-mono">
+                                {r.posicao}º
+                              </Badge>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-green-700' : ''}>
+                                {r.nome}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="text-muted-foreground text-xs">
+                                {r.votos.toLocaleString('pt-BR')}/{r.eleitores.toLocaleString('pt-BR')}
+                              </span>
+                              <span className="font-mono font-bold w-20 text-right">
+                                {r.pctEleitoresRegiao.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Tab % Votação */}
+                <TabsContent value="pct-votacao" className="mt-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-500" />
+                        Ranking por % da Votação
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        <strong>Fórmula:</strong> Votos da região / Total de votos do candidato ({rankingsCompletos.totalVotosCandidato.toLocaleString('pt-BR')} votos)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {rankingsCompletos.rankingPctVotacao.map((r) => (
+                          <div 
+                            key={r.nome}
+                            className={`flex items-center justify-between py-2 px-3 rounded-md text-sm ${
+                              r.nome === rankingsCompletos.regiaoAtual 
+                                ? 'bg-amber-100 border border-amber-300 font-medium' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="w-10 justify-center font-mono">
+                                {r.posicao}º
+                              </Badge>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-amber-700' : ''}>
+                                {r.nome}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="text-muted-foreground text-xs">
+                                {r.votos.toLocaleString('pt-BR')} votos
+                              </span>
+                              <span className="font-mono font-bold w-20 text-right">
+                                {r.pctTotalVotos.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Tab Votos Absolutos */}
+                <TabsContent value="votos-abs" className="mt-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Vote className="h-4 w-4 text-purple-500" />
+                        Ranking por Número de Votos
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Regiões ordenadas pelo número absoluto de votos recebidos
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {rankingsCompletos.rankingVotosAbsolutos.map((r) => (
+                          <div 
+                            key={r.nome}
+                            className={`flex items-center justify-between py-2 px-3 rounded-md text-sm ${
+                              r.nome === rankingsCompletos.regiaoAtual 
+                                ? 'bg-purple-100 border border-purple-300 font-medium' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="w-10 justify-center font-mono">
+                                {r.posicao}º
+                              </Badge>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-purple-700' : ''}>
+                                {r.nome}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="font-mono font-bold">
+                                {r.votos.toLocaleString('pt-BR')} votos
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Tab Eleitores Absolutos */}
+                <TabsContent value="eleitores-abs" className="mt-0">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Users className="h-4 w-4 text-cyan-500" />
+                        Ranking por Número de Eleitores
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Regiões ordenadas pelo número absoluto de eleitores
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {rankingsCompletos.rankingEleitoresAbsolutos.map((r) => (
+                          <div 
+                            key={r.nome}
+                            className={`flex items-center justify-between py-2 px-3 rounded-md text-sm ${
+                              r.nome === rankingsCompletos.regiaoAtual 
+                                ? 'bg-cyan-100 border border-cyan-300 font-medium' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="w-10 justify-center font-mono">
+                                {r.posicao}º
+                              </Badge>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-cyan-700' : ''}>
+                                {r.nome}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="font-mono font-bold">
+                                {r.eleitores.toLocaleString('pt-BR')} eleitores
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </ScrollArea>
+            </Tabs>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
       {/* 
