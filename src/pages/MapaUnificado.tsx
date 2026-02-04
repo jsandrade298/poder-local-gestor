@@ -1310,7 +1310,7 @@ export default function MapaUnificado() {
                           />
                         </div>
 
-                        {/* Modo de Visualização (ATUALIZADO LAYOUT DOS BOTÕES) */}
+                        {/* Modo de Visualização (LAYOUT UNIFORMIZADO) */}
                         {modoVisualizacao !== 'padrao' && (
                         <div className="space-y-3">
                           <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
@@ -1322,14 +1322,14 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
+                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('resolutividade')}
                             >
-                              <div className="flex items-center gap-1 font-semibold">
+                              <div className="flex items-center gap-1.5 font-semibold">
                                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
                                 Resolutividade
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
                                 Eficiência na resolução de demandas
                               </span>
                             </Button>
@@ -1338,15 +1338,15 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
+                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('votos')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
-                              <div className="flex items-center gap-1 font-semibold">
+                              <div className="flex items-center gap-1.5 font-semibold">
                                 <Vote className="h-3.5 w-3.5 flex-shrink-0" />
                                 Votos
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
                                 Densidade eleitoral histórica
                               </span>
                             </Button>
@@ -1355,14 +1355,14 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
+                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('predominancia')}
                             >
-                              <div className="flex items-center gap-1 font-semibold">
+                              <div className="flex items-center gap-1.5 font-semibold">
                                 <PieChart className="h-3.5 w-3.5 flex-shrink-0" />
                                 DNA do Bairro
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
                                 Tema predominante (Saúde, Obras...)
                               </span>
                             </Button>
@@ -1371,15 +1371,15 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
+                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('comparativo')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
-                              <div className="flex items-center gap-1 font-semibold">
+                              <div className="flex items-center gap-1.5 font-semibold">
                                 <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
                                 Oportunidade
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
                                 Votos vs. Volume de Demandas
                               </span>
                             </Button>
@@ -1697,31 +1697,142 @@ export default function MapaUnificado() {
 
             <div className="flex-1 overflow-y-auto p-4">
               <TabsContent value="dados" className="mt-0 space-y-4">
-                {/* ... Cards de dados ... */}
+                {/* Card de Resumo da Região */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <MapIcon className="h-4 w-4 text-primary" />
+                      Resumo da Região
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Demandas */}
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-orange-500" />
+                        <span className="text-sm">Demandas</span>
+                      </div>
+                      <span className="font-mono font-bold text-lg">
+                        {dadosRegiaoSelecionada.totalDemandas.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                    
+                    {/* Munícipes */}
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-green-500" />
+                        <span className="text-sm">Munícipes</span>
+                      </div>
+                      <span className="font-mono font-bold text-lg">
+                        {dadosRegiaoSelecionada.totalMunicipes.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                    
+                    {/* Votos */}
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <Vote className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm">Votos</span>
+                      </div>
+                      <span className="font-mono font-bold text-lg text-purple-700">
+                        {dadosRegiaoSelecionada.votos.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                    
+                    {/* Eleitores */}
+                    <div className="flex justify-between items-center py-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-cyan-500" />
+                        <span className="text-sm">Eleitores</span>
+                      </div>
+                      <span className="font-mono font-bold text-lg text-cyan-700">
+                        {dadosRegiaoSelecionada.eleitores.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card de Análise Eleitoral */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-blue-600" />
-                      Análise de Desempenho
+                      Análise Eleitoral
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* ... Métricas ... */}
+                  <CardContent className="space-y-3">
+                    {/* % Eleitorado (votos / total eleitores GERAL) */}
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">% Eleitorado</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">% Eleitorado</span>
+                          <span className="text-[10px] text-muted-foreground">Votos / Total eleitores geral</span>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-blue-700">
                             {dadosRegiaoSelecionada.percentualSobreTotalEleitores.toFixed(2)}%
                           </span>
-                          <Badge className="bg-blue-100 text-blue-700">
+                          <Badge className="bg-blue-100 text-blue-700 text-xs">
                             {dadosRegiaoSelecionada.rankingTotalEleitores}º
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* % Na Região (votos / eleitores DA REGIÃO) */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">% Na Região</span>
+                          <span className="text-[10px] text-muted-foreground">Votos / Eleitores da região</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-emerald-700">
+                            {dadosRegiaoSelecionada.percentualSobreEleitoresRegiao.toFixed(2)}%
+                          </span>
+                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                            {dadosRegiaoSelecionada.rankingEleitoresRegiao}º
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* % Votação (votos / total votos CANDIDATO) */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">% Votação</span>
+                          <span className="text-[10px] text-muted-foreground">Votos / Total votos do candidato</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-purple-700">
+                            {dadosRegiaoSelecionada.percentualSobreTotalVotos.toFixed(2)}%
+                          </span>
+                          <Badge className="bg-purple-100 text-purple-700 text-xs">
+                            {dadosRegiaoSelecionada.rankingTotalVotos}º
                           </Badge>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Totais Gerais para referência */}
+                <div className="p-3 bg-muted/50 rounded-md border text-xs space-y-1">
+                  <p className="font-medium text-muted-foreground mb-2">Totais da camada ({dadosRegiaoSelecionada.totalRegioes} regiões)</p>
+                  <div className="flex justify-between">
+                    <span>Total de eleitores:</span>
+                    <span className="font-mono">{dadosRegiaoSelecionada.totalEleitoresGeral.toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total de votos:</span>
+                    <span className="font-mono">{dadosRegiaoSelecionada.totalVotosCandidato.toLocaleString('pt-BR')}</span>
+                  </div>
+                </div>
 
                 <Button 
                   variant="outline" 
