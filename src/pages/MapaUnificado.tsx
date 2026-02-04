@@ -336,6 +336,24 @@ export default function MapaUnificado() {
     return contagem;
   }, [demandasRaw]);
 
+  // Calcular centro aproximado dos dados para usar na busca de endereços
+  const centroProximidade = useMemo(() => {
+    const pontosComCoordenadas = [
+      ...demandasRaw.filter(d => d.latitude && d.longitude),
+      ...municipesRaw.filter(m => m.latitude && m.longitude)
+    ];
+    
+    if (pontosComCoordenadas.length === 0) return null;
+    
+    const somaLat = pontosComCoordenadas.reduce((acc, p) => acc + (p.latitude || 0), 0);
+    const somaLng = pontosComCoordenadas.reduce((acc, p) => acc + (p.longitude || 0), 0);
+    
+    return {
+      lat: somaLat / pontosComCoordenadas.length,
+      lng: somaLng / pontosComCoordenadas.length
+    };
+  }, [demandasRaw, municipesRaw]);
+
   // Total de itens no mapa
   const totalNoMapa = 
     tipoFiltro === 'nenhum' ? 0 :
@@ -1246,6 +1264,7 @@ export default function MapaUnificado() {
                 onChange={setOrigemRota}
                 placeholder="Digite um endereço ou use GPS..."
                 showGeolocation={true}
+                proximity={centroProximidade}
               />
 
               <Separator />
@@ -1342,6 +1361,7 @@ export default function MapaUnificado() {
                 onChange={setDestinoRota}
                 placeholder="Digite um endereço ou use GPS..."
                 showGeolocation={true}
+                proximity={centroProximidade}
               />
               <p className="text-xs text-muted-foreground -mt-2">
                 Se não definido, o último ponto será o destino.
@@ -3016,34 +3036,58 @@ export default function MapaUnificado() {
         open={gerenciarRotasOpen}
         onOpenChange={setGerenciarRotasOpen}
         onVisualizarRota={(rota) => {
-          // Carregar pontos da rota no mapa
-          if (rota.rota_pontos && rota.rota_pontos.length > 0) {
-            const pontosParaMapa = rota.rota_pontos.map(p => {
-              if (p.tipo === 'demanda') {
-                const demanda = demandasRaw.find(d => d.id === p.referencia_id);
-                if (demanda) return demanda;
-              } else {
-                const municipe = municipesRaw.find(m => m.id === p.referencia_id);
-                if (municipe) return municipe;
+          try {
+            // Carregar pontos da rota no mapa
+            if (rota.rota_pontos && rota.rota_pontos.length > 0) {
+              const pontosParaMapa: Array<DemandaMapa | MunicipeMapa> = [];
+              
+              for (const p of rota.rota_pontos) {
+                if (p.tipo === 'demanda') {
+                  const demanda = demandasRaw.find(d => d.id === p.referencia_id);
+                  if (demanda) {
+                    pontosParaMapa.push(demanda);
+                    continue;
+                  }
+                } else {
+                  const municipe = municipesRaw.find(m => m.id === p.referencia_id);
+                  if (municipe) {
+                    pontosParaMapa.push(municipe);
+                    continue;
+                  }
+                }
+                // Fallback: criar objeto mínimo se não encontrou o original
+                pontosParaMapa.push({
+                  id: p.referencia_id,
+                  nome: p.nome,
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  bairro: p.endereco || ''
+                } as MunicipeMapa);
               }
-              return {
-                id: p.referencia_id,
-                nome: p.nome,
-                latitude: p.latitude,
-                longitude: p.longitude,
-                bairro: p.endereco
-              } as MunicipeMapa;
-            }).filter(Boolean) as Array<DemandaMapa | MunicipeMapa>;
-            
-            setPontosRota(pontosParaMapa);
-            if (rota.origem_lat && rota.origem_lng) {
-              setOrigemRota({ lat: rota.origem_lat, lng: rota.origem_lng });
+              
+              setPontosRota(pontosParaMapa);
+              
+              if (rota.origem_lat && rota.origem_lng) {
+                setOrigemRota({ lat: rota.origem_lat, lng: rota.origem_lng });
+              } else {
+                setOrigemRota(null);
+              }
+              
+              if (rota.destino_lat && rota.destino_lng) {
+                setDestinoRota({ lat: rota.destino_lat, lng: rota.destino_lng });
+              } else {
+                setDestinoRota(null);
+              }
+              
+              setOtimizarRota(rota.otimizar || false);
+              setAbaSidebar('rotas');
+              toast.success('Rota carregada no mapa');
+            } else {
+              toast.error('Esta rota não possui pontos de parada');
             }
-            if (rota.destino_lat && rota.destino_lng) {
-              setDestinoRota({ lat: rota.destino_lat, lng: rota.destino_lng });
-            }
-            setOtimizarRota(rota.otimizar);
-            toast.success('Rota carregada no mapa');
+          } catch (error) {
+            console.error('Erro ao carregar rota:', error);
+            toast.error('Erro ao carregar rota no mapa');
           }
         }}
         onConcluirRota={(rota) => {
