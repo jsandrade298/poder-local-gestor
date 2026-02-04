@@ -1225,181 +1225,251 @@ export default function MapaUnificado() {
             </TabsContent>
 
             {/* Tab Rotas */}
-            <TabsContent value="rotas" className="p-4 space-y-4 mt-0">
-              {/* Origem */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">PONTO DE PARTIDA</label>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 justify-start"
-                    onClick={obterLocalizacao}
-                  >
-                    <Navigation className="h-4 w-4 mr-2" />
-                    {origemRota 
-                      ? `${origemRota.lat.toFixed(4)}, ${origemRota.lng.toFixed(4)}`
-                      : 'Usar minha localização'
-                    }
-                  </Button>
-                  {origemRota && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => setOrigemRota(null)}
-                      className="h-9 w-9 text-red-500 hover:text-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
+            <TabsContent value="rotas" className="p-0 mt-0">
+              <Tabs value={abaRotas} onValueChange={(v) => setAbaRotas(v as 'criar' | 'salvas')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
+                  <TabsTrigger value="criar" className="text-xs">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Criar Rota
+                  </TabsTrigger>
+                  <TabsTrigger value="salvas" className="text-xs">
+                    <List className="h-3 w-3 mr-1" />
+                    Rotas Salvas
+                  </TabsTrigger>
+                </TabsList>
 
-              <Separator />
-
-              {/* Pontos da rota */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    PONTOS DE PARADA ({pontosRota.length})
-                  </label>
-                  {pontosRota.length > 0 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setPontosRota([])}
-                      className="h-6 text-xs text-red-600 hover:text-red-700"
-                    >
-                      Limpar
-                    </Button>
-                  )}
-                </div>
-
-                {pontosRota.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center">
-                    Clique em um marcador no mapa e adicione à rota
-                  </p>
-                ) : (
+                {/* Sub-aba Criar Rota */}
+                <TabsContent value="criar" className="p-4 space-y-4 mt-0">
+                  {/* Origem */}
                   <div className="space-y-2">
-                    {pontosRota.map((ponto, index) => (
-                      <Card key={ponto.id} className="p-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => moverPonto(index, 'up')}
-                              disabled={index === 0 || otimizarRota}
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => moverPonto(index, 'down')}
-                              disabled={index === pontosRota.length - 1 || otimizarRota}
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">
-                              {index + 1}. {'titulo' in ponto ? ponto.titulo : ponto.nome}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {'bairro' in ponto && ponto.bairro}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-red-500 hover:text-red-600"
-                            onClick={() => removerDaRota(ponto.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
+                    <label className="text-xs font-medium text-muted-foreground">PONTO DE PARTIDA</label>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 justify-start"
+                        onClick={obterLocalizacao}
+                      >
+                        <Navigation className="h-4 w-4 mr-2" />
+                        {origemRota 
+                          ? `${origemRota.lat.toFixed(4)}, ${origemRota.lng.toFixed(4)}`
+                          : 'Usar minha localização'
+                        }
+                      </Button>
+                      {origemRota && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setOrigemRota(null)}
+                          className="h-9 w-9 text-red-500 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
 
-              <Separator />
+                  <Separator />
 
-              {/* Destino Final */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">PONTO DE CHEGADA (OPCIONAL)</label>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 justify-start"
-                    onClick={obterLocalizacaoDestino}
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    {destinoRota 
-                      ? `${destinoRota.lat.toFixed(4)}, ${destinoRota.lng.toFixed(4)}`
-                      : 'Definir destino final'
-                    }
-                  </Button>
-                  {destinoRota && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => setDestinoRota(null)}
-                      className="h-9 w-9 text-red-500 hover:text-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Se não definido, o último ponto de parada será o destino.
-                </p>
-              </div>
+                  {/* Pontos da rota */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        PONTOS DE PARADA ({pontosRota.length})
+                      </label>
+                      {pontosRota.length > 0 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setPontosRota([])}
+                          className="h-6 text-xs text-red-600 hover:text-red-700"
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
 
-              <Separator />
+                    {pontosRota.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4 text-center">
+                        Clique em um marcador no mapa e adicione à rota
+                      </p>
+                    ) : (
+                      <ScrollArea className="h-[150px]">
+                        <div className="space-y-2 pr-2">
+                          {pontosRota.map((ponto, index) => (
+                            <Card key={ponto.id} className="p-2">
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => moverPonto(index, 'up')}
+                                    disabled={index === 0 || otimizarRota}
+                                  >
+                                    <ArrowUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => moverPonto(index, 'down')}
+                                    disabled={index === pontosRota.length - 1 || otimizarRota}
+                                  >
+                                    <ArrowDown className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate">
+                                    {index + 1}. {'titulo' in ponto ? ponto.titulo : ponto.nome}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {'bairro' in ponto && ponto.bairro}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-red-500 hover:text-red-600"
+                                  onClick={() => removerDaRota(ponto.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
 
-              {/* Opção de Otimização */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <label className="text-xs font-medium text-muted-foreground">OTIMIZAR ROTA</label>
+                  <Separator />
+
+                  {/* Destino Final */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">PONTO DE CHEGADA (OPCIONAL)</label>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 justify-start"
+                        onClick={obterLocalizacaoDestino}
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        {destinoRota 
+                          ? `${destinoRota.lat.toFixed(4)}, ${destinoRota.lng.toFixed(4)}`
+                          : 'Definir destino final'
+                        }
+                      </Button>
+                      {destinoRota && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setDestinoRota(null)}
+                          className="h-9 w-9 text-red-500 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      {otimizarRota 
-                        ? 'Ordem calculada automaticamente' 
-                        : 'Ordem definida manualmente'}
+                      Se não definido, o último ponto de parada será o destino.
                     </p>
                   </div>
-                  <Switch
-                    checked={otimizarRota}
-                    onCheckedChange={setOtimizarRota}
-                  />
-                </div>
-                {otimizarRota && (
-                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                    ⚡ A rota será otimizada para o menor percurso ao exportar
-                  </p>
-                )}
-              </div>
 
-              {pontosRota.length > 0 && (
-                <>
                   <Separator />
-                  
-                  {/* Botões de exportação */}
+
+                  {/* Opção de Otimização */}
                   <div className="space-y-2">
-                    <Button 
-                      className="w-full" 
-                      onClick={exportarGoogleMaps}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Abrir no Google Maps
-                    </Button>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <label className="text-xs font-medium text-muted-foreground">OTIMIZAR ROTA</label>
+                        <p className="text-xs text-muted-foreground">
+                          {otimizarRota 
+                            ? 'Ordem calculada automaticamente' 
+                            : 'Ordem definida manualmente'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={otimizarRota}
+                        onCheckedChange={setOtimizarRota}
+                      />
+                    </div>
+                    {otimizarRota && (
+                      <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                        ⚡ A rota será otimizada para o menor percurso ao exportar
+                      </p>
+                    )}
                   </div>
-                </>
-              )}
+
+                  {pontosRota.length > 0 && (
+                    <>
+                      <Separator />
+                      
+                      {/* Botões de ação */}
+                      <div className="space-y-2">
+                        <Button 
+                          className="w-full" 
+                          onClick={() => setCriarRotaDialogOpen(true)}
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          Criar Rota
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="w-full" 
+                          onClick={exportarGoogleMaps}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Abrir no Google Maps
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* Sub-aba Rotas Salvas */}
+                <TabsContent value="salvas" className="p-4 mt-0">
+                  <RotasSalvasList
+                    onVisualizarRota={(rota) => {
+                      // Carregar pontos da rota no mapa
+                      if (rota.rota_pontos && rota.rota_pontos.length > 0) {
+                        // Converter pontos da rota para o formato do mapa
+                        const pontosParaMapa = rota.rota_pontos.map(p => {
+                          if (p.tipo === 'demanda') {
+                            const demanda = demandasRaw.find(d => d.id === p.referencia_id);
+                            if (demanda) return demanda;
+                          } else {
+                            const municipe = municipesRaw.find(m => m.id === p.referencia_id);
+                            if (municipe) return municipe;
+                          }
+                          // Fallback: criar objeto mínimo
+                          return {
+                            id: p.referencia_id,
+                            nome: p.nome,
+                            latitude: p.latitude,
+                            longitude: p.longitude,
+                            bairro: p.endereco
+                          } as MunicipeMapa;
+                        }).filter(Boolean) as Array<DemandaMapa | MunicipeMapa>;
+                        
+                        setPontosRota(pontosParaMapa);
+                        if (rota.origem_lat && rota.origem_lng) {
+                          setOrigemRota({ lat: rota.origem_lat, lng: rota.origem_lng });
+                        }
+                        if (rota.destino_lat && rota.destino_lng) {
+                          setDestinoRota({ lat: rota.destino_lat, lng: rota.destino_lng });
+                        }
+                        setOtimizarRota(rota.otimizar);
+                        setAbaRotas('criar');
+                        toast.success('Rota carregada no mapa');
+                      }
+                    }}
+                    onConcluirRota={(rota) => {
+                      setRotaParaConcluir(rota);
+                      setConcluirRotaDialogOpen(true);
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             {/* Tab Análise */}
