@@ -366,11 +366,16 @@ export function GerenciarRotasModal({
     // Fechar modal
     onOpenChange(false);
     
-    // Usar setTimeout para garantir que o modal feche completamente
-    // antes de atualizar os estados no componente pai
+    // CORREÇÃO: Forçar limpeza de estilos e garantir timeout maior
+    // Isso evita que o Dialog bloqueie os cliques após fechar via Dropdown
     setTimeout(() => {
+      // Forçar desbloqueio do body
+      document.body.style.pointerEvents = '';
+      document.body.style.overflow = '';
+      
+      // Chamar callback do pai
       onVisualizarRota?.(rotaParaVisualizar);
-    }, 150);
+    }, 300);
   };
 
   const handleConcluirRota = (rota: Rota) => {
@@ -387,10 +392,14 @@ export function GerenciarRotasModal({
     // Fechar modal
     onOpenChange(false);
     
-    // Usar setTimeout para garantir que o modal feche completamente
+    // CORREÇÃO: Forçar limpeza de estilos
     setTimeout(() => {
+      // Forçar desbloqueio do body
+      document.body.style.pointerEvents = '';
+      document.body.style.overflow = '';
+      
       onConcluirRota?.(rotaParaConcluir);
-    }, 150);
+    }, 300);
   };
 
   const renderRotaCard = (rota: Rota) => {
@@ -498,7 +507,10 @@ export function GerenciarRotasModal({
                     )}
                     {rota.status === 'em_andamento' && (
                       <>
-                        <DropdownMenuItem onClick={() => handleConcluirRota(rota)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.preventDefault(); // Evitar fechamento automático para controlar manualmente
+                          handleConcluirRota(rota);
+                        }}>
                           <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
                           Concluir Rota
                         </DropdownMenuItem>
@@ -549,7 +561,10 @@ export function GerenciarRotasModal({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleVisualizarRota(rota)}>
+                  <DropdownMenuItem onClick={(e) => {
+                    e.preventDefault(); // Evitar conflito
+                    handleVisualizarRota(rota);
+                  }}>
                     <Eye className="h-4 w-4 mr-2" />
                     Visualizar no Mapa
                   </DropdownMenuItem>
