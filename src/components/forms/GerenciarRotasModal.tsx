@@ -352,18 +352,18 @@ export function GerenciarRotasModal({
   };
 
   const handleVisualizarRota = (rota: Rota) => {
-    handleClose(false); // Fechar modal e limpar estados
-    // Delay para garantir que o modal fechou antes de atualizar estado
-    setTimeout(() => {
-      onVisualizarRota?.(rota);
-    }, 100);
+    // Salvar dados da rota antes de fechar
+    const rotaParaVisualizar = { ...rota };
+    // Fechar modal
+    onOpenChange(false);
+    // Chamar callback com os dados salvos
+    onVisualizarRota?.(rotaParaVisualizar);
   };
 
   const handleConcluirRota = (rota: Rota) => {
-    handleClose(false); // Fechar modal e limpar estados
-    setTimeout(() => {
-      onConcluirRota?.(rota);
-    }, 100);
+    const rotaParaConcluir = { ...rota };
+    onOpenChange(false);
+    onConcluirRota?.(rotaParaConcluir);
   };
 
   const renderRotaCard = (rota: Rota) => {
