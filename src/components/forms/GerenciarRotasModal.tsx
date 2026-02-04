@@ -354,16 +354,43 @@ export function GerenciarRotasModal({
   const handleVisualizarRota = (rota: Rota) => {
     // Salvar dados da rota antes de fechar
     const rotaParaVisualizar = { ...rota };
+    
+    // Limpar estados internos primeiro
+    setRotaParaExcluir(null);
+    setRotaParaCopiar(null);
+    setRotaParaEditar(null);
+    setRotaDetalhes(null);
+    setTituloCopia('');
+    setDataCopiaNova(undefined);
+    
     // Fechar modal
     onOpenChange(false);
-    // Chamar callback com os dados salvos
-    onVisualizarRota?.(rotaParaVisualizar);
+    
+    // Usar setTimeout para garantir que o modal feche completamente
+    // antes de atualizar os estados no componente pai
+    setTimeout(() => {
+      onVisualizarRota?.(rotaParaVisualizar);
+    }, 150);
   };
 
   const handleConcluirRota = (rota: Rota) => {
     const rotaParaConcluir = { ...rota };
+    
+    // Limpar estados internos primeiro
+    setRotaParaExcluir(null);
+    setRotaParaCopiar(null);
+    setRotaParaEditar(null);
+    setRotaDetalhes(null);
+    setTituloCopia('');
+    setDataCopiaNova(undefined);
+    
+    // Fechar modal
     onOpenChange(false);
-    onConcluirRota?.(rotaParaConcluir);
+    
+    // Usar setTimeout para garantir que o modal feche completamente
+    setTimeout(() => {
+      onConcluirRota?.(rotaParaConcluir);
+    }, 150);
   };
 
   const renderRotaCard = (rota: Rota) => {
