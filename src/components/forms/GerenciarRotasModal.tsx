@@ -102,6 +102,7 @@ export function GerenciarRotasModal({
     rotas, 
     isLoading,
     error,
+    refetch,
     iniciarRota,
     cancelarRota,
     excluirRota,
@@ -123,11 +124,11 @@ export function GerenciarRotasModal({
     enabled: open
   });
 
-  // Filtros - "apenas minhas" como padrão
+  // Filtros - "apenas minhas" como padrão, sem filtro de status (mostra todos)
   const [busca, setBusca] = useState('');
-  const [statusFiltro, setStatusFiltro] = useState<string[]>(['pendente', 'em_andamento']);
+  const [statusFiltro, setStatusFiltro] = useState<string[]>([]);
   const [apenasMinhas, setApenasMinhas] = useState(true);
-  const [usuarioSelecionado, setUsuarioSelecionado] = useState<string>('');
+  const [usuarioSelecionado, setUsuarioSelecionado] = useState<string>('_todos');
   
   // Modais internos
   const [rotaParaExcluir, setRotaParaExcluir] = useState<Rota | null>(null);
@@ -149,7 +150,7 @@ export function GerenciarRotasModal({
   // Reset filtro de usuário quando muda "apenas minhas"
   useEffect(() => {
     if (apenasMinhas) {
-      setUsuarioSelecionado('');
+      setUsuarioSelecionado('_todos');
     }
   }, [apenasMinhas]);
 
@@ -182,7 +183,7 @@ export function GerenciarRotasModal({
     let rotasParaContar = rotas;
     if (apenasMinhas && user) {
       rotasParaContar = rotas.filter(r => r.usuario_id === user.id);
-    } else if (usuarioSelecionado) {
+    } else if (usuarioSelecionado && usuarioSelecionado !== '_todos') {
       rotasParaContar = rotas.filter(r => r.usuario_id === usuarioSelecionado);
     }
     
@@ -208,7 +209,7 @@ export function GerenciarRotasModal({
       );
     }
     
-    // Filtro por status
+    // Filtro por status (se nenhum selecionado, mostra todos)
     if (statusFiltro.length > 0) {
       resultado = resultado.filter(r => statusFiltro.includes(r.status));
     }
@@ -216,7 +217,7 @@ export function GerenciarRotasModal({
     // Filtro por usuário
     if (apenasMinhas && user) {
       resultado = resultado.filter(r => r.usuario_id === user.id);
-    } else if (usuarioSelecionado) {
+    } else if (usuarioSelecionado && usuarioSelecionado !== '_todos') {
       resultado = resultado.filter(r => r.usuario_id === usuarioSelecionado);
     }
     
@@ -293,9 +294,7 @@ export function GerenciarRotasModal({
         setRotaParaCopiar(null);
         setTituloCopia('');
         setDataCopiaNova(undefined);
-        
-        // Recarregar rotas
-        window.location.reload();
+        refetch(); // Recarregar lista de rotas
       } catch (error: any) {
         toast.error('Erro ao copiar rota: ' + error.message);
       }
@@ -598,7 +597,7 @@ export function GerenciarRotasModal({
                     <SelectValue placeholder="Todos os usuários" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os usuários</SelectItem>
+                    <SelectItem value="_todos">Todos os usuários</SelectItem>
                     {usuarios.map(u => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.nome}
