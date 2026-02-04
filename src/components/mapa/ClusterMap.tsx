@@ -281,7 +281,7 @@ interface ClusterMapProps {
   totalEleitoresPorCamada?: Map<string, Map<string, number>>;
   modoVisualizacao?: 'padrao' | 'atendimento' | 'votos' | 'comparativo';
   // Filtro de tipo para coloração
-  tipoFiltro?: 'todos' | 'demandas' | 'municipes';
+  tipoFiltro?: 'todos' | 'demandas' | 'municipes' | 'nenhum';
   // Controle de clustering
   clusterEnabled?: boolean;
 }
