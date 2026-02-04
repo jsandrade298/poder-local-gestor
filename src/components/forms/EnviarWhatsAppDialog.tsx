@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useWhatsAppSending } from "@/contexts/WhatsAppSendingContext";
@@ -20,12 +20,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import { 
   MessageSquare, Send, Loader2, Upload, X, Image, Video, FileAudio, 
   FileText, AlertCircle, Users, Settings, Eye, CheckCircle2, 
   Clock, Shuffle, Heart, Plus, Search, UserCheck, Smartphone,
-  BarChart3, ChevronRight, Sparkles, Info
+  BarChart3, ChevronRight, Sparkles, Info, ArrowRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -80,6 +79,9 @@ const VARIAVEIS = [
 // Emojis para reação automática
 const EMOJIS_REACAO = ['❤️', '👍', '🙏', '😊', '✅', '🎉', '👏', '🤝', '💪', '🔥'];
 
+// Ordem das abas
+const TABS_ORDER = ['mensagem', 'destinatarios', 'config', 'preview'];
+
 export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhatsAppDialogProps) {
   // ========== ESTADOS ==========
   const [open, setOpen] = useState(false);
@@ -106,6 +108,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const [lastEnvioId, setLastEnvioId] = useState<string | null>(null);
   
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { startSending, updateRecipientStatus, updateCountdown, finishSending } = useWhatsAppSending();
 
   // Sincronizar munícipes selecionados
@@ -225,8 +228,34 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
   const validacaoDestinatarios = incluirTodos || selectedMunicipes.length > 0;
   const validacaoConfig = selectedInstance !== "";
 
+  // Verificar se está na última aba (preview)
+  const isLastTab = activeTab === 'preview';
+
   // ========== FUNÇÕES ==========
   
+  // Avançar para próxima aba
+  const handleNext = () => {
+    const currentIndex = TABS_ORDER.indexOf(activeTab);
+    
+    // Validar aba atual antes de avançar
+    if (activeTab === 'mensagem' && !validacaoMensagem) {
+      toast({ title: "Atenção", description: "Digite uma mensagem ou adicione um arquivo", variant: "destructive" });
+      return;
+    }
+    if (activeTab === 'destinatarios' && !validacaoDestinatarios) {
+      toast({ title: "Atenção", description: "Selecione ao menos um destinatário", variant: "destructive" });
+      return;
+    }
+    if (activeTab === 'config' && !validacaoConfig) {
+      toast({ title: "Atenção", description: "Selecione uma instância WhatsApp", variant: "destructive" });
+      return;
+    }
+    
+    if (currentIndex < TABS_ORDER.length - 1) {
+      setActiveTab(TABS_ORDER[currentIndex + 1]);
+    }
+  };
+
   // Preview da mensagem com variáveis substituídas
   const getPreviewMensagem = (municipe?: Municipe) => {
     let preview = mensagem;
@@ -311,6 +340,36 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
+  };
+
+  // ========== REGISTRAR NO PRONTUÁRIO ==========
+  const registrarNoProntuario = async (
+    municipeId: string, 
+    municipeNome: string, 
+    mensagemEnviada: string, 
+    sucesso: boolean
+  ) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+
+      await supabase
+        .from('municipe_atividades')
+        .insert({
+          municipe_id: municipeId,
+          created_by: user.user.id,
+          tipo_atividade: 'whatsapp',
+          titulo: sucesso ? 'Mensagem WhatsApp enviada' : 'Tentativa de envio WhatsApp (erro)',
+          descricao: mensagemEnviada.substring(0, 500) + (mensagemEnviada.length > 500 ? '...' : ''),
+          data_atividade: new Date().toISOString(),
+        });
+      
+      // Invalidar cache do prontuário
+      queryClient.invalidateQueries({ queryKey: ['municipe-atividades', municipeId] });
+      queryClient.invalidateQueries({ queryKey: ['municipe-atividades-count', municipeId] });
+    } catch (error) {
+      console.warn('Erro ao registrar no prontuário:', error);
+    }
   };
 
   // ========== MUTATION ENVIO ==========
@@ -448,6 +507,9 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           return { resumo: { total: recipients.length, sucessos: totalEnviados, erros: totalErros }, envioId };
         }
         
+        // Preparar mensagem final com variáveis substituídas
+        const mensagemFinal = getPreviewMensagem(recipient as Municipe);
+        
         try {
           // Preparar dados do destinatário com variáveis
           const now = new Date();
@@ -485,10 +547,16 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           updateRecipientStatus(recipient.id, 'sent');
           totalEnviados++;
           
+          // ========== REGISTRAR NO PRONTUÁRIO (SUCESSO) ==========
+          await registrarNoProntuario(recipient.id, recipient.nome, mensagemFinal, true);
+          
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
           updateRecipientStatus(recipient.id, 'error', errorMsg);
           totalErros++;
+          
+          // ========== REGISTRAR NO PRONTUÁRIO (ERRO) ==========
+          await registrarNoProntuario(recipient.id, recipient.nome, `[ERRO] ${errorMsg}\n\nMensagem: ${mensagemFinal}`, false);
         }
       }
 
@@ -529,19 +597,8 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
 
   // Validar e enviar
   const handleEnviar = () => {
-    if (!validacaoMensagem) {
-      toast({ title: "Atenção", description: "Digite uma mensagem ou adicione um arquivo", variant: "destructive" });
-      setActiveTab("mensagem");
-      return;
-    }
-    if (!validacaoDestinatarios) {
-      toast({ title: "Atenção", description: "Selecione ao menos um destinatário", variant: "destructive" });
-      setActiveTab("destinatarios");
-      return;
-    }
-    if (!validacaoConfig) {
-      toast({ title: "Atenção", description: "Selecione uma instância WhatsApp", variant: "destructive" });
-      setActiveTab("config");
+    if (!validacaoMensagem || !validacaoDestinatarios || !validacaoConfig) {
+      toast({ title: "Atenção", description: "Complete todas as etapas antes de enviar", variant: "destructive" });
       return;
     }
     enviarWhatsApp.mutate();
@@ -561,7 +618,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
         
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           {/* Header */}
-          <div className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+          <div className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-xl">
@@ -619,576 +676,598 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content com Tabs - Área com Scroll */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <ScrollArea className="flex-1 px-6">
-              {/* TAB: Mensagem */}
-              <TabsContent value="mensagem" className="py-4 space-y-4 mt-0">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 text-green-500" />
-                      Conteúdo da Mensagem
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Área de texto */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>Mensagem de Texto</Label>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                                <Sparkles className="h-3 w-3" />
-                                Variáveis
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" className="w-72 p-3">
-                              <p className="font-medium mb-2">Variáveis disponíveis:</p>
-                              <div className="space-y-1">
-                                {VARIAVEIS.map(v => (
-                                  <button
-                                    key={v.codigo}
-                                    onClick={() => inserirVariavel(v.codigo)}
-                                    className="w-full text-left px-2 py-1 rounded hover:bg-muted flex justify-between text-sm"
-                                  >
-                                    <span>{v.descricao}</span>
-                                    <code className="text-xs bg-muted px-1 rounded">{v.codigo}</code>
-                                  </button>
-                                ))}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <Textarea
-                        placeholder="Olá {primeiro_nome}! Tudo bem?
-
-Estamos entrando em contato para..."
-                        value={mensagem}
-                        onChange={(e) => setMensagem(e.target.value)}
-                        rows={6}
-                        className="font-mono text-sm resize-none"
-                      />
-                      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                        <span>{mensagem.length} caracteres</span>
-                        {temVariaveis && (
-                          <Badge variant="secondary" className="gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            Mensagem personalizada
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Botões de variáveis rápidas */}
-                    <div className="flex flex-wrap gap-2">
-                      {VARIAVEIS.slice(0, 5).map(v => (
-                        <Button
-                          key={v.codigo}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => inserirVariavel(v.codigo)}
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          {v.descricao}
-                        </Button>
-                      ))}
-                    </div>
-
-                    <Separator />
-
-                    {/* Upload de mídia */}
-                    <div>
-                      <Label className="flex items-center gap-2 mb-2">
-                        <Upload className="h-4 w-4" />
-                        Arquivos de Mídia (opcional)
-                      </Label>
-                      <div className="border-2 border-dashed rounded-lg p-4 text-center hover:border-green-500 transition-colors">
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                          id="media-upload"
-                        />
-                        <label htmlFor="media-upload" className="cursor-pointer">
-                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            Clique para adicionar imagens, vídeos, áudios ou documentos
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Máximo 100MB por arquivo
-                          </p>
-                        </label>
-                      </div>
-
-                      {mediaFiles.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          {mediaFiles.map((media, index) => (
-                            <div key={index} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
-                              {media.type === 'image' && (
-                                <img src={media.url} alt="" className="w-12 h-12 object-cover rounded" />
-                              )}
-                              {media.type !== 'image' && (
-                                <div className="w-12 h-12 flex items-center justify-center bg-background rounded">
-                                  {getMediaIcon(media.type)}
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{media.file.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {(media.file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                              </div>
-                              <Badge variant="outline">{media.type}</Badge>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => removeMediaFile(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* TAB: Destinatários */}
-              <TabsContent value="destinatarios" className="py-4 space-y-4 mt-0">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="h-4 w-4 text-blue-500" />
-                      Selecionar Destinatários
-                    </CardTitle>
-                    <CardDescription>
-                      {municipes?.length || 0} contatos disponíveis com telefone
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Enviar para todos */}
-                    <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-500 rounded-lg">
-                          <Users className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-medium">Enviar para todos</p>
-                          <p className="text-sm text-muted-foreground">
-                            {municipes?.length || 0} contatos com telefone cadastrado
-                          </p>
-                        </div>
-                      </div>
-                      <Checkbox
-                        id="todos"
-                        checked={incluirTodos}
-                        onCheckedChange={(checked) => {
-                          setIncluirTodos(!!checked);
-                          if (checked) setSelectedMunicipes([]);
-                        }}
-                      />
-                    </div>
-
-                    {!incluirTodos && (
-                      <>
-                        {/* Selecionados */}
-                        {selectedMunicipes.length > 0 && (
-                          <div>
-                            <Label className="mb-2 flex items-center gap-2">
-                              <UserCheck className="h-4 w-4 text-green-500" />
-                              Selecionados ({selectedMunicipes.length})
-                            </Label>
-                            <div className="flex flex-wrap gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 max-h-32 overflow-y-auto">
-                              {selectedMunicipesList.map(m => (
-                                <Badge key={m.id} variant="secondary" className="gap-1 pr-1">
-                                  {m.nome}
-                                  <button
-                                    onClick={() => setSelectedMunicipes(prev => prev.filter(id => id !== m.id))}
-                                    className="ml-1 hover:text-destructive"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Busca */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Buscar por nome, telefone ou bairro..."
-                            value={searchMunicipe}
-                            onChange={(e) => setSearchMunicipe(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-
-                        {/* Lista de municipes */}
-                        <div className="border rounded-lg max-h-64 overflow-y-auto">
-                          {loadingMunicipes ? (
-                            <div className="p-8 text-center">
-                              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                              <p className="text-sm text-muted-foreground">Carregando contatos...</p>
-                            </div>
-                          ) : filteredMunicipes.length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground">
-                              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                              <p>Nenhum contato encontrado</p>
-                            </div>
-                          ) : (
-                            filteredMunicipes.slice(0, 100).map(municipe => {
-                              const isSelected = selectedMunicipes.includes(municipe.id);
-                              return (
-                                <button
-                                  key={municipe.id}
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setSelectedMunicipes(prev => prev.filter(id => id !== municipe.id));
-                                    } else {
-                                      setSelectedMunicipes(prev => [...prev, municipe.id]);
-                                    }
-                                  }}
-                                  className={`w-full flex items-center gap-3 p-3 text-left border-b last:border-b-0 transition-colors ${
-                                    isSelected 
-                                      ? 'bg-green-50 dark:bg-green-950/30' 
-                                      : 'hover:bg-muted/50'
-                                  }`}
-                                >
-                                  <Checkbox checked={isSelected} />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium truncate">{municipe.nome}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {municipe.telefone}
-                                      {municipe.bairro && ` • ${municipe.bairro}`}
-                                    </p>
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                          {filteredMunicipes.length > 100 && (
-                            <div className="p-3 text-center text-sm text-muted-foreground bg-muted/50">
-                              Mostrando 100 de {filteredMunicipes.length} resultados. Refine a busca.
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* TAB: Configurações */}
-              <TabsContent value="config" className="py-4 space-y-4 mt-0">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Smartphone className="h-4 w-4 text-purple-500" />
-                      Instância WhatsApp
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingInstances ? (
-                      <div className="flex items-center gap-2 p-4">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Verificando conexões...</span>
-                      </div>
-                    ) : instances && instances.length > 0 ? (
-                      <div className="grid gap-3">
-                        {instances.map((inst) => (
-                          <button
-                            key={inst.instanceName}
-                            onClick={() => setSelectedInstance(inst.instanceName)}
-                            className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
-                              selectedInstance === inst.instanceName
-                                ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
-                                : 'border-border hover:border-green-300'
-                            }`}
-                          >
-                            <div className={`w-3 h-3 rounded-full ${
-                              selectedInstance === inst.instanceName ? 'bg-green-500' : 'bg-gray-300'
-                            }`} />
-                            <div className="flex-1 text-left">
-                              <p className="font-medium">{inst.displayName}</p>
-                              {inst.number && (
-                                <p className="text-sm text-muted-foreground">{inst.number}</p>
-                              )}
-                            </div>
-                            {selectedInstance === inst.instanceName && (
-                              <CheckCircle2 className="h-5 w-5 text-green-500" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Nenhuma instância conectada</AlertTitle>
-                        <AlertDescription>
-                          Configure uma instância WhatsApp em Configurações → WhatsApp
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-orange-500" />
-                      Intervalo entre Envios
-                    </CardTitle>
-                    <CardDescription>
-                      Define o tempo de espera entre cada mensagem
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="tempo-min">Mínimo (segundos)</Label>
-                        <Input
-                          id="tempo-min"
-                          type="number"
-                          min="2"
-                          max="60"
-                          value={tempoMinimo}
-                          onChange={(e) => setTempoMinimo(Math.max(2, Number(e.target.value)))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="tempo-max">Máximo (segundos)</Label>
-                        <Input
-                          id="tempo-max"
-                          type="number"
-                          min="2"
-                          max="60"
-                          value={tempoMaximo}
-                          onChange={(e) => setTempoMaximo(Math.max(tempoMinimo, Number(e.target.value)))}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                      <Info className="h-4 w-4 inline mr-2" />
-                      O intervalo aleatório entre {tempoMinimo}s e {tempoMaximo}s simula o comportamento humano
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-yellow-500" />
-                      Opções Avançadas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Ordem aleatória */}
-                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Shuffle className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium text-sm">Ordem aleatória</p>
-                          <p className="text-xs text-muted-foreground">
-                            Embaralha a ordem dos destinatários
-                          </p>
-                        </div>
-                      </div>
-                      <Checkbox
-                        checked={ordemAleatoria}
-                        onCheckedChange={(checked) => setOrdemAleatoria(!!checked)}
-                      />
-                    </div>
-
-                    {/* Reação automática */}
-                    <div>
-                      <Label className="flex items-center gap-2 mb-3">
-                        <Heart className="h-4 w-4 text-red-500" />
-                        Reação automática ao receber resposta
-                      </Label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setReacaoAutomatica("")}
-                          className={`px-4 py-2 rounded-lg border text-sm transition-all ${
-                            reacaoAutomatica === ""
-                              ? 'bg-primary text-primary-foreground'
-                              : 'hover:bg-muted'
-                          }`}
-                        >
-                          Nenhuma
-                        </button>
-                        {EMOJIS_REACAO.map((emoji) => (
-                          <button
-                            key={emoji}
-                            onClick={() => setReacaoAutomatica(emoji)}
-                            className={`px-3 py-2 text-xl rounded-lg border transition-all ${
-                              reacaoAutomatica === emoji
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'hover:bg-muted'
-                            }`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* TAB: Prévia */}
-              <TabsContent value="preview" className="py-4 space-y-4 mt-0">
-                <div className="grid md:grid-cols-2 gap-4">
-                  {/* Prévia do WhatsApp */}
+            {/* TAB: Mensagem */}
+            <TabsContent value="mensagem" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="px-6 py-4 space-y-4">
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Smartphone className="h-4 w-4 text-green-500" />
-                        Prévia da Mensagem
+                        <MessageSquare className="h-4 w-4 text-green-500" />
+                        Conteúdo da Mensagem
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Área de texto */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <Label>Mensagem de Texto</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                                  <Sparkles className="h-3 w-3" />
+                                  Variáveis
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="w-72 p-3">
+                                <p className="font-medium mb-2">Variáveis disponíveis:</p>
+                                <div className="space-y-1">
+                                  {VARIAVEIS.map(v => (
+                                    <button
+                                      key={v.codigo}
+                                      onClick={() => inserirVariavel(v.codigo)}
+                                      className="w-full text-left px-2 py-1 rounded hover:bg-muted flex justify-between text-sm"
+                                    >
+                                      <span>{v.descricao}</span>
+                                      <code className="text-xs bg-muted px-1 rounded">{v.codigo}</code>
+                                    </button>
+                                  ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <Textarea
+                          placeholder="Olá {primeiro_nome}! Tudo bem?
+
+Estamos entrando em contato para..."
+                          value={mensagem}
+                          onChange={(e) => setMensagem(e.target.value)}
+                          rows={6}
+                          className="font-mono text-sm resize-none"
+                        />
+                        <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                          <span>{mensagem.length} caracteres</span>
+                          {temVariaveis && (
+                            <Badge variant="secondary" className="gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              Mensagem personalizada
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Botões de variáveis rápidas */}
+                      <div className="flex flex-wrap gap-2">
+                        {VARIAVEIS.slice(0, 5).map(v => (
+                          <Button
+                            key={v.codigo}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => inserirVariavel(v.codigo)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            {v.descricao}
+                          </Button>
+                        ))}
+                      </div>
+
+                      <Separator />
+
+                      {/* Upload de mídia */}
+                      <div>
+                        <Label className="flex items-center gap-2 mb-2">
+                          <Upload className="h-4 w-4" />
+                          Arquivos de Mídia (opcional)
+                        </Label>
+                        <div className="border-2 border-dashed rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="media-upload"
+                          />
+                          <label htmlFor="media-upload" className="cursor-pointer">
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              Clique para adicionar imagens, vídeos, áudios ou documentos
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Máximo 100MB por arquivo
+                            </p>
+                          </label>
+                        </div>
+
+                        {mediaFiles.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {mediaFiles.map((media, index) => (
+                              <div key={index} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
+                                {media.type === 'image' && (
+                                  <img src={media.url} alt="" className="w-12 h-12 object-cover rounded" />
+                                )}
+                                {media.type !== 'image' && (
+                                  <div className="w-12 h-12 flex items-center justify-center bg-background rounded">
+                                    {getMediaIcon(media.type)}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{media.file.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {(media.file.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
+                                <Badge variant="outline">{media.type}</Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => removeMediaFile(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* TAB: Destinatários */}
+            <TabsContent value="destinatarios" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="px-6 py-4 space-y-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4 text-blue-500" />
+                        Selecionar Destinatários
                       </CardTitle>
                       <CardDescription>
-                        Como a mensagem aparecerá no WhatsApp
+                        {municipes?.length || 0} contatos disponíveis com telefone
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="bg-[#e5ddd5] dark:bg-[#0b141a] p-4 rounded-lg min-h-[300px]">
-                        {/* Balão de mensagem */}
-                        <div className="max-w-[85%] ml-auto">
-                          {mediaFiles.length > 0 && mediaFiles[0].type === 'image' && (
-                            <div className="mb-1 rounded-lg overflow-hidden">
-                              <img src={mediaFiles[0].url} alt="" className="w-full" />
-                            </div>
-                          )}
-                          <div className="bg-[#dcf8c6] dark:bg-[#005c4b] p-3 rounded-lg shadow-sm">
-                            <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-100">
-                              {getPreviewMensagem() || "Digite uma mensagem..."}
+                    <CardContent className="space-y-4">
+                      {/* Enviar para todos */}
+                      <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-500 rounded-lg">
+                            <Users className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-medium">Enviar para todos</p>
+                            <p className="text-sm text-muted-foreground">
+                              {municipes?.length || 0} contatos com telefone cadastrado
                             </p>
-                            <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                              <CheckCircle2 className="h-3 w-3 text-blue-500" />
-                            </div>
                           </div>
                         </div>
+                        <Checkbox
+                          id="todos"
+                          checked={incluirTodos}
+                          onCheckedChange={(checked) => {
+                            setIncluirTodos(!!checked);
+                            if (checked) setSelectedMunicipes([]);
+                          }}
+                        />
+                      </div>
+
+                      {!incluirTodos && (
+                        <>
+                          {/* Selecionados */}
+                          {selectedMunicipes.length > 0 && (
+                            <div>
+                              <Label className="mb-2 flex items-center gap-2">
+                                <UserCheck className="h-4 w-4 text-green-500" />
+                                Selecionados ({selectedMunicipes.length})
+                              </Label>
+                              <div className="flex flex-wrap gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 max-h-32 overflow-y-auto">
+                                {selectedMunicipesList.map(m => (
+                                  <Badge key={m.id} variant="secondary" className="gap-1 pr-1">
+                                    {m.nome}
+                                    <button
+                                      onClick={() => setSelectedMunicipes(prev => prev.filter(id => id !== m.id))}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Busca */}
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Buscar por nome, telefone ou bairro..."
+                              value={searchMunicipe}
+                              onChange={(e) => setSearchMunicipe(e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+
+                          {/* Lista de municipes */}
+                          <div className="border rounded-lg max-h-64 overflow-y-auto">
+                            {loadingMunicipes ? (
+                              <div className="p-8 text-center">
+                                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                                <p className="text-sm text-muted-foreground">Carregando contatos...</p>
+                              </div>
+                            ) : filteredMunicipes.length === 0 ? (
+                              <div className="p-8 text-center text-muted-foreground">
+                                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Nenhum contato encontrado</p>
+                              </div>
+                            ) : (
+                              filteredMunicipes.slice(0, 100).map(municipe => {
+                                const isSelected = selectedMunicipes.includes(municipe.id);
+                                return (
+                                  <button
+                                    key={municipe.id}
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSelectedMunicipes(prev => prev.filter(id => id !== municipe.id));
+                                      } else {
+                                        setSelectedMunicipes(prev => [...prev, municipe.id]);
+                                      }
+                                    }}
+                                    className={`w-full flex items-center gap-3 p-3 text-left border-b last:border-b-0 transition-colors ${
+                                      isSelected 
+                                        ? 'bg-green-50 dark:bg-green-950/30' 
+                                        : 'hover:bg-muted/50'
+                                    }`}
+                                  >
+                                    <Checkbox checked={isSelected} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium truncate">{municipe.nome}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {municipe.telefone}
+                                        {municipe.bairro && ` • ${municipe.bairro}`}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                            {filteredMunicipes.length > 100 && (
+                              <div className="p-3 text-center text-sm text-muted-foreground bg-muted/50">
+                                Mostrando 100 de {filteredMunicipes.length} resultados. Refine a busca.
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* TAB: Configurações */}
+            <TabsContent value="config" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="px-6 py-4 space-y-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-purple-500" />
+                        Instância WhatsApp
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingInstances ? (
+                        <div className="flex items-center gap-2 p-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Verificando conexões...</span>
+                        </div>
+                      ) : instances && instances.length > 0 ? (
+                        <div className="grid gap-3">
+                          {instances.map((inst) => (
+                            <button
+                              key={inst.instanceName}
+                              onClick={() => setSelectedInstance(inst.instanceName)}
+                              className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                                selectedInstance === inst.instanceName
+                                  ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                                  : 'border-border hover:border-green-300'
+                              }`}
+                            >
+                              <div className={`w-3 h-3 rounded-full ${
+                                selectedInstance === inst.instanceName ? 'bg-green-500' : 'bg-gray-300'
+                              }`} />
+                              <div className="flex-1 text-left">
+                                <p className="font-medium">{inst.displayName}</p>
+                                {inst.number && (
+                                  <p className="text-sm text-muted-foreground">{inst.number}</p>
+                                )}
+                              </div>
+                              {selectedInstance === inst.instanceName && (
+                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>Nenhuma instância conectada</AlertTitle>
+                          <AlertDescription>
+                            Configure uma instância WhatsApp em Configurações → WhatsApp
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-orange-500" />
+                        Intervalo entre Envios
+                      </CardTitle>
+                      <CardDescription>
+                        Define o tempo de espera entre cada mensagem
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="tempo-min">Mínimo (segundos)</Label>
+                          <Input
+                            id="tempo-min"
+                            type="number"
+                            min="2"
+                            max="60"
+                            value={tempoMinimo}
+                            onChange={(e) => setTempoMinimo(Math.max(2, Number(e.target.value)))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="tempo-max">Máximo (segundos)</Label>
+                          <Input
+                            id="tempo-max"
+                            type="number"
+                            min="2"
+                            max="60"
+                            value={tempoMaximo}
+                            onChange={(e) => setTempoMaximo(Math.max(tempoMinimo, Number(e.target.value)))}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                        <Info className="h-4 w-4 inline mr-2" />
+                        O intervalo aleatório entre {tempoMinimo}s e {tempoMaximo}s simula o comportamento humano
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* Resumo do envio */}
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Resumo do Envio
+                        <Sparkles className="h-4 w-4 text-yellow-500" />
+                        Opções Avançadas
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-sm text-muted-foreground">Destinatários</span>
-                          <span className="font-medium">{totalDestinatarios}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-sm text-muted-foreground">Instância</span>
-                          <span className="font-medium">{selectedInstance || '-'}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-sm text-muted-foreground">Intervalo</span>
-                          <span className="font-medium">{tempoMinimo}s - {tempoMaximo}s</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-sm text-muted-foreground">Tempo estimado</span>
-                          <span className="font-medium">{tempoEstimado}</span>
-                        </div>
-                        {ordemAleatoria && (
-                          <div className="flex justify-between items-center py-2 border-b">
-                            <span className="text-sm text-muted-foreground">Ordem</span>
-                            <Badge variant="secondary" className="gap-1">
-                              <Shuffle className="h-3 w-3" />
-                              Aleatória
-                            </Badge>
+                      {/* Ordem aleatória */}
+                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Shuffle className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">Ordem aleatória</p>
+                            <p className="text-xs text-muted-foreground">
+                              Embaralha a ordem dos destinatários
+                            </p>
                           </div>
-                        )}
-                        {reacaoAutomatica && (
-                          <div className="flex justify-between items-center py-2 border-b">
-                            <span className="text-sm text-muted-foreground">Reação automática</span>
-                            <span className="text-xl">{reacaoAutomatica}</span>
-                          </div>
-                        )}
-                        {mediaFiles.length > 0 && (
-                          <div className="flex justify-between items-center py-2 border-b">
-                            <span className="text-sm text-muted-foreground">Mídia</span>
-                            <Badge variant="secondary">{mediaFiles.length} arquivo(s)</Badge>
-                          </div>
-                        )}
+                        </div>
+                        <Checkbox
+                          checked={ordemAleatoria}
+                          onCheckedChange={(checked) => setOrdemAleatoria(!!checked)}
+                        />
                       </div>
 
-                      {/* Checklist de validação */}
-                      <div className="space-y-2 pt-2">
-                        <div className={`flex items-center gap-2 text-sm ${validacaoMensagem ? 'text-green-600' : 'text-red-500'}`}>
-                          {validacaoMensagem ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                          Mensagem configurada
-                        </div>
-                        <div className={`flex items-center gap-2 text-sm ${validacaoDestinatarios ? 'text-green-600' : 'text-red-500'}`}>
-                          {validacaoDestinatarios ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                          Destinatários selecionados
-                        </div>
-                        <div className={`flex items-center gap-2 text-sm ${validacaoConfig ? 'text-green-600' : 'text-red-500'}`}>
-                          {validacaoConfig ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                          Instância conectada
+                      {/* Reação automática */}
+                      <div>
+                        <Label className="flex items-center gap-2 mb-3">
+                          <Heart className="h-4 w-4 text-red-500" />
+                          Reação automática ao receber resposta
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => setReacaoAutomatica("")}
+                            className={`px-4 py-2 rounded-lg border text-sm transition-all ${
+                              reacaoAutomatica === ""
+                                ? 'bg-primary text-primary-foreground'
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            Nenhuma
+                          </button>
+                          {EMOJIS_REACAO.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => setReacaoAutomatica(emoji)}
+                              className={`px-3 py-2 text-xl rounded-lg border transition-all ${
+                                reacaoAutomatica === emoji
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'hover:bg-muted'
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 </div>
+              </ScrollArea>
+            </TabsContent>
 
-                {/* Amostra de destinatários */}
-                {!incluirTodos && selectedMunicipesList.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Amostra de Mensagens</CardTitle>
-                      <CardDescription>
-                        Veja como a mensagem ficará para alguns destinatários
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-3">
-                        {selectedMunicipesList.slice(0, 3).map(m => (
-                          <div key={m.id} className="p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
-                                {m.nome.charAt(0)}
+            {/* TAB: Prévia */}
+            <TabsContent value="preview" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="px-6 py-4 space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Prévia do WhatsApp */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Smartphone className="h-4 w-4 text-green-500" />
+                          Prévia da Mensagem
+                        </CardTitle>
+                        <CardDescription>
+                          Como a mensagem aparecerá no WhatsApp
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="bg-[#e5ddd5] dark:bg-[#0b141a] p-4 rounded-lg min-h-[200px]">
+                          {/* Balão de mensagem */}
+                          <div className="max-w-[85%] ml-auto">
+                            {mediaFiles.length > 0 && mediaFiles[0].type === 'image' && (
+                              <div className="mb-1 rounded-lg overflow-hidden">
+                                <img src={mediaFiles[0].url} alt="" className="w-full" />
                               </div>
-                              <div>
-                                <p className="font-medium text-sm">{m.nome}</p>
-                                <p className="text-xs text-muted-foreground">{m.telefone}</p>
+                            )}
+                            <div className="bg-[#dcf8c6] dark:bg-[#005c4b] p-3 rounded-lg shadow-sm">
+                              <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-100">
+                                {getPreviewMensagem() || "Digite uma mensagem..."}
+                              </p>
+                              <div className="flex items-center justify-end gap-1 mt-1">
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                  {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <CheckCircle2 className="h-3 w-3 text-blue-500" />
                               </div>
-                            </div>
-                            <div className="ml-10 p-2 bg-[#dcf8c6] dark:bg-[#005c4b] rounded-lg text-sm">
-                              {getPreviewMensagem(m)}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </ScrollArea>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-            {/* Footer com botões */}
-            <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between">
+                    {/* Resumo do envio */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          Resumo do Envio
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center py-2 border-b">
+                            <span className="text-sm text-muted-foreground">Destinatários</span>
+                            <span className="font-medium">{totalDestinatarios}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b">
+                            <span className="text-sm text-muted-foreground">Instância</span>
+                            <span className="font-medium">{selectedInstance || '-'}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b">
+                            <span className="text-sm text-muted-foreground">Intervalo</span>
+                            <span className="font-medium">{tempoMinimo}s - {tempoMaximo}s</span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b">
+                            <span className="text-sm text-muted-foreground">Tempo estimado</span>
+                            <span className="font-medium">{tempoEstimado}</span>
+                          </div>
+                          {ordemAleatoria && (
+                            <div className="flex justify-between items-center py-2 border-b">
+                              <span className="text-sm text-muted-foreground">Ordem</span>
+                              <Badge variant="secondary" className="gap-1">
+                                <Shuffle className="h-3 w-3" />
+                                Aleatória
+                              </Badge>
+                            </div>
+                          )}
+                          {reacaoAutomatica && (
+                            <div className="flex justify-between items-center py-2 border-b">
+                              <span className="text-sm text-muted-foreground">Reação automática</span>
+                              <span className="text-xl">{reacaoAutomatica}</span>
+                            </div>
+                          )}
+                          {mediaFiles.length > 0 && (
+                            <div className="flex justify-between items-center py-2 border-b">
+                              <span className="text-sm text-muted-foreground">Mídia</span>
+                              <Badge variant="secondary">{mediaFiles.length} arquivo(s)</Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Checklist de validação */}
+                        <div className="space-y-2 pt-2">
+                          <div className={`flex items-center gap-2 text-sm ${validacaoMensagem ? 'text-green-600' : 'text-red-500'}`}>
+                            {validacaoMensagem ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                            Mensagem configurada
+                          </div>
+                          <div className={`flex items-center gap-2 text-sm ${validacaoDestinatarios ? 'text-green-600' : 'text-red-500'}`}>
+                            {validacaoDestinatarios ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                            Destinatários selecionados
+                          </div>
+                          <div className={`flex items-center gap-2 text-sm ${validacaoConfig ? 'text-green-600' : 'text-red-500'}`}>
+                            {validacaoConfig ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                            Instância conectada
+                          </div>
+                        </div>
+
+                        {/* Aviso sobre prontuário */}
+                        <Alert className="bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800">
+                          <MessageSquare className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-green-700 dark:text-green-300 text-xs">
+                            O envio será registrado automaticamente no prontuário de cada contato.
+                          </AlertDescription>
+                        </Alert>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Amostra de destinatários */}
+                  {!incluirTodos && selectedMunicipesList.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Amostra de Mensagens</CardTitle>
+                        <CardDescription>
+                          Veja como a mensagem ficará para alguns destinatários
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-3">
+                          {selectedMunicipesList.slice(0, 3).map(m => (
+                            <div key={m.id} className="p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
+                                  {m.nome.charAt(0)}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{m.nome}</p>
+                                  <p className="text-xs text-muted-foreground">{m.telefone}</p>
+                                </div>
+                              </div>
+                              <div className="ml-10 p-2 bg-[#dcf8c6] dark:bg-[#005c4b] rounded-lg text-sm">
+                                {getPreviewMensagem(m)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Footer com botões - fixo */}
+            <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between flex-shrink-0">
               <div className="text-sm text-muted-foreground">
                 {totalDestinatarios > 0 && (
                   <span className="flex items-center gap-2">
@@ -1201,23 +1280,35 @@ Estamos entrando em contato para..."
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <Button
-                  onClick={handleEnviar}
-                  disabled={enviarWhatsApp.isPending || !validacaoMensagem || !validacaoDestinatarios || !validacaoConfig}
-                  className="gap-2 bg-green-600 hover:bg-green-700"
-                >
-                  {enviarWhatsApp.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      Enviar Mensagem
-                    </>
-                  )}
-                </Button>
+                
+                {/* Botão dinâmico: Avançar ou Enviar */}
+                {isLastTab ? (
+                  <Button
+                    onClick={handleEnviar}
+                    disabled={enviarWhatsApp.isPending || !validacaoMensagem || !validacaoDestinatarios || !validacaoConfig}
+                    className="gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    {enviarWhatsApp.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Iniciando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        Enviar Mensagem
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleNext}
+                    className="gap-2"
+                  >
+                    Avançar
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </Tabs>
