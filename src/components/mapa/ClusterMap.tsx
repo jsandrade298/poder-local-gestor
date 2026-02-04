@@ -3,10 +3,10 @@ import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from 'r
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
+import { DemandaMapa, MunicipeMapa, AreaMapa } from '@/hooks/useMapaUnificado';
 import { Badge } from '@/components/ui/badge';
 import { Phone, MapPin, FileText, User, ExternalLink } from 'lucide-react';
-import { GeoJSONLayer } from './GeoJSONLayer';
+import { GeoJSONLayer, ModoVisualizacao } from './GeoJSONLayer';
 import { CamadaGeografica } from '@/hooks/useCamadasGeograficas';
 
 // Declaração de tipos para leaflet.heat (carregado via CDN)
@@ -174,7 +174,6 @@ function HeatmapControl({
   useEffect(() => {
     loadHeatmapScript()
       .then(() => {
-        console.log('✅ leaflet.heat carregado via CDN');
         setScriptLoaded(true);
       })
       .catch((err) => {
@@ -262,6 +261,7 @@ function HeatmapControl({
 interface ClusterMapProps {
   demandas: DemandaMapa[];
   municipes: MunicipeMapa[];
+  areas?: AreaMapa[]; // Lista de áreas para coloração por predominância
   centro?: [number, number];
   zoom?: number;
   onDemandaClick?: (demanda: DemandaMapa) => void;
@@ -279,7 +279,7 @@ interface ClusterMapProps {
   // Props para dados eleitorais
   votosPorCamada?: Map<string, Map<string, number>>;
   totalEleitoresPorCamada?: Map<string, Map<string, number>>;
-  modoVisualizacao?: 'padrao' | 'atendimento' | 'votos' | 'comparativo';
+  modoVisualizacao?: ModoVisualizacao;
   // Filtro de tipo para coloração
   tipoFiltro?: 'todos' | 'demandas' | 'municipes' | 'nenhum';
   // Controle de clustering
@@ -289,6 +289,7 @@ interface ClusterMapProps {
 export function ClusterMap({
   demandas,
   municipes,
+  areas = [], // Valor padrão para evitar erros
   centro,
   zoom = 13,
   onDemandaClick,
@@ -402,6 +403,9 @@ export function ClusterMap({
           cor={camada.cor_padrao}
           opacidade={camada.opacidade}
           nome={camada.nome}
+          // PASSANDO DADOS PARA CÁLCULOS AVANÇADOS
+          demandas={demandas}
+          areas={areas}
           estatisticas={estatisticasPorRegiao?.get(camada.id)}
           votosPorRegiao={votosPorCamada?.get(camada.id)}
           totalEleitoresPorRegiao={totalEleitoresPorCamada?.get(camada.id)}
@@ -502,7 +506,6 @@ export function ClusterMap({
             
             // Cluster misto - criar ícone de pizza/dividido
             const demandaPercent = (demandasCount / total) * 100;
-            const municipePercent = (municipesCount / total) * 100;
             
             // Usar conic-gradient para efeito de pizza
             return L.divIcon({
