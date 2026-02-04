@@ -3080,7 +3080,6 @@ export default function MapaUnificado() {
               }
               
               setOtimizarRota(rota.otimizar || false);
-              setAbaSidebar('rotas');
               toast.success('Rota carregada no mapa');
             } else {
               toast.error('Esta rota não possui pontos de parada');
