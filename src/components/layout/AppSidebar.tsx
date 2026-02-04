@@ -13,7 +13,8 @@ import {
   Bot,
   MessageCircle,
   Target,
-  MapPin
+  MapPin,
+  Layers
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
@@ -41,6 +42,7 @@ const menuItems = [
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Assessor IA", url: "/assessor-ia", icon: Bot },
   { title: "Tags", url: "/tags", icon: Tags },
+  { title: "Categorias", url: "/categorias", icon: Layers },
   { title: "Áreas", url: "/areas", icon: Building2 },
   { title: "Usuários", url: "/usuarios", icon: UserCheck },
   { title: "Configurações", url: "/config", icon: Settings },
