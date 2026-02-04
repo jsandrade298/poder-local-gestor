@@ -6,7 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, MoreHorizontal, FolderOpen, BarChart3, Clock, Play, Pause, CheckCircle, XCircle, Grid3x3, List } from "lucide-react";
+import { 
+  Plus, 
+  Search, 
+  MoreHorizontal, 
+  FolderOpen, 
+  BarChart3, 
+  Clock, 
+  CheckCircle, 
+  Grid3x3, 
+  List,
+  Palette // Importado para ícone de cor se necessário
+} from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -18,23 +29,30 @@ import { toast } from "@/hooks/use-toast";
 export default function Areas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  
+  // Estados de Criação
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaDescription, setNewAreaDescription] = useState("");
+  const [newAreaColor, setNewAreaColor] = useState("#6b7280"); // Estado para a cor (padrão cinza)
+
+  // Estados de Edição
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<any>(null);
   const [editAreaName, setEditAreaName] = useState("");
   const [editAreaDescription, setEditAreaDescription] = useState("");
+  const [editAreaColor, setEditAreaColor] = useState("#6b7280"); // Estado para a cor na edição
+
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch areas from Supabase
+  // Fetch areas from Supabase (incluindo a coluna 'cor')
   const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('areas')
-        .select('*')
+        .select('*') // O select * já traz a coluna 'cor' se ela existir no banco
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -53,7 +71,7 @@ export default function Areas() {
       if (error) throw error;
       
       // Count demandas by area
-      const countByArea = data.reduce((acc, demanda) => {
+      const countByArea = data.reduce((acc: any, demanda: any) => {
         if (!demanda.area_id) return acc;
         
         if (!acc[demanda.area_id]) {
@@ -64,7 +82,7 @@ export default function Areas() {
             aguardando: 0,
             resolvidas: 0,
             canceladas: 0,
-            ativas: 0 // abertas + em_andamento + aguardando
+            ativas: 0
           };
         }
         
@@ -95,12 +113,13 @@ export default function Areas() {
 
   // Create area mutation
   const createAreaMutation = useMutation({
-    mutationFn: async (newArea: { nome: string; descricao?: string }) => {
+    mutationFn: async (newArea: { nome: string; descricao?: string; cor?: string }) => {
       const { data, error } = await supabase
         .from('areas')
         .insert([{
           nome: newArea.nome,
-          descricao: newArea.descricao || null
+          descricao: newArea.descricao || null,
+          cor: newArea.cor || '#6b7280'
         }])
         .select()
         .single();
@@ -117,6 +136,7 @@ export default function Areas() {
       setIsCreateDialogOpen(false);
       setNewAreaName("");
       setNewAreaDescription("");
+      setNewAreaColor("#6b7280"); // Resetar cor
     },
     onError: (error) => {
       toast({
@@ -129,12 +149,13 @@ export default function Areas() {
 
   // Update area mutation
   const updateAreaMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: { nome: string; descricao?: string } }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: { nome: string; descricao?: string; cor?: string } }) => {
       const { data, error } = await supabase
         .from('areas')
         .update({
           nome: updates.nome,
-          descricao: updates.descricao || null
+          descricao: updates.descricao || null,
+          cor: updates.cor
         })
         .eq('id', id)
         .select()
@@ -153,6 +174,7 @@ export default function Areas() {
       setEditingArea(null);
       setEditAreaName("");
       setEditAreaDescription("");
+      setEditAreaColor("#6b7280");
     },
     onError: (error) => {
       toast({
@@ -194,6 +216,8 @@ export default function Areas() {
   const areasWithCount = useMemo(() => {
     return areas.map(area => ({
       ...area,
+      // Se não vier cor do banco, usa cinza como fallback
+      cor: area.cor || '#6b7280',
       total_demandas: demandasCount[area.id]?.total || 0,
       demandas_ativas: demandasCount[area.id]?.ativas || 0,
       demandas_solicitadas: demandasCount[area.id]?.abertas || 0,
@@ -215,6 +239,7 @@ export default function Areas() {
     createAreaMutation.mutate({
       nome: newAreaName.trim(),
       descricao: newAreaDescription.trim() || undefined,
+      cor: newAreaColor,
     });
   };
 
@@ -222,6 +247,7 @@ export default function Areas() {
     setEditingArea(area);
     setEditAreaName(area.nome);
     setEditAreaDescription(area.descricao || "");
+    setEditAreaColor(area.cor || "#6b7280"); // Carregar cor existente
     setIsEditDialogOpen(true);
   };
 
@@ -233,6 +259,7 @@ export default function Areas() {
       updates: {
         nome: editAreaName.trim(),
         descricao: editAreaDescription.trim() || undefined,
+        cor: editAreaColor
       }
     });
   };
@@ -275,6 +302,7 @@ export default function Areas() {
           </p>
         </div>
         
+        {/* DIALOG DE CRIAÇÃO */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -296,6 +324,31 @@ export default function Areas() {
                   onChange={(e) => setNewAreaName(e.target.value)}
                 />
               </div>
+
+              {/* Seletor de Cor - Criação */}
+              <div className="space-y-2">
+                <Label htmlFor="cor">Cor de Identificação</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cor"
+                    type="color"
+                    value={newAreaColor}
+                    onChange={(e) => setNewAreaColor(e.target.value)}
+                    className="w-14 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    value={newAreaColor}
+                    onChange={(e) => setNewAreaColor(e.target.value)}
+                    className="flex-1 uppercase"
+                    placeholder="#000000"
+                    maxLength={7}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Essa cor será usada para identificar a área nos mapas temáticos.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="descricao">Descrição</Label>
                 <Textarea
@@ -336,6 +389,27 @@ export default function Areas() {
                   onChange={(e) => setEditAreaName(e.target.value)}
                 />
               </div>
+
+              {/* Seletor de Cor - Edição */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-cor">Cor de Identificação</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="edit-cor"
+                    type="color"
+                    value={editAreaColor}
+                    onChange={(e) => setEditAreaColor(e.target.value)}
+                    className="w-14 h-10 p-1 cursor-pointer"
+                  />
+                  <Input
+                    value={editAreaColor}
+                    onChange={(e) => setEditAreaColor(e.target.value)}
+                    className="flex-1 uppercase"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="edit-descricao">Descrição</Label>
                 <Textarea
@@ -466,7 +540,12 @@ export default function Areas() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="h-5 w-5 text-primary" />
+                    {/* Indicador de Cor da Área */}
+                    <div 
+                      className="w-4 h-4 rounded-full border shadow-sm"
+                      style={{ backgroundColor: area.cor }}
+                      title={`Cor: ${area.cor}`}
+                    />
                     <CardTitle className="text-base font-semibold">{area.nome}</CardTitle>
                   </div>
                   <DropdownMenu>
@@ -512,7 +591,7 @@ export default function Areas() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground min-h-[40px]">
                     {area.descricao || "Sem descrição"}
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -625,8 +704,16 @@ export default function Areas() {
                       <TableRow key={area.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <FolderOpen className="h-5 w-5 text-primary" />
-                            <span className="font-medium text-foreground">{area.nome}</span>
+                            {/* Indicador de Cor da Área */}
+                            <div 
+                              className="w-3 h-3 rounded-full border shadow-sm flex-shrink-0"
+                              style={{ backgroundColor: area.cor }}
+                              title={`Cor: ${area.cor}`}
+                            />
+                            <div className="flex items-center gap-2">
+                              <FolderOpen className="h-5 w-5 text-primary" />
+                              <span className="font-medium text-foreground">{area.nome}</span>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
