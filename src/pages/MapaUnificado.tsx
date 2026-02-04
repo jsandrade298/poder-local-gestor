@@ -1321,10 +1321,11 @@ export default function MapaUnificado() {
                             {/* 1. Taxa de Resolutividade */}
                             <Button
                               variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
-                              className="w-full h-auto min-h-[3.5rem] py-2 px-3 flex flex-col gap-1 items-start justify-start text-left whitespace-normal"
+                              size="sm"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('resolutividade')}
                             >
-                              <div className="flex items-center gap-1.5 font-semibold text-xs leading-none mb-0.5">
+                              <div className="flex items-center gap-1 font-semibold">
                                 <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
                                 Resolutividade
                               </div>
@@ -1336,11 +1337,12 @@ export default function MapaUnificado() {
                             {/* 2. Votos */}
                             <Button
                               variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
-                              className="w-full h-auto min-h-[3.5rem] py-2 px-3 flex flex-col gap-1 items-start justify-start text-left whitespace-normal"
+                              size="sm"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('votos')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
-                              <div className="flex items-center gap-1.5 font-semibold text-xs leading-none mb-0.5">
+                              <div className="flex items-center gap-1 font-semibold">
                                 <Vote className="h-3.5 w-3.5 flex-shrink-0" />
                                 Votos
                               </div>
@@ -1352,10 +1354,11 @@ export default function MapaUnificado() {
                             {/* 3. Predominância Temática */}
                             <Button
                               variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
-                              className="w-full h-auto min-h-[3.5rem] py-2 px-3 flex flex-col gap-1 items-start justify-start text-left whitespace-normal"
+                              size="sm"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('predominancia')}
                             >
-                              <div className="flex items-center gap-1.5 font-semibold text-xs leading-none mb-0.5">
+                              <div className="flex items-center gap-1 font-semibold">
                                 <PieChart className="h-3.5 w-3.5 flex-shrink-0" />
                                 DNA do Bairro
                               </div>
@@ -1367,11 +1370,12 @@ export default function MapaUnificado() {
                             {/* 4. Comparativo */}
                             <Button
                               variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
-                              className="w-full h-auto min-h-[3.5rem] py-2 px-3 flex flex-col gap-1 items-start justify-start text-left whitespace-normal"
+                              size="sm"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('comparativo')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
-                              <div className="flex items-center gap-1.5 font-semibold text-xs leading-none mb-0.5">
+                              <div className="flex items-center gap-1 font-semibold">
                                 <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
                                 Oportunidade
                               </div>
@@ -1401,7 +1405,7 @@ export default function MapaUnificado() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
-                                    <span>Excelente (> 80%)</span>
+                                    <span>Excelente (&gt; 80%)</span>
                                   </div>
                                 </div>
                               </>
