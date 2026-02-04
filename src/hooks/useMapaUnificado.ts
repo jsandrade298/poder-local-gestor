@@ -8,6 +8,7 @@ export interface AreaMapa {
   id: string;
   nome: string;
   cor: string | null;
+  descricao?: string | null;
 }
 
 export interface TagMapa {
@@ -86,7 +87,7 @@ function buildFullAddress(
   return parts.join(', ');
 }
 
-// Função para gerar cor consistente baseada em texto
+// Função para gerar cor consistente baseada em texto (Fallback)
 function gerarCorPorTexto(texto: string): string {
   const cores = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
@@ -133,14 +134,14 @@ export function useMapaUnificado() {
   const [geocodificando, setGeocodificando] = useState(false);
   const [progressoGeocodificacao, setProgressoGeocodificacao] = useState({ atual: 0, total: 0 });
 
-  // Buscar TODAS as áreas
+  // Buscar TODAS as áreas (Incluindo a cor)
   const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
     queryKey: ['mapa-areas-todas'],
     queryFn: async () => {
       console.log('🔄 [MAPA] Buscando todas as áreas...');
       const { data, error } = await supabase
         .from('areas')
-        .select('id, nome, descricao')
+        .select('id, nome, descricao, cor')
         .order('nome');
       
       if (error) {
@@ -150,7 +151,8 @@ export function useMapaUnificado() {
       
       const areasComCor = (data || []).map(area => ({
         ...area,
-        cor: gerarCorPorTexto(area.nome)
+        // Usa a cor do banco ou gera uma se for null
+        cor: area.cor || gerarCorPorTexto(area.nome)
       }));
       
       console.log(`✅ [MAPA] Áreas encontradas: ${areasComCor.length}`);
@@ -185,7 +187,7 @@ export function useMapaUnificado() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Buscar demandas - CORRIGIDO: removido logradouro de municipes
+  // Buscar demandas
   const { 
     data: demandasRaw = [], 
     isLoading: isLoadingDemandas,
@@ -195,7 +197,6 @@ export function useMapaUnificado() {
     queryFn: async () => {
       console.log('🔄 [MAPA] Buscando todas as demandas...');
       
-      // Query CORRIGIDA - removido logradouro de municipes pois não existe
       const { data, error } = await supabase
         .from('demandas')
         .select(`
@@ -217,7 +218,7 @@ export function useMapaUnificado() {
           responsavel_id,
           data_prazo,
           created_at,
-          areas (id, nome),
+          areas (id, nome, cor),
           municipes (id, nome, telefone, bairro, cidade, latitude, longitude)
         `)
         .order('created_at', { ascending: false });
@@ -228,17 +229,6 @@ export function useMapaUnificado() {
       }
       
       console.log(`📊 [MAPA] Demandas retornadas do banco: ${data?.length || 0}`);
-      
-      if (data && data.length > 0) {
-        console.log('📍 [MAPA] Amostra da primeira demanda:', {
-          id: data[0].id,
-          titulo: data[0].titulo,
-          latitude: data[0].latitude,
-          longitude: data[0].longitude,
-          tipo_lat: typeof data[0].latitude,
-          tipo_lng: typeof data[0].longitude
-        });
-      }
       
       const processadas = (data || []).map(d => {
         // Tentar usar coordenadas da demanda, senão do munícipe
@@ -255,6 +245,12 @@ export function useMapaUnificado() {
         const latNum = typeof lat === 'string' ? parseFloat(lat) : (lat || null);
         const lngNum = typeof lng === 'string' ? parseFloat(lng) : (lng || null);
         
+        // Determinar cor da área (Banco > Gerada > Fallback)
+        let areaCor = null;
+        if (d.areas) {
+          areaCor = d.areas.cor || gerarCorPorTexto(d.areas.nome);
+        }
+
         return {
           id: d.id,
           titulo: d.titulo,
@@ -278,7 +274,7 @@ export function useMapaUnificado() {
           ),
           area_id: d.area_id,
           area_nome: d.areas?.nome || null,
-          area_cor: d.areas ? gerarCorPorTexto(d.areas.nome) : null,
+          area_cor: areaCor,
           municipe_id: d.municipe_id,
           municipe_nome: d.municipes?.nome || null,
           municipe_telefone: d.municipes?.telefone || null,
@@ -289,8 +285,6 @@ export function useMapaUnificado() {
           tipo: 'demanda' as const
         };
       });
-      
-      console.log(`✅ [MAPA] Demandas processadas: ${processadas.length}`);
       
       return processadas as DemandaMapa[];
     },
@@ -325,19 +319,6 @@ export function useMapaUnificado() {
       if (error) {
         console.error('❌ [MAPA] Erro ao buscar munícipes:', error);
         return [];
-      }
-      
-      console.log(`📊 [MAPA] Munícipes retornados do banco: ${data?.length || 0}`);
-      
-      if (data && data.length > 0) {
-        console.log('📍 [MAPA] Amostra do primeiro munícipe:', {
-          id: data[0].id,
-          nome: data[0].nome,
-          latitude: data[0].latitude,
-          longitude: data[0].longitude,
-          tipo_lat: typeof data[0].latitude,
-          tipo_lng: typeof data[0].longitude
-        });
       }
       
       if (!data || data.length === 0) return [];
@@ -407,8 +388,6 @@ export function useMapaUnificado() {
         };
       });
       
-      console.log(`✅ [MAPA] Munícipes processados: ${processados.length}`);
-      
       return processados as MunicipeMapa[];
     },
     staleTime: 2 * 60 * 1000,
@@ -417,13 +396,6 @@ export function useMapaUnificado() {
   // Filtrar apenas os que têm coordenadas válidas para exibição no mapa
   const demandas = demandasRaw.filter(d => isValidCoordinate(d.latitude, d.longitude));
   const municipes = municipesRaw.filter(m => isValidCoordinate(m.latitude, m.longitude));
-
-  // Log final
-  console.log(`🗺️ [MAPA] RESUMO FINAL:`);
-  console.log(`   - Demandas totais: ${demandasRaw.length}`);
-  console.log(`   - Demandas com coordenadas válidas: ${demandas.length}`);
-  console.log(`   - Munícipes totais: ${municipesRaw.length}`);
-  console.log(`   - Munícipes com coordenadas válidas: ${municipes.length}`);
 
   // Contar itens sem geocodificação
   const semCoordenadas = {
@@ -455,19 +427,16 @@ export function useMapaUnificado() {
     // Geocodificar demandas
     for (const demanda of demandasSemCoord) {
       try {
-        // Construir endereço para geocodificação
         const logradouro = demanda.logradouro || '';
         const numero = demanda.numero || '';
         const bairro = demanda.bairro || '';
         const cidade = demanda.cidade || 'São Paulo';
-        const estado = 'SP'; // TODO: pegar do registro
+        const estado = 'SP'; 
 
-        // Só geocodificar se tiver pelo menos bairro ou logradouro
         if (logradouro || bairro) {
           const coord = await geocodificarEndereco(logradouro, numero, bairro, cidade, estado);
 
           if (coord) {
-            // Atualizar no banco
             const { error } = await supabase
               .from('demandas')
               .update({
@@ -477,26 +446,15 @@ export function useMapaUnificado() {
               })
               .eq('id', demanda.id);
 
-            if (!error) {
-              sucesso++;
-            } else {
-              console.error('Erro ao atualizar demanda:', error);
-              falhas++;
-            }
-          } else {
-            falhas++;
-          }
-        } else {
-          falhas++;
-        }
+            if (!error) sucesso++;
+            else falhas++;
+          } else falhas++;
+        } else falhas++;
 
         processados++;
         setProgressoGeocodificacao({ atual: processados, total });
-
-        // Delay entre requisições para evitar rate limit
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
-        console.error('Erro ao geocodificar demanda:', err);
         falhas++;
         processados++;
         setProgressoGeocodificacao({ atual: processados, total });
@@ -506,13 +464,11 @@ export function useMapaUnificado() {
     // Geocodificar munícipes
     for (const municipe of municipesSemCoord) {
       try {
-        // Extrair dados do endereço (campo 'endereco' pode conter logradouro e número)
         const enderecoCompleto = municipe.endereco || '';
         const bairro = municipe.bairro || '';
         const cidade = municipe.cidade || 'São Paulo';
         const estado = 'SP';
 
-        // Tentar extrair número do endereço
         const matchNumero = enderecoCompleto.match(/,?\s*(\d+)\s*$/);
         const numero = matchNumero ? matchNumero[1] : '';
         const logradouro = matchNumero 
@@ -532,25 +488,15 @@ export function useMapaUnificado() {
               })
               .eq('id', municipe.id);
 
-            if (!error) {
-              sucesso++;
-            } else {
-              console.error('Erro ao atualizar munícipe:', error);
-              falhas++;
-            }
-          } else {
-            falhas++;
-          }
-        } else {
-          falhas++;
-        }
+            if (!error) sucesso++;
+            else falhas++;
+          } else falhas++;
+        } else falhas++;
 
         processados++;
         setProgressoGeocodificacao({ atual: processados, total });
-
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err) {
-        console.error('Erro ao geocodificar munícipe:', err);
         falhas++;
         processados++;
         setProgressoGeocodificacao({ atual: processados, total });
@@ -559,16 +505,11 @@ export function useMapaUnificado() {
 
     setGeocodificando(false);
     
-    // Recarregar dados
     await refetchDemandas();
     await refetchMunicipes();
 
-    if (sucesso > 0) {
-      toast.success(`Geocodificação concluída! ${sucesso} registros atualizados.`);
-    }
-    if (falhas > 0) {
-      toast.warning(`${falhas} registros não puderam ser geocodificados (endereço incompleto ou não encontrado).`);
-    }
+    if (sucesso > 0) toast.success(`Geocodificação concluída! ${sucesso} registros atualizados.`);
+    if (falhas > 0) toast.warning(`${falhas} registros não puderam ser geocodificados.`);
   }, [demandasRaw, municipesRaw, refetchDemandas, refetchMunicipes]);
 
   // Bairros únicos
