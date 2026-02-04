@@ -337,14 +337,33 @@ export function GerenciarRotasModal({
     window.open(url, '_blank');
   };
 
+  // Função para fechar e limpar estados
+  const handleClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      // Limpar estados internos ao fechar
+      setRotaParaExcluir(null);
+      setRotaParaCopiar(null);
+      setRotaParaEditar(null);
+      setRotaDetalhes(null);
+      setTituloCopia('');
+      setDataCopiaNova(undefined);
+    }
+    onOpenChange(isOpen);
+  };
+
   const handleVisualizarRota = (rota: Rota) => {
-    onVisualizarRota?.(rota);
-    onOpenChange(false);
+    handleClose(false); // Fechar modal e limpar estados
+    // Delay para garantir que o modal fechou antes de atualizar estado
+    setTimeout(() => {
+      onVisualizarRota?.(rota);
+    }, 100);
   };
 
   const handleConcluirRota = (rota: Rota) => {
-    onConcluirRota?.(rota);
-    onOpenChange(false);
+    handleClose(false); // Fechar modal e limpar estados
+    setTimeout(() => {
+      onConcluirRota?.(rota);
+    }, 100);
   };
 
   const renderRotaCard = (rota: Rota) => {
@@ -549,7 +568,7 @@ export function GerenciarRotasModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
