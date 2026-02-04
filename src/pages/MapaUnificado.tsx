@@ -136,7 +136,7 @@ export default function MapaUnificado() {
 
   // Estados de filtro
   const [busca, setBusca] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'demandas' | 'municipes'>('todos');
+  const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'demandas' | 'municipes' | 'nenhum'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string[]>([]);
   const [areasFiltro, setAreasFiltro] = useState<string[]>([]);
   const [tagsFiltro, setTagsFiltro] = useState<string[]>([]);
@@ -180,6 +180,8 @@ export default function MapaUnificado() {
   // Estados de rota
   const [pontosRota, setPontosRota] = useState<Array<DemandaMapa | MunicipeMapa>>([]);
   const [origemRota, setOrigemRota] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinoRota, setDestinoRota] = useState<{ lat: number; lng: number } | null>(null);
+  const [otimizarRota, setOtimizarRota] = useState(false);
 
   // Estados para camadas geográficas (camadaSelecionadaStats já declarado acima)
   const [colorirPorDensidade, setColorirPorDensidade] = useState(false);
@@ -321,6 +323,7 @@ export default function MapaUnificado() {
 
   // Total de itens no mapa
   const totalNoMapa = 
+    tipoFiltro === 'nenhum' ? 0 :
     (tipoFiltro === 'todos' || tipoFiltro === 'demandas' ? demandasFiltradas.length : 0) +
     (tipoFiltro === 'todos' || tipoFiltro === 'municipes' ? municipesFiltrados.length : 0);
 
@@ -704,6 +707,52 @@ export default function MapaUnificado() {
     setPontosRota(novospontos);
   };
 
+  // Algoritmo Nearest Neighbor para otimizar ordem dos pontos
+  const otimizarOrdemPontos = (pontos: Array<DemandaMapa | MunicipeMapa>, origem: { lat: number; lng: number } | null) => {
+    if (pontos.length <= 1) return pontos;
+    
+    const calcularDistancia = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371000; // Raio da Terra em metros
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    const naoVisitados = [...pontos];
+    const rotaOtimizada: Array<DemandaMapa | MunicipeMapa> = [];
+    let pontoAtual = origem || { lat: pontos[0].latitude!, lng: pontos[0].longitude! };
+    
+    while (naoVisitados.length > 0) {
+      let menorDistancia = Infinity;
+      let indiceMaisProximo = 0;
+      
+      naoVisitados.forEach((ponto, index) => {
+        if (ponto.latitude && ponto.longitude) {
+          const distancia = calcularDistancia(
+            pontoAtual.lat, pontoAtual.lng,
+            ponto.latitude, ponto.longitude
+          );
+          if (distancia < menorDistancia) {
+            menorDistancia = distancia;
+            indiceMaisProximo = index;
+          }
+        }
+      });
+      
+      const proximoPonto = naoVisitados.splice(indiceMaisProximo, 1)[0];
+      rotaOtimizada.push(proximoPonto);
+      if (proximoPonto.latitude && proximoPonto.longitude) {
+        pontoAtual = { lat: proximoPonto.latitude, lng: proximoPonto.longitude };
+      }
+    }
+    
+    return rotaOtimizada;
+  };
+
   // Exportar para Google Maps
   const exportarGoogleMaps = () => {
     if (pontosRota.length === 0) {
@@ -711,7 +760,12 @@ export default function MapaUnificado() {
       return;
     }
 
-    const waypoints = pontosRota
+    // Aplicar otimização se estiver ativada
+    const pontosParaExportar = otimizarRota 
+      ? otimizarOrdemPontos(pontosRota, origemRota)
+      : pontosRota;
+
+    const waypoints = pontosParaExportar
       .filter(p => p.latitude && p.longitude)
       .map(p => `${p.latitude},${p.longitude}`);
 
@@ -723,7 +777,32 @@ export default function MapaUnificado() {
     
     url += waypoints.join('/');
     
+    // Adicionar destino final se definido
+    if (destinoRota) {
+      url += `/${destinoRota.lat},${destinoRota.lng}`;
+    }
+    
     window.open(url, '_blank');
+  };
+
+  // Obter localização para destino
+  const obterLocalizacaoDestino = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setDestinoRota({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          toast.success('Localização de destino obtida!');
+        },
+        (error) => {
+          toast.error('Erro ao obter localização: ' + error.message);
+        }
+      );
+    } else {
+      toast.error('Geolocalização não suportada pelo navegador');
+    }
   };
 
   // Formatar telefone para WhatsApp
@@ -871,6 +950,12 @@ export default function MapaUnificado() {
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-purple-500" />
                         Munícipes
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="nenhum">
+                      <div className="flex items-center gap-2">
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                        Nenhum (ocultar todos)
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -1130,17 +1215,29 @@ export default function MapaUnificado() {
               {/* Origem */}
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground">PONTO DE PARTIDA</label>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={obterLocalizacao}
-                >
-                  <Navigation className="h-4 w-4 mr-2" />
-                  {origemRota 
-                    ? `${origemRota.lat.toFixed(4)}, ${origemRota.lng.toFixed(4)}`
-                    : 'Usar minha localização'
-                  }
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 justify-start"
+                    onClick={obterLocalizacao}
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    {origemRota 
+                      ? `${origemRota.lat.toFixed(4)}, ${origemRota.lng.toFixed(4)}`
+                      : 'Usar minha localização'
+                    }
+                  </Button>
+                  {origemRota && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setOrigemRota(null)}
+                      className="h-9 w-9 text-red-500 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <Separator />
@@ -1149,7 +1246,7 @@ export default function MapaUnificado() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-muted-foreground">
-                    PONTOS DA ROTA ({pontosRota.length})
+                    PONTOS DE PARADA ({pontosRota.length})
                   </label>
                   {pontosRota.length > 0 && (
                     <Button 
@@ -1178,7 +1275,7 @@ export default function MapaUnificado() {
                               size="icon"
                               className="h-5 w-5"
                               onClick={() => moverPonto(index, 'up')}
-                              disabled={index === 0}
+                              disabled={index === 0 || otimizarRota}
                             >
                               <ArrowUp className="h-3 w-3" />
                             </Button>
@@ -1187,7 +1284,7 @@ export default function MapaUnificado() {
                               size="icon"
                               className="h-5 w-5"
                               onClick={() => moverPonto(index, 'down')}
-                              disabled={index === pontosRota.length - 1}
+                              disabled={index === pontosRota.length - 1 || otimizarRota}
                             >
                               <ArrowDown className="h-3 w-3" />
                             </Button>
@@ -1212,6 +1309,64 @@ export default function MapaUnificado() {
                       </Card>
                     ))}
                   </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Destino Final */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">PONTO DE CHEGADA (OPCIONAL)</label>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 justify-start"
+                    onClick={obterLocalizacaoDestino}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {destinoRota 
+                      ? `${destinoRota.lat.toFixed(4)}, ${destinoRota.lng.toFixed(4)}`
+                      : 'Definir destino final'
+                    }
+                  </Button>
+                  {destinoRota && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setDestinoRota(null)}
+                      className="h-9 w-9 text-red-500 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Se não definido, o último ponto de parada será o destino.
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Opção de Otimização */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <label className="text-xs font-medium text-muted-foreground">OTIMIZAR ROTA</label>
+                    <p className="text-xs text-muted-foreground">
+                      {otimizarRota 
+                        ? 'Ordem calculada automaticamente' 
+                        : 'Ordem definida manualmente'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={otimizarRota}
+                    onCheckedChange={setOtimizarRota}
+                  />
+                </div>
+                {otimizarRota && (
+                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                    ⚡ A rota será otimizada para o menor percurso ao exportar
+                  </p>
                 )}
               </div>
 
@@ -1708,11 +1863,11 @@ export default function MapaUnificado() {
         )}
         
         <ClusterMap
-          demandas={tipoFiltro === 'municipes' ? [] : demandasFiltradas}
-          municipes={tipoFiltro === 'demandas' ? [] : municipesFiltrados}
-          mostrarDemandas={tipoFiltro !== 'municipes'}
-          mostrarMunicipes={tipoFiltro !== 'demandas'}
-          heatmapVisible={heatmapVisible}
+          demandas={tipoFiltro === 'municipes' || tipoFiltro === 'nenhum' ? [] : demandasFiltradas}
+          municipes={tipoFiltro === 'demandas' || tipoFiltro === 'nenhum' ? [] : municipesFiltrados}
+          mostrarDemandas={tipoFiltro !== 'municipes' && tipoFiltro !== 'nenhum'}
+          mostrarMunicipes={tipoFiltro !== 'demandas' && tipoFiltro !== 'nenhum'}
+          heatmapVisible={heatmapVisible && tipoFiltro !== 'nenhum'}
           heatmapType={heatmapType}
           clusterEnabled={clusterEnabled}
           camadasGeograficas={camadasVisiveis}
