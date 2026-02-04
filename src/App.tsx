@@ -21,6 +21,7 @@ import WhatsApp from "./pages/WhatsApp";
 import ConfiguracoesWhatsApp from "./pages/ConfiguracoesWhatsApp";
 import AssessorIA from "./pages/AssessorIA";
 import Tags from "./pages/Tags";
+import Categorias from "./pages/Categorias";
 import Areas from "./pages/Areas";
 import Usuarios from "./pages/Usuarios";
 import Configuracoes from "./pages/Configuracoes";
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="/configuracoes-whatsapp" element={<ConfiguracoesWhatsApp />} />
               <Route path="/assessor-ia" element={<AssessorIA />} />
               <Route path="/tags" element={<Tags />} />
+              <Route path="/categorias" element={<Categorias />} />
               <Route path="/areas" element={<Areas />} />
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/config" element={<Configuracoes />} />
