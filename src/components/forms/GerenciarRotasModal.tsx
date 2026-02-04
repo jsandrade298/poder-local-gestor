@@ -38,7 +38,6 @@ import {
   ExternalLink,
   MoreVertical,
   MapPin,
-  Clock,
   FileText,
   Users,
   XCircle,
@@ -366,14 +365,11 @@ export function GerenciarRotasModal({
     // Fechar modal
     onOpenChange(false);
     
-    // CORREÇÃO: Forçar limpeza de estilos e garantir timeout maior
-    // Isso evita que o Dialog bloqueie os cliques após fechar via Dropdown
+    // Forçar limpeza de estilos
     setTimeout(() => {
-      // Forçar desbloqueio do body
       document.body.style.pointerEvents = '';
       document.body.style.overflow = '';
       
-      // Chamar callback do pai
       onVisualizarRota?.(rotaParaVisualizar);
     }, 300);
   };
@@ -392,9 +388,8 @@ export function GerenciarRotasModal({
     // Fechar modal
     onOpenChange(false);
     
-    // CORREÇÃO: Forçar limpeza de estilos
+    // Forçar limpeza de estilos
     setTimeout(() => {
-      // Forçar desbloqueio do body
       document.body.style.pointerEvents = '';
       document.body.style.overflow = '';
       
@@ -508,7 +503,7 @@ export function GerenciarRotasModal({
                     {rota.status === 'em_andamento' && (
                       <>
                         <DropdownMenuItem onClick={(e) => {
-                          e.preventDefault(); // Evitar fechamento automático para controlar manualmente
+                          e.preventDefault();
                           handleConcluirRota(rota);
                         }}>
                           <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
@@ -562,7 +557,7 @@ export function GerenciarRotasModal({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={(e) => {
-                    e.preventDefault(); // Evitar conflito
+                    e.preventDefault();
                     handleVisualizarRota(rota);
                   }}>
                     <Eye className="h-4 w-4 mr-2" />
@@ -750,38 +745,114 @@ export function GerenciarRotasModal({
 
       {/* Modal de Detalhes da Rota */}
       <Dialog open={!!rotaDetalhes} onOpenChange={() => setRotaDetalhes(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Rota</DialogTitle>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="pb-2 border-b">
+            <DialogTitle className="flex items-center justify-between">
+              <span>Detalhes da Rota</span>
+              {rotaDetalhes && (
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.bgClass
+                  )}
+                >
+                  {STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.label}
+                </Badge>
+              )}
+            </DialogTitle>
+            {rotaDetalhes && (
+                <DialogDescription>
+                    Criado por {rotaDetalhes.usuario_nome || 'Usuário'}
+                </DialogDescription>
+            )}
           </DialogHeader>
+          
           {rotaDetalhes && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-semibold">{rotaDetalhes.titulo}</h4>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(rotaDetalhes.data_programada + 'T00:00:00'), "PPPP", { locale: ptBR })}
-                </p>
+            <div className="space-y-6 py-2">
+              {/* Cabeçalho da Rota */}
+              <div className="flex items-start gap-4">
+                <div className="bg-primary/10 p-3 rounded-full">
+                    <Route className="h-6 w-6 text-primary" />
+                </div>
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-lg leading-none">{rotaDetalhes.titulo}</h4>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        <span>{format(new Date(rotaDetalhes.data_programada + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                    </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h5 className="text-sm font-medium">Pontos da Rota ({rotaDetalhes.rota_pontos?.length || 0})</h5>
-                <ScrollArea className="h-[200px]">
-                  <div className="space-y-2">
+              {/* Estatísticas Rápidas */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-muted/50 p-2 rounded-md text-center border">
+                    <span className="block text-xl font-bold">{rotaDetalhes.rota_pontos?.length || 0}</span>
+                    <span className="text-xs text-muted-foreground uppercase font-medium">Pontos</span>
+                </div>
+                <div className="bg-red-50 p-2 rounded-md text-center border border-red-100">
+                    <span className="block text-xl font-bold text-red-600">
+                        {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'demanda').length || 0}
+                    </span>
+                    <span className="text-xs text-red-600/80 uppercase font-medium">Demandas</span>
+                </div>
+                <div className="bg-purple-50 p-2 rounded-md text-center border border-purple-100">
+                    <span className="block text-xl font-bold text-purple-600">
+                        {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'municipe').length || 0}
+                    </span>
+                    <span className="text-xs text-purple-600/80 uppercase font-medium">Munícipes</span>
+                </div>
+              </div>
+
+              {/* Lista de Pontos */}
+              <div className="space-y-3">
+                <h5 className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Roteiro de Visitas
+                </h5>
+                <ScrollArea className="h-[250px] pr-4 -mr-4">
+                  <div className="space-y-3 pl-1 pr-3">
                     {rotaDetalhes.rota_pontos?.map((ponto, index) => (
-                      <div key={ponto.id} className="flex items-center gap-2 p-2 bg-muted rounded">
-                        <Badge variant="outline" className="w-6 h-6 p-0 flex items-center justify-center text-xs">
-                          {index + 1}
-                        </Badge>
-                        {ponto.tipo === 'demanda' ? (
-                          <FileText className="h-4 w-4 text-red-500" />
-                        ) : (
-                          <Users className="h-4 w-4 text-purple-500" />
+                      <div key={ponto.id} className="relative flex gap-3 group">
+                        {/* Linha conectora (exceto no último) */}
+                        {index !== (rotaDetalhes.rota_pontos?.length || 0) - 1 && (
+                            <div className="absolute left-[11px] top-8 bottom-[-12px] w-[2px] bg-border group-hover:bg-primary/20 transition-colors" />
                         )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{ponto.nome}</p>
-                          {ponto.endereco && (
-                            <p className="text-xs text-muted-foreground truncate">{ponto.endereco}</p>
-                          )}
+                        
+                        {/* Marcador */}
+                        <div className="flex-shrink-0 mt-1">
+                            <Badge 
+                                variant="outline" 
+                                className={cn(
+                                    "w-6 h-6 p-0 flex items-center justify-center text-xs rounded-full border-2 bg-background z-10 relative",
+                                    ponto.tipo === 'demanda' ? "border-red-200 text-red-700" : "border-purple-200 text-purple-700"
+                                )}
+                            >
+                                {index + 1}
+                            </Badge>
+                        </div>
+
+                        {/* Conteúdo */}
+                        <div className="flex-1 bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium text-sm">{ponto.nome}</span>
+                                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                                            {ponto.tipo === 'demanda' ? 'Demanda' : 'Munícipe'}
+                                        </Badge>
+                                    </div>
+                                    {ponto.endereco && (
+                                        <p className="text-xs text-muted-foreground line-clamp-2">
+                                            {ponto.endereco}
+                                        </p>
+                                    )}
+                                </div>
+                                {ponto.tipo === 'demanda' ? (
+                                    <FileText className="h-4 w-4 text-red-400 flex-shrink-0" />
+                                ) : (
+                                    <Users className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                                )}
+                            </div>
                         </div>
                       </div>
                     ))}
@@ -790,19 +861,27 @@ export function GerenciarRotasModal({
               </div>
 
               {rotaDetalhes.observacoes && (
-                <div>
-                  <h5 className="text-sm font-medium">Observações</h5>
-                  <p className="text-sm text-muted-foreground">{rotaDetalhes.observacoes}</p>
+                <div className="bg-muted/30 p-3 rounded-lg border text-sm">
+                  <h5 className="font-medium mb-1 text-xs uppercase text-muted-foreground">Observações</h5>
+                  <p className="text-muted-foreground italic">"{rotaDetalhes.observacoes}"</p>
                 </div>
               )}
 
-              <Button 
-                className="w-full" 
-                onClick={() => abrirGoogleMaps(rotaDetalhes)}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Abrir no Google Maps
-              </Button>
+              <DialogFooter className="sm:justify-between gap-2 border-t pt-4">
+                <Button 
+                    variant="ghost" 
+                    onClick={() => setRotaDetalhes(null)}
+                >
+                    Fechar
+                </Button>
+                <Button 
+                    onClick={() => abrirGoogleMaps(rotaDetalhes)}
+                    className="flex-1 sm:flex-none"
+                >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir no Google Maps
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
