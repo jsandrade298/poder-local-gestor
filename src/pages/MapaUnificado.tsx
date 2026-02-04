@@ -103,6 +103,7 @@ export default function MapaUnificado() {
   const {
     areas,
     tags,
+    categorias,
     demandas,
     municipes,
     demandasRaw,
@@ -153,6 +154,7 @@ export default function MapaUnificado() {
   const [statusFiltro, setStatusFiltro] = useState<string[]>([]);
   const [areasFiltro, setAreasFiltro] = useState<string[]>([]);
   const [tagsFiltro, setTagsFiltro] = useState<string[]>([]);
+  const [categoriasFiltro, setCategoriasFiltro] = useState<string[]>([]);
 
   // Estados de heatmap
   const [heatmapVisible, setHeatmapVisible] = useState(false);
@@ -168,6 +170,7 @@ export default function MapaUnificado() {
   const [statusExpanded, setStatusExpanded] = useState(true);
   const [areasExpanded, setAreasExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
+  const [categoriasExpanded, setCategoriasExpanded] = useState(true);
 
   // Estados de seleção
   const [itemSelecionado, setItemSelecionado] = useState<DemandaMapa | MunicipeMapa | null>(null);
@@ -297,6 +300,13 @@ export default function MapaUnificado() {
         if (!temAlgumaTag) return false;
       }
 
+      // Filtro de categorias (multi-select)
+      if (categoriasFiltro.length > 0) {
+        if (!m.categoria_id || !categoriasFiltro.includes(m.categoria_id)) {
+          return false;
+        }
+      }
+
       // FILTRO CRUZADO: Demandas → Munícipes
       if (filtroCruzado && (statusFiltro.length > 0 || areasFiltro.length > 0)) {
         if (!municipesComDemandasFiltradas.includes(m.id)) {
@@ -306,7 +316,7 @@ export default function MapaUnificado() {
 
       return true;
     });
-  }, [municipes, busca, tagsFiltro, filtroCruzado, statusFiltro, areasFiltro, municipesComDemandasFiltradas]);
+  }, [municipes, busca, tagsFiltro, categoriasFiltro, filtroCruzado, statusFiltro, areasFiltro, municipesComDemandasFiltradas]);
 
   // Estatísticas do filtro cruzado
   const estatisticasCruzado = useMemo(() => {
@@ -998,6 +1008,118 @@ export default function MapaUnificado() {
                                   style={{ backgroundColor: area.cor || '#6b7280' }}
                                 />
                                 <span className="truncate">{area.nome}</span>
+                                <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                                  ({count})
+                                </span>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Categorias (Munícipes) */}
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => setCategoriasExpanded(!categoriasExpanded)}
+                      className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        CATEGORIAS (MUNÍCIPES)
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {categoriasFiltro.length > 0 && (
+                          <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                            {categoriasFiltro.length}
+                          </Badge>
+                        )}
+                        <ChevronDown className={`h-4 w-4 transition-transform ${categoriasExpanded ? '' : '-rotate-90'}`} />
+                      </div>
+                    </button>
+                    {categoriasExpanded && (
+                      <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
+                        {categorias.map((categoria) => {
+                          const count = municipesRaw.filter(m => m.categoria_id === categoria.id).length;
+                          return (
+                            <div key={categoria.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`categoria-${categoria.id}`}
+                                checked={categoriasFiltro.includes(categoria.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setCategoriasFiltro([...categoriasFiltro, categoria.id]);
+                                  } else {
+                                    setCategoriasFiltro(categoriasFiltro.filter(c => c !== categoria.id));
+                                  }
+                                }}
+                              />
+                              <label 
+                                htmlFor={`categoria-${categoria.id}`}
+                                className="flex items-center gap-2 text-sm cursor-pointer flex-1 truncate"
+                              >
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: categoria.cor }}
+                                />
+                                <span className="truncate">{categoria.nome}</span>
+                                <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                                  ({count})
+                                </span>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tags (Munícipes) */}
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => setTagsExpanded(!tagsExpanded)}
+                      className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        TAGS (MUNÍCIPES)
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {tagsFiltro.length > 0 && (
+                          <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                            {tagsFiltro.length}
+                          </Badge>
+                        )}
+                        <ChevronDown className={`h-4 w-4 transition-transform ${tagsExpanded ? '' : '-rotate-90'}`} />
+                      </div>
+                    </button>
+                    {tagsExpanded && (
+                      <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
+                        {tags.map((tag) => {
+                          const count = municipesRaw.filter(m => m.tags?.some(t => t.id === tag.id)).length;
+                          return (
+                            <div key={tag.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`tag-${tag.id}`}
+                                checked={tagsFiltro.includes(tag.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setTagsFiltro([...tagsFiltro, tag.id]);
+                                  } else {
+                                    setTagsFiltro(tagsFiltro.filter(t => t !== tag.id));
+                                  }
+                                }}
+                              />
+                              <label 
+                                htmlFor={`tag-${tag.id}`}
+                                className="flex items-center gap-2 text-sm cursor-pointer flex-1 truncate"
+                              >
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: tag.cor || '#6b7280' }}
+                                />
+                                <span className="truncate">{tag.nome}</span>
                                 <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
                                   ({count})
                                 </span>
