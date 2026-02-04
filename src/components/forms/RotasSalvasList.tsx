@@ -1,16 +1,15 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +37,8 @@ import {
   Users,
   XCircle,
   RefreshCw,
-  Loader2
+  Loader2,
+  ChevronDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -59,6 +59,14 @@ interface RotasSalvasListProps {
   onAbrirGoogleMaps?: (rota: Rota) => void;
 }
 
+// Configuração dos status
+const STATUS_CONFIG = {
+  pendente: { label: 'Pendente', cor: '#eab308', bgClass: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  em_andamento: { label: 'Em Andamento', cor: '#3b82f6', bgClass: 'bg-blue-100 text-blue-800 border-blue-300' },
+  concluida: { label: 'Concluída', cor: '#22c55e', bgClass: 'bg-green-100 text-green-800 border-green-300' },
+  cancelada: { label: 'Cancelada', cor: '#6b7280', bgClass: 'bg-gray-100 text-gray-800 border-gray-300' }
+};
+
 export function RotasSalvasList({
   onVisualizarRota,
   onConcluirRota,
@@ -67,40 +75,62 @@ export function RotasSalvasList({
   const { user } = useAuth();
   const { 
     rotas, 
-    rotasPendentes, 
-    rotasEmAndamento, 
-    rotasConcluidas,
     isLoading,
+    error,
     iniciarRota,
     cancelarRota,
     excluirRota,
     copiarRota
   } = useRotas();
 
-  const [tabAtiva, setTabAtiva] = useState('pendentes');
+  // Filtros por status (multi-select)
+  const [statusFiltro, setStatusFiltro] = useState<string[]>(['pendente', 'em_andamento']);
+  const [apenasMinhas, setApenasMinhas] = useState(false);
+  
   const [rotaParaExcluir, setRotaParaExcluir] = useState<Rota | null>(null);
   const [rotaParaCopiar, setRotaParaCopiar] = useState<Rota | null>(null);
   const [dataCopiaNova, setDataCopiaNova] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pendente': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'em_andamento': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'concluida': return 'bg-green-100 text-green-800 border-green-300';
-      case 'cancelada': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  // Contagem por status
+  const contagemStatus = useMemo(() => {
+    const contagem: Record<string, number> = {
+      pendente: 0,
+      em_andamento: 0,
+      concluida: 0,
+      cancelada: 0
+    };
+    rotas.forEach(r => {
+      if (contagem[r.status] !== undefined) {
+        contagem[r.status]++;
+      }
+    });
+    return contagem;
+  }, [rotas]);
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pendente': return 'Pendente';
-      case 'em_andamento': return 'Em Andamento';
-      case 'concluida': return 'Concluída';
-      case 'cancelada': return 'Cancelada';
-      default: return status;
+  // Rotas filtradas
+  const rotasFiltradas = useMemo(() => {
+    let resultado = rotas;
+    
+    // Filtro por status
+    if (statusFiltro.length > 0) {
+      resultado = resultado.filter(r => statusFiltro.includes(r.status));
     }
+    
+    // Filtro apenas minhas
+    if (apenasMinhas && user) {
+      resultado = resultado.filter(r => r.usuario_id === user.id);
+    }
+    
+    return resultado;
+  }, [rotas, statusFiltro, apenasMinhas, user]);
+
+  const toggleStatus = (status: string) => {
+    setStatusFiltro(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
   };
 
   const handleIniciarRota = async (rota: Rota) => {
@@ -158,6 +188,7 @@ export function RotasSalvasList({
     const dataProgramada = new Date(rota.data_programada + 'T00:00:00');
     const isHoje = format(dataProgramada, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     const isPast = dataProgramada < new Date(new Date().setHours(0, 0, 0, 0)) && rota.status === 'pendente';
+    const statusConfig = STATUS_CONFIG[rota.status as keyof typeof STATUS_CONFIG];
 
     return (
       <Card key={rota.id} className={cn(
@@ -165,31 +196,31 @@ export function RotasSalvasList({
         isPast && "border-red-200 bg-red-50/50",
         isHoje && rota.status === 'pendente' && "border-blue-200 bg-blue-50/50"
       )}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between gap-2">
             {/* Info Principal */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-semibold truncate">{rota.titulo}</h4>
-                <Badge variant="outline" className={getStatusColor(rota.status)}>
-                  {getStatusLabel(rota.status)}
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h4 className="font-semibold text-sm truncate">{rota.titulo}</h4>
+                <Badge variant="outline" className={cn("text-xs", statusConfig.bgClass)}>
+                  {statusConfig.label}
                 </Badge>
               </div>
               
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <CalendarIcon className="h-3 w-3" />
                   {format(dataProgramada, "dd/MM/yyyy", { locale: ptBR })}
-                  {isHoje && <Badge variant="secondary" className="text-xs ml-1">Hoje</Badge>}
-                  {isPast && <Badge variant="destructive" className="text-xs ml-1">Atrasada</Badge>}
                 </span>
+                {isHoje && <Badge variant="secondary" className="text-xs py-0">Hoje</Badge>}
+                {isPast && <Badge variant="destructive" className="text-xs py-0">Atrasada</Badge>}
                 <span className="flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  {rota.profiles?.nome || 'Usuário'}
+                  {rota.usuario_nome || 'Usuário'}
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
                   {pontosCount} pontos
@@ -197,22 +228,16 @@ export function RotasSalvasList({
                 {demandasCount > 0 && (
                   <span className="flex items-center gap-1">
                     <FileText className="h-3 w-3 text-red-500" />
-                    {demandasCount} demandas
+                    {demandasCount}
                   </span>
                 )}
                 {municipesCount > 0 && (
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3 text-purple-500" />
-                    {municipesCount} munícipes
+                    {municipesCount}
                   </span>
                 )}
               </div>
-
-              {rota.observacoes && (
-                <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
-                  {rota.observacoes}
-                </p>
-              )}
             </div>
 
             {/* Ações */}
@@ -222,6 +247,7 @@ export function RotasSalvasList({
                 <Button 
                   variant="outline" 
                   size="sm"
+                  className="h-7 text-xs"
                   onClick={() => handleIniciarRota(rota)}
                   disabled={iniciarRota.isPending}
                 >
@@ -234,7 +260,7 @@ export function RotasSalvasList({
                 <Button 
                   variant="outline" 
                   size="sm"
-                  className="text-green-600 border-green-300 hover:bg-green-50"
+                  className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
                   onClick={() => onConcluirRota?.(rota)}
                 >
                   <CheckCircle className="h-3 w-3 mr-1" />
@@ -245,18 +271,18 @@ export function RotasSalvasList({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-7 w-7"
                 onClick={() => abrirGoogleMaps(rota)}
                 title="Abrir no Google Maps"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-3 w-3" />
               </Button>
 
               {/* Menu de mais opções */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <MoreVertical className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -319,13 +345,13 @@ export function RotasSalvasList({
 
           {/* Info de conclusão */}
           {rota.status === 'concluida' && rota.concluida_em && (
-            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                Concluída em {format(new Date(rota.concluida_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                Concluída em {format(new Date(rota.concluida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
               </span>
               {rota.observacoes_conclusao && (
-                <p className="mt-1 italic">"{rota.observacoes_conclusao}"</p>
+                <p className="mt-1 italic line-clamp-1">"{rota.observacoes_conclusao}"</p>
               )}
             </div>
           )}
@@ -334,80 +360,107 @@ export function RotasSalvasList({
     );
   };
 
+  // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span className="text-muted-foreground">Carregando rotas...</span>
+      <div className="flex flex-col items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+        <span className="text-sm text-muted-foreground">Carregando rotas...</span>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        <p className="text-sm">Erro ao carregar rotas</p>
+        <p className="text-xs mt-1">{(error as Error).message}</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="space-y-4">
-        <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pendentes" className="text-xs">
-              Pendentes ({rotasPendentes.length + rotasEmAndamento.length})
-            </TabsTrigger>
-            <TabsTrigger value="concluidas" className="text-xs">
-              Concluídas ({rotasConcluidas.length})
-            </TabsTrigger>
-            <TabsTrigger value="todas" className="text-xs">
-              Todas ({rotas.length})
-            </TabsTrigger>
-          </TabsList>
+      <div className="space-y-3">
+        {/* Filtros por Status */}
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">FILTRAR POR STATUS</label>
+          <div className="space-y-1">
+            {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+              <div key={value} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`status-rota-${value}`}
+                  checked={statusFiltro.includes(value)}
+                  onCheckedChange={() => toggleStatus(value)}
+                />
+                <label 
+                  htmlFor={`status-rota-${value}`}
+                  className="flex items-center gap-2 text-xs cursor-pointer flex-1"
+                >
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: config.cor }}
+                  />
+                  {config.label}
+                  <span className="text-muted-foreground ml-auto">
+                    ({contagemStatus[value] || 0})
+                  </span>
+                </label>
+              </div>
+            ))}
+          </div>
+          
+          {/* Filtro apenas minhas rotas */}
+          <div className="flex items-center space-x-2 pt-2 border-t">
+            <Checkbox 
+              id="apenas-minhas"
+              checked={apenasMinhas}
+              onCheckedChange={(checked) => setApenasMinhas(!!checked)}
+            />
+            <label 
+              htmlFor="apenas-minhas"
+              className="text-xs cursor-pointer"
+            >
+              Apenas minhas rotas
+            </label>
+          </div>
+        </div>
 
-          <TabsContent value="pendentes" className="mt-4">
-            <ScrollArea className="h-[400px]">
-              {rotasPendentes.length === 0 && rotasEmAndamento.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Route className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma rota pendente</p>
-                  <p className="text-xs mt-1">Crie uma rota para começar</p>
-                </div>
-              ) : (
-                <div className="space-y-3 pr-4">
-                  {/* Em andamento primeiro */}
-                  {rotasEmAndamento.map(renderRotaCard)}
-                  {/* Depois pendentes */}
-                  {rotasPendentes.map(renderRotaCard)}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
+        {/* Lista de Rotas */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground">
+              ROTAS ({rotasFiltradas.length})
+            </label>
+            {statusFiltro.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setStatusFiltro([])}
+                className="h-5 text-xs px-2"
+              >
+                Limpar filtros
+              </Button>
+            )}
+          </div>
 
-          <TabsContent value="concluidas" className="mt-4">
-            <ScrollArea className="h-[400px]">
-              {rotasConcluidas.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CheckCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma rota concluída</p>
-                </div>
-              ) : (
-                <div className="space-y-3 pr-4">
-                  {rotasConcluidas.map(renderRotaCard)}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="todas" className="mt-4">
-            <ScrollArea className="h-[400px]">
-              {rotas.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Route className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma rota cadastrada</p>
-                </div>
-              ) : (
-                <div className="space-y-3 pr-4">
-                  {rotas.map(renderRotaCard)}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+          <ScrollArea className="h-[280px]">
+            {rotasFiltradas.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Route className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p className="text-xs">Nenhuma rota encontrada</p>
+                {statusFiltro.length > 0 && (
+                  <p className="text-xs mt-1">Tente ajustar os filtros</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2 pr-2">
+                {rotasFiltradas.map(renderRotaCard)}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
       </div>
 
       {/* Dialog de confirmação de exclusão */}
