@@ -129,6 +129,7 @@ export default function Areas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-areas-todas'] });
       toast({
         title: "Área criada",
         description: "A área foi criada com sucesso.",
@@ -166,6 +167,7 @@ export default function Areas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-areas-todas'] });
       toast({
         title: "Área atualizada",
         description: "A área foi atualizada com sucesso.",
@@ -197,6 +199,7 @@ export default function Areas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['areas'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-areas-todas'] });
       queryClient.invalidateQueries({ queryKey: ['demandas-count-by-area'] });
       toast({
         title: "Área excluída",
