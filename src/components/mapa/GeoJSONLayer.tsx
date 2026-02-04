@@ -1,16 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { DemandaMapa, AreaMapa } from '@/hooks/useMapaUnificado';
 
 // =============================================
-// TIPOS
+// TIPOS E INTERFACES
 // =============================================
 
 export type ModoVisualizacao = 
-  | 'padrao'           // Cor sólida sem densidade
-  | 'atendimento'      // Demandas + Munícipes
-  | 'votos'            // Apenas votos
-  | 'comparativo';     // Votos vs Atendimento
+  | 'padrao'           // Cor sólida
+  | 'resolutividade'   // Taxa de sucesso (Atendidas / Total)
+  | 'votos'            // Densidade de votos
+  | 'comparativo'      // Votos vs Demandas
+  | 'predominancia';   // Cor da área com mais demandas
 
 interface GeoJSONLayerProps {
   data: any;
@@ -21,31 +23,29 @@ interface GeoJSONLayerProps {
   onFeatureClick?: (feature: any, nome: string) => void;
   onFeatureHover?: (feature: any | null, nome: string | null) => void;
   
-  // Estatísticas de atendimento (demandas + munícipes)
+  // DADOS NECESSÁRIOS PARA OS CÁLCULOS
+  demandas: DemandaMapa[]; // Necessário para calcular predominância e resolutividade localmente
+  areas: AreaMapa[];       // Necessário para buscar as cores das áreas
+  
+  // Estatísticas pré-calculadas (mantido para compatibilidade/performance em modos simples)
   estatisticas?: Map<string, { demandas: number; municipes: number }>;
   
   // Dados de votação
   votosPorRegiao?: Map<string, number>;
-  
-  // Total de eleitores por região
   totalEleitoresPorRegiao?: Map<string, number>;
   
-  // Modo de visualização
+  // Configuração
   modoVisualizacao?: ModoVisualizacao;
-  
-  // Filtro de tipo (para considerar só demandas, só munícipes ou ambos)
-  tipoFiltro?: 'todos' | 'demandas' | 'municipes';
-  
-  // Legacy: para compatibilidade com código existente
-  colorirPorDensidade?: boolean;
+  tipoFiltro?: 'todos' | 'demandas' | 'municipes' | 'nenhum';
+  colorirPorDensidade?: boolean; // Legacy
 }
 
 // =============================================
-// FUNÇÕES AUXILIARES
+// FUNÇÕES AUXILIARES DE CORES E LÓGICA
 // =============================================
 
 /**
- * Obtém o nome da feature das propriedades
+ * Obtém o nome da feature (bairro/região) das propriedades do GeoJSON
  */
 const getFeatureName = (properties: any): string => {
   const campos = [
@@ -59,7 +59,7 @@ const getFeatureName = (properties: any): string => {
   
   for (const campo of campos) {
     if (properties?.[campo]) {
-      return String(properties[campo]);
+      return String(properties[campo]).trim();
     }
   }
   
@@ -67,39 +67,73 @@ const getFeatureName = (properties: any): string => {
 };
 
 /**
- * Gera cor para modo de atendimento (verde → vermelho)
+ * Calcula cor baseada na Taxa de Resolutividade (Semáforo)
  */
-function getCorAtendimento(valor: number, maxValor: number, corBase: string): string {
-  if (maxValor === 0 || valor === 0) return corBase;
-  
-  const intensidade = valor / maxValor;
-  
-  if (intensidade < 0.25) return '#22c55e'; // Verde
-  if (intensidade < 0.5) return '#eab308';  // Amarelo
-  if (intensidade < 0.75) return '#f97316'; // Laranja
-  return '#ef4444'; // Vermelho
+function getCorResolutividade(demandasDaRegiao: DemandaMapa[]): string {
+  if (!demandasDaRegiao || demandasDaRegiao.length === 0) return '#94a3b8'; // Cinza (sem dados)
+
+  // Consideramos o total de demandas existentes na região
+  const totalConsiderado = demandasDaRegiao.length;
+  if (totalConsiderado === 0) return '#94a3b8';
+
+  const atendidas = demandasDaRegiao.filter(d => d.status === 'atendido').length;
+  const taxa = atendidas / totalConsiderado;
+
+  if (taxa >= 0.8) return '#22c55e'; // Verde (> 80%)
+  if (taxa >= 0.5) return '#eab308'; // Amarelo (50-80%)
+  return '#ef4444'; // Vermelho (< 50%)
 }
 
 /**
- * Gera cor para modo de votos (azul claro → azul escuro)
+ * Calcula cor baseada na Predominância Temática (Área com mais demandas)
+ */
+function getCorPredominancia(demandasDaRegiao: DemandaMapa[], areas: AreaMapa[]): string {
+  if (!demandasDaRegiao || demandasDaRegiao.length === 0) return '#e2e8f0'; // Cinza claro
+
+  // Contar demandas por área
+  const contagem: Record<string, number> = {};
+  
+  demandasDaRegiao.forEach(d => {
+    if (d.area_id) {
+      contagem[d.area_id] = (contagem[d.area_id] || 0) + 1;
+    }
+  });
+
+  // Encontrar o ID da área com maior contagem
+  let maxAreaId = null;
+  let maxCount = 0;
+
+  for (const [areaId, count] of Object.entries(contagem)) {
+    if (count > maxCount) {
+      maxCount = count;
+      maxAreaId = areaId;
+    }
+  }
+
+  if (!maxAreaId) return '#e2e8f0';
+
+  // Buscar a cor dessa área
+  const areaVencedora = areas.find(a => a.id === maxAreaId);
+  return areaVencedora?.cor || '#6b7280';
+}
+
+/**
+ * Calcula cor baseada na densidade de Votos (Escala de Azul)
  */
 function getCorVotos(valor: number, maxValor: number): string {
   if (maxValor === 0 || valor === 0) return '#e0e7ff'; // Azul muito claro (sem dados)
   
   const intensidade = valor / maxValor;
   
-  if (intensidade < 0.2) return '#c7d2fe';  // Azul bem claro
-  if (intensidade < 0.4) return '#a5b4fc';  // Azul claro
-  if (intensidade < 0.6) return '#818cf8';  // Azul médio
-  if (intensidade < 0.8) return '#6366f1';  // Azul
+  if (intensidade < 0.2) return '#c7d2fe';
+  if (intensidade < 0.4) return '#a5b4fc';
+  if (intensidade < 0.6) return '#818cf8';
+  if (intensidade < 0.8) return '#6366f1';
   return '#4f46e5'; // Azul escuro
 }
 
 /**
- * Gera cor para modo comparativo (votos vs atendimento)
- * - Verde: Mais atendimento que votos (proporcionalmente)
- * - Amarelo: Equilibrado
- * - Vermelho: Mais votos que atendimento (oportunidade)
+ * Calcula cor Comparativa (Votos x Atendimento)
  */
 function getCorComparativo(
   votos: number, 
@@ -110,29 +144,28 @@ function getCorComparativo(
   if (maxVotos === 0 || maxAtendimento === 0) return '#94a3b8'; // Cinza
   if (votos === 0 && atendimento === 0) return '#e2e8f0'; // Cinza claro
   
-  // Normalizar valores
+  // Normalizar valores (0 a 1)
   const votosNorm = votos / maxVotos;
   const atendNorm = atendimento / maxAtendimento;
   
   // Calcular diferença
   const diff = votosNorm - atendNorm;
   
-  if (diff > 0.3) return '#ef4444';   // Vermelho: muito mais votos que atendimento
-  if (diff > 0.1) return '#f97316';   // Laranja: mais votos que atendimento
-  if (diff > -0.1) return '#eab308';  // Amarelo: equilibrado
-  if (diff > -0.3) return '#84cc16';  // Verde claro: mais atendimento que votos
-  return '#22c55e';                    // Verde: muito mais atendimento que votos
+  if (diff > 0.3) return '#ef4444';   // Vermelho: Muito mais votos que atendimento (Risco)
+  if (diff > 0.1) return '#f97316';   // Laranja: Mais votos
+  if (diff > -0.1) return '#eab308';  // Amarelo: Equilibrado
+  if (diff > -0.3) return '#84cc16';  // Verde claro: Mais atendimento
+  return '#22c55e';                    // Verde: Muito mais atendimento (Confortável)
 }
 
 // =============================================
-// COMPONENTE
+// COMPONENTE PRINCIPAL
 // =============================================
 
 export function GeoJSONLayer({ 
   data, 
   cor = '#3B82F6', 
   opacidade = 0.3,
-  nome,
   mostrarLabels = false,
   onFeatureClick,
   onFeatureHover,
@@ -141,133 +174,36 @@ export function GeoJSONLayer({
   totalEleitoresPorRegiao,
   modoVisualizacao = 'padrao',
   tipoFiltro = 'todos',
-  colorirPorDensidade = false // Legacy support
+  colorirPorDensidade = false,
+  demandas,
+  areas
 }: GeoJSONLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
   const hasZoomedRef = useRef<boolean>(false);
 
-  // Determinar modo efetivo (legacy support)
+  // Lógica de compatibilidade para o toggle antigo de "Densidade"
+  // Se o usuário ativar "colorirPorDensidade" mas estiver no modo "padrao", forçamos "resolutividade"
   const modoEfetivo: ModoVisualizacao = colorirPorDensidade && modoVisualizacao === 'padrao' 
-    ? 'atendimento' 
+    ? 'resolutividade' 
     : modoVisualizacao;
 
   useEffect(() => {
     if (!data || !data.features || data.features.length === 0) return;
 
-    // Função auxiliar para calcular atendimento baseado no tipoFiltro
-    const calcularAtendimento = (stats: { demandas: number; municipes: number } | undefined): number => {
-      if (!stats) return 0;
-      switch (tipoFiltro) {
-        case 'demandas':
-          return stats.demandas;
-        case 'municipes':
-          return stats.municipes;
-        default:
-          return stats.demandas + stats.municipes;
-      }
-    };
-
-    // Calcular valores máximos para cada modo
-    let maxAtendimento = 0;
+    // Calcular máximos globais para normalização (Votos e Comparativo)
     let maxVotos = 0;
+    let maxAtendimento = 0;
 
+    if (votosPorRegiao) {
+      votosPorRegiao.forEach(v => { if (v > maxVotos) maxVotos = v; });
+    }
     if (estatisticas) {
-      estatisticas.forEach((stats) => {
-        const total = calcularAtendimento(stats);
-        if (total > maxAtendimento) maxAtendimento = total;
+      estatisticas.forEach(s => { 
+        const total = s.demandas + s.municipes;
+        if (total > maxAtendimento) maxAtendimento = total; 
       });
     }
-
-    if (votosPorRegiao) {
-      votosPorRegiao.forEach((votos) => {
-        if (votos > maxVotos) maxVotos = votos;
-      });
-    }
-
-    // =============================================
-    // CÁLCULOS PARA O TOOLTIP AVANÇADO
-    // =============================================
-    
-    // Total geral de votos do candidato
-    let totalVotosCandidato = 0;
-    if (votosPorRegiao) {
-      votosPorRegiao.forEach((votos) => {
-        totalVotosCandidato += votos;
-      });
-    }
-
-    // Total geral de eleitores (todas as regiões)
-    let totalEleitoresGeral = 0;
-    if (totalEleitoresPorRegiao) {
-      totalEleitoresPorRegiao.forEach((eleitores) => {
-        totalEleitoresGeral += eleitores;
-      });
-    }
-
-    // Preparar dados para rankings
-    interface DadosRegiao {
-      nome: string;
-      votos: number;
-      eleitores: number;
-      percentualSobreTotalEleitores: number;  // votos / total eleitores geral
-      percentualSobreEleitoresRegiao: number; // votos / eleitores da região
-      percentualSobreTotalVotos: number;      // votos / total votos candidato
-    }
-
-    const dadosRegioes: DadosRegiao[] = [];
-
-    // Coletar dados de todas as features
-    data.features.forEach((feature: any) => {
-      const featureName = getFeatureName(feature.properties);
-      const votos = votosPorRegiao?.get(featureName) || 0;
-      const eleitores = totalEleitoresPorRegiao?.get(featureName) || 0;
-
-      const percentualSobreTotalEleitores = totalEleitoresGeral > 0 
-        ? (votos / totalEleitoresGeral) * 100 
-        : 0;
-      
-      const percentualSobreEleitoresRegiao = eleitores > 0 
-        ? (votos / eleitores) * 100 
-        : 0;
-      
-      const percentualSobreTotalVotos = totalVotosCandidato > 0 
-        ? (votos / totalVotosCandidato) * 100 
-        : 0;
-
-      dadosRegioes.push({
-        nome: featureName,
-        votos,
-        eleitores,
-        percentualSobreTotalEleitores,
-        percentualSobreEleitoresRegiao,
-        percentualSobreTotalVotos
-      });
-    });
-
-    // Calcular rankings (ordenar do maior para menor)
-    const rankingSobreTotalEleitores = [...dadosRegioes]
-      .sort((a, b) => b.percentualSobreTotalEleitores - a.percentualSobreTotalEleitores)
-      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
-
-    const rankingSobreEleitoresRegiao = [...dadosRegioes]
-      .sort((a, b) => b.percentualSobreEleitoresRegiao - a.percentualSobreEleitoresRegiao)
-      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
-
-    const rankingSobreTotalVotos = [...dadosRegioes]
-      .sort((a, b) => b.percentualSobreTotalVotos - a.percentualSobreTotalVotos)
-      .map((d, i) => ({ nome: d.nome, ranking: i + 1 }));
-
-    // Função para obter ranking de uma região
-    const getRanking = (nome: string, rankingList: { nome: string; ranking: number }[]): number => {
-      const found = rankingList.find(r => r.nome === nome);
-      return found ? found.ranking : 0;
-    };
-
-    // Função para formatar posição do ranking
-    const formatarRanking = (posicao: number): string => {
-      return `${posicao}º`;
-    };
 
     // Criar camada GeoJSON
     const layer = L.geoJSON(data, {
@@ -275,15 +211,27 @@ export function GeoJSONLayer({
         const featureName = getFeatureName(feature?.properties);
         let fillColor = cor;
         
-        // Obter dados para esta feature
-        const stats = estatisticas?.get(featureName);
+        // Dados gerais da região
         const votos = votosPorRegiao?.get(featureName) || 0;
-        const atendimento = calcularAtendimento(stats);
-        
-        // Determinar cor baseada no modo
+        const stats = estatisticas?.get(featureName);
+        const totalAtendimentos = (stats?.demandas || 0) + (stats?.municipes || 0);
+
+        // Filtrar demandas desta região específica (para cálculos de Resolutividade e Predominância)
+        // O filtro é feito comparando o nome do bairro/região normalizado
+        const demandasRegiao = (modoEfetivo === 'resolutividade' || modoEfetivo === 'predominancia')
+          ? demandas.filter(d => 
+              d.bairro && d.bairro.toLowerCase().trim() === featureName.toLowerCase().trim()
+            )
+          : [];
+
+        // Aplicar a lógica de cor baseada no modo selecionado
         switch (modoEfetivo) {
-          case 'atendimento':
-            fillColor = getCorAtendimento(atendimento, maxAtendimento, cor);
+          case 'resolutividade':
+            fillColor = getCorResolutividade(demandasRegiao);
+            break;
+            
+          case 'predominancia':
+            fillColor = getCorPredominancia(demandasRegiao, areas);
             break;
             
           case 'votos':
@@ -291,7 +239,7 @@ export function GeoJSONLayer({
             break;
             
           case 'comparativo':
-            fillColor = getCorComparativo(votos, atendimento, maxVotos, maxAtendimento);
+            fillColor = getCorComparativo(votos, totalAtendimentos, maxVotos, maxAtendimento);
             break;
             
           default:
@@ -299,82 +247,94 @@ export function GeoJSONLayer({
         }
         
         return {
-          color: cor,
-          weight: 2,
+          color: '#334155', // Cor da borda (Slate-700)
+          weight: 1,        // Espessura da borda
           fillColor: fillColor,
-          fillOpacity: opacidade,
-          opacity: 0.8
+          fillOpacity: modoEfetivo === 'padrao' ? opacidade : 0.6, // Mais opaco nos modos coloridos para melhor visibilidade
+          opacity: 1
         };
       },
       onEachFeature: (feature, featureLayer) => {
         const featureName = getFeatureName(feature.properties);
         
-        // Obter dados para tooltip
+        // Preparar conteúdo do Tooltip (hover)
         const stats = estatisticas?.get(featureName);
         const votos = votosPorRegiao?.get(featureName) || 0;
-        const eleitores = totalEleitoresPorRegiao?.get(featureName) || 0;
-        const atendimento = calcularAtendimento(stats);
         
-        // Obter dados calculados da região
-        const dadosRegiao = dadosRegioes.find(d => d.nome === featureName);
+        let tooltipContent = `<div class="font-sans text-xs">`;
+        tooltipContent += `<strong class="block mb-1 text-sm">${featureName}</strong>`;
         
-        // Construir conteúdo do tooltip (simplificado - detalhes na sidebar)
-        let tooltipContent = `<div style="min-width: 160px;">`;
-        tooltipContent += `<strong style="font-size: 13px; display: block; margin-bottom: 6px;">${featureName}</strong>`;
+        if (modoEfetivo === 'resolutividade') {
+           // Calcular dados específicos para o tooltip
+           const demandasRegiao = demandas.filter(d => 
+              d.bairro && d.bairro.toLowerCase().trim() === featureName.toLowerCase().trim()
+           );
+           const resolvidas = demandasRegiao.filter(d => d.status === 'atendido').length;
+           const total = demandasRegiao.length;
+           const pct = total > 0 ? Math.round((resolvidas/total)*100) : 0;
+           
+           tooltipContent += `<div>Eficiência: <strong>${pct}%</strong></div>`;
+           tooltipContent += `<div class="text-[10px] text-gray-600">Resolvidas: ${resolvidas}/${total}</div>`;
         
-        // Resumo rápido
-        tooltipContent += `<div style="font-size: 11px; line-height: 1.4;">`;
-        tooltipContent += `👥 ${stats?.municipes || 0} munícipes &nbsp;·&nbsp; 📋 ${stats?.demandas || 0} demandas<br/>`;
-        tooltipContent += `🗳️ ${votos.toLocaleString('pt-BR')} votos`;
-        if (eleitores > 0) {
-          tooltipContent += ` &nbsp;·&nbsp; 👤 ${eleitores.toLocaleString('pt-BR')} eleitores`;
+        } else if (modoEfetivo === 'predominancia') {
+           const demandasRegiao = demandas.filter(d => 
+              d.bairro && d.bairro.toLowerCase().trim() === featureName.toLowerCase().trim()
+           );
+           
+           // Encontrar área predominante para exibir o nome
+           const contagem: Record<string, number> = {};
+           demandasRegiao.forEach(d => { 
+             if(d.area_nome) contagem[d.area_nome] = (contagem[d.area_nome] || 0) + 1; 
+           });
+           
+           const sortedAreas = Object.entries(contagem).sort((a,b) => b[1] - a[1]);
+           const topAreaNome = sortedAreas.length > 0 ? sortedAreas[0][0] : 'N/A';
+           const topAreaCount = sortedAreas.length > 0 ? sortedAreas[0][1] : 0;
+           
+           tooltipContent += `<div>Dominante: <strong>${topAreaNome}</strong></div>`;
+           tooltipContent += `<div class="text-[10px] text-gray-600">${topAreaCount} demandas</div>`;
+           
+        } else {
+           // Modos numéricos padrão (Votos ou Padrão)
+           tooltipContent += `<div>Demandas: <strong>${stats?.demandas || 0}</strong></div>`;
+           if (votos > 0) {
+             tooltipContent += `<div>Votos: <strong>${votos.toLocaleString('pt-BR')}</strong></div>`;
+           }
         }
-        tooltipContent += `</div>`;
         
-        // Dica para clicar
-        tooltipContent += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; font-size: 10px; color: #666;">`;
-        tooltipContent += `<em>Clique para ver detalhes →</em>`;
+        tooltipContent += `<div class="mt-1 text-[10px] text-gray-500 italic border-t pt-1">Clique para detalhes</div>`;
         tooltipContent += `</div>`;
-        
-        tooltipContent += `</div>`;
-        
-        // Adicionar tooltip
+
+        // Vincular tooltip
         featureLayer.bindTooltip(tooltipContent, {
           permanent: mostrarLabels,
           direction: 'auto',
-          className: 'leaflet-tooltip-custom',
+          className: 'custom-leaflet-tooltip bg-white border border-gray-200 shadow-md rounded px-2 py-1',
           sticky: true
         });
 
-        // Evento de clique
+        // Eventos de mouse
         featureLayer.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          if (onFeatureClick) {
-            onFeatureClick(feature, featureName);
-          }
+          L.DomEvent.stopPropagation(e); // Evita clique no mapa abaixo
+          if (onFeatureClick) onFeatureClick(feature, featureName);
         });
 
-        // Hover effects
         featureLayer.on('mouseover', () => {
-          (featureLayer as any).setStyle({
-            weight: 3,
-            fillOpacity: Math.min(opacidade + 0.2, 0.8)
+          // Destacar ao passar o mouse
+          (featureLayer as any).setStyle({ 
+            weight: 3, 
+            fillOpacity: 0.8 
           });
-          
-          if (onFeatureHover) {
-            onFeatureHover(feature, featureName);
-          }
+          if (onFeatureHover) onFeatureHover(feature, featureName);
         });
 
         featureLayer.on('mouseout', () => {
-          (featureLayer as any).setStyle({
-            weight: 2,
-            fillOpacity: opacidade
+          // Restaurar estilo original
+          (featureLayer as any).setStyle({ 
+            weight: 1, 
+            fillOpacity: modoEfetivo === 'padrao' ? opacidade : 0.6 
           });
-          
-          if (onFeatureHover) {
-            onFeatureHover(null, null);
-          }
+          if (onFeatureHover) onFeatureHover(null, null);
         });
       }
     });
@@ -382,7 +342,7 @@ export function GeoJSONLayer({
     layer.addTo(map);
     layerRef.current = layer;
 
-    // Fazer zoom para a camada na primeira vez
+    // Zoom automático na primeira carga (se houver dados válidos)
     if (!hasZoomedRef.current) {
       try {
         const bounds = layer.getBounds();
@@ -391,20 +351,21 @@ export function GeoJSONLayer({
           hasZoomedRef.current = true;
         }
       } catch (e) {
-        console.warn('Não foi possível fazer zoom para a camada:', e);
+        console.warn('Erro ao ajustar zoom da camada:', e);
       }
     }
 
+    // Cleanup: remover camada ao desmontar ou atualizar dados
     return () => {
       if (layerRef.current) {
         map.removeLayer(layerRef.current);
         layerRef.current = null;
       }
     };
-  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, totalEleitoresPorRegiao, modoEfetivo, tipoFiltro]);
+  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, totalEleitoresPorRegiao, modoEfetivo, tipoFiltro, demandas, areas]);
 
   return null;
 }
 
-// Exportar função auxiliar para uso externo
+// Exportar função auxiliar para uso externo em outros componentes
 export { getFeatureName };
