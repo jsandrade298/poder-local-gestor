@@ -393,6 +393,11 @@ export function useMapaUnificado() {
         const latNum = typeof m.latitude === 'string' ? parseFloat(m.latitude) : (m.latitude || null);
         const lngNum = typeof m.longitude === 'string' ? parseFloat(m.longitude) : (m.longitude || null);
         
+        // Debug: log categoria_id
+        if (m.categoria_id) {
+          console.log(`📌 [MAPA] Munícipe "${m.nome}" tem categoria_id: ${m.categoria_id}`);
+        }
+        
         return {
           id: m.id,
           nome: m.nome,
@@ -418,6 +423,10 @@ export function useMapaUnificado() {
           tipo: 'municipe' as const
         };
       });
+      
+      // Debug: resumo
+      const comCategoria = processados.filter(m => m.categoria_id).length;
+      console.log(`📊 [MAPA] Munícipes com categoria: ${comCategoria}/${processados.length}`);
       
       return processados as MunicipeMapa[];
     },
