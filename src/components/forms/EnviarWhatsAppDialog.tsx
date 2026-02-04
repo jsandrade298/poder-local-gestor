@@ -677,10 +677,10 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
           </div>
 
           {/* Content com Tabs - Área com Scroll */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
             {/* TAB: Mensagem */}
-            <TabsContent value="mensagem" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="mensagem" className="flex-1 mt-0 min-h-0">
+              <ScrollArea className="h-[calc(90vh-280px)]">
                 <div className="px-6 py-4 space-y-4">
                   <Card>
                     <CardHeader className="pb-3">
@@ -823,8 +823,8 @@ Estamos entrando em contato para..."
             </TabsContent>
 
             {/* TAB: Destinatários */}
-            <TabsContent value="destinatarios" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="destinatarios" className="flex-1 mt-0 min-h-0">
+              <ScrollArea className="h-[calc(90vh-280px)]">
                 <div className="px-6 py-4 space-y-4">
                   <Card>
                     <CardHeader className="pb-3">
@@ -954,8 +954,8 @@ Estamos entrando em contato para..."
             </TabsContent>
 
             {/* TAB: Configurações */}
-            <TabsContent value="config" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="config" className="flex-1 mt-0 min-h-0">
+              <ScrollArea className="h-[calc(90vh-280px)]">
                 <div className="px-6 py-4 space-y-4">
                   <Card>
                     <CardHeader className="pb-3">
@@ -1115,8 +1115,8 @@ Estamos entrando em contato para..."
             </TabsContent>
 
             {/* TAB: Prévia */}
-            <TabsContent value="preview" className="flex-1 overflow-hidden mt-0 data-[state=active]:flex flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="preview" className="flex-1 mt-0 min-h-0">
+              <ScrollArea className="h-[calc(90vh-280px)]">
                 <div className="px-6 py-4 space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* Prévia do WhatsApp */}
