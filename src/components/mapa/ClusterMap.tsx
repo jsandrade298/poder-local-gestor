@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from 'r
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { DemandaMapa, MunicipeMapa, AreaMapa } from '@/hooks/useMapaUnificado';
+import { DemandaMapa, MunicipeMapa, AreaMapa, CategoriaMapa } from '@/hooks/useMapaUnificado';
 import { Badge } from '@/components/ui/badge';
 import { Phone, MapPin, FileText, User, ExternalLink } from 'lucide-react';
 import { GeoJSONLayer, ModoVisualizacao } from './GeoJSONLayer';
@@ -72,9 +72,9 @@ const STATUS_COLORS: Record<string, string> = {
   'visitado': '#06b6d4',      // Ciano
 };
 
-// Criar ícone customizado para demanda
-function createDemandaIcon(status: string | null, cor?: string | null): L.DivIcon {
-  const color = cor || STATUS_COLORS[status || 'aberta'] || '#3b82f6';
+// Criar ícone customizado para demanda (usa cor do STATUS)
+function createDemandaIcon(status: string | null): L.DivIcon {
+  const color = STATUS_COLORS[status || 'solicitada'] || '#3b82f6';
   
   return L.divIcon({
     className: 'custom-marker',
@@ -105,33 +105,99 @@ function createDemandaIcon(status: string | null, cor?: string | null): L.DivIco
   });
 }
 
-// Criar ícone customizado para munícipe
-function createMunicipeIcon(): L.DivIcon {
+// SVG paths para diferentes formas de ícones de categoria
+const ICON_SHAPES: Record<string, { viewBox: string; path: string }> = {
+  circle: {
+    viewBox: '0 0 24 24',
+    path: '<circle cx="12" cy="12" r="10" fill="currentColor"/>'
+  },
+  star: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+  },
+  square: {
+    viewBox: '0 0 24 24',
+    path: '<rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor"/>'
+  },
+  triangle: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 2L2 22h20L12 2z"/>'
+  },
+  hexagon: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 2l9 5v10l-9 5-9-5V7l9-5z"/>'
+  },
+  pentagon: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 2l10 7.5-4 12H6l-4-12L12 2z"/>'
+  },
+  diamond: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 2l10 10-10 10L2 12 12 2z"/>'
+  },
+  rectangle: {
+    viewBox: '0 0 24 24',
+    path: '<rect x="2" y="6" width="20" height="12" rx="2" fill="currentColor"/>'
+  },
+  cross: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7V2z"/>'
+  },
+  heart: {
+    viewBox: '0 0 24 24',
+    path: '<path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>'
+  }
+};
+
+// Criar ícone customizado para munícipe (usa categoria e inicial do nome)
+function createMunicipeIcon(nome: string, categoria?: CategoriaMapa | null): L.DivIcon {
+  const inicial = nome.charAt(0).toUpperCase();
+  const cor = categoria?.cor || '#8b5cf6'; // Roxo padrão se não tiver categoria
+  const icone = categoria?.icone || 'circle';
+  
+  // Obter a forma do ícone
+  const shape = ICON_SHAPES[icone] || ICON_SHAPES.circle;
+  
   return L.divIcon({
-    className: 'custom-marker',
+    className: 'custom-marker-municipe',
     html: `
       <div style="
-        background-color: #8b5cf6;
-        width: 32px;
-        height: 32px;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        border: 3px solid white;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        position: relative;
+        width: 36px;
+        height: 36px;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
       ">
-        <svg style="transform: rotate(45deg); width: 16px; height: 16px; color: white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
+        <svg 
+          viewBox="${shape.viewBox}" 
+          style="
+            width: 36px; 
+            height: 36px; 
+            color: ${cor};
+          "
+        >
+          ${shape.path}
+          <text 
+            x="12" 
+            y="12" 
+            text-anchor="middle" 
+            dominant-baseline="central" 
+            fill="white" 
+            font-size="11" 
+            font-weight="bold"
+            font-family="Arial, sans-serif"
+          >${inicial}</text>
         </svg>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
   });
+}
+
+// Criar ícone padrão para munícipe sem categoria (círculo roxo com inicial)
+function createMunicipeIconDefault(nome: string): L.DivIcon {
+  return createMunicipeIcon(nome, null);
 }
 
 // Gradientes para heatmap
@@ -262,6 +328,7 @@ interface ClusterMapProps {
   demandas: DemandaMapa[];
   municipes: MunicipeMapa[];
   areas?: AreaMapa[]; // Lista de áreas para coloração por predominância
+  categorias?: CategoriaMapa[]; // Lista de categorias para ícones de munícipes
   centro?: [number, number];
   zoom?: number;
   onDemandaClick?: (demanda: DemandaMapa) => void;
@@ -290,6 +357,7 @@ export function ClusterMap({
   demandas,
   municipes,
   areas = [], // Valor padrão para evitar erros
+  categorias = [], // Lista de categorias
   centro,
   zoom = 13,
   onDemandaClick,
@@ -309,6 +377,19 @@ export function ClusterMap({
   tipoFiltro = 'todos',
   clusterEnabled = true
 }: ClusterMapProps) {
+  // Mapa de categorias por ID para acesso rápido
+  const categoriasMap = useMemo(() => {
+    const map = new Map<string, CategoriaMapa>();
+    categorias.forEach(cat => map.set(cat.id, cat));
+    return map;
+  }, [categorias]);
+
+  // Função auxiliar para obter categoria de um munícipe
+  const getCategoria = (categoriaId: string | null): CategoriaMapa | null => {
+    if (!categoriaId) return null;
+    return categoriasMap.get(categoriaId) || null;
+  };
+
   // Calcular centro do mapa baseado nos pontos
   const centroCalculado = useMemo(() => {
     if (centro) return centro;
@@ -565,7 +646,7 @@ export function ClusterMap({
               <Marker
                 key={`demanda-${demanda.id}`}
                 position={[demanda.latitude, demanda.longitude]}
-                icon={createDemandaIcon(demanda.status, demanda.area_cor)}
+                icon={createDemandaIcon(demanda.status)}
                 data={{ tipo: 'demanda', item: demanda }}
                 eventHandlers={{
                   click: () => onDemandaClick?.(demanda)
@@ -650,7 +731,7 @@ export function ClusterMap({
               <Marker
                 key={`municipe-${municipe.id}`}
                 position={[municipe.latitude, municipe.longitude]}
-                icon={createMunicipeIcon()}
+                icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
                 data={{ tipo: 'municipe', item: municipe }}
                 eventHandlers={{
                   click: () => onMunicipeClick?.(municipe)
@@ -747,7 +828,7 @@ export function ClusterMap({
               <Marker
                 key={`demanda-nc-${demanda.id}`}
                 position={[demanda.latitude, demanda.longitude]}
-                icon={createDemandaIcon(demanda.status, demanda.area_cor)}
+                icon={createDemandaIcon(demanda.status)}
                 eventHandlers={{
                   click: () => onDemandaClick?.(demanda)
                 }}
@@ -831,7 +912,7 @@ export function ClusterMap({
               <Marker
                 key={`municipe-nc-${municipe.id}`}
                 position={[municipe.latitude, municipe.longitude]}
-                icon={createMunicipeIcon()}
+                icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
                 eventHandlers={{
                   click: () => onMunicipeClick?.(municipe)
                 }}
