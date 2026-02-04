@@ -168,6 +168,7 @@ export default function Tags() {
         description: "A nova tag foi adicionada ao sistema."
       });
       queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-tags-todas'] });
       setIsCreateDialogOpen(false);
       setNewTagName("");
       setNewTagDescription("");
@@ -212,6 +213,7 @@ export default function Tags() {
         description: "As alterações foram salvas."
       });
       queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-tags-todas'] });
       setIsEditDialogOpen(false);
       setSelectedTag(null);
     },
@@ -249,6 +251,7 @@ export default function Tags() {
         description: "A tag foi removida do sistema."
       });
       queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-tags-todas'] });
     },
     onError: (error) => {
       toast({
@@ -281,6 +284,7 @@ export default function Tags() {
       });
       queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
       queryClient.invalidateQueries({ queryKey: ['tag-municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-municipes-todos'] });
     },
     onError: (error) => {
       toast({
@@ -309,6 +313,7 @@ export default function Tags() {
       });
       queryClient.invalidateQueries({ queryKey: ['tags-with-counts'] });
       queryClient.invalidateQueries({ queryKey: ['tag-municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-municipes-todos'] });
     },
     onError: (error) => {
       toast({
