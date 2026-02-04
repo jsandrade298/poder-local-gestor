@@ -1685,7 +1685,11 @@ export default function MapaUnificado() {
                       variant="default" 
                       className="w-full"
                       onClick={() => {
-                        setMunicipeModalId(itemSelecionado.id);
+                        const municipeCompleto = municipesRaw.find(m => m.id === itemSelecionado.id);
+                        if (municipeCompleto) {
+                          setMunicipeParaDetalhes(municipeCompleto);
+                          setMunicipeDetalhesOpen(true);
+                        }
                         setItemSelecionado(null);
                       }}
                     >
@@ -1700,8 +1704,168 @@ export default function MapaUnificado() {
         </div>
       )}
 
-      {/* Sidebar Direita - Cluster e Região (Mantidos conforme original, apenas abreviados aqui) */}
-      {/* ... Código do Cluster e Região ... */}
+      {/* Sidebar Direita - Cluster Selecionado */}
+      {clusterSelecionado && (
+        <div className="w-96 border-l bg-background flex flex-col">
+          <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
+            <div>
+              <h2 className="font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Cluster Selecionado
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {clusterSelecionado.demandas.length + clusterSelecionado.municipes.length} itens agrupados
+              </p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setClusterSelecionado(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Tabs value={abaCluster} onValueChange={(v) => setAbaCluster(v as 'demandas' | 'municipes')} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-2 mx-4 mt-2" style={{ width: 'calc(100% - 2rem)' }}>
+              <TabsTrigger value="demandas" className="text-xs gap-1">
+                <FileText className="h-3 w-3" />
+                Demandas ({clusterSelecionado.demandas.length})
+              </TabsTrigger>
+              <TabsTrigger value="municipes" className="text-xs gap-1">
+                <Users className="h-3 w-3" />
+                Munícipes ({clusterSelecionado.municipes.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                <TabsContent value="demandas" className="mt-0 space-y-2">
+                  {clusterSelecionado.demandas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhuma demanda neste cluster
+                    </p>
+                  ) : (
+                    clusterSelecionado.demandas.map((demanda) => (
+                      <Card key={demanda.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-3">
+                            <div 
+                              className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: (demanda.area_cor || '#3b82f6') + '20' }}
+                            >
+                              <FileText 
+                                className="h-4 w-4" 
+                                style={{ color: demanda.area_cor || '#3b82f6' }}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                              <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-[10px] px-1.5"
+                                  style={{ 
+                                    borderColor: STATUS_COLORS[demanda.status] || '#6b7280',
+                                    color: STATUS_COLORS[demanda.status] || '#6b7280'
+                                  }}
+                                >
+                                  {STATUS_LABELS[demanda.status] || demanda.status}
+                                </Badge>
+                                {demanda.area_nome && (
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    {demanda.area_nome}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => setDemandaModalId(demanda.id)}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="municipes" className="mt-0 space-y-2">
+                  {clusterSelecionado.municipes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhum munícipe neste cluster
+                    </p>
+                  ) : (
+                    clusterSelecionado.municipes.map((municipe) => (
+                      <Card key={municipe.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
+                              <Users className="h-4 w-4 text-green-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{municipe.nome}</p>
+                              {municipe.telefone && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {municipe.telefone}
+                                </p>
+                              )}
+                              {municipe.bairro && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {municipe.bairro}
+                                </p>
+                              )}
+                              {municipe.tags && municipe.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {municipe.tags.slice(0, 2).map((tag: any) => (
+                                    <Badge 
+                                      key={tag.id} 
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5"
+                                      style={{ backgroundColor: tag.cor + '20', color: tag.cor }}
+                                    >
+                                      {tag.nome}
+                                    </Badge>
+                                  ))}
+                                  {municipe.tags.length > 2 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      +{municipe.tags.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
+                                if (municipeCompleto) {
+                                  setMunicipeParaDetalhes(municipeCompleto);
+                                  setMunicipeDetalhesOpen(true);
+                                }
+                              }}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+              </div>
+            </ScrollArea>
+          </Tabs>
+        </div>
+      )}
       
       {/* Sidebar Direita - Região Selecionada */}
       {regiaoSelecionada && dadosRegiaoSelecionada && (
@@ -1732,156 +1896,282 @@ export default function MapaUnificado() {
               <TabsTrigger value="municipes" className="text-xs gap-1">Munícipes ({dadosRegiaoSelecionada.totalMunicipes})</TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              <TabsContent value="dados" className="mt-0 space-y-4">
-                {/* Card de Resumo da Região */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <MapIcon className="h-4 w-4 text-primary" />
-                      Resumo da Região
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Demandas */}
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-orange-500" />
-                        <span className="text-sm">Demandas</span>
-                      </div>
-                      <span className="font-mono font-bold text-lg">
-                        {dadosRegiaoSelecionada.totalDemandas.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                    
-                    {/* Munícipes */}
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">Munícipes</span>
-                      </div>
-                      <span className="font-mono font-bold text-lg">
-                        {dadosRegiaoSelecionada.totalMunicipes.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                    
-                    {/* Votos */}
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <div className="flex items-center gap-2">
-                        <Vote className="h-4 w-4 text-purple-500" />
-                        <span className="text-sm">Votos</span>
-                      </div>
-                      <span className="font-mono font-bold text-lg text-purple-700">
-                        {dadosRegiaoSelecionada.votos.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                    
-                    {/* Eleitores */}
-                    <div className="flex justify-between items-center py-2">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-cyan-500" />
-                        <span className="text-sm">Eleitores</span>
-                      </div>
-                      <span className="font-mono font-bold text-lg text-cyan-700">
-                        {dadosRegiaoSelecionada.eleitores.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Card de Análise Eleitoral */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4 text-blue-600" />
-                      Análise Eleitoral
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* % Eleitorado (votos / total eleitores GERAL) */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">% Eleitorado</span>
-                          <span className="text-[10px] text-muted-foreground">Votos / Total eleitores geral</span>
-                        </div>
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                {/* Aba de Dados */}
+                <TabsContent value="dados" className="mt-0 space-y-4">
+                  {/* Card de Resumo da Região */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <MapIcon className="h-4 w-4 text-primary" />
+                        Resumo da Região
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Demandas */}
+                      <div className="flex justify-between items-center py-2 border-b">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-blue-700">
-                            {dadosRegiaoSelecionada.percentualSobreTotalEleitores.toFixed(2)}%
-                          </span>
-                          <Badge className="bg-blue-100 text-blue-700 text-xs">
-                            {dadosRegiaoSelecionada.rankingTotalEleitores}º
-                          </Badge>
+                          <FileText className="h-4 w-4 text-orange-500" />
+                          <span className="text-sm">Demandas</span>
                         </div>
+                        <span className="font-mono font-bold text-lg">
+                          {dadosRegiaoSelecionada.totalDemandas.toLocaleString('pt-BR')}
+                        </span>
                       </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* % Na Região (votos / eleitores DA REGIÃO) */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">% Na Região</span>
-                          <span className="text-[10px] text-muted-foreground">Votos / Eleitores da região</span>
-                        </div>
+                      
+                      {/* Munícipes */}
+                      <div className="flex justify-between items-center py-2 border-b">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-emerald-700">
-                            {dadosRegiaoSelecionada.percentualSobreEleitoresRegiao.toFixed(2)}%
-                          </span>
-                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">
-                            {dadosRegiaoSelecionada.rankingEleitoresRegiao}º
-                          </Badge>
+                          <Users className="h-4 w-4 text-green-500" />
+                          <span className="text-sm">Munícipes</span>
                         </div>
+                        <span className="font-mono font-bold text-lg">
+                          {dadosRegiaoSelecionada.totalMunicipes.toLocaleString('pt-BR')}
+                        </span>
                       </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* % Votação (votos / total votos CANDIDATO) */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">% Votação</span>
-                          <span className="text-[10px] text-muted-foreground">Votos / Total votos do candidato</span>
-                        </div>
+                      
+                      {/* Votos */}
+                      <div className="flex justify-between items-center py-2 border-b">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-purple-700">
-                            {dadosRegiaoSelecionada.percentualSobreTotalVotos.toFixed(2)}%
-                          </span>
-                          <Badge className="bg-purple-100 text-purple-700 text-xs">
-                            {dadosRegiaoSelecionada.rankingTotalVotos}º
-                          </Badge>
+                          <Vote className="h-4 w-4 text-purple-500" />
+                          <span className="text-sm">Votos</span>
+                        </div>
+                        <span className="font-mono font-bold text-lg text-purple-700">
+                          {dadosRegiaoSelecionada.votos.toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      
+                      {/* Eleitores */}
+                      <div className="flex justify-between items-center py-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-cyan-500" />
+                          <span className="text-sm">Eleitores</span>
+                        </div>
+                        <span className="font-mono font-bold text-lg text-cyan-700">
+                          {dadosRegiaoSelecionada.eleitores.toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Card de Análise Eleitoral */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-blue-600" />
+                        Análise Eleitoral
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* % Eleitorado (votos / total eleitores GERAL) */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">% Eleitorado</span>
+                            <span className="text-[10px] text-muted-foreground">Votos / Total eleitores geral</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-blue-700">
+                              {dadosRegiaoSelecionada.percentualSobreTotalEleitores.toFixed(2)}%
+                            </span>
+                            <Badge className="bg-blue-100 text-blue-700 text-xs">
+                              {dadosRegiaoSelecionada.rankingTotalEleitores}º
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
 
-                {/* Totais Gerais para referência */}
-                <div className="p-3 bg-muted/50 rounded-md border text-xs space-y-1">
-                  <p className="font-medium text-muted-foreground mb-2">Totais da camada ({dadosRegiaoSelecionada.totalRegioes} regiões)</p>
-                  <div className="flex justify-between">
-                    <span>Total de eleitores:</span>
-                    <span className="font-mono">{dadosRegiaoSelecionada.totalEleitoresGeral.toLocaleString('pt-BR')}</span>
+                      <Separator />
+
+                      {/* % Na Região (votos / eleitores DA REGIÃO) */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">% Na Região</span>
+                            <span className="text-[10px] text-muted-foreground">Votos / Eleitores da região</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-emerald-700">
+                              {dadosRegiaoSelecionada.percentualSobreEleitoresRegiao.toFixed(2)}%
+                            </span>
+                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                              {dadosRegiaoSelecionada.rankingEleitoresRegiao}º
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* % Votação (votos / total votos CANDIDATO) */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">% Votação</span>
+                            <span className="text-[10px] text-muted-foreground">Votos / Total votos do candidato</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-purple-700">
+                              {dadosRegiaoSelecionada.percentualSobreTotalVotos.toFixed(2)}%
+                            </span>
+                            <Badge className="bg-purple-100 text-purple-700 text-xs">
+                              {dadosRegiaoSelecionada.rankingTotalVotos}º
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Totais Gerais para referência */}
+                  <div className="p-3 bg-muted/50 rounded-md border text-xs space-y-1">
+                    <p className="font-medium text-muted-foreground mb-2">Totais da camada ({dadosRegiaoSelecionada.totalRegioes} regiões)</p>
+                    <div className="flex justify-between">
+                      <span>Total de eleitores:</span>
+                      <span className="font-mono">{dadosRegiaoSelecionada.totalEleitoresGeral.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total de votos:</span>
+                      <span className="font-mono">{dadosRegiaoSelecionada.totalVotosCandidato.toLocaleString('pt-BR')}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Total de votos:</span>
-                    <span className="font-mono">{dadosRegiaoSelecionada.totalVotosCandidato.toLocaleString('pt-BR')}</span>
-                  </div>
-                </div>
 
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setModalRankingsAberto(true)}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Ver Rankings Completos
-                </Button>
-              </TabsContent>
-              {/* ... Outras abas ... */}
-            </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setModalRankingsAberto(true)}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Ver Rankings Completos
+                  </Button>
+                </TabsContent>
+
+                {/* Aba de Demandas da Região */}
+                <TabsContent value="demandas" className="mt-0 space-y-2">
+                  {dadosRegiaoSelecionada.demandas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhuma demanda nesta região
+                    </p>
+                  ) : (
+                    dadosRegiaoSelecionada.demandas.map((demanda) => (
+                      <Card key={demanda.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-3">
+                            <div 
+                              className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: (demanda.area_cor || '#3b82f6') + '20' }}
+                            >
+                              <FileText 
+                                className="h-4 w-4" 
+                                style={{ color: demanda.area_cor || '#3b82f6' }}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                              <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-[10px] px-1.5"
+                                  style={{ 
+                                    borderColor: STATUS_COLORS[demanda.status] || '#6b7280',
+                                    color: STATUS_COLORS[demanda.status] || '#6b7280'
+                                  }}
+                                >
+                                  {STATUS_LABELS[demanda.status] || demanda.status}
+                                </Badge>
+                                {demanda.area_nome && (
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    {demanda.area_nome}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => setDemandaModalId(demanda.id)}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                {/* Aba de Munícipes da Região */}
+                <TabsContent value="municipes" className="mt-0 space-y-2">
+                  {dadosRegiaoSelecionada.municipes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhum munícipe nesta região
+                    </p>
+                  ) : (
+                    dadosRegiaoSelecionada.municipes.map((municipe) => (
+                      <Card key={municipe.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
+                              <Users className="h-4 w-4 text-green-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{municipe.nome}</p>
+                              {municipe.telefone && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {municipe.telefone}
+                                </p>
+                              )}
+                              {municipe.bairro && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {municipe.bairro}
+                                </p>
+                              )}
+                              {municipe.tags && municipe.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {municipe.tags.slice(0, 2).map((tag: any) => (
+                                    <Badge 
+                                      key={tag.id} 
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5"
+                                      style={{ backgroundColor: tag.cor + '20', color: tag.cor }}
+                                    >
+                                      {tag.nome}
+                                    </Badge>
+                                  ))}
+                                  {municipe.tags.length > 2 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      +{municipe.tags.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0"
+                              onClick={() => {
+                                const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
+                                if (municipeCompleto) {
+                                  setMunicipeParaDetalhes(municipeCompleto);
+                                  setMunicipeDetalhesOpen(true);
+                                }
+                              }}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+              </div>
+            </ScrollArea>
           </Tabs>
         </div>
       )}
