@@ -1,25 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Navigation, MapPin, Loader2, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface EnderecoResult {
-  display_name: string;
-  lat: string;
-  lon: string;
+  place_name: string;
+  center: [number, number]; // [lng, lat]
 }
 
 interface BuscaEnderecoInputProps {
@@ -30,6 +18,9 @@ interface BuscaEnderecoInputProps {
   label?: string;
 }
 
+// Token do Mapbox (mesmo usado em useBrasilAPI.ts)
+const MAPBOX_TOKEN = 'pk.eyJ1IjoianNhbmRyYWRlMjk4IiwiYSI6ImNta3drZXJ4NDAwMnQzZG9oOXFlY2RwNnEifQ.bTCMd8ALMou7GbqApG_ipg';
+
 export function BuscaEnderecoInput({
   value,
   onChange,
@@ -37,23 +28,19 @@ export function BuscaEnderecoInput({
   showGeolocation = true,
   label
 }: BuscaEnderecoInputProps) {
-  const [open, setOpen] = useState(false);
+  // Estados locais para controle do input
   const [inputValue, setInputValue] = useState('');
   const [results, setResults] = useState<EnderecoResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isGeolocating, setIsGeolocating] = useState(false);
-  const [displayText, setDisplayText] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState('');
+  
   const debounceRef = useRef<NodeJS.Timeout>();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Atualizar display text quando value mudar externamente
-  useEffect(() => {
-    if (value && !displayText) {
-      setDisplayText(`${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}`);
-    }
-  }, [value]);
-
-  // Buscar endereços usando Nominatim (OpenStreetMap)
-  const searchAddress = async (query: string) => {
+  // Buscar endereços usando Mapbox Geocoding API
+  const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setResults([]);
       return;
@@ -61,26 +48,21 @@ export function BuscaEnderecoInput({
 
     setIsSearching(true);
     try {
-      // Usando Nominatim API (gratuita, sem necessidade de chave)
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?` + 
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` + 
         new URLSearchParams({
-          q: query,
-          format: 'json',
-          addressdetails: '1',
+          access_token: MAPBOX_TOKEN,
+          country: 'br',
+          language: 'pt-BR',
           limit: '5',
-          countrycodes: 'br' // Limitar ao Brasil
-        }),
-        {
-          headers: {
-            'Accept-Language': 'pt-BR'
-          }
-        }
+          types: 'address,place,locality,neighborhood,poi'
+        })
       );
       
       if (response.ok) {
         const data = await response.json();
-        setResults(data);
+        setResults(data.features || []);
+        setShowResults(true);
       }
     } catch (error) {
       console.error('Erro ao buscar endereço:', error);
@@ -88,37 +70,48 @@ export function BuscaEnderecoInput({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, []);
 
-  // Debounce para busca
-  const handleInputChange = (value: string) => {
-    setInputValue(value);
-    setDisplayText(value);
+  // Handler de mudança do input com debounce
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    setSelectedAddress('');
     
+    // Limpar timeout anterior
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     
+    // Se limpar o campo, limpar o valor
+    if (!newValue.trim()) {
+      setResults([]);
+      setShowResults(false);
+      onChange(null);
+      return;
+    }
+    
+    // Debounce de 400ms para buscar
     debounceRef.current = setTimeout(() => {
-      searchAddress(value);
-    }, 500);
-  };
+      searchAddress(newValue);
+    }, 400);
+  }, [searchAddress, onChange]);
 
   // Selecionar endereço
-  const handleSelectAddress = (result: EnderecoResult) => {
+  const handleSelectAddress = useCallback((result: EnderecoResult) => {
     const coords = {
-      lat: parseFloat(result.lat),
-      lng: parseFloat(result.lon)
+      lat: result.center[1],
+      lng: result.center[0]
     };
     onChange(coords);
-    setDisplayText(result.display_name);
+    setSelectedAddress(result.place_name);
     setInputValue('');
     setResults([]);
-    setOpen(false);
-  };
+    setShowResults(false);
+  }, [onChange]);
 
   // Obter geolocalização
-  const handleGeolocation = () => {
+  const handleGeolocation = useCallback(() => {
     if (!navigator.geolocation) {
       alert('Geolocalização não suportada pelo navegador');
       return;
@@ -132,25 +125,38 @@ export function BuscaEnderecoInput({
           lng: position.coords.longitude
         };
         onChange(coords);
-        setDisplayText(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
+        setSelectedAddress(`📍 Localização atual`);
+        setInputValue('');
+        setResults([]);
+        setShowResults(false);
         setIsGeolocating(false);
       },
       (error) => {
         console.error('Erro ao obter localização:', error);
-        alert('Erro ao obter localização: ' + error.message);
+        alert('Erro ao obter localização. Verifique as permissões do navegador.');
         setIsGeolocating(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-  };
+  }, [onChange]);
 
   // Limpar
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     onChange(null);
-    setDisplayText('');
+    setSelectedAddress('');
     setInputValue('');
     setResults([]);
-  };
+    setShowResults(false);
+    inputRef.current?.focus();
+  }, [onChange]);
+
+  // Fechar dropdown ao clicar fora
+  const handleBlur = useCallback(() => {
+    // Delay para permitir clique nos resultados
+    setTimeout(() => {
+      setShowResults(false);
+    }, 200);
+  }, []);
 
   return (
     <div className="space-y-1">
@@ -158,74 +164,75 @@ export function BuscaEnderecoInput({
         <label className="text-xs font-medium text-muted-foreground">{label}</label>
       )}
       <div className="flex gap-1">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={placeholder}
-                value={open ? inputValue : displayText}
-                onChange={(e) => {
-                  if (!open) setOpen(true);
-                  handleInputChange(e.target.value);
-                }}
-                onFocus={() => setOpen(true)}
-                className={cn(
-                  "pl-8 pr-8 text-sm",
-                  value && "border-primary"
-                )}
-              />
-              {(value || displayText) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1 h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClear();
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={inputRef}
+            placeholder={selectedAddress || placeholder}
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => inputValue.length >= 3 && setShowResults(true)}
+            onBlur={handleBlur}
+            className={cn(
+              "pl-9 pr-8 text-sm",
+              value && "border-green-500",
+              selectedAddress && !inputValue && "placeholder:text-foreground placeholder:font-medium"
+            )}
+          />
+          {(value || inputValue) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1 h-7 w-7"
+              onClick={handleClear}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          
+          {/* Dropdown de resultados */}
+          {showResults && (inputValue.length >= 3 || results.length > 0) && (
+            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg">
+              {isSearching ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span className="text-sm text-muted-foreground">Buscando...</span>
+                </div>
+              ) : results.length === 0 ? (
+                <div className="py-4 text-center text-sm text-muted-foreground">
+                  {inputValue.length < 3 
+                    ? "Digite ao menos 3 caracteres" 
+                    : "Nenhum endereço encontrado"
+                  }
+                </div>
+              ) : (
+                <ScrollArea className="max-h-[200px]">
+                  <div className="p-1">
+                    {results.map((result, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full flex items-start gap-2 p-2 hover:bg-muted rounded text-left transition-colors"
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Previne blur
+                          handleSelectAddress(result);
+                        }}
+                      >
+                        <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                        <span className="text-sm line-clamp-2">{result.place_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
               )}
             </div>
-          </PopoverTrigger>
-          <PopoverContent className="p-0 w-[300px]" align="start">
-            <Command>
-              <CommandList>
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    <span className="text-sm text-muted-foreground">Buscando...</span>
-                  </div>
-                ) : results.length === 0 ? (
-                  <CommandEmpty>
-                    {inputValue.length < 3 
-                      ? "Digite ao menos 3 caracteres..." 
-                      : "Nenhum endereço encontrado"
-                    }
-                  </CommandEmpty>
-                ) : (
-                  <CommandGroup>
-                    {results.map((result, index) => (
-                      <CommandItem
-                        key={index}
-                        onSelect={() => handleSelectAddress(result)}
-                        className="cursor-pointer"
-                      >
-                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0 text-muted-foreground" />
-                        <span className="text-sm line-clamp-2">{result.display_name}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+          )}
+        </div>
 
         {showGeolocation && (
           <Button
+            type="button"
             variant="outline"
             size="icon"
             onClick={handleGeolocation}
@@ -243,8 +250,8 @@ export function BuscaEnderecoInput({
       </div>
       
       {value && (
-        <p className="text-xs text-muted-foreground">
-          📍 {value.lat.toFixed(5)}, {value.lng.toFixed(5)}
+        <p className="text-xs text-green-600">
+          ✓ {value.lat.toFixed(5)}, {value.lng.toFixed(5)}
         </p>
       )}
     </div>
