@@ -283,6 +283,15 @@ export default function MapaUnificado() {
 
   // Filtrar munícipes
   const municipesFiltrados = useMemo(() => {
+    // Debug: verificar dados antes do filtro
+    if (categoriasFiltro.length > 0) {
+      console.log('🔍 [FILTRO] Categorias selecionadas:', categoriasFiltro);
+      console.log('🔍 [FILTRO] Munícipes com coordenadas:', municipes.length);
+      const comCategoriaSelecionada = municipes.filter(m => m.categoria_id && categoriasFiltro.includes(m.categoria_id));
+      console.log('🔍 [FILTRO] Munícipes com categoria selecionada E coordenadas:', comCategoriaSelecionada.length);
+      comCategoriaSelecionada.forEach(m => console.log(`   - ${m.nome} (${m.categoria_id})`));
+    }
+    
     return municipes.filter(m => {
       // Busca textual
       if (busca) {
@@ -339,14 +348,15 @@ export default function MapaUnificado() {
   }, [filtroCruzado, tagsFiltro, statusFiltro, areasFiltro, municipesComTagsSelecionadas, municipesComDemandasFiltradas, demandas]);
 
   // Contagem por status
+  // Contagem por status (apenas demandas com coordenadas no mapa)
   const contagemStatus = useMemo(() => {
     const contagem: Record<string, number> = {};
-    demandasRaw.forEach(d => {
+    demandas.forEach(d => {
       const status = d.status || 'sem_status';
       contagem[status] = (contagem[status] || 0) + 1;
     });
     return contagem;
-  }, [demandasRaw]);
+  }, [demandas]);
 
   // Calcular centro aproximado
   const centroProximidade = useMemo(() => {
@@ -985,7 +995,8 @@ export default function MapaUnificado() {
                     {areasExpanded && (
                       <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
                         {areas.map((area) => {
-                          const count = demandasRaw.filter(d => d.area_id === area.id).length;
+                          // Usar demandas (com coordenadas) para contagem no mapa
+                          const count = demandas.filter(d => d.area_id === area.id).length;
                           return (
                             <div key={area.id} className="flex items-center space-x-2">
                               <Checkbox 
@@ -1041,7 +1052,8 @@ export default function MapaUnificado() {
                     {categoriasExpanded && (
                       <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
                         {categorias.map((categoria) => {
-                          const count = municipesRaw.filter(m => m.categoria_id === categoria.id).length;
+                          // Usar municipes (com coordenadas) para contagem no mapa
+                          const count = municipes.filter(m => m.categoria_id === categoria.id).length;
                           return (
                             <div key={categoria.id} className="flex items-center space-x-2">
                               <Checkbox 
@@ -1097,7 +1109,8 @@ export default function MapaUnificado() {
                     {tagsExpanded && (
                       <div className="pt-1 space-y-1 max-h-40 overflow-y-auto">
                         {tags.map((tag) => {
-                          const count = municipesRaw.filter(m => m.tags?.some(t => t.id === tag.id)).length;
+                          // Usar municipes (com coordenadas) para contagem no mapa
+                          const count = municipes.filter(m => m.tags?.some(t => t.id === tag.id)).length;
                           return (
                             <div key={tag.id} className="flex items-center space-x-2">
                               <Checkbox 
