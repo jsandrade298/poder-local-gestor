@@ -71,6 +71,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 // Cores por status (valores reais do banco)
@@ -1310,160 +1316,191 @@ export default function MapaUnificado() {
                           />
                         </div>
 
-                        {/* Modo de Visualização (LAYOUT UNIFORMIZADO) */}
+                        {/* Modo de Visualização (BOTÕES COM TOOLTIP) */}
                         {modoVisualizacao !== 'padrao' && (
                         <div className="space-y-3">
                           <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                             Indicadores Territoriais
                           </label>
                           
-                          <div className="grid grid-cols-2 gap-2">
-                            {/* 1. Taxa de Resolutividade */}
-                            <Button
-                              variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
-                              size="sm"
-                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
-                              onClick={() => setModoVisualizacao('resolutividade')}
-                            >
-                              <div className="flex items-center gap-1.5 font-semibold">
-                                <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                Resolutividade
-                              </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
-                                Eficiência na resolução de demandas
-                              </span>
-                            </Button>
+                          <TooltipProvider delayDuration={300}>
+                            <div className="grid grid-cols-4 gap-2">
+                              {/* 1. Taxa de Resolutividade */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    onClick={() => setModoVisualizacao('resolutividade')}
+                                  >
+                                    <CheckCircle className="h-5 w-5" />
+                                    <span className="text-[10px] font-medium leading-tight">Resolutividade</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-1">Taxa de Resolutividade</p>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Mede a eficiência do mandato em resolver demandas por região.
+                                  </p>
+                                  <p className="text-xs mb-1"><strong>Cálculo:</strong> Demandas atendidas ÷ Total de demandas ativas</p>
+                                  <div className="text-xs space-y-0.5 mt-2 pt-2 border-t">
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#22c55e] mr-1.5"></span><strong>Verde:</strong> Excelente (&gt;80%)</p>
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#eab308] mr-1.5"></span><strong>Amarelo:</strong> Atenção (50-80%)</p>
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#ef4444] mr-1.5"></span><strong>Vermelho:</strong> Crítico (&lt;50%)</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
 
-                            {/* 2. Votos */}
-                            <Button
-                              variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
-                              size="sm"
-                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
-                              onClick={() => setModoVisualizacao('votos')}
-                              disabled={eleicoesDisponiveis.length === 0}
-                            >
-                              <div className="flex items-center gap-1.5 font-semibold">
-                                <Vote className="h-3.5 w-3.5 flex-shrink-0" />
-                                Votos
-                              </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
-                                Densidade eleitoral histórica
-                              </span>
-                            </Button>
+                              {/* 2. Votos */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    onClick={() => setModoVisualizacao('votos')}
+                                    disabled={eleicoesDisponiveis.length === 0}
+                                  >
+                                    <Vote className="h-5 w-5" />
+                                    <span className="text-[10px] font-medium leading-tight">Votos</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-1">Densidade de Votos</p>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Mostra a concentração de votos do candidato em cada região.
+                                  </p>
+                                  <p className="text-xs mb-1"><strong>Cálculo:</strong> Votos na região ÷ Total de votos do candidato</p>
+                                  <div className="text-xs space-y-0.5 mt-2 pt-2 border-t">
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#7c3aed] mr-1.5"></span><strong>Roxo intenso:</strong> Alta concentração de votos</p>
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#c4b5fd] mr-1.5"></span><strong>Roxo claro:</strong> Baixa concentração de votos</p>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground mt-2 italic">
+                                    Útil para identificar redutos eleitorais e bases de apoio.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
 
-                            {/* 3. Predominância Temática */}
-                            <Button
-                              variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
-                              size="sm"
-                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
-                              onClick={() => setModoVisualizacao('predominancia')}
-                            >
-                              <div className="flex items-center gap-1.5 font-semibold">
-                                <PieChart className="h-3.5 w-3.5 flex-shrink-0" />
-                                DNA do Bairro
-                              </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
-                                Tema predominante (Saúde, Obras...)
-                              </span>
-                            </Button>
+                              {/* 3. DNA do Bairro */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    onClick={() => setModoVisualizacao('predominancia')}
+                                  >
+                                    <PieChart className="h-5 w-5" />
+                                    <span className="text-[10px] font-medium leading-tight">DNA</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-1">DNA do Bairro</p>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Identifica o tema predominante das demandas em cada região.
+                                  </p>
+                                  <p className="text-xs mb-1"><strong>Cálculo:</strong> Área temática com maior número de demandas na região</p>
+                                  <div className="text-xs mt-2 pt-2 border-t">
+                                    <p className="mb-1">Cada cor representa uma área temática diferente (Saúde, Obras, Educação, etc.)</p>
+                                    <p className="text-[10px] text-muted-foreground italic">
+                                      Útil para entender as principais necessidades de cada território e direcionar ações específicas.
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
 
-                            {/* 4. Comparativo */}
-                            <Button
-                              variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
-                              size="sm"
-                              className="h-[72px] py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
-                              onClick={() => setModoVisualizacao('comparativo')}
-                              disabled={eleicoesDisponiveis.length === 0}
-                            >
-                              <div className="flex items-center gap-1.5 font-semibold">
-                                <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
-                                Oportunidade
-                              </div>
-                              <span className="text-[10px] opacity-80 font-normal leading-tight line-clamp-2">
-                                Votos vs. Volume de Demandas
-                              </span>
-                            </Button>
-                          </div>
+                              {/* 4. Oportunidade */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-16 flex flex-col items-center justify-center gap-1.5 px-2"
+                                    onClick={() => setModoVisualizacao('comparativo')}
+                                    disabled={eleicoesDisponiveis.length === 0}
+                                  >
+                                    <TrendingUp className="h-5 w-5" />
+                                    <span className="text-[10px] font-medium leading-tight">Oportunidade</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs p-3">
+                                  <p className="font-semibold mb-1">Análise de Oportunidade</p>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Cruza dados de votação com volume de atendimentos para identificar oportunidades e riscos.
+                                  </p>
+                                  <p className="text-xs mb-1"><strong>Compara:</strong> % de votos vs. % de demandas atendidas</p>
+                                  <div className="text-xs space-y-0.5 mt-2 pt-2 border-t">
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#ef4444] mr-1.5"></span><strong>Vermelho (Risco):</strong> Muitos votos, pouco atendimento</p>
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#22c55e] mr-1.5"></span><strong>Verde (Potencial):</strong> Bom atendimento, poucos votos</p>
+                                    <p><span className="inline-block w-2 h-2 rounded-full bg-[#3b82f6] mr-1.5"></span><strong>Azul (Equilibrado):</strong> Votos e atendimento proporcionais</p>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground mt-2 italic">
+                                    Priorize regiões vermelhas para manter a base e verdes para expandir.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TooltipProvider>
                           
-                          {/* Legendas Dinâmicas */}
-                          <div className="p-3 bg-muted/50 rounded-md border text-xs space-y-2">
-                            
+                          {/* Legenda Visual Compacta */}
+                          <div className="p-2 bg-muted/30 rounded-md border text-[10px]">
                             {modoVisualizacao === 'resolutividade' && (
-                              <>
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="font-semibold">Eficiência do Mandato</span>
-                                  <span className="text-[10px] text-muted-foreground">(Atendidas / Total Ativas)</span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                                  <span>&lt;50%</span>
                                 </div>
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
-                                    <span>Crítico (0% - 50%)</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-[#eab308]" />
-                                    <span>Atenção (50% - 80%)</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
-                                    <span>Excelente (&gt; 80%)</span>
-                                  </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#eab308]" />
+                                  <span>50-80%</span>
                                 </div>
-                              </>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                                  <span>&gt;80%</span>
+                                </div>
+                              </div>
                             )}
 
                             {modoVisualizacao === 'predominancia' && (
-                              <>
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="font-semibold">Temas Predominantes</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto">
-                                  {areas.slice(0, 6).map(area => (
-                                    <div key={area.id} className="flex items-center gap-1.5">
-                                      <div 
-                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                                        style={{ backgroundColor: area.cor || '#6b7280' }} 
-                                      />
-                                      <span className="truncate max-w-[100px]">{area.nome}</span>
-                                    </div>
-                                  ))}
-                                  {areas.length > 6 && (
-                                    <span className="text-[10px] text-muted-foreground pl-4">e mais {areas.length - 6}...</span>
-                                  )}
-                                </div>
-                              </>
+                              <div className="grid grid-cols-3 gap-x-2 gap-y-0.5">
+                                {areas.slice(0, 6).map(area => (
+                                  <div key={area.id} className="flex items-center gap-1">
+                                    <div 
+                                      className="w-2 h-2 rounded-full flex-shrink-0" 
+                                      style={{ backgroundColor: area.cor || '#6b7280' }} 
+                                    />
+                                    <span className="truncate">{area.nome}</span>
+                                  </div>
+                                ))}
+                              </div>
                             )}
 
                             {modoVisualizacao === 'votos' && (
-                              <>
-                                <p className="font-semibold mb-1">Intensidade de Votos</p>
-                                <div className="flex items-center gap-2">
-                                  <span>Menos</span>
-                                  <div className="flex-1 h-2 rounded-full" style={{
-                                    background: 'linear-gradient(to right, #e0e7ff, #4f46e5)'
-                                  }} />
-                                  <span>Mais</span>
-                                </div>
-                              </>
+                              <div className="flex items-center gap-2">
+                                <span>Menos</span>
+                                <div className="flex-1 h-1.5 rounded-full" style={{
+                                  background: 'linear-gradient(to right, #c4b5fd, #7c3aed)'
+                                }} />
+                                <span>Mais</span>
+                              </div>
                             )}
 
                             {modoVisualizacao === 'comparativo' && (
-                              <>
-                                <p className="font-semibold mb-1">Relação Votos x Atendimento</p>
-                                <div className="grid grid-cols-1 gap-1">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[#ef4444]" />
-                                    <span>Votos sem Atendimento (Risco)</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[#22c55e]" />
-                                    <span>Atendimento sem Votos (Potencial)</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-sm bg-[#eab308]" />
-                                    <span>Equilibrado</span>
-                                  </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-sm bg-[#ef4444]" />
+                                  <span>Risco</span>
                                 </div>
-                              </>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-sm bg-[#3b82f6]" />
+                                  <span>Equilíbrio</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-sm bg-[#22c55e]" />
+                                  <span>Potencial</span>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
