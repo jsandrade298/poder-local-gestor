@@ -7,12 +7,14 @@ import { ShapefileUpload } from '@/components/mapa/ShapefileUpload';
 import { VotosUpload } from '@/components/mapa/VotosUpload';
 import { useCamadasGeograficas } from '@/hooks/useCamadasGeograficas';
 import { useDadosEleitorais } from '@/hooks/useDadosEleitorais';
+import { useRotas, Rota } from '@/hooks/useRotas';
 import { calcularEstatisticasPorRegiao, getFeatureName, filtrarPorRegiao } from '@/lib/geoUtils';
 import { ViewDemandaDialog } from '@/components/forms/ViewDemandaDialog';
 import { EditDemandaDialog } from '@/components/forms/EditDemandaDialog';
-// Nota: Se os modais de Munícipe existirem no projeto, descomente as linhas abaixo:
-// import { ViewMunicipeDialog } from '@/components/forms/ViewMunicipeDialog';
-// import { EditMunicipeDialog } from '@/components/forms/EditMunicipeDialog';
+import { MunicipeDetailsDialog } from '@/components/forms/MunicipeDetailsDialog';
+import { CriarRotaDialog } from '@/components/forms/CriarRotaDialog';
+import { ConcluirRotaDialog } from '@/components/forms/ConcluirRotaDialog';
+import { RotasSalvasList } from '@/components/forms/RotasSalvasList';
 import { 
   MapPin, 
   Filter, 
@@ -44,7 +46,9 @@ import {
   EyeOff,
   Palette,
   Map as MapIcon,
-  Vote
+  Vote,
+  Save,
+  List
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -182,6 +186,16 @@ export default function MapaUnificado() {
   const [origemRota, setOrigemRota] = useState<{ lat: number; lng: number } | null>(null);
   const [destinoRota, setDestinoRota] = useState<{ lat: number; lng: number } | null>(null);
   const [otimizarRota, setOtimizarRota] = useState(false);
+  
+  // Estados para rotas salvas
+  const [abaRotas, setAbaRotas] = useState<'criar' | 'salvas'>('criar');
+  const [criarRotaDialogOpen, setCriarRotaDialogOpen] = useState(false);
+  const [concluirRotaDialogOpen, setConcluirRotaDialogOpen] = useState(false);
+  const [rotaParaConcluir, setRotaParaConcluir] = useState<Rota | null>(null);
+  
+  // Estados para modal de munícipe (para conclusão de rota)
+  const [municipeDetalhesOpen, setMunicipeDetalhesOpen] = useState(false);
+  const [municipeParaDetalhes, setMunicipeParaDetalhes] = useState<any>(null);
 
   // Estados para camadas geográficas (camadaSelecionadaStats já declarado acima)
   const [colorirPorDensidade, setColorirPorDensidade] = useState(false);
@@ -2967,6 +2981,55 @@ export default function MapaUnificado() {
         }}
       />
       */}
+
+      {/* Modal Criar Rota */}
+      <CriarRotaDialog
+        open={criarRotaDialogOpen}
+        onOpenChange={setCriarRotaDialogOpen}
+        pontosRota={pontosRota}
+        origemRota={origemRota}
+        destinoRota={destinoRota}
+        otimizarRota={otimizarRota}
+        onSuccess={() => {
+          // Limpar pontos após criar
+          setPontosRota([]);
+          setOrigemRota(null);
+          setDestinoRota(null);
+          setOtimizarRota(false);
+          // Mudar para aba de rotas salvas
+          setAbaRotas('salvas');
+        }}
+      />
+
+      {/* Modal Concluir Rota */}
+      <ConcluirRotaDialog
+        open={concluirRotaDialogOpen}
+        onOpenChange={(open) => {
+          setConcluirRotaDialogOpen(open);
+          if (!open) setRotaParaConcluir(null);
+        }}
+        rota={rotaParaConcluir}
+        onAbrirDemanda={(demandaId) => {
+          setDemandaModalId(demandaId);
+        }}
+        onAbrirMunicipe={(municipeId) => {
+          const municipe = municipesRaw.find(m => m.id === municipeId);
+          if (municipe) {
+            setMunicipeParaDetalhes(municipe);
+            setMunicipeDetalhesOpen(true);
+          }
+        }}
+      />
+
+      {/* Modal Detalhes do Munícipe (para conclusão de rota) */}
+      <MunicipeDetailsDialog
+        municipe={municipeParaDetalhes}
+        open={municipeDetalhesOpen}
+        onOpenChange={(open) => {
+          setMunicipeDetalhesOpen(open);
+          if (!open) setMunicipeParaDetalhes(null);
+        }}
+      />
     </div>
   );
 }
