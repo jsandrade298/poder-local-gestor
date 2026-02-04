@@ -2713,7 +2713,7 @@ export default function MapaUnificado() {
 
       {/* Modal de Rankings Completos */}
       <Dialog open={modalRankingsAberto} onOpenChange={setModalRankingsAberto}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -2726,7 +2726,7 @@ export default function MapaUnificado() {
           
           {rankingsCompletos && (
             <Tabs defaultValue="pct-eleitorado" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-5 flex-shrink-0">
                 <TabsTrigger value="pct-eleitorado" className="text-xs">% Eleitorado</TabsTrigger>
                 <TabsTrigger value="pct-regiao" className="text-xs">% na Região</TabsTrigger>
                 <TabsTrigger value="pct-votacao" className="text-xs">% Votação</TabsTrigger>
@@ -2734,9 +2734,9 @@ export default function MapaUnificado() {
                 <TabsTrigger value="eleitores-abs" className="text-xs">Eleitores</TabsTrigger>
               </TabsList>
 
-              <ScrollArea className="flex-1 mt-4">
-                {/* Tab % Eleitorado */}
-                <TabsContent value="pct-eleitorado" className="mt-0">
+              {/* Tab % Eleitorado */}
+              <TabsContent value="pct-eleitorado" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full pr-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -2779,10 +2779,12 @@ export default function MapaUnificado() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                </ScrollArea>
+              </TabsContent>
 
-                {/* Tab % na Região */}
-                <TabsContent value="pct-regiao" className="mt-0">
+              {/* Tab % na Região */}
+              <TabsContent value="pct-regiao" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full pr-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -2825,10 +2827,12 @@ export default function MapaUnificado() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                </ScrollArea>
+              </TabsContent>
 
-                {/* Tab % Votação */}
-                <TabsContent value="pct-votacao" className="mt-0">
+              {/* Tab % Votação */}
+              <TabsContent value="pct-votacao" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full pr-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -2871,10 +2875,12 @@ export default function MapaUnificado() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                </ScrollArea>
+              </TabsContent>
 
-                {/* Tab Votos Absolutos */}
-                <TabsContent value="votos-abs" className="mt-0">
+              {/* Tab Votos Absolutos */}
+              <TabsContent value="votos-abs" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full pr-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -2914,10 +2920,12 @@ export default function MapaUnificado() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                </ScrollArea>
+              </TabsContent>
 
-                {/* Tab Eleitores Absolutos */}
-                <TabsContent value="eleitores-abs" className="mt-0">
+              {/* Tab Eleitores Absolutos */}
+              <TabsContent value="eleitores-abs" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full pr-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -2957,13 +2965,13 @@ export default function MapaUnificado() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
-              </ScrollArea>
+                </ScrollArea>
+              </TabsContent>
             </Tabs>
           )}
         </DialogContent>
       </Dialog>
-
+      
       {/* Modais de Munícipe - Descomente se os componentes existirem no projeto */}
       {/* 
       <ViewMunicipeDialog
