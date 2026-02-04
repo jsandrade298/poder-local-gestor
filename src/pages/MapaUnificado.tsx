@@ -1747,9 +1747,13 @@ export default function MapaUnificado() {
                     </p>
                   ) : (
                     clusterSelecionado.demandas.map((demanda) => (
-                      <Card key={demanda.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Card 
+                        key={demanda.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setDemandaModalId(demanda.id)}
+                      >
                         <CardContent className="p-3">
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-2">
                             <div 
                               className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: (demanda.area_cor || '#3b82f6') + '20' }}
@@ -1760,9 +1764,9 @@ export default function MapaUnificado() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                              <p className="font-medium text-sm line-clamp-2">{demanda.titulo}</p>
                               <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <Badge 
                                   variant="outline" 
                                   className="text-[10px] px-1.5"
@@ -1774,20 +1778,13 @@ export default function MapaUnificado() {
                                   {STATUS_LABELS[demanda.status] || demanda.status}
                                 </Badge>
                                 {demanda.area_nome && (
-                                  <span className="text-[10px] text-muted-foreground truncate">
+                                  <span className="text-[10px] text-muted-foreground">
                                     {demanda.area_nome}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 flex-shrink-0"
-                              onClick={() => setDemandaModalId(demanda.id)}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
                         </CardContent>
                       </Card>
@@ -1802,43 +1799,37 @@ export default function MapaUnificado() {
                     </p>
                   ) : (
                     clusterSelecionado.municipes.map((municipe) => (
-                      <Card key={municipe.id} className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden">
+                      <Card 
+                        key={municipe.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
+                          if (municipeCompleto) {
+                            setMunicipeParaDetalhes(municipeCompleto);
+                            setMunicipeDetalhesOpen(true);
+                          }
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-start gap-2">
                             <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
                               <Users className="h-4 w-4 text-green-600" />
                             </div>
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="font-medium text-sm truncate flex-1">{municipe.nome}</p>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 flex-shrink-0"
-                                  onClick={() => {
-                                    const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
-                                    if (municipeCompleto) {
-                                      setMunicipeParaDetalhes(municipeCompleto);
-                                      setMunicipeDetalhesOpen(true);
-                                    }
-                                  }}
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-2">{municipe.nome}</p>
                               {municipe.telefone && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                   <Phone className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate">{municipe.telefone}</span>
+                                  <span>{municipe.telefone}</span>
                                 </p>
                               )}
                               {municipe.bairro && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   {municipe.bairro}
                                 </p>
                               )}
                               {municipe.tags && municipe.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
+                                <div className="flex flex-wrap gap-1 mt-1.5">
                                   {municipe.tags.slice(0, 2).map((tag: any) => (
                                     <Badge 
                                       key={tag.id} 
@@ -1857,6 +1848,7 @@ export default function MapaUnificado() {
                                 </div>
                               )}
                             </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
                         </CardContent>
                       </Card>
@@ -2057,9 +2049,13 @@ export default function MapaUnificado() {
                     </p>
                   ) : (
                     dadosRegiaoSelecionada.demandas.map((demanda) => (
-                      <Card key={demanda.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Card 
+                        key={demanda.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setDemandaModalId(demanda.id)}
+                      >
                         <CardContent className="p-3">
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-2">
                             <div 
                               className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: (demanda.area_cor || '#3b82f6') + '20' }}
@@ -2070,9 +2066,9 @@ export default function MapaUnificado() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{demanda.titulo}</p>
+                              <p className="font-medium text-sm line-clamp-2">{demanda.titulo}</p>
                               <p className="text-xs text-muted-foreground">{demanda.protocolo}</p>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <Badge 
                                   variant="outline" 
                                   className="text-[10px] px-1.5"
@@ -2084,20 +2080,13 @@ export default function MapaUnificado() {
                                   {STATUS_LABELS[demanda.status] || demanda.status}
                                 </Badge>
                                 {demanda.area_nome && (
-                                  <span className="text-[10px] text-muted-foreground truncate">
+                                  <span className="text-[10px] text-muted-foreground">
                                     {demanda.area_nome}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 flex-shrink-0"
-                              onClick={() => setDemandaModalId(demanda.id)}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
                         </CardContent>
                       </Card>
@@ -2113,43 +2102,37 @@ export default function MapaUnificado() {
                     </p>
                   ) : (
                     dadosRegiaoSelecionada.municipes.map((municipe) => (
-                      <Card key={municipe.id} className="cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden">
+                      <Card 
+                        key={municipe.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
+                          if (municipeCompleto) {
+                            setMunicipeParaDetalhes(municipeCompleto);
+                            setMunicipeDetalhesOpen(true);
+                          }
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-start gap-2">
                             <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
                               <Users className="h-4 w-4 text-green-600" />
                             </div>
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="font-medium text-sm truncate flex-1">{municipe.nome}</p>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 flex-shrink-0"
-                                  onClick={() => {
-                                    const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
-                                    if (municipeCompleto) {
-                                      setMunicipeParaDetalhes(municipeCompleto);
-                                      setMunicipeDetalhesOpen(true);
-                                    }
-                                  }}
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-2">{municipe.nome}</p>
                               {municipe.telefone && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                   <Phone className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate">{municipe.telefone}</span>
+                                  <span>{municipe.telefone}</span>
                                 </p>
                               )}
                               {municipe.bairro && (
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5">
                                   {municipe.bairro}
                                 </p>
                               )}
                               {municipe.tags && municipe.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
+                                <div className="flex flex-wrap gap-1 mt-1.5">
                                   {municipe.tags.slice(0, 2).map((tag: any) => (
                                     <Badge 
                                       key={tag.id} 
@@ -2168,6 +2151,7 @@ export default function MapaUnificado() {
                                 </div>
                               )}
                             </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
                         </CardContent>
                       </Card>
