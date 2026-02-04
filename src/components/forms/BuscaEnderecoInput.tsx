@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Navigation, MapPin, Loader2, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +15,8 @@ interface BuscaEnderecoInputProps {
   placeholder?: string;
   showGeolocation?: boolean;
   label?: string;
+  /** Coordenadas para priorizar resultados próximos (opcional) */
+  proximity?: { lat: number; lng: number } | null;
 }
 
 // Token do Mapbox (mesmo usado em useBrasilAPI.ts)
@@ -26,7 +27,8 @@ export function BuscaEnderecoInput({
   onChange,
   placeholder = "Digite um endereço...",
   showGeolocation = true,
-  label
+  label,
+  proximity
 }: BuscaEnderecoInputProps) {
   // Estados locais para controle do input
   const [inputValue, setInputValue] = useState('');
@@ -48,15 +50,22 @@ export function BuscaEnderecoInput({
 
     setIsSearching(true);
     try {
+      const params: Record<string, string> = {
+        access_token: MAPBOX_TOKEN,
+        country: 'br',
+        language: 'pt-BR',
+        limit: '8',
+        types: 'poi,address,place,locality,neighborhood'
+      };
+      
+      // Adicionar proximidade se fornecida (prioriza resultados próximos)
+      if (proximity) {
+        params.proximity = `${proximity.lng},${proximity.lat}`;
+      }
+      
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` + 
-        new URLSearchParams({
-          access_token: MAPBOX_TOKEN,
-          country: 'br',
-          language: 'pt-BR',
-          limit: '5',
-          types: 'address,place,locality,neighborhood,poi'
-        })
+        new URLSearchParams(params)
       );
       
       if (response.ok) {
@@ -70,7 +79,7 @@ export function BuscaEnderecoInput({
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [proximity]);
 
   // Handler de mudança do input com debounce
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,7 +202,7 @@ export function BuscaEnderecoInput({
           
           {/* Dropdown de resultados */}
           {showResults && (inputValue.length >= 3 || results.length > 0) && (
-            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg">
+            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg overflow-hidden">
               {isSearching ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -207,7 +216,7 @@ export function BuscaEnderecoInput({
                   }
                 </div>
               ) : (
-                <ScrollArea className="max-h-[200px]">
+                <div className="max-h-[280px] overflow-y-auto">
                   <div className="p-1">
                     {results.map((result, index) => (
                       <button
@@ -224,7 +233,7 @@ export function BuscaEnderecoInput({
                       </button>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               )}
             </div>
           )}
