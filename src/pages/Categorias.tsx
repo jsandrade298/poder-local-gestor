@@ -186,6 +186,7 @@ export default function Categorias() {
         description: "A nova categoria foi adicionada ao sistema."
       });
       queryClient.invalidateQueries({ queryKey: ['categorias-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-categorias-todas'] });
       setIsCreateDialogOpen(false);
       resetForm();
     },
@@ -220,6 +221,7 @@ export default function Categorias() {
         description: "As alterações foram salvas com sucesso."
       });
       queryClient.invalidateQueries({ queryKey: ['categorias-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-categorias-todas'] });
       setIsEditDialogOpen(false);
       setSelectedCategoria(null);
       resetForm();
@@ -256,7 +258,9 @@ export default function Categorias() {
         description: "A categoria foi removida do sistema."
       });
       queryClient.invalidateQueries({ queryKey: ['categorias-with-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-categorias-todas'] });
       queryClient.invalidateQueries({ queryKey: ['all-municipes-categorias'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-municipes-todos'] });
     },
     onError: (error) => {
       toast({
@@ -285,6 +289,7 @@ export default function Categorias() {
       queryClient.invalidateQueries({ queryKey: ['categorias-with-counts'] });
       queryClient.invalidateQueries({ queryKey: ['categoria-municipes', selectedCategoria?.id] });
       queryClient.invalidateQueries({ queryKey: ['all-municipes-categorias'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-municipes-todos'] });
       setSelectedMunicipes([]);
     },
     onError: (error) => {
@@ -314,6 +319,7 @@ export default function Categorias() {
       queryClient.invalidateQueries({ queryKey: ['categorias-with-counts'] });
       queryClient.invalidateQueries({ queryKey: ['categoria-municipes', selectedCategoria?.id] });
       queryClient.invalidateQueries({ queryKey: ['all-municipes-categorias'] });
+      queryClient.invalidateQueries({ queryKey: ['mapa-municipes-todos'] });
     },
     onError: (error) => {
       toast({
