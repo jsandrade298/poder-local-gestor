@@ -1310,7 +1310,7 @@ export default function MapaUnificado() {
                           />
                         </div>
 
-                        {/* Modo de Visualização (ATUALIZADO) */}
+                        {/* Modo de Visualização (ATUALIZADO LAYOUT DOS BOTÕES) */}
                         {modoVisualizacao !== 'padrao' && (
                         <div className="space-y-3">
                           <label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
@@ -1318,18 +1318,18 @@ export default function MapaUnificado() {
                           </label>
                           
                           <div className="grid grid-cols-2 gap-2">
-                            {/* 1. Taxa de Resolutividade (Substitui Atendimento) */}
+                            {/* 1. Taxa de Resolutividade */}
                             <Button
                               variant={modoVisualizacao === 'resolutividade' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-auto py-2 text-xs flex flex-col gap-1 items-start"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('resolutividade')}
                             >
                               <div className="flex items-center gap-1 font-semibold">
-                                <CheckCircle className="h-3.5 w-3.5" />
+                                <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
                                 Resolutividade
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal text-left leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight">
                                 Eficiência na resolução de demandas
                               </span>
                             </Button>
@@ -1338,31 +1338,31 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'votos' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-auto py-2 text-xs flex flex-col gap-1 items-start"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('votos')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
                               <div className="flex items-center gap-1 font-semibold">
-                                <Vote className="h-3.5 w-3.5" />
+                                <Vote className="h-3.5 w-3.5 flex-shrink-0" />
                                 Votos
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal text-left leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight">
                                 Densidade eleitoral histórica
                               </span>
                             </Button>
 
-                            {/* 3. Predominância Temática (Novo) */}
+                            {/* 3. Predominância Temática */}
                             <Button
                               variant={modoVisualizacao === 'predominancia' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-auto py-2 text-xs flex flex-col gap-1 items-start"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('predominancia')}
                             >
                               <div className="flex items-center gap-1 font-semibold">
-                                <PieChart className="h-3.5 w-3.5" />
+                                <PieChart className="h-3.5 w-3.5 flex-shrink-0" />
                                 DNA do Bairro
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal text-left leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight">
                                 Tema predominante (Saúde, Obras...)
                               </span>
                             </Button>
@@ -1371,15 +1371,15 @@ export default function MapaUnificado() {
                             <Button
                               variant={modoVisualizacao === 'comparativo' ? 'default' : 'outline'}
                               size="sm"
-                              className="h-auto py-2 text-xs flex flex-col gap-1 items-start"
+                              className="h-full py-2 px-3 text-xs flex flex-col gap-1 items-start justify-start whitespace-normal text-left"
                               onClick={() => setModoVisualizacao('comparativo')}
                               disabled={eleicoesDisponiveis.length === 0}
                             >
                               <div className="flex items-center gap-1 font-semibold">
-                                <TrendingUp className="h-3.5 w-3.5" />
+                                <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
                                 Oportunidade
                               </div>
-                              <span className="text-[10px] opacity-80 font-normal text-left leading-tight">
+                              <span className="text-[10px] opacity-80 font-normal leading-tight">
                                 Votos vs. Volume de Demandas
                               </span>
                             </Button>
