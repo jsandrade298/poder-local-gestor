@@ -1442,7 +1442,67 @@ export default function MapaUnificado() {
                                     <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
                                   )}
                                 </Button>
-                                {/* ... Outros botões de camada (cor, remover) ... */}
+                                
+                                {/* Popover de Cor e Opacidade */}
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                    >
+                                      <Palette className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64" align="end">
+                                    <div className="space-y-4">
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">Cor da camada</label>
+                                        <div className="grid grid-cols-8 gap-1">
+                                          {[
+                                            '#ef4444', '#f97316', '#f59e0b', '#eab308',
+                                            '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+                                            '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+                                            '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+                                            '#f43f5e', '#78716c', '#737373', '#525252',
+                                            '#404040', '#262626', '#171717', '#000000'
+                                          ].map(cor => (
+                                            <button
+                                              key={cor}
+                                              className={`w-6 h-6 rounded border-2 transition-all ${
+                                                camada.cor_padrao === cor 
+                                                  ? 'border-primary scale-110' 
+                                                  : 'border-transparent hover:scale-105'
+                                              }`}
+                                              style={{ backgroundColor: cor }}
+                                              onClick={() => atualizarCor.mutate({ id: camada.id, cor })}
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">
+                                          Opacidade: {Math.round((camada.opacidade || 0.5) * 100)}%
+                                        </label>
+                                        <Slider
+                                          value={[(camada.opacidade || 0.5) * 100]}
+                                          onValueChange={([value]) => {
+                                            atualizarOpacidade.mutate({ 
+                                              id: camada.id, 
+                                              opacidade: value / 100 
+                                            });
+                                          }}
+                                          max={100}
+                                          min={10}
+                                          step={5}
+                                          className="w-full"
+                                        />
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+
                                 <Button
                                   variant="ghost"
                                   size="icon"
