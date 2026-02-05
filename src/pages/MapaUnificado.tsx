@@ -232,32 +232,22 @@ export default function MapaUnificado() {
   // Estado de tela cheia
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Listener para mudanças no estado de fullscreen
+  // Função para toggle fullscreen (via CSS, não API nativa)
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
+
+  // Listener para tecla ESC sair do fullscreen
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // Função para toggle fullscreen
-  const toggleFullscreen = useCallback(() => {
-    const container = document.getElementById('mapa-container');
-    if (!container) return;
-
-    if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(err => {
-        console.warn('Erro ao entrar em tela cheia:', err);
-        toast.error('Não foi possível entrar em tela cheia');
-      });
-    } else {
-      document.exitFullscreen().catch(err => {
-        console.warn('Erro ao sair da tela cheia:', err);
-      });
-    }
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
   const municipesComTagsSelecionadas = useMemo(() => {
@@ -807,7 +797,14 @@ export default function MapaUnificado() {
   };
 
   return (
-    <div id="mapa-container" className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
+    <div 
+      id="mapa-container" 
+      className={`flex overflow-hidden bg-background transition-all duration-300 ${
+        isFullscreen 
+          ? 'fixed inset-0 z-40 h-screen' 
+          : 'h-[calc(100vh-4rem)]'
+      }`}
+    >
       {/* Sidebar Esquerda */}
       <div className={`border-r bg-background flex flex-col h-full overflow-hidden transition-all duration-300 ${
         sidebarMinimizada ? 'w-16' : 'w-80'
