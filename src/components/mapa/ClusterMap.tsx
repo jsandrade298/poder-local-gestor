@@ -339,6 +339,21 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     bearingRef.current = bearing;
   }, [bearing]);
 
+  // Calcular escala necessária para cobrir os cantos durante rotação
+  // Para 45° precisa de √2 ≈ 1.414, para 0° ou 90° precisa de 1
+  const calculateScale = useCallback((angle: number) => {
+    // Normalizar ângulo para 0-90
+    const normalizedAngle = angle % 90;
+    const effectiveAngle = normalizedAngle > 45 ? 90 - normalizedAngle : normalizedAngle;
+    
+    // Fator máximo de escala (√2 para 45°)
+    const maxScale = 1.42;
+    
+    // Interpolar baseado no ângulo (seno para curva suave)
+    const factor = Math.sin(effectiveAngle * Math.PI / 90);
+    return 1 + (factor * (maxScale - 1));
+  }, []);
+
   // Aplicar rotação preservando o transform existente do Leaflet
   const applyRotation = useCallback((newBearing: number) => {
     const container = map.getContainer();
@@ -348,17 +363,23 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     // Obter o transform atual (translate3d do Leaflet)
     const currentTransform = mapPane.style.transform || '';
     
-    // Remover qualquer rotate existente
-    const baseTransform = currentTransform.replace(/\s*rotate\([^)]*\)/g, '').trim();
+    // Remover qualquer rotate e scale existente
+    const baseTransform = currentTransform
+      .replace(/\s*rotate\([^)]*\)/g, '')
+      .replace(/\s*scale\([^)]*\)/g, '')
+      .trim();
     
-    // Aplicar novo transform com rotação
+    // Calcular escala para cobrir cantos
+    const scale = calculateScale(newBearing);
+    
+    // Aplicar novo transform com rotação e escala
     if (newBearing === 0) {
       mapPane.style.transform = baseTransform;
     } else {
-      mapPane.style.transform = `${baseTransform} rotate(${newBearing}deg)`;
+      mapPane.style.transform = `${baseTransform} rotate(${newBearing}deg) scale(${scale})`;
     }
     mapPane.style.transformOrigin = 'center center';
-  }, [map]);
+  }, [map, calculateScale]);
 
   // MutationObserver para reaplicar rotação quando Leaflet atualiza o transform
   useEffect(() => {
@@ -371,10 +392,13 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
       for (const mutation of mutations) {
         if (mutation.attributeName === 'style' && bearingRef.current !== 0) {
           const currentTransform = mapPane.style.transform || '';
-          // Se não tem rotate, adicionar
+          // Se não tem rotate, adicionar rotate e scale
           if (!currentTransform.includes('rotate')) {
-            const baseTransform = currentTransform.trim();
-            mapPane.style.transform = `${baseTransform} rotate(${bearingRef.current}deg)`;
+            const baseTransform = currentTransform
+              .replace(/\s*scale\([^)]*\)/g, '')
+              .trim();
+            const scale = calculateScale(bearingRef.current);
+            mapPane.style.transform = `${baseTransform} rotate(${bearingRef.current}deg) scale(${scale})`;
           }
         }
       }
@@ -388,7 +412,7 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     return () => {
       observerRef.current?.disconnect();
     };
-  }, [map]);
+  }, [map, calculateScale]);
 
   // Função para rotacionar
   const rotate = useCallback((direction: 'left' | 'right') => {
@@ -430,9 +454,12 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     const container = map.getContainer();
     const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
     if (mapPane) {
-      // Obter transform base sem rotate
+      // Obter transform base sem rotate e scale
       const currentTransform = mapPane.style.transform || '';
-      const baseTransform = currentTransform.replace(/\s*rotate\([^)]*\)/g, '').trim();
+      const baseTransform = currentTransform
+        .replace(/\s*rotate\([^)]*\)/g, '')
+        .replace(/\s*scale\([^)]*\)/g, '')
+        .trim();
       
       mapPane.style.transition = 'transform 0.3s ease-out';
       mapPane.style.transform = baseTransform;
