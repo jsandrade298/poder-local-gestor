@@ -232,22 +232,32 @@ export default function MapaUnificado() {
   // Estado de tela cheia
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Função para toggle fullscreen (via CSS, não API nativa)
-  const toggleFullscreen = useCallback(() => {
-    setIsFullscreen(prev => !prev);
-  }, []);
-
-  // Listener para tecla ESC sair do fullscreen
+  // Listener para mudanças no estado de fullscreen
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Função para toggle fullscreen
+  const toggleFullscreen = useCallback(() => {
+    const container = document.getElementById('mapa-container');
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(err => {
+        console.warn('Erro ao entrar em tela cheia:', err);
+        toast.error('Não foi possível entrar em tela cheia');
+      });
+    } else {
+      document.exitFullscreen().catch(err => {
+        console.warn('Erro ao sair da tela cheia:', err);
+      });
+    }
+  }, []);
 
   // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
   const municipesComTagsSelecionadas = useMemo(() => {
@@ -797,14 +807,7 @@ export default function MapaUnificado() {
   };
 
   return (
-    <div 
-      id="mapa-container" 
-      className={`flex overflow-hidden bg-background transition-all duration-300 ${
-        isFullscreen 
-          ? 'fixed inset-0 z-40 h-screen' 
-          : 'h-[calc(100vh-4rem)]'
-      }`}
-    >
+    <div id="mapa-container" className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
       {/* Sidebar Esquerda */}
       <div className={`border-r bg-background flex flex-col h-full overflow-hidden transition-all duration-300 ${
         sidebarMinimizada ? 'w-16' : 'w-80'
@@ -1451,35 +1454,28 @@ export default function MapaUnificado() {
                                       <Palette className="h-3.5 w-3.5" />
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-64" align="end">
+                                  <PopoverContent className="w-72" align="end">
                                     <div className="space-y-4">
-                                      <div>
-                                        <label className="text-sm font-medium mb-2 block">Cor da camada</label>
-                                        <div className="grid grid-cols-8 gap-1">
-                                          {[
-                                            '#ef4444', '#f97316', '#f59e0b', '#eab308',
-                                            '#84cc16', '#22c55e', '#10b981', '#14b8a6',
-                                            '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
-                                            '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-                                            '#f43f5e', '#78716c', '#737373', '#525252',
-                                            '#404040', '#262626', '#171717', '#000000'
-                                          ].map(cor => (
-                                            <button
-                                              key={cor}
-                                              className={`w-6 h-6 rounded border-2 transition-all ${
-                                                camada.cor_padrao === cor 
-                                                  ? 'border-primary scale-110' 
-                                                  : 'border-transparent hover:scale-105'
-                                              }`}
-                                              style={{ backgroundColor: cor }}
-                                              onClick={() => atualizarCor.mutate({ id: camada.id, cor })}
-                                            />
-                                          ))}
+                                      <div className="space-y-2">
+                                        <label className="text-sm font-medium">Cor da camada</label>
+                                        <div className="flex gap-2">
+                                          <input
+                                            type="color"
+                                            value={camada.cor_padrao}
+                                            onChange={(e) => atualizarCor.mutate({ id: camada.id, cor: e.target.value })}
+                                            className="w-12 h-9 p-1 cursor-pointer rounded border"
+                                          />
+                                          <Input
+                                            value={camada.cor_padrao}
+                                            onChange={(e) => atualizarCor.mutate({ id: camada.id, cor: e.target.value })}
+                                            placeholder="#3B82F6"
+                                            className="flex-1 font-mono text-sm"
+                                          />
                                         </div>
                                       </div>
                                       
-                                      <div>
-                                        <label className="text-sm font-medium mb-2 block">
+                                      <div className="space-y-2">
+                                        <label className="text-sm font-medium">
                                           Opacidade: {Math.round((camada.opacidade || 0.5) * 100)}%
                                         </label>
                                         <Slider
