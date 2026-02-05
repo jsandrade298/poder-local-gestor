@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DemandaMapa, MunicipeMapa, AreaMapa, CategoriaMapa } from '@/hooks/useMapaUnificado';
 import { Badge } from '@/components/ui/badge';
-import { Phone, MapPin, FileText, User, ExternalLink, Compass } from 'lucide-react';
+import { Phone, MapPin, FileText, User, ExternalLink } from 'lucide-react';
 import { GeoJSONLayer, ModoVisualizacao } from './GeoJSONLayer';
 import { CamadaGeografica } from '@/hooks/useCamadasGeograficas';
 
@@ -50,32 +50,6 @@ function loadHeatmapScript(): Promise<void> {
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Falha ao carregar leaflet.heat'));
-    document.head.appendChild(script);
-  });
-}
-
-// Função para carregar script do leaflet-rotate
-function loadRotateScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Verificar se já está carregado
-    if ((L.Map.prototype as any).setBearing) {
-      resolve();
-      return;
-    }
-
-    // Verificar se o script já existe
-    const existingScript = document.querySelector('script[src*="leaflet-rotate"]');
-    if (existingScript) {
-      existingScript.addEventListener('load', () => resolve());
-      return;
-    }
-
-    // Criar e carregar o script
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js';
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Falha ao carregar leaflet-rotate'));
     document.head.appendChild(script);
   });
 }
@@ -356,90 +330,59 @@ function HeatmapControl({
 function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: number) => void }) {
   const map = useMap();
   const [bearing, setBearing] = useState(0);
-  const [rotateEnabled, setRotateEnabled] = useState(false);
-  const isDragging = useRef(false);
-  const startAngle = useRef(0);
-  const startBearing = useRef(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const bearingRef = useRef(0); // Para manter valor atualizado no interval
 
-  // Carregar script de rotação e habilitar
+  // Sincronizar ref com state
   useEffect(() => {
-    loadRotateScript()
-      .then(() => {
-        setRotateEnabled(true);
-        console.log('✅ leaflet-rotate carregado');
-      })
-      .catch((err) => {
-        console.warn('⚠️ Rotação não disponível:', err);
-      });
+    bearingRef.current = bearing;
+  }, [bearing]);
+
+  // Aplicar rotação no mapa
+  const applyRotation = useCallback((newBearing: number) => {
+    const container = map.getContainer();
+    const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
+    if (mapPane) {
+      mapPane.style.transform = `rotate(${newBearing}deg)`;
+      mapPane.style.transformOrigin = 'center center';
+    }
+  }, [map]);
+
+  // Função para rotacionar
+  const rotate = useCallback((direction: 'left' | 'right') => {
+    const delta = direction === 'left' ? -1 : 1;
+    let newBearing = (bearingRef.current + delta) % 360;
+    if (newBearing < 0) newBearing += 360;
+    
+    setBearing(newBearing);
+    bearingRef.current = newBearing;
+    onBearingChange?.(newBearing);
+    applyRotation(newBearing);
+  }, [onBearingChange, applyRotation]);
+
+  // Iniciar rotação contínua (quando segura o botão)
+  const startContinuousRotation = useCallback((direction: 'left' | 'right') => {
+    // Rotaciona imediatamente
+    rotate(direction);
+    
+    // Depois continua rotacionando a cada 50ms
+    intervalRef.current = setInterval(() => {
+      rotate(direction);
+    }, 50);
+  }, [rotate]);
+
+  // Parar rotação contínua
+  const stopContinuousRotation = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
 
-  // Implementar rotação manual via Shift + arrastar
-  useEffect(() => {
-    if (!rotateEnabled) return;
-
-    const container = map.getContainer();
-    
-    const getAngleFromCenter = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      return Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    };
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.shiftKey) {
-        isDragging.current = true;
-        startAngle.current = getAngleFromCenter(e);
-        startBearing.current = bearing;
-        container.style.cursor = 'grabbing';
-        e.preventDefault();
-        
-        // Desabilitar arrastar do mapa durante rotação
-        map.dragging.disable();
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      
-      const currentAngle = getAngleFromCenter(e);
-      const angleDiff = currentAngle - startAngle.current;
-      let newBearing = (startBearing.current + angleDiff) % 360;
-      if (newBearing < 0) newBearing += 360;
-      
-      setBearing(newBearing);
-      onBearingChange?.(newBearing);
-      
-      // Aplicar rotação via CSS transform no container do mapa
-      const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
-      if (mapPane) {
-        mapPane.style.transform = `rotate(${newBearing}deg)`;
-        mapPane.style.transformOrigin = 'center center';
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false;
-        container.style.cursor = '';
-        map.dragging.enable();
-      }
-    };
-
-    container.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      container.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [map, bearing, rotateEnabled, onBearingChange]);
-
-  // Função para resetar a rotação
+  // Resetar rotação
   const resetBearing = useCallback(() => {
     setBearing(0);
+    bearingRef.current = 0;
     onBearingChange?.(0);
     
     const container = map.getContainer();
@@ -453,11 +396,29 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     }
   }, [map, onBearingChange]);
 
-  if (!rotateEnabled) return null;
+  // Cleanup ao desmontar
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  const buttonStyle: React.CSSProperties = {
+    width: '30px',
+    height: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  };
 
   return (
     <div 
-      className="leaflet-top leaflet-right" 
       style={{ 
         position: 'absolute', 
         top: '80px', 
@@ -465,22 +426,48 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
         zIndex: 1000 
       }}
     >
-      <div className="leaflet-control leaflet-bar">
+      <div 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'white',
+          borderRadius: '4px',
+          boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Botão Rotacionar Esquerda */}
+        <button
+          onMouseDown={() => startContinuousRotation('left')}
+          onMouseUp={stopContinuousRotation}
+          onMouseLeave={stopContinuousRotation}
+          onTouchStart={() => startContinuousRotation('left')}
+          onTouchEnd={stopContinuousRotation}
+          title="Rotacionar para esquerda (segure para contínuo)"
+          style={{
+            ...buttonStyle,
+            borderBottom: '1px solid #e5e5e5',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f4f4f4';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            stopContinuousRotation();
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12l7-7M5 12l7 7" transform="rotate(-90 12 12)" />
+          </svg>
+        </button>
+
+        {/* Bússola (resetar) */}
         <button
           onClick={resetBearing}
-          title={bearing !== 0 ? `Rotação: ${Math.round(bearing)}° - Clique para resetar` : 'Norte alinhado (Shift + arrastar para rotacionar)'}
+          title={bearing !== 0 ? `Rotação: ${Math.round(bearing)}° - Clique para resetar` : 'Norte alinhado'}
           style={{
-            width: '34px',
-            height: '34px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
-            transition: 'all 0.2s',
+            ...buttonStyle,
+            borderBottom: '1px solid #e5e5e5',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#f4f4f4';
@@ -491,18 +478,17 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
         >
           <svg 
             viewBox="0 0 24 24" 
-            width="20" 
-            height="20" 
+            width="18" 
+            height="18" 
             fill="none" 
             stroke="currentColor" 
-            strokeWidth="2"
+            strokeWidth="1.5"
             style={{ 
               transform: `rotate(${-bearing}deg)`,
               transition: 'transform 0.1s ease-out'
             }}
           >
-            {/* Bússola com seta para o norte */}
-            <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
+            <circle cx="12" cy="12" r="10" />
             <polygon 
               points="12,2 14,10 12,8 10,10" 
               fill="#ef4444" 
@@ -513,19 +499,33 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
               fill="#3b82f6" 
               stroke="#3b82f6"
             />
-            <text 
-              x="12" 
-              y="5" 
-              textAnchor="middle" 
-              fontSize="4" 
-              fill="#ef4444"
-              fontWeight="bold"
-            >
-              N
-            </text>
+          </svg>
+        </button>
+
+        {/* Botão Rotacionar Direita */}
+        <button
+          onMouseDown={() => startContinuousRotation('right')}
+          onMouseUp={stopContinuousRotation}
+          onMouseLeave={stopContinuousRotation}
+          onTouchStart={() => startContinuousRotation('right')}
+          onTouchEnd={stopContinuousRotation}
+          title="Rotacionar para direita (segure para contínuo)"
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f4f4f4';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            stopContinuousRotation();
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12l7-7M5 12l7 7" transform="rotate(90 12 12)" />
           </svg>
         </button>
       </div>
+
+      {/* Indicador de graus */}
       {bearing !== 0 && (
         <div 
           style={{
