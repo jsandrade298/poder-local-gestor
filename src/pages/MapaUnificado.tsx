@@ -51,7 +51,9 @@ import {
   Save,
   FolderOpen,
   PieChart,
-  TrendingUp
+  TrendingUp,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -226,6 +228,36 @@ export default function MapaUnificado() {
   // Estados para dados eleitorais e novos modos de visualização
   const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'resolutividade' | 'votos' | 'comparativo' | 'predominancia'>('padrao');
   const [eleicaoSelecionada, setEleicaoSelecionada] = useState<string | null>(null);
+
+  // Estado de tela cheia
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Listener para mudanças no estado de fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Função para toggle fullscreen
+  const toggleFullscreen = useCallback(() => {
+    const container = document.getElementById('mapa-container');
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(err => {
+        console.warn('Erro ao entrar em tela cheia:', err);
+        toast.error('Não foi possível entrar em tela cheia');
+      });
+    } else {
+      document.exitFullscreen().catch(err => {
+        console.warn('Erro ao sair da tela cheia:', err);
+      });
+    }
+  }, []);
 
   // IDs de munícipes que têm as tags selecionadas (para filtro cruzado)
   const municipesComTagsSelecionadas = useMemo(() => {
@@ -775,7 +807,7 @@ export default function MapaUnificado() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div id="mapa-container" className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
       {/* Sidebar Esquerda */}
       <div className={`border-r bg-background flex flex-col h-full overflow-hidden transition-all duration-300 ${
         sidebarMinimizada ? 'w-16' : 'w-80'
@@ -783,14 +815,29 @@ export default function MapaUnificado() {
         {sidebarMinimizada ? (
           // Versão Minimizada
           <div className="flex flex-col items-center py-4 gap-4 h-full">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => setSidebarMinimizada(false)}
-              className="hover:bg-accent"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => setSidebarMinimizada(false)}
+                className="hover:bg-accent"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={toggleFullscreen}
+                className="hover:bg-accent"
+                title={isFullscreen ? 'Sair da tela cheia (ESC)' : 'Tela cheia'}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
             <div className="flex flex-col items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               <span className="text-xs font-medium writing-mode-vertical">{totalNoMapa}</span>
@@ -846,14 +893,37 @@ export default function MapaUnificado() {
                   <MapPin className="h-5 w-5 text-primary" />
                   <h1 className="font-semibold text-lg">Gestão Territorial</h1>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => setSidebarMinimizada(true)}
-                  className="h-8 w-8"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={toggleFullscreen}
+                          className="h-8 w-8"
+                        >
+                          {isFullscreen ? (
+                            <Minimize2 className="h-4 w-4" />
+                          ) : (
+                            <Maximize2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isFullscreen ? 'Sair da tela cheia (ESC)' : 'Tela cheia'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => setSidebarMinimizada(true)}
+                    className="h-8 w-8"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <p className="text-sm text-muted-foreground">
                 {totalNoMapa} itens no mapa
