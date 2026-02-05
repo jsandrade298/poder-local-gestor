@@ -331,21 +331,63 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
   const map = useMap();
   const [bearing, setBearing] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const bearingRef = useRef(0); // Para manter valor atualizado no interval
+  const bearingRef = useRef(0);
+  const observerRef = useRef<MutationObserver | null>(null);
 
   // Sincronizar ref com state
   useEffect(() => {
     bearingRef.current = bearing;
   }, [bearing]);
 
-  // Aplicar rotação no mapa
+  // Aplicar rotação preservando o transform existente do Leaflet
   const applyRotation = useCallback((newBearing: number) => {
     const container = map.getContainer();
     const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
-    if (mapPane) {
-      mapPane.style.transform = `rotate(${newBearing}deg)`;
-      mapPane.style.transformOrigin = 'center center';
+    if (!mapPane) return;
+
+    // Obter o transform atual (translate3d do Leaflet)
+    const currentTransform = mapPane.style.transform || '';
+    
+    // Remover qualquer rotate existente
+    const baseTransform = currentTransform.replace(/\s*rotate\([^)]*\)/g, '').trim();
+    
+    // Aplicar novo transform com rotação
+    if (newBearing === 0) {
+      mapPane.style.transform = baseTransform;
+    } else {
+      mapPane.style.transform = `${baseTransform} rotate(${newBearing}deg)`;
     }
+    mapPane.style.transformOrigin = 'center center';
+  }, [map]);
+
+  // MutationObserver para reaplicar rotação quando Leaflet atualiza o transform
+  useEffect(() => {
+    const container = map.getContainer();
+    const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
+    if (!mapPane) return;
+
+    // Criar observer para monitorar mudanças no style
+    observerRef.current = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.attributeName === 'style' && bearingRef.current !== 0) {
+          const currentTransform = mapPane.style.transform || '';
+          // Se não tem rotate, adicionar
+          if (!currentTransform.includes('rotate')) {
+            const baseTransform = currentTransform.trim();
+            mapPane.style.transform = `${baseTransform} rotate(${bearingRef.current}deg)`;
+          }
+        }
+      }
+    });
+
+    observerRef.current.observe(mapPane, { 
+      attributes: true, 
+      attributeFilter: ['style'] 
+    });
+
+    return () => {
+      observerRef.current?.disconnect();
+    };
   }, [map]);
 
   // Função para rotacionar
@@ -388,8 +430,12 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     const container = map.getContainer();
     const mapPane = container.querySelector('.leaflet-map-pane') as HTMLElement;
     if (mapPane) {
+      // Obter transform base sem rotate
+      const currentTransform = mapPane.style.transform || '';
+      const baseTransform = currentTransform.replace(/\s*rotate\([^)]*\)/g, '').trim();
+      
       mapPane.style.transition = 'transform 0.3s ease-out';
-      mapPane.style.transform = 'rotate(0deg)';
+      mapPane.style.transform = baseTransform;
       setTimeout(() => {
         mapPane.style.transition = '';
       }, 300);
@@ -402,7 +448,14 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      observerRef.current?.disconnect();
     };
+  }, []);
+
+  // Handler para prevenir zoom no duplo clique
+  const preventZoom = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   }, []);
 
   const buttonStyle: React.CSSProperties = {
@@ -415,6 +468,7 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
     border: 'none',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
+    userSelect: 'none',
   };
 
   return (
@@ -425,6 +479,8 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
         right: '10px', 
         zIndex: 1000 
       }}
+      onDoubleClick={preventZoom}
+      onClick={preventZoom}
     >
       <div 
         style={{
@@ -438,11 +494,26 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
       >
         {/* Botão Rotacionar Esquerda */}
         <button
-          onMouseDown={() => startContinuousRotation('left')}
-          onMouseUp={stopContinuousRotation}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startContinuousRotation('left');
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            stopContinuousRotation();
+          }}
           onMouseLeave={stopContinuousRotation}
-          onTouchStart={() => startContinuousRotation('left')}
-          onTouchEnd={stopContinuousRotation}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            startContinuousRotation('left');
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            stopContinuousRotation();
+          }}
+          onDoubleClick={preventZoom}
           title="Rotacionar para esquerda (segure para contínuo)"
           style={{
             ...buttonStyle,
@@ -451,19 +522,20 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#f4f4f4';
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'white';
-            stopContinuousRotation();
-          }}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12l7-7M5 12l7 7" transform="rotate(-90 12 12)" />
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
 
         {/* Bússola (resetar) */}
         <button
-          onClick={resetBearing}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            resetBearing();
+          }}
+          onDoubleClick={preventZoom}
           title={bearing !== 0 ? `Rotação: ${Math.round(bearing)}° - Clique para resetar` : 'Norte alinhado'}
           style={{
             ...buttonStyle,
@@ -504,11 +576,26 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
 
         {/* Botão Rotacionar Direita */}
         <button
-          onMouseDown={() => startContinuousRotation('right')}
-          onMouseUp={stopContinuousRotation}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startContinuousRotation('right');
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            stopContinuousRotation();
+          }}
           onMouseLeave={stopContinuousRotation}
-          onTouchStart={() => startContinuousRotation('right')}
-          onTouchEnd={stopContinuousRotation}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            startContinuousRotation('right');
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            stopContinuousRotation();
+          }}
+          onDoubleClick={preventZoom}
           title="Rotacionar para direita (segure para contínuo)"
           style={buttonStyle}
           onMouseEnter={(e) => {
@@ -519,8 +606,8 @@ function RotationControl({ onBearingChange }: { onBearingChange?: (bearing: numb
             stopContinuousRotation();
           }}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12l7-7M5 12l7 7" transform="rotate(90 12 12)" />
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
       </div>
