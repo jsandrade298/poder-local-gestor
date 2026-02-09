@@ -1828,6 +1828,7 @@ export default function MapaUnificado() {
           demandas={tipoFiltro === 'municipes' || tipoFiltro === 'nenhum' ? [] : demandasFiltradas}
           municipes={tipoFiltro === 'demandas' || tipoFiltro === 'nenhum' ? [] : municipesFiltrados}
           areas={areas} // Passando áreas com cores para o mapa
+          categorias={categorias} // Passando categorias para os ícones de munícipes
           mostrarDemandas={tipoFiltro !== 'municipes' && tipoFiltro !== 'nenhum'}
           mostrarMunicipes={tipoFiltro !== 'demandas' && tipoFiltro !== 'nenhum'}
           heatmapVisible={heatmapVisible && tipoFiltro !== 'nenhum'}
