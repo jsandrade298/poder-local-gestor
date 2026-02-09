@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/hooks/useBrasilAPI";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export function NovaDemandaDialog() {
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "solicitada" as "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido",
+    status: "solicitada",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -44,6 +45,7 @@ export function NovaDemandaDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
+  const { statusList } = useDemandaStatus();
 
   const { data: municipes = [] } = useMunicipesSelect();
 
@@ -475,7 +477,7 @@ export function NovaDemandaDialog() {
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido") => 
+                  onValueChange={(value) => 
                     setFormData(prev => ({ ...prev, status: value }))
                   }
                 >
@@ -483,12 +485,17 @@ export function NovaDemandaDialog() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="em_producao">Em Produção</SelectItem>
-                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
-                    <SelectItem value="atendido">Atendido</SelectItem>
-                    <SelectItem value="devolvido">Devolvido</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: status.cor }}
+                          />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
