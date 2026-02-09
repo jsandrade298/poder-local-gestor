@@ -16,6 +16,9 @@ export interface RotaPonto {
   longitude: number;
   visitado?: boolean;
   observacao_visita?: string;
+  // Novos campos para agendamento
+  horario_agendado?: string; // Formato HH:MM
+  duracao_estimada?: number; // Em minutos (padrão: 30)
 }
 
 export interface Rota {
@@ -96,7 +99,9 @@ export function useRotas() {
             latitude,
             longitude,
             visitado,
-            observacao_visita
+            observacao_visita,
+            horario_agendado,
+            duracao_estimada
           )
         `)
         .order('data_programada', { ascending: true });
@@ -151,7 +156,9 @@ export function useRotas() {
           latitude,
           longitude,
           visitado,
-          observacao_visita
+          observacao_visita,
+          horario_agendado,
+          duracao_estimada
         )
       `)
       .eq('id', id)
@@ -217,7 +224,9 @@ export function useRotas() {
           nome: ponto.nome,
           endereco: ponto.endereco,
           latitude: ponto.latitude,
-          longitude: ponto.longitude
+          longitude: ponto.longitude,
+          horario_agendado: ponto.horario_agendado || null,
+          duracao_estimada: ponto.duracao_estimada || 30
         }));
 
         const { error: pontosError } = await supabase
@@ -281,7 +290,9 @@ export function useRotas() {
             latitude: ponto.latitude,
             longitude: ponto.longitude,
             visitado: ponto.visitado || false,
-            observacao_visita: ponto.observacao_visita
+            observacao_visita: ponto.observacao_visita,
+            horario_agendado: ponto.horario_agendado || null,
+            duracao_estimada: ponto.duracao_estimada || 30
           }));
 
           const { error: pontosError } = await supabase
@@ -422,7 +433,9 @@ export function useRotas() {
           nome: ponto.nome,
           endereco: ponto.endereco,
           latitude: ponto.latitude,
-          longitude: ponto.longitude
+          longitude: ponto.longitude,
+          horario_agendado: ponto.horario_agendado,
+          duracao_estimada: ponto.duracao_estimada || 30
         }));
 
         const { error: pontosError } = await supabase
@@ -465,6 +478,29 @@ export function useRotas() {
     }
   });
 
+  // Atualizar horário de um ponto específico
+  const atualizarHorarioPonto = useMutation({
+    mutationFn: async ({ pontoId, horario, duracao }: { pontoId: string; horario?: string; duracao?: number }) => {
+      const updateData: any = {};
+      if (horario !== undefined) updateData.horario_agendado = horario || null;
+      if (duracao !== undefined) updateData.duracao_estimada = duracao;
+
+      const { error } = await supabase
+        .from('rota_pontos')
+        .update(updateData)
+        .eq('id', pontoId);
+
+      if (error) throw error;
+      return { pontoId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rotas'] });
+    },
+    onError: (error: any) => {
+      toast.error('Erro ao atualizar horário: ' + error.message);
+    }
+  });
+
   // Filtrar rotas
   const rotasPendentes = rotas.filter(r => r.status === 'pendente');
   const rotasEmAndamento = rotas.filter(r => r.status === 'em_andamento');
@@ -490,6 +526,7 @@ export function useRotas() {
     cancelarRota,
     excluirRota,
     copiarRota,
-    marcarPontoVisitado
+    marcarPontoVisitado,
+    atualizarHorarioPonto
   };
 }
