@@ -1084,18 +1084,19 @@ export default function Demandas() {
       if (novosMunicipes.length > 0) {
         console.log('👥 Criando novos munícipes...');
         
-        const municipesArray = novosMunicipes.map(d => ({
-          nome: d.novoNome.trim(),
-          telefone: d.telefone || null,
-          email: d.email || null,
-          endereco: d.endereco || null,
-          numero: d.numero || null,
-          bairro: d.bairro || null,
-          cidade: d.cidade || null,
-          cep: d.cep || null,
-          data_nascimento: d.data_nascimento || null,
-          observacoes: d.observacoes || null
-        }));
+        const municipesArray = novosMunicipes.map(d => {
+          return {
+            nome: d.novoNome.trim(),
+            telefone: d.telefone || null,
+            email: d.email || null,
+            endereco: d.endereco || null,
+            bairro: d.bairro || null,
+            cidade: d.cidade || null,
+            cep: d.cep || null,
+            data_nascimento: d.data_nascimento || null,
+            observacoes: d.observacoes || null
+          };
+        });
         
         // Criar em lotes de 50
         const BATCH_SIZE = 50;
