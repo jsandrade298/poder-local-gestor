@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Popover,
@@ -49,7 +50,9 @@ import {
   ArrowRight,
   ArrowLeft,
   RotateCcw,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  ChevronUp
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,9 +61,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { format } from 'date-fns';
+import { format, parse, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Rota, useRotas } from '@/hooks/useRotas';
+import { Rota, RotaPonto, useRotas } from '@/hooks/useRotas';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +75,20 @@ interface GerenciarRotasModalProps {
   onOpenChange: (open: boolean) => void;
   onVisualizarRota?: (rota: Rota) => void;
   onConcluirRota?: (rota: Rota) => void;
+}
+
+// Interface para ponto com horário editável
+interface PontoEditavel {
+  id?: string;
+  ordem: number;
+  tipo: 'demanda' | 'municipe';
+  referencia_id: string;
+  nome: string;
+  endereco?: string;
+  latitude: number;
+  longitude: number;
+  horario_agendado?: string;
+  duracao_estimada?: number;
 }
 
 // Configuração dos status
@@ -139,12 +156,19 @@ export function GerenciarRotasModal({
   const [tituloCopia, setTituloCopia] = useState('');
   const [dataCopiaNova, setDataCopiaNova] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [pontosCopiados, setPontosCopiados] = useState<PontoEditavel[]>([]);
+  const [agendarHorariosCopia, setAgendarHorariosCopia] = useState(false);
+  const [horarioInicialCopia, setHorarioInicialCopia] = useState('09:00');
+  const [tempoDeslocamentoCopia, setTempoDeslocamentoCopia] = useState(15);
+  const [horariosExpandidosCopia, setHorariosExpandidosCopia] = useState(false);
   
   // Estados de edição
   const [tituloEdicao, setTituloEdicao] = useState('');
   const [dataEdicao, setDataEdicao] = useState<Date | undefined>(undefined);
   const [observacoesEdicao, setObservacoesEdicao] = useState('');
   const [calendarEdicaoOpen, setCalendarEdicaoOpen] = useState(false);
+  const [pontosEdicao, setPontosEdicao] = useState<PontoEditavel[]>([]);
+  const [horariosExpandidosEdicao, setHorariosExpandidosEdicao] = useState(false);
 
   // Reset filtro de usuário quando muda "apenas minhas"
   useEffect(() => {
@@ -159,6 +183,19 @@ export function GerenciarRotasModal({
       setTituloEdicao(rotaParaEditar.titulo);
       setDataEdicao(new Date(rotaParaEditar.data_programada + 'T00:00:00'));
       setObservacoesEdicao(rotaParaEditar.observacoes || '');
+      // Inicializar pontos para edição
+      setPontosEdicao(rotaParaEditar.rota_pontos?.map(p => ({
+        id: p.id,
+        ordem: p.ordem,
+        tipo: p.tipo,
+        referencia_id: p.referencia_id,
+        nome: p.nome,
+        endereco: p.endereco,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        horario_agendado: p.horario_agendado || '',
+        duracao_estimada: p.duracao_estimada || 30
+      })) || []);
     }
   }, [rotaParaEditar]);
 
@@ -167,8 +204,75 @@ export function GerenciarRotasModal({
     if (rotaParaCopiar) {
       setTituloCopia(`${rotaParaCopiar.titulo} (Cópia)`);
       setDataCopiaNova(undefined);
+      // Verificar se a rota original tem horários
+      const temHorarios = rotaParaCopiar.rota_pontos?.some(p => p.horario_agendado);
+      setAgendarHorariosCopia(!!temHorarios);
+      // Inicializar pontos para cópia
+      setPontosCopiados(rotaParaCopiar.rota_pontos?.map(p => ({
+        ordem: p.ordem,
+        tipo: p.tipo,
+        referencia_id: p.referencia_id,
+        nome: p.nome,
+        endereco: p.endereco,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        horario_agendado: p.horario_agendado || '',
+        duracao_estimada: p.duracao_estimada || 30
+      })) || []);
     }
   }, [rotaParaCopiar]);
+
+  // Recalcular horários para cópia
+  const recalcularHorariosCopia = () => {
+    if (!agendarHorariosCopia || pontosCopiados.length === 0) return;
+    
+    const novosHorarios = pontosCopiados.map((ponto, index) => {
+      let minutosAcumulados = 0;
+      for (let i = 0; i < index; i++) {
+        minutosAcumulados += (pontosCopiados[i].duracao_estimada || 30) + tempoDeslocamentoCopia;
+      }
+      
+      try {
+        const horaBase = parse(horarioInicialCopia, 'HH:mm', new Date());
+        const novaHora = addMinutes(horaBase, minutosAcumulados);
+        return { ...ponto, horario_agendado: format(novaHora, 'HH:mm') };
+      } catch {
+        return ponto;
+      }
+    });
+    
+    setPontosCopiados(novosHorarios);
+  };
+
+  // Atualizar horário de ponto na cópia
+  const atualizarHorarioPontoCopia = (index: number, horario: string) => {
+    const novos = [...pontosCopiados];
+    novos[index] = { ...novos[index], horario_agendado: horario };
+    setPontosCopiados(novos);
+  };
+
+  // Atualizar duração de ponto na cópia
+  const atualizarDuracaoPontoCopia = (index: number, duracao: number) => {
+    const novos = [...pontosCopiados];
+    novos[index] = { ...novos[index], duracao_estimada: duracao };
+    setPontosCopiados(novos);
+    // Recalcular próximos
+    setTimeout(() => recalcularHorariosCopia(), 0);
+  };
+
+  // Atualizar horário de ponto na edição
+  const atualizarHorarioPontoEdicao = (index: number, horario: string) => {
+    const novos = [...pontosEdicao];
+    novos[index] = { ...novos[index], horario_agendado: horario };
+    setPontosEdicao(novos);
+  };
+
+  // Atualizar duração de ponto na edição
+  const atualizarDuracaoPontoEdicao = (index: number, duracao: number) => {
+    const novos = [...pontosEdicao];
+    novos[index] = { ...novos[index], duracao_estimada: duracao };
+    setPontosEdicao(novos);
+  };
 
   // Contagem por status
   const contagemStatus = useMemo(() => {
@@ -238,374 +342,168 @@ export function GerenciarRotasModal({
         id: rota.id,
         status: novoStatus as any
       });
-      toast.success(`Status alterado para "${STATUS_CONFIG[novoStatus as keyof typeof STATUS_CONFIG].label}"`);
+      toast.success(`Status alterado para ${STATUS_CONFIG[novoStatus as keyof typeof STATUS_CONFIG]?.label}`);
     } catch (error) {
-      // Erro já tratado no hook
+      console.error('Erro ao mudar status:', error);
     }
   };
 
   const handleExcluirRota = async () => {
-    if (rotaParaExcluir) {
-      await excluirRota.mutateAsync(rotaParaExcluir.id);
-      setRotaParaExcluir(null);
-    }
+    if (!rotaParaExcluir) return;
+    await excluirRota.mutateAsync(rotaParaExcluir.id);
+    setRotaParaExcluir(null);
   };
 
   const handleCopiarRota = async () => {
-    if (rotaParaCopiar && dataCopiaNova && tituloCopia.trim()) {
-      try {
-        // Criar rota com título personalizado
-        const { data: novaRota, error: rotaError } = await supabase
-          .from('rotas')
-          .insert({
-            titulo: tituloCopia.trim(),
-            usuario_id: user!.id,
-            data_programada: format(dataCopiaNova, 'yyyy-MM-dd'),
-            origem_lat: rotaParaCopiar.origem_lat,
-            origem_lng: rotaParaCopiar.origem_lng,
-            destino_lat: rotaParaCopiar.destino_lat,
-            destino_lng: rotaParaCopiar.destino_lng,
-            otimizar: rotaParaCopiar.otimizar,
-            observacoes: rotaParaCopiar.observacoes
-          })
-          .select()
-          .single();
+    if (!rotaParaCopiar || !dataCopiaNova) return;
+    
+    try {
+      // Criar nova rota com título e data novos
+      const { data: novaRota, error: rotaError } = await supabase
+        .from('rotas')
+        .insert({
+          titulo: tituloCopia,
+          usuario_id: user?.id,
+          data_programada: format(dataCopiaNova, 'yyyy-MM-dd'),
+          origem_lat: rotaParaCopiar.origem_lat,
+          origem_lng: rotaParaCopiar.origem_lng,
+          destino_lat: rotaParaCopiar.destino_lat,
+          destino_lng: rotaParaCopiar.destino_lng,
+          otimizar: rotaParaCopiar.otimizar,
+          observacoes: rotaParaCopiar.observacoes
+        })
+        .select()
+        .single();
 
-        if (rotaError) throw rotaError;
+      if (rotaError) throw rotaError;
 
-        // Copiar pontos
-        if (rotaParaCopiar.rota_pontos && rotaParaCopiar.rota_pontos.length > 0) {
-          const pontosParaInserir = rotaParaCopiar.rota_pontos.map(ponto => ({
-            rota_id: novaRota.id,
-            ordem: ponto.ordem,
-            tipo: ponto.tipo,
-            referencia_id: ponto.referencia_id,
-            nome: ponto.nome,
-            endereco: ponto.endereco,
-            latitude: ponto.latitude,
-            longitude: ponto.longitude
-          }));
+      // Copiar os pontos com horários atualizados
+      if (pontosCopiados.length > 0) {
+        const pontosParaInserir = pontosCopiados.map(ponto => ({
+          rota_id: novaRota.id,
+          ordem: ponto.ordem,
+          tipo: ponto.tipo,
+          referencia_id: ponto.referencia_id,
+          nome: ponto.nome,
+          endereco: ponto.endereco,
+          latitude: ponto.latitude,
+          longitude: ponto.longitude,
+          horario_agendado: agendarHorariosCopia ? ponto.horario_agendado : null,
+          duracao_estimada: ponto.duracao_estimada || 30
+        }));
 
-          await supabase.from('rota_pontos').insert(pontosParaInserir);
-        }
+        const { error: pontosError } = await supabase
+          .from('rota_pontos')
+          .insert(pontosParaInserir);
 
-        toast.success('Rota copiada com sucesso!');
-        setRotaParaCopiar(null);
-        setTituloCopia('');
-        setDataCopiaNova(undefined);
-        refetch(); // Recarregar lista de rotas
-      } catch (error: any) {
-        toast.error('Erro ao copiar rota: ' + error.message);
+        if (pontosError) throw pontosError;
       }
+
+      toast.success('Rota copiada com sucesso!');
+      refetch();
+      setRotaParaCopiar(null);
+      setTituloCopia('');
+      setDataCopiaNova(undefined);
+      setPontosCopiados([]);
+    } catch (error: any) {
+      toast.error('Erro ao copiar rota: ' + error.message);
     }
   };
 
   const handleSalvarEdicao = async () => {
-    if (rotaParaEditar && tituloEdicao.trim() && dataEdicao) {
-      try {
-        await atualizarRota.mutateAsync({
-          id: rotaParaEditar.id,
-          titulo: tituloEdicao.trim(),
-          data_programada: format(dataEdicao, 'yyyy-MM-dd'),
-          observacoes: observacoesEdicao || undefined
-        });
-        setRotaParaEditar(null);
-      } catch (error) {
-        // Erro já tratado no hook
-      }
-    }
+    if (!rotaParaEditar || !dataEdicao) return;
+    
+    // Preparar pontos com horários
+    const pontosParaSalvar = pontosEdicao.map(p => ({
+      ordem: p.ordem,
+      tipo: p.tipo,
+      referencia_id: p.referencia_id,
+      nome: p.nome,
+      endereco: p.endereco,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      horario_agendado: p.horario_agendado || undefined,
+      duracao_estimada: p.duracao_estimada || 30
+    }));
+    
+    await atualizarRota.mutateAsync({
+      id: rotaParaEditar.id,
+      titulo: tituloEdicao,
+      data_programada: format(dataEdicao, 'yyyy-MM-dd'),
+      observacoes: observacoesEdicao,
+      pontos: pontosParaSalvar
+    });
+    setRotaParaEditar(null);
   };
 
+  // Abrir no Google Maps
   const abrirGoogleMaps = (rota: Rota) => {
-    if (!rota.rota_pontos || rota.rota_pontos.length === 0) return;
+    if (!rota.rota_pontos || rota.rota_pontos.length === 0) {
+      toast.error('Esta rota não possui pontos');
+      return;
+    }
 
-    const waypoints = rota.rota_pontos.map(p => `${p.latitude},${p.longitude}`);
-
-    let url = 'https://www.google.com/maps/dir/';
+    const pontos = rota.rota_pontos.sort((a, b) => a.ordem - b.ordem);
+    const waypoints = pontos.map(p => `${p.latitude},${p.longitude}`).join('/');
     
-    if (rota.origem_lat && rota.origem_lng) {
-      url += `${rota.origem_lat},${rota.origem_lng}/`;
+    // Formato: origin/destination ou origin/waypoint1/waypoint2/.../destination
+    const origem = rota.origem_lat && rota.origem_lng 
+      ? `${rota.origem_lat},${rota.origem_lng}` 
+      : `${pontos[0].latitude},${pontos[0].longitude}`;
+    
+    const destino = rota.destino_lat && rota.destino_lng
+      ? `${rota.destino_lat},${rota.destino_lng}`
+      : `${pontos[pontos.length - 1].latitude},${pontos[pontos.length - 1].longitude}`;
+
+    let url = `https://www.google.com/maps/dir/${origem}`;
+    
+    // Adicionar waypoints intermediários
+    if (pontos.length > 1) {
+      pontos.forEach(p => {
+        url += `/${p.latitude},${p.longitude}`;
+      });
     }
     
-    url += waypoints.join('/');
-    
-    if (rota.destino_lat && rota.destino_lng) {
-      url += `/${rota.destino_lat},${rota.destino_lng}`;
+    if (destino !== `${pontos[pontos.length - 1].latitude},${pontos[pontos.length - 1].longitude}`) {
+      url += `/${destino}`;
     }
-    
+
     window.open(url, '_blank');
   };
 
-  // Função para fechar e limpar estados
-  const handleClose = (isOpen: boolean) => {
-    if (!isOpen) {
-      // Limpar estados internos ao fechar
-      setRotaParaExcluir(null);
-      setRotaParaCopiar(null);
-      setRotaParaEditar(null);
-      setRotaDetalhes(null);
-      setTituloCopia('');
-      setDataCopiaNova(undefined);
+  // Formatar data
+  const formatarData = (dataStr: string) => {
+    try {
+      const data = new Date(dataStr + 'T00:00:00');
+      return format(data, "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return dataStr;
     }
-    onOpenChange(isOpen);
   };
 
-  const handleVisualizarRota = (rota: Rota) => {
-    // Salvar dados da rota antes de fechar
-    const rotaParaVisualizar = { ...rota };
-    
-    // Limpar estados internos primeiro
-    setRotaParaExcluir(null);
-    setRotaParaCopiar(null);
-    setRotaParaEditar(null);
-    setRotaDetalhes(null);
-    setTituloCopia('');
-    setDataCopiaNova(undefined);
-    
-    // Fechar modal
-    onOpenChange(false);
-    
-    // Forçar limpeza de estilos
-    setTimeout(() => {
-      document.body.style.pointerEvents = '';
-      document.body.style.overflow = '';
+  // Formatar data relativa
+  const formatarDataRelativa = (dataStr: string) => {
+    try {
+      const data = new Date(dataStr + 'T00:00:00');
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diffDias = Math.ceil((data.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
       
-      onVisualizarRota?.(rotaParaVisualizar);
-    }, 300);
-  };
-
-  const handleConcluirRota = (rota: Rota) => {
-    const rotaParaConcluir = { ...rota };
-    
-    // Limpar estados internos primeiro
-    setRotaParaExcluir(null);
-    setRotaParaCopiar(null);
-    setRotaParaEditar(null);
-    setRotaDetalhes(null);
-    setTituloCopia('');
-    setDataCopiaNova(undefined);
-    
-    // Fechar modal
-    onOpenChange(false);
-    
-    // Forçar limpeza de estilos
-    setTimeout(() => {
-      document.body.style.pointerEvents = '';
-      document.body.style.overflow = '';
+      if (diffDias === 0) return 'Hoje';
+      if (diffDias === 1) return 'Amanhã';
+      if (diffDias === -1) return 'Ontem';
+      if (diffDias > 0 && diffDias <= 7) return `Em ${diffDias} dias`;
+      if (diffDias < 0 && diffDias >= -7) return `Há ${Math.abs(diffDias)} dias`;
       
-      onConcluirRota?.(rotaParaConcluir);
-    }, 300);
-  };
-
-  const renderRotaCard = (rota: Rota) => {
-    const isOwner = rota.usuario_id === user?.id;
-    const pontosCount = rota.rota_pontos?.length || 0;
-    const demandasCount = rota.rota_pontos?.filter(p => p.tipo === 'demanda').length || 0;
-    const municipesCount = rota.rota_pontos?.filter(p => p.tipo === 'municipe').length || 0;
-    const dataProgramada = new Date(rota.data_programada + 'T00:00:00');
-    const isHoje = format(dataProgramada, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-    const isPast = dataProgramada < new Date(new Date().setHours(0, 0, 0, 0)) && rota.status === 'pendente';
-    const statusConfig = STATUS_CONFIG[rota.status as keyof typeof STATUS_CONFIG];
-    const transicoesPossiveis = STATUS_TRANSITIONS[rota.status as keyof typeof STATUS_TRANSITIONS];
-
-    return (
-      <Card key={rota.id} className={cn(
-        "transition-all hover:shadow-md",
-        isPast && "border-red-200 bg-red-50/50",
-        isHoje && rota.status === 'pendente' && "border-blue-200 bg-blue-50/50"
-      )}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            {/* Info Principal */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h4 className="font-semibold truncate">{rota.titulo}</h4>
-                <Badge variant="outline" className={cn("text-xs", statusConfig.bgClass)}>
-                  {statusConfig.label}
-                </Badge>
-                {isOwner && (
-                  <Badge variant="secondary" className="text-xs">Minha</Badge>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <CalendarIcon className="h-3 w-3" />
-                  {format(dataProgramada, "dd/MM/yyyy (EEE)", { locale: ptBR })}
-                </span>
-                {isHoje && <Badge className="text-xs bg-blue-500">Hoje</Badge>}
-                {isPast && <Badge variant="destructive" className="text-xs">Atrasada</Badge>}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-                {!apenasMinhas && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {rota.usuario_nome || 'Usuário'}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {pontosCount} pontos
-                </span>
-                {demandasCount > 0 && (
-                  <span className="flex items-center gap-1 text-red-600">
-                    <FileText className="h-3 w-3" />
-                    {demandasCount}
-                  </span>
-                )}
-                {municipesCount > 0 && (
-                  <span className="flex items-center gap-1 text-purple-600">
-                    <Users className="h-3 w-3" />
-                    {municipesCount}
-                  </span>
-                )}
-              </div>
-
-              {rota.observacoes && (
-                <p className="text-xs text-muted-foreground mt-2 line-clamp-1 italic">
-                  "{rota.observacoes}"
-                </p>
-              )}
-
-              {/* Info de conclusão */}
-              {rota.status === 'concluida' && rota.concluida_em && (
-                <div className="mt-2 pt-2 border-t text-xs text-green-600">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    Concluída em {format(new Date(rota.concluida_em), "dd/MM 'às' HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Ações */}
-            <div className="flex flex-col gap-1">
-              {/* Botões de mudança de status */}
-              {isOwner && transicoesPossiveis.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="text-xs">
-                      {rota.status === 'pendente' && <Play className="h-3 w-3 mr-1" />}
-                      {rota.status === 'em_andamento' && <ArrowRight className="h-3 w-3 mr-1" />}
-                      {rota.status === 'cancelada' && <RotateCcw className="h-3 w-3 mr-1" />}
-                      Status
-                      <ChevronDown className="h-3 w-3 ml-1" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {rota.status === 'pendente' && (
-                      <DropdownMenuItem onClick={() => handleMudarStatus(rota, 'em_andamento')}>
-                        <Play className="h-4 w-4 mr-2 text-blue-500" />
-                        Iniciar Rota
-                      </DropdownMenuItem>
-                    )}
-                    {rota.status === 'em_andamento' && (
-                      <>
-                        <DropdownMenuItem onClick={(e) => {
-                          e.preventDefault();
-                          handleConcluirRota(rota);
-                        }}>
-                          <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                          Concluir Rota
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleMudarStatus(rota, 'pendente')}>
-                          <ArrowLeft className="h-4 w-4 mr-2 text-yellow-500" />
-                          Voltar para Pendente
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {rota.status === 'cancelada' && (
-                      <DropdownMenuItem onClick={() => handleMudarStatus(rota, 'pendente')}>
-                        <RotateCcw className="h-4 w-4 mr-2 text-yellow-500" />
-                        Reativar Rota
-                      </DropdownMenuItem>
-                    )}
-                    {transicoesPossiveis.includes('cancelada') && rota.status !== 'cancelada' && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleMudarStatus(rota, 'cancelada')}
-                          className="text-orange-600"
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Cancelar Rota
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Botão Maps */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs"
-                onClick={() => abrirGoogleMaps(rota)}
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Maps
-              </Button>
-
-              {/* Menu de mais opções */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => {
-                    e.preventDefault();
-                    handleVisualizarRota(rota);
-                  }}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Visualizar no Mapa
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem onClick={() => setRotaDetalhes(rota)}>
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Ver Detalhes
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem onClick={() => setRotaParaCopiar(rota)}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copiar / Refazer
-                  </DropdownMenuItem>
-
-                  {isOwner && rota.status !== 'concluida' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      
-                      <DropdownMenuItem onClick={() => setRotaParaEditar(rota)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar Rota
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem 
-                        onClick={() => setRotaParaExcluir(rota)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir Rota
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+      return format(data, "dd 'de' MMMM", { locale: ptBR });
+    } catch {
+      return dataStr;
+    }
   };
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -613,190 +511,280 @@ export function GerenciarRotasModal({
               Gerenciar Rotas
             </DialogTitle>
             <DialogDescription>
-              Visualize, edite e gerencie todas as rotas de visitas
+              Visualize, edite e gerencie suas rotas de visitas
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col flex-1 min-h-0 gap-4">
-            {/* Barra de Busca */}
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por título ou observação..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Filtros */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Apenas minhas rotas */}
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="modal-apenas-minhas"
+          {/* Filtros */}
+          <div className="flex flex-col gap-3 pb-4 border-b">
+            {/* Busca e Filtros */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar rotas..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 border rounded-md bg-muted/30">
+                <Checkbox
+                  id="apenas-minhas"
                   checked={apenasMinhas}
                   onCheckedChange={(checked) => setApenasMinhas(!!checked)}
                 />
-                <label 
-                  htmlFor="modal-apenas-minhas"
-                  className="text-sm cursor-pointer font-medium"
-                >
-                  Apenas minhas rotas
+                <label htmlFor="apenas-minhas" className="text-sm whitespace-nowrap cursor-pointer">
+                  Apenas minhas
                 </label>
               </div>
 
-              {/* Seletor de usuário */}
               {!apenasMinhas && (
                 <Select value={usuarioSelecionado} onValueChange={setUsuarioSelecionado}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Todos os usuários" />
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por usuário" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_todos">Todos os usuários</SelectItem>
-                    {usuarios.map(u => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.nome}
-                      </SelectItem>
+                    {usuarios.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
 
-              <Separator orientation="vertical" className="h-6" />
+              <Button variant="outline" size="icon" onClick={() => refetch()}>
+                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+              </Button>
+            </div>
 
-              {/* Filtros de Status */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                  <div key={value} className="flex items-center space-x-1">
-                    <Checkbox 
-                      id={`modal-status-${value}`}
-                      checked={statusFiltro.includes(value)}
-                      onCheckedChange={() => toggleStatus(value)}
-                    />
-                    <label 
-                      htmlFor={`modal-status-${value}`}
-                      className="flex items-center gap-1 text-xs cursor-pointer"
-                    >
-                      <div 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ backgroundColor: config.cor }}
-                      />
-                      {config.label}
-                      <span className="text-muted-foreground">
-                        ({contagemStatus[value] || 0})
-                      </span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              {/* Limpar filtros */}
-              {(statusFiltro.length < 4 || busca) && (
-                <Button 
-                  variant="ghost" 
+            {/* Filtros de Status */}
+            <div className="flex gap-2">
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+                const count = contagemStatus[key] || 0;
+                const isSelected = statusFiltro.includes(key);
+                return (
+                  <Button
+                    key={key}
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "gap-1.5",
+                      isSelected && config.bgClass
+                    )}
+                    onClick={() => toggleStatus(key)}
+                  >
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      !isSelected && "opacity-60"
+                    )} style={{ backgroundColor: config.cor }} />
+                    {config.label}
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                      {count}
+                    </Badge>
+                  </Button>
+                );
+              })}
+              
+              {statusFiltro.length > 0 && (
+                <Button
+                  variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setStatusFiltro(['pendente', 'em_andamento', 'concluida', 'cancelada']);
-                    setBusca('');
-                  }}
-                  className="text-xs h-7"
+                  onClick={() => setStatusFiltro([])}
+                  className="text-muted-foreground"
                 >
-                  Mostrar todas
+                  Limpar filtros
                 </Button>
               )}
             </div>
-
-            {/* Lista de Rotas */}
-            <div className="flex-1 min-h-0">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin mb-3" />
-                  <span className="text-muted-foreground">Carregando rotas...</span>
-                </div>
-              ) : error ? (
-                <div className="text-center py-12 text-red-500">
-                  <p>Erro ao carregar rotas</p>
-                  <p className="text-sm mt-1">{(error as Error).message}</p>
-                </div>
-              ) : rotasFiltradas.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Route className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma rota encontrada</p>
-                  <p className="text-sm mt-1">Ajuste os filtros ou crie uma nova rota</p>
-                </div>
-              ) : (
-                <ScrollArea className="h-[400px] pr-4">
-                  <div className="space-y-3">
-                    {rotasFiltradas.map(renderRotaCard)}
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
-
-            {/* Footer com contagem */}
-            <div className="text-xs text-muted-foreground text-center pt-2 border-t">
-              Mostrando {rotasFiltradas.length} de {rotas.length} rotas
-            </div>
           </div>
+
+          {/* Lista de Rotas */}
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : rotasFiltradas.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Route className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p>Nenhuma rota encontrada</p>
+                <p className="text-sm">Tente ajustar os filtros</p>
+              </div>
+            ) : (
+              <div className="space-y-3 py-4">
+                {rotasFiltradas.map((rota) => {
+                  const statusConfig = STATUS_CONFIG[rota.status as keyof typeof STATUS_CONFIG];
+                  const transicoesPossiveis = STATUS_TRANSITIONS[rota.status as keyof typeof STATUS_TRANSITIONS] || [];
+                  const temHorarios = rota.rota_pontos?.some(p => p.horario_agendado);
+                  
+                  return (
+                    <Card key={rota.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium truncate">{rota.titulo}</h3>
+                              <Badge variant="outline" className={cn("text-xs shrink-0", statusConfig?.bgClass)}>
+                                {statusConfig?.label}
+                              </Badge>
+                              {temHorarios && (
+                                <Badge variant="secondary" className="text-xs shrink-0 bg-blue-100 text-blue-700">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Agendada
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <CalendarIcon className="h-3.5 w-3.5" />
+                                {formatarDataRelativa(rota.data_programada)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {rota.rota_pontos?.length || 0} pontos
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <User className="h-3.5 w-3.5" />
+                                {rota.usuario_nome}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Botões de ação rápida baseados no status */}
+                            {rota.status === 'pendente' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => handleMudarStatus(rota, 'em_andamento')}
+                              >
+                                <Play className="h-3.5 w-3.5" />
+                                Iniciar
+                              </Button>
+                            )}
+                            
+                            {rota.status === 'em_andamento' && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="gap-1 bg-green-600 hover:bg-green-700"
+                                onClick={() => onConcluirRota?.(rota)}
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Concluir
+                              </Button>
+                            )}
+
+                            {/* Menu de mais opções */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setRotaDetalhes(rota)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Ver detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => abrirGoogleMaps(rota)}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Abrir no Google Maps
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator />
+                                
+                                {rota.status !== 'concluida' && (
+                                  <DropdownMenuItem onClick={() => setRotaParaEditar(rota)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                )}
+                                
+                                <DropdownMenuItem onClick={() => setRotaParaCopiar(rota)}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copiar / Refazer
+                                </DropdownMenuItem>
+
+                                {transicoesPossiveis.length > 0 && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    {transicoesPossiveis.map(status => (
+                                      <DropdownMenuItem 
+                                        key={status}
+                                        onClick={() => handleMudarStatus(rota, status)}
+                                      >
+                                        {status === 'cancelada' && <XCircle className="h-4 w-4 mr-2" />}
+                                        {status === 'pendente' && <RotateCcw className="h-4 w-4 mr-2" />}
+                                        {status === 'em_andamento' && <Play className="h-4 w-4 mr-2" />}
+                                        {status === 'concluida' && <CheckCircle className="h-4 w-4 mr-2" />}
+                                        {STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.label}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </>
+                                )}
+
+                                <DropdownMenuSeparator />
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => setRotaParaExcluir(rota)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
       {/* Modal de Detalhes da Rota */}
       <Dialog open={!!rotaDetalhes} onOpenChange={() => setRotaDetalhes(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader className="pb-2 border-b">
-            <DialogTitle className="flex items-center justify-between">
-              <span>Detalhes da Rota</span>
-              {rotaDetalhes && (
-                <Badge 
-                  variant="outline" 
-                  className={cn(
-                    STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.bgClass
-                  )}
-                >
-                  {STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.label}
-                </Badge>
-              )}
-            </DialogTitle>
-            {rotaDetalhes && (
-                <DialogDescription>
-                    Criado por {rotaDetalhes.usuario_nome || 'Usuário'}
-                </DialogDescription>
-            )}
-          </DialogHeader>
-          
+        <DialogContent className="max-w-lg">
           {rotaDetalhes && (
-            <div className="space-y-6 py-2">
-              {/* Cabeçalho da Rota */}
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-3 rounded-full">
-                    <Route className="h-6 w-6 text-primary" />
-                </div>
-                <div className="space-y-1">
-                    <h4 className="font-semibold text-lg leading-none">{rotaDetalhes.titulo}</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        <span>{format(new Date(rotaDetalhes.data_programada + 'T00:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
-                    </div>
-                </div>
-              </div>
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Route className="h-5 w-5" />
+                  {rotaDetalhes.titulo}
+                </DialogTitle>
+                <DialogDescription className="flex items-center gap-3 pt-1">
+                  <Badge variant="outline" className={STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.bgClass}>
+                    {STATUS_CONFIG[rotaDetalhes.status as keyof typeof STATUS_CONFIG]?.label}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    {formatarData(rotaDetalhes.data_programada)}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
 
-              {/* Estatísticas Rápidas */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-muted/50 p-2 rounded-md text-center border">
-                    <span className="block text-xl font-bold">{rotaDetalhes.rota_pontos?.length || 0}</span>
-                    <span className="text-xs text-muted-foreground uppercase font-medium">Pontos</span>
+              {/* Estatísticas */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <span className="text-2xl font-bold">{rotaDetalhes.rota_pontos?.length || 0}</span>
+                    <span className="text-xs text-muted-foreground block">Total de Paradas</span>
                 </div>
-                <div className="bg-red-50 p-2 rounded-md text-center border border-red-100">
-                    <span className="block text-xl font-bold text-red-600">
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <span className="text-2xl font-bold text-red-700">
                         {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'demanda').length || 0}
                     </span>
                     <span className="text-xs text-red-600/80 uppercase font-medium">Demandas</span>
                 </div>
-                <div className="bg-purple-50 p-2 rounded-md text-center border border-purple-100">
-                    <span className="block text-xl font-bold text-purple-600">
+                <div className="bg-purple-50 rounded-lg p-3 text-center">
+                    <span className="text-2xl font-bold text-purple-700">
                         {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'municipe').length || 0}
                     </span>
                     <span className="text-xs text-purple-600/80 uppercase font-medium">Munícipes</span>
@@ -834,17 +822,30 @@ export function GerenciarRotasModal({
                         {/* Conteúdo */}
                         <div className="flex-1 bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex items-start justify-between gap-2">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
+                                <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <span className="font-medium text-sm">{ponto.nome}</span>
                                         <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
                                             {ponto.tipo === 'demanda' ? 'Demanda' : 'Munícipe'}
                                         </Badge>
+                                        {/* Mostrar horário agendado */}
+                                        {ponto.horario_agendado && (
+                                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 border-blue-200 text-blue-700">
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            {ponto.horario_agendado}
+                                          </Badge>
+                                        )}
                                     </div>
                                     {ponto.endereco && (
                                         <p className="text-xs text-muted-foreground line-clamp-2">
                                             {ponto.endereco}
                                         </p>
+                                    )}
+                                    {/* Mostrar duração estimada */}
+                                    {ponto.duracao_estimada && ponto.duracao_estimada !== 30 && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Duração: {ponto.duracao_estimada} min
+                                      </p>
                                     )}
                                 </div>
                                 {ponto.tipo === 'demanda' ? (
@@ -889,7 +890,7 @@ export function GerenciarRotasModal({
 
       {/* Modal de Edição */}
       <Dialog open={!!rotaParaEditar} onOpenChange={() => setRotaParaEditar(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="h-5 w-5" />
@@ -897,58 +898,118 @@ export function GerenciarRotasModal({
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="titulo-edicao">Título</Label>
-              <Input
-                id="titulo-edicao"
-                value={tituloEdicao}
-                onChange={(e) => setTituloEdicao(e.target.value)}
-              />
-            </div>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="titulo-edicao">Título</Label>
+                <Input
+                  id="titulo-edicao"
+                  value={tituloEdicao}
+                  onChange={(e) => setTituloEdicao(e.target.value)}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Data Programada</Label>
-              <Popover open={calendarEdicaoOpen} onOpenChange={setCalendarEdicaoOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataEdicao && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataEdicao 
-                      ? format(dataEdicao, "PPP", { locale: ptBR })
-                      : "Selecione a data"
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataEdicao}
-                    onSelect={(date) => {
-                      setDataEdicao(date);
-                      setCalendarEdicaoOpen(false);
-                    }}
-                    locale={ptBR}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+              <div className="space-y-2">
+                <Label>Data Programada</Label>
+                <Popover open={calendarEdicaoOpen} onOpenChange={setCalendarEdicaoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dataEdicao && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataEdicao 
+                        ? format(dataEdicao, "PPP", { locale: ptBR })
+                        : "Selecione a data"
+                      }
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataEdicao}
+                      onSelect={(date) => {
+                        setDataEdicao(date);
+                        setCalendarEdicaoOpen(false);
+                      }}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="obs-edicao">Observações</Label>
-              <Textarea
-                id="obs-edicao"
-                value={observacoesEdicao}
-                onChange={(e) => setObservacoesEdicao(e.target.value)}
-                rows={3}
-              />
+              {/* Horários dos Pontos */}
+              {pontosEdicao.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Horários das Visitas ({pontosEdicao.length} pontos)
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setHorariosExpandidosEdicao(!horariosExpandidosEdicao)}
+                    >
+                      {horariosExpandidosEdicao ? (
+                        <><ChevronUp className="h-4 w-4 mr-1" /> Ocultar</>
+                      ) : (
+                        <><ChevronDown className="h-4 w-4 mr-1" /> Expandir</>
+                      )}
+                    </Button>
+                  </div>
+
+                  {horariosExpandidosEdicao && (
+                    <ScrollArea className="h-48 rounded-md border p-2">
+                      <div className="space-y-2">
+                        {pontosEdicao.map((ponto, index) => (
+                          <div key={index} className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50">
+                            <Badge variant="outline" className="w-6 h-6 p-0 flex items-center justify-center text-xs shrink-0">
+                              {index + 1}
+                            </Badge>
+                            {ponto.tipo === 'demanda' ? (
+                              <FileText className="h-3 w-3 text-red-500 shrink-0" />
+                            ) : (
+                              <Users className="h-3 w-3 text-purple-500 shrink-0" />
+                            )}
+                            <span className="truncate flex-1">{ponto.nome}</span>
+                            <Input
+                              type="time"
+                              value={ponto.horario_agendado || ''}
+                              onChange={(e) => atualizarHorarioPontoEdicao(index, e.target.value)}
+                              className="w-24 h-7 text-xs"
+                            />
+                            <Input
+                              type="number"
+                              min={5}
+                              max={180}
+                              value={ponto.duracao_estimada || 30}
+                              onChange={(e) => atualizarDuracaoPontoEdicao(index, Number(e.target.value))}
+                              className="w-16 h-7 text-xs"
+                              title="Duração em minutos"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="obs-edicao">Observações</Label>
+                <Textarea
+                  id="obs-edicao"
+                  value={observacoesEdicao}
+                  onChange={(e) => setObservacoesEdicao(e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
-          </div>
+          </ScrollArea>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setRotaParaEditar(null)}>
@@ -998,71 +1059,178 @@ export function GerenciarRotasModal({
         setRotaParaCopiar(null);
         setTituloCopia('');
         setDataCopiaNova(undefined);
+        setPontosCopiados([]);
       }}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Copy className="h-5 w-5" />
               Copiar / Refazer Rota
             </DialogTitle>
             <DialogDescription>
-              Crie uma cópia desta rota com um novo título e data.
+              Crie uma cópia desta rota com um novo título, data e horários.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="titulo-copia">Título da Nova Rota</Label>
-              <Input
-                id="titulo-copia"
-                value={tituloCopia}
-                onChange={(e) => setTituloCopia(e.target.value)}
-                placeholder="Digite o título..."
-              />
-            </div>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="titulo-copia">Título da Nova Rota</Label>
+                <Input
+                  id="titulo-copia"
+                  value={tituloCopia}
+                  onChange={(e) => setTituloCopia(e.target.value)}
+                  placeholder="Digite o título..."
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Nova Data</Label>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
+              <div className="space-y-2">
+                <Label>Nova Data</Label>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dataCopiaNova && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dataCopiaNova 
+                        ? format(dataCopiaNova, "PPP", { locale: ptBR })
+                        : "Selecione a data"
+                      }
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataCopiaNova}
+                      onSelect={(date) => {
+                        setDataCopiaNova(date);
+                        setCalendarOpen(false);
+                      }}
+                      locale={ptBR}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Toggle Agendar Horários */}
+              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <Label className="font-medium">Agendar horários</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Defina novos horários para cada visita
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={agendarHorariosCopia}
+                  onCheckedChange={setAgendarHorariosCopia}
+                />
+              </div>
+
+              {/* Configurações de Horário */}
+              {agendarHorariosCopia && (
+                <div className="space-y-4 p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Horário Inicial</Label>
+                      <Input
+                        type="time"
+                        value={horarioInicialCopia}
+                        onChange={(e) => setHorarioInicialCopia(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Deslocamento (min)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={60}
+                        value={tempoDeslocamentoCopia}
+                        onChange={(e) => setTempoDeslocamentoCopia(Number(e.target.value))}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  
                   <Button
                     variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataCopiaNova && "text-muted-foreground"
-                    )}
+                    size="sm"
+                    onClick={recalcularHorariosCopia}
+                    className="w-full"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataCopiaNova 
-                      ? format(dataCopiaNova, "PPP", { locale: ptBR })
-                      : "Selecione a data"
-                    }
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recalcular Horários
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dataCopiaNova}
-                    onSelect={(date) => {
-                      setDataCopiaNova(date);
-                      setCalendarOpen(false);
-                    }}
-                    locale={ptBR}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
 
-            <div className="p-3 bg-muted rounded text-sm">
-              <p className="font-medium mb-1">Será copiado:</p>
-              <ul className="text-muted-foreground text-xs space-y-1">
-                <li>• {rotaParaCopiar?.rota_pontos?.length || 0} pontos de parada</li>
-                <li>• Configurações de origem e destino</li>
-                <li>• Observações originais</li>
-              </ul>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setHorariosExpandidosCopia(!horariosExpandidosCopia)}
+                  >
+                    {horariosExpandidosCopia ? (
+                      <><ChevronUp className="h-4 w-4 mr-2" /> Ocultar horários</>
+                    ) : (
+                      <><ChevronDown className="h-4 w-4 mr-2" /> Ajustar horários individuais</>
+                    )}
+                  </Button>
+
+                  {horariosExpandidosCopia && (
+                    <ScrollArea className="h-48 rounded-md border bg-background p-2">
+                      <div className="space-y-2">
+                        {pontosCopiados.map((ponto, index) => (
+                          <div key={index} className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50">
+                            <Badge variant="outline" className="w-6 h-6 p-0 flex items-center justify-center text-xs shrink-0">
+                              {index + 1}
+                            </Badge>
+                            {ponto.tipo === 'demanda' ? (
+                              <FileText className="h-3 w-3 text-red-500 shrink-0" />
+                            ) : (
+                              <Users className="h-3 w-3 text-purple-500 shrink-0" />
+                            )}
+                            <span className="truncate flex-1">{ponto.nome}</span>
+                            <Input
+                              type="time"
+                              value={ponto.horario_agendado || ''}
+                              onChange={(e) => atualizarHorarioPontoCopia(index, e.target.value)}
+                              className="w-24 h-7 text-xs"
+                            />
+                            <Input
+                              type="number"
+                              min={5}
+                              max={180}
+                              value={ponto.duracao_estimada || 30}
+                              onChange={(e) => atualizarDuracaoPontoCopia(index, Number(e.target.value))}
+                              className="w-16 h-7 text-xs"
+                              title="Duração em minutos"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              )}
+
+              <div className="p-3 bg-muted rounded text-sm">
+                <p className="font-medium mb-1">Será copiado:</p>
+                <ul className="text-muted-foreground text-xs space-y-1">
+                  <li>• {pontosCopiados.length} pontos de parada</li>
+                  <li>• Configurações de origem e destino</li>
+                  <li>• Observações originais</li>
+                  {agendarHorariosCopia && <li>• Novos horários definidos</li>}
+                </ul>
+              </div>
             </div>
-          </div>
+          </ScrollArea>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setRotaParaCopiar(null)}>
