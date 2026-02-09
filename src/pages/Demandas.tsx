@@ -20,6 +20,7 @@ import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
 import { ValidarMunicipesDialog } from "@/components/forms/ValidarMunicipesDialog";
+import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
@@ -40,6 +41,11 @@ export default function Demandas() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
+  const [importProgress, setImportProgress] = useState<{
+    fase: 'importando' | 'geocodificando';
+    atual: number;
+    total: number;
+  } | undefined>(undefined);
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   
   // Estados para paginação
@@ -479,24 +485,35 @@ export default function Demandas() {
     toast.success(`CSV exportado com sucesso! ${paginatedDemandas.length} demandas exportadas.`);
   };
 
-  // Função para processar demandas em lotes
+  // Função para processar demandas em lotes com geocodificação
   const importDemandas = useMutation({
     mutationFn: async (demandas: any[]) => {
       console.log(`📥 Iniciando importação de ${demandas.length} demandas`);
       
-      // Processar em lotes para evitar problemas de performance
-      const BATCH_SIZE = 50; // Processar 50 demandas por vez
-      const results = [];
+      const results: Array<{
+        success: boolean;
+        titulo: string;
+        error?: string;
+        id?: string;
+        geocodificado?: boolean;
+      }> = [];
       
-      // Dividir em lotes
+      // FASE 1: Importar demandas
+      setImportProgress({ fase: 'importando', atual: 0, total: demandas.length });
+      
+      const BATCH_SIZE = 50;
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      
       for (let i = 0; i < demandas.length; i += BATCH_SIZE) {
         const batch = demandas.slice(i, i + BATCH_SIZE);
         console.log(`🔄 Processando lote ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(demandas.length / BATCH_SIZE)} (${batch.length} demandas)`);
         
-        // Processar lote atual
-        for (const demanda of batch) {
+        for (let j = 0; j < batch.length; j++) {
+          const demanda = batch[j];
+          const currentIndex = i + j;
+          setImportProgress({ fase: 'importando', atual: currentIndex + 1, total: demandas.length });
+          
           try {
-            // Mapear prioridade para valores válidos do enum
             const prioridadeMap: Record<string, string> = {
               'alta': 'alta',
               'média': 'media',
@@ -505,21 +522,14 @@ export default function Demandas() {
               'urgente': 'urgente'
             };
             
-            // Mapear status para valores válidos do enum
             const statusMap: Record<string, string> = {
               'solicitada': 'solicitada',
               'em andamento': 'em_producao',
+              'em_producao': 'em_producao',
+              'encaminhado': 'encaminhado',
               'atendido': 'atendido',
               'devolvido': 'devolvido'
             };
-            
-            console.log('🔍 Demanda original:', JSON.stringify({
-              titulo: demanda.titulo,
-              prioridade_original: demanda.prioridade,
-              status_original: demanda.status,
-              prioridade_type: typeof demanda.prioridade,
-              status_type: typeof demanda.status
-            }));
             
             const prioridadeNormalizada = demanda.prioridade 
               ? prioridadeMap[demanda.prioridade.toLowerCase()] || 'media'
@@ -528,13 +538,6 @@ export default function Demandas() {
             const statusNormalizado = demanda.status 
               ? statusMap[demanda.status.toLowerCase()] || 'solicitada'
               : 'solicitada';
-              
-            console.log('✅ Valores normalizados:', JSON.stringify({
-              prioridade_original: demanda.prioridade,
-              prioridade_normalizada: prioridadeNormalizada,
-              status_original: demanda.status,
-              status_normalizado: statusNormalizado
-            }));
 
             const { data, error } = await supabase
               .from('demandas')
@@ -549,44 +552,115 @@ export default function Demandas() {
                 logradouro: demanda.logradouro || null,
                 numero: demanda.numero || null,
                 bairro: demanda.bairro || null,
-                cidade: demanda.cidade || 'São Paulo',
+                cidade: demanda.cidade || null,
                 cep: demanda.cep || null,
                 complemento: demanda.complemento || null,
                 data_prazo: demanda.data_prazo || null,
                 observacoes: demanda.observacoes || null,
-                criado_por: (await supabase.auth.getUser()).data.user?.id
+                criado_por: userId,
+                geocodificado: false // Será atualizado na fase 2
               })
-               .select('id')
-               .single();
+              .select('id')
+              .single();
 
             if (error) {
               results.push({ success: false, titulo: demanda.titulo, error: error.message });
             } else {
-              results.push({ success: true, titulo: demanda.titulo, id: data.id });
+              results.push({ 
+                success: true, 
+                titulo: demanda.titulo, 
+                id: data.id,
+                geocodificado: false,
+                // Guardar dados de endereço para geocodificação
+                ...demanda
+              });
             }
           } catch (err) {
             results.push({ success: false, titulo: demanda.titulo, error: 'Erro inesperado' });
           }
         }
         
-        // Pequena pausa entre lotes para não sobrecarregar o servidor
         if (i + BATCH_SIZE < demandas.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
+      // FASE 2: Geocodificar demandas importadas com sucesso
+      const demandasParaGeocoding = results.filter(r => r.success && r.id);
+      const demandasComEndereco = demandasParaGeocoding.filter((r: any) => 
+        r.logradouro || r.bairro || r.cidade
+      );
+      
+      if (demandasComEndereco.length > 0) {
+        console.log(`🗺️ Iniciando geocodificação de ${demandasComEndereco.length} demandas...`);
+        setImportProgress({ fase: 'geocodificando', atual: 0, total: demandasComEndereco.length });
+        
+        for (let i = 0; i < demandasComEndereco.length; i++) {
+          const demanda: any = demandasComEndereco[i];
+          setImportProgress({ fase: 'geocodificando', atual: i + 1, total: demandasComEndereco.length });
+          
+          try {
+            // A geocodificação funciona melhor com endereço completo
+            // O Mapbox/Nominatim conseguem determinar o estado automaticamente
+            const coordenadas = await geocodificarEndereco(
+              demanda.logradouro || '',
+              demanda.numero || '',
+              demanda.bairro || '',
+              demanda.cidade || '',
+              '' // Estado será inferido pela API de geocodificação
+            );
+            
+            if (coordenadas) {
+              // Atualizar a demanda com as coordenadas
+              const { error: updateError } = await supabase
+                .from('demandas')
+                .update({
+                  latitude: coordenadas.latitude,
+                  longitude: coordenadas.longitude,
+                  geocodificado: true
+                })
+                .eq('id', demanda.id);
+              
+              if (!updateError) {
+                // Atualizar resultado
+                const resultIndex = results.findIndex(r => r.id === demanda.id);
+                if (resultIndex !== -1) {
+                  results[resultIndex].geocodificado = true;
+                }
+                console.log(`✅ Geocodificada: ${demanda.titulo} (${coordenadas.fonte})`);
+              }
+            } else {
+              console.log(`⚠️ Não foi possível geocodificar: ${demanda.titulo}`);
+            }
+            
+            // Pequena pausa entre geocodificações para não sobrecarregar APIs
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+          } catch (err) {
+            console.error(`❌ Erro ao geocodificar ${demanda.titulo}:`, err);
+          }
+        }
+      }
+      
+      setImportProgress(undefined);
       return results;
     },
     onSuccess: (results) => {
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
+      const geocodificadosCount = results.filter(r => r.success && r.geocodificado).length;
       
       setImportResults(results);
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       
-      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
+      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros, ${geocodificadosCount} geocodificadas`);
+      
+      if (geocodificadosCount > 0) {
+        toast.success(`${successCount} demandas importadas, ${geocodificadosCount} geocodificadas!`);
+      }
     },
     onError: (error) => {
+      setImportProgress(undefined);
       setImportResults([{ success: false, titulo: 'Erro', error: error.message }]);
       console.error('❌ Erro na importação:', error);
     }
@@ -1017,7 +1091,7 @@ export default function Demandas() {
           endereco: d.endereco || null,
           numero: d.numero || null,
           bairro: d.bairro || null,
-          cidade: d.cidade || 'Santo André',
+          cidade: d.cidade || null,
           cep: d.cep || null,
           data_nascimento: d.data_nascimento || null,
           observacoes: d.observacoes || null
@@ -1102,7 +1176,7 @@ export default function Demandas() {
         logradouro: d.logradouro || null,
         numero: d.numero || null,
         bairro: d.bairro || null,
-        cidade: d.cidade || 'Santo André',
+        cidade: d.cidade || null,
         cep: d.cep || null,
         complemento: d.complemento || null,
         data_prazo: d.data_prazo || null,
@@ -1179,6 +1253,7 @@ export default function Demandas() {
                   isImporting={importDemandas.isPending}
                   fileInputRef={fileInputRef}
                   importResults={importResults}
+                  importProgress={importProgress}
                 />
                 <Button 
                   variant="outline" 
