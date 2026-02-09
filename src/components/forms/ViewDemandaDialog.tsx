@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot } from "lucide-react";
+import { HumorBadge, getHumorLabel } from "./HumorSelector";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -210,6 +211,12 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       >
                         {getPrioridadeLabel(demanda.prioridade)}
                       </Badge>
+                      {demanda.humor && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <HumorBadge humor={demanda.humor} size="sm" />
+                          <span className="text-xs">{getHumorLabel(demanda.humor)}</span>
+                        </Badge>
+                      )}
                       {isOverdue(demanda.data_prazo) && (
                         <Badge variant="destructive" className="flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3" />
