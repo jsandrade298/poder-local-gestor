@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Download, FileText, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { Upload, Download, FileText, CheckCircle, Loader2, AlertCircle, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface ImportResult {
   success: boolean;
   nome: string;
   error?: string;
   id?: string;
+  geocodificado?: boolean;
 }
 
 interface ImportCSVDialogProps {
@@ -17,9 +20,20 @@ interface ImportCSVDialogProps {
   isImporting: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   importResults?: ImportResult[];
+  importProgress?: {
+    fase: 'importando' | 'geocodificando';
+    atual: number;
+    total: number;
+  };
 }
 
-export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, importResults }: ImportCSVDialogProps) {
+export function ImportCSVDialog({ 
+  onFileSelect, 
+  isImporting, 
+  fileInputRef, 
+  importResults,
+  importProgress 
+}: ImportCSVDialogProps) {
   const [open, setOpen] = useState(false);
   const [showingResults, setShowingResults] = useState(false);
 
@@ -136,6 +150,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
   const successCount = importResults?.filter(r => r.success).length || 0;
   const errorCount = importResults?.filter(r => !r.success).length || 0;
   const totalCount = importResults?.length || 0;
+  const geocodificadosCount = importResults?.filter(r => r.success && r.geocodificado).length || 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -149,7 +164,7 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
           {isImporting ? 'Importando...' : 'Importar CSV'}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -165,13 +180,41 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                 <div className="flex items-center gap-3 mb-4">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                   <div>
-                    <h3 className="font-semibold text-lg">Processando arquivo...</h3>
+                    <h3 className="font-semibold text-lg">
+                      {importProgress?.fase === 'geocodificando' 
+                        ? 'Geocodificando endereços...' 
+                        : 'Importando munícipes...'}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      Importando os dados dos munícipes. Aguarde...
+                      {importProgress?.fase === 'geocodificando' 
+                        ? `Buscando coordenadas GPS: ${importProgress?.atual || 0} de ${importProgress?.total || 0}`
+                        : `Processando: ${importProgress?.atual || 0} de ${importProgress?.total || 0} munícipes`
+                      }
                     </p>
                   </div>
                 </div>
-                <Progress value={undefined} className="h-2" />
+                {importProgress && (
+                  <div className="space-y-2">
+                    <Progress 
+                      value={(importProgress.atual / importProgress.total) * 100} 
+                      className="h-2" 
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {importProgress.fase === 'geocodificando' ? (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            Fase 2: Geocodificação
+                          </span>
+                        ) : (
+                          'Fase 1: Importação'
+                        )}
+                      </span>
+                      <span>{Math.round((importProgress.atual / importProgress.total) * 100)}%</span>
+                    </div>
+                  </div>
+                )}
+                {!importProgress && <Progress value={undefined} className="h-2" />}
               </CardContent>
             </Card>
           )}
@@ -191,64 +234,67 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                     <p className="text-sm text-muted-foreground">
                       {successCount > 0 
                         ? `${successCount} munícipes importados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
-                        : `Não foi possível importar nenhum munícipe. ${errorCount} erros encontrados.`
+                        : `Nenhum munícipe importado. ${errorCount} erros encontrados.`
                       }
                     </p>
                   </div>
                 </div>
-
-                {/* Estatísticas */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-foreground">{totalCount}</div>
-                    <div className="text-sm text-muted-foreground">Total</div>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{successCount}</div>
-                    <div className="text-sm text-muted-foreground">Sucesso</div>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{errorCount}</div>
-                    <div className="text-sm text-muted-foreground">Erros</div>
-                  </div>
+                
+                {/* Badges de resumo */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                    ✅ {successCount} importados
+                  </Badge>
+                  {geocodificadosCount > 0 && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      📍 {geocodificadosCount} geocodificados
+                    </Badge>
+                  )}
+                  {errorCount > 0 && (
+                    <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                      ❌ {errorCount} erros
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Lista de erros se houver */}
-                {errorCount > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-red-600">Erros encontrados:</h4>
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {importResults
-                        .filter(r => !r.success)
-                        .slice(0, 5) // Mostrar apenas os primeiros 5 erros
-                        .map((result, index) => (
-                          <div key={index} className="text-sm bg-red-50 dark:bg-red-950/20 p-2 rounded">
-                            <strong>{result.nome}</strong>: {result.error}
-                          </div>
-                        ))
-                      }
-                      {importResults.filter(r => !r.success).length > 5 && (
-                        <div className="text-sm text-muted-foreground">
-                          ... e mais {importResults.filter(r => !r.success).length - 5} erros
-                        </div>
+                {/* Detalhes dos resultados (limitado a 10 itens) */}
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {importResults.slice(0, 10).map((result, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm py-1 border-b border-border/50 last:border-0">
+                      {result.success ? (
+                        <>
+                          <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                          <span className="truncate">{result.nome}</span>
+                          {result.geocodificado && (
+                            <Badge variant="outline" className="text-xs ml-auto flex-shrink-0">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              GPS
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                          <span className="truncate">{result.nome}</span>
+                          <span className="text-red-500 text-xs ml-auto flex-shrink-0">{result.error}</span>
+                        </>
                       )}
                     </div>
-                  </div>
-                )}
+                  ))}
+                  {(importResults?.length || 0) > 10 && (
+                    <p className="text-xs text-muted-foreground pt-2">
+                      ... e mais {(importResults?.length || 0) - 10} registros
+                    </p>
+                  )}
+                </div>
 
-                {/* Botões de ação */}
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      handleStartOver();
-                      handleImportClick();
-                    }}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
+                <Separator className="my-4" />
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={handleStartOver}>
                     Importar Outro Arquivo
                   </Button>
-                  <Button onClick={() => setOpen(false)}>
+                  <Button size="sm" onClick={() => setOpen(false)}>
                     Fechar
                   </Button>
                 </div>
@@ -340,6 +386,28 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                 </div>
               </div>
 
+              {/* Info sobre geocodificação */}
+              <Card className="border-blue-500/30 bg-blue-50 dark:bg-blue-950/20">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900 dark:text-blue-100">Georeferenciamento Automático</h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Após a importação, o sistema buscará automaticamente as coordenadas GPS de cada munícipe 
+                        usando o endereço informado, permitindo visualizá-los no mapa. Para melhores resultados:
+                      </p>
+                      <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
+                        <li>Preencha o <strong>logradouro</strong> completo (ex: "Rua das Flores")</li>
+                        <li>Inclua o <strong>número</strong> do endereço quando possível</li>
+                        <li>Informe o <strong>bairro</strong> e a <strong>cidade</strong></li>
+                        <li>O <strong>CEP</strong> ajuda na precisão</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Informações sobre os campos */}
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Campos Disponíveis</h3>
@@ -359,23 +427,23 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                         <span>email</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>logradouro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>numero</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>bairro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>cidade</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>cep</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -395,6 +463,10 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                          <span>tag (use vírgula para múltiplas tags: "Tag1, Tag2")</span>
                        </div>
                     </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      Campos em azul são usados para geocodificação (localização no mapa)
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -411,12 +483,14 @@ export function ImportCSVDialog({ onFileSelect, isImporting, fileInputRef, impor
                    <p>• Exemplo de múltiplas tags: "Família, Idoso" ou "Empresário, Comércio"</p>
                    <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
                    <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
-                   <p>• O sistema mostrará quantos munícipes foram importados com sucesso</p>
+                   <p>• O sistema mostrará quantos munícipes foram importados e geocodificados</p>
                 </div>
               </div>
 
+              <Separator />
+
               {/* Botões de ação */}
-              <div className="flex justify-between gap-3 pt-4 border-t">
+              <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
