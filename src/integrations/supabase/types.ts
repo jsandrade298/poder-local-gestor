@@ -436,6 +436,45 @@ export type Database = {
           },
         ]
       }
+      demanda_status: {
+        Row: {
+          id: string
+          nome: string
+          slug: string
+          cor: string
+          icone: string | null
+          ordem: number
+          ativo: boolean
+          notificar_municipe: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          slug: string
+          cor?: string
+          icone?: string | null
+          ordem?: number
+          ativo?: boolean
+          notificar_municipe?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          slug?: string
+          cor?: string
+          icone?: string | null
+          ordem?: number
+          ativo?: boolean
+          notificar_municipe?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demandas: {
         Row: {
           area_id: string | null
@@ -459,7 +498,7 @@ export type Database = {
           protocolo: string
           resolucao: string | null
           responsavel_id: string | null
-          status: Database["public"]["Enums"]["status_demanda"] | null
+          status: string | null
           titulo: string
           updated_at: string | null
         }
@@ -485,7 +524,7 @@ export type Database = {
           protocolo: string
           resolucao?: string | null
           responsavel_id?: string | null
-          status?: Database["public"]["Enums"]["status_demanda"] | null
+          status?: string | null
           titulo: string
           updated_at?: string | null
         }
@@ -511,7 +550,7 @@ export type Database = {
           protocolo?: string
           resolucao?: string | null
           responsavel_id?: string | null
-          status?: Database["public"]["Enums"]["status_demanda"] | null
+          status?: string | null
           titulo?: string
           updated_at?: string | null
         }
