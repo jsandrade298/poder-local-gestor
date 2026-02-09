@@ -28,7 +28,6 @@ interface DecisaoMunicipe {
   telefone?: string;
   email?: string;
   endereco?: string;
-  numero?: string;
   bairro?: string;
   cidade?: string;
   cep?: string;
@@ -91,8 +90,7 @@ export function ValidarMunicipesDialog({
         return {
           nomeOriginal: m.nome,
           tipo: 'novo' as const,
-          novoNome: m.nome,
-          cidade: 'Santo André'
+          novoNome: m.nome
         };
       }
       return decisao;
@@ -291,8 +289,7 @@ export function ValidarMunicipesDialog({
                             if (value.trim()) {
                               handleDecisao(municipe.nome, {
                                 tipo: 'novo',
-                                novoNome: value,
-                                cidade: 'Santo André'
+                                novoNome: value
                               });
                             }
                           }}
@@ -300,8 +297,7 @@ export function ValidarMunicipesDialog({
                             if (!decisao || decisao.tipo !== 'novo') {
                               handleDecisao(municipe.nome, {
                                 tipo: 'novo',
-                                novoNome: municipe.nome,
-                                cidade: 'Santo André'
+                                novoNome: municipe.nome
                               });
                             }
                           }}
@@ -344,27 +340,14 @@ export function ValidarMunicipesDialog({
                               />
                             </div>
                             
-                            <div>
-                              <Label className="text-xs">Endereço</Label>
+                            <div className="md:col-span-2">
+                              <Label className="text-xs">Endereço (com número)</Label>
                               <Input
-                                placeholder="Rua, Avenida..."
+                                placeholder="Rua, Avenida..., 123"
                                 value={decisao.endereco || ''}
                                 onChange={(e) => handleDecisao(municipe.nome, {
                                   ...decisao,
                                   endereco: e.target.value
-                                })}
-                                className="h-8"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label className="text-xs">Número</Label>
-                              <Input
-                                placeholder="123"
-                                value={decisao.numero || ''}
-                                onChange={(e) => handleDecisao(municipe.nome, {
-                                  ...decisao,
-                                  numero: e.target.value
                                 })}
                                 className="h-8"
                               />
@@ -386,8 +369,8 @@ export function ValidarMunicipesDialog({
                             <div>
                               <Label className="text-xs">Cidade</Label>
                               <Input
-                                placeholder="Santo André"
-                                value={decisao.cidade || 'Santo André'}
+                                placeholder="Cidade"
+                                value={decisao.cidade || ''}
                                 onChange={(e) => handleDecisao(municipe.nome, {
                                   ...decisao,
                                   cidade: e.target.value
