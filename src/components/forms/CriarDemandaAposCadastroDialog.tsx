@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
 interface CriarDemandaAposCadastroDialogProps {
   open: boolean;
@@ -33,7 +34,7 @@ export function CriarDemandaAposCadastroDialog({
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "solicitada" as "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido",
+    status: "solicitada",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -49,6 +50,7 @@ export function CriarDemandaAposCadastroDialog({
   const queryClient = useQueryClient();
   const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
   const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const { statusList } = useDemandaStatus();
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
     lng: null
