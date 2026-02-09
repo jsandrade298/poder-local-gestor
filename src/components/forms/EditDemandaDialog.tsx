@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
 interface EditDemandaDialogProps {
   open: boolean;
@@ -28,7 +29,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
-    status: "solicitada" as "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido",
+    status: "solicitada",
     data_prazo: "",
     logradouro: "",
     numero: "",
@@ -42,6 +43,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
   });
 
   const queryClient = useQueryClient();
+  const { statusList, getStatusLabel, shouldNotify } = useDemandaStatus();
 
   // Buscar anexos existentes
   const { data: anexos = [] } = useQuery({
@@ -169,23 +171,16 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   };
 
-  // Função para mapear status antigos para novos
-  const mapStatusAntigoParaNovo = (status: string): "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido" => {
-    const mapeamento: Record<string, "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido"> = {
+  // Função para mapear status antigos para novos (compatibilidade)
+  const mapStatusAntigoParaNovo = (status: string): string => {
+    const mapeamento: Record<string, string> = {
       'aberta': 'solicitada',
       'em_andamento': 'em_producao',
       'aguardando': 'encaminhado',
       'resolvida': 'atendido',
       'cancelada': 'devolvido',
-      // Novos valores já mapeados para si mesmos
-      'solicitada': 'solicitada',
-      'em_producao': 'em_producao',
-      'encaminhado': 'encaminhado',
-      'devolvido': 'devolvido',
-      'visitado': 'visitado',
-      'atendido': 'atendido'
     };
-    return mapeamento[status] || 'solicitada';
+    return mapeamento[status] || status || 'solicitada';
   };
 
   // Preencher formulário quando demanda mudar
@@ -258,18 +253,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'Solicitada';
-      case 'em_producao': return 'Em Produção';
-      case 'atendido': return 'Atendido';
-      case 'devolvido': return 'Devolvido';
-      case 'visitado': return 'Visitado';
-      case 'encaminhado': return 'Encaminhado';
-      default: return status;
-    }
-  };
-
   const updateDemanda = useMutation({
     mutationFn: async (data: typeof formData) => {
       // Obter usuário atual
@@ -332,9 +315,13 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       const municipeData = demandaAnterior?.municipes as any;
       let whatsappEnviado = false;
 
+      // Garantir que o status seja válido (mapear status antigos se necessário)
+      const statusMapeado = mapStatusAntigoParaNovo(data.status);
+
       // Atualizar demanda
       const cleanData = {
         ...data,
+        status: statusMapeado, // Usar status mapeado para garantir valor válido
         area_id: data.area_id || null,
         responsavel_id: data.responsavel_id || null,
         data_prazo: data.data_prazo || null,
@@ -381,8 +368,11 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         }
       }
 
+      // Mapear status anterior para comparação correta
+      const statusAnteriorMapeado = mapStatusAntigoParaNovo(statusAnterior || 'solicitada');
+
       // Notificar se status mudou
-      if (statusAnterior !== data.status && municipeData?.telefone) {
+      if (statusAnteriorMapeado !== statusMapeado && municipeData?.telefone) {
         try {
           console.log('🔔 Enviando notificação WhatsApp...');
           const response = await supabase.functions.invoke('whatsapp-notificar-demanda', {
@@ -390,8 +380,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
               demanda_id: demanda.id,
               municipe_nome: municipeData.nome,
               municipe_telefone: municipeData.telefone,
-              status: getStatusLabel(data.status),
-              status_anterior: getStatusLabel(statusAnterior),
+              status: getStatusLabel(statusMapeado),
+              status_anterior: getStatusLabel(statusAnteriorMapeado),
               titulo_demanda: data.titulo,
               protocolo: demanda.protocolo
             }
@@ -408,7 +398,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       }
 
       // ========== REGISTRAR MUDANÇA DE STATUS NO PRONTUÁRIO DO MUNÍCIPE ==========
-      if (statusAnterior !== data.status && demanda.municipe_id) {
+      if (statusAnteriorMapeado !== statusMapeado && demanda.municipe_id) {
         try {
           console.log('📋 Registrando mudança de status no prontuário do munícipe...');
           
@@ -419,7 +409,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
               created_by: userId,
               tipo_atividade: 'anotacao',
               titulo: `Demanda #${demanda.protocolo} - Status alterado`,
-              descricao: `A demanda "${data.titulo}" teve seu status alterado de "${getStatusLabel(statusAnterior)}" para "${getStatusLabel(data.status)}".`,
+              descricao: `A demanda "${data.titulo}" teve seu status alterado de "${getStatusLabel(statusAnteriorMapeado)}" para "${getStatusLabel(statusMapeado)}".`,
               data_atividade: new Date().toISOString()
             });
 
@@ -737,7 +727,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: "solicitada" | "em_producao" | "encaminhado" | "devolvido" | "visitado" | "atendido") => 
+                  onValueChange={(value) => 
                     setFormData(prev => ({ ...prev, status: value }))
                   }
                 >
@@ -745,12 +735,17 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="em_producao">Em Produção</SelectItem>
-                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
-                    <SelectItem value="atendido">Atendido</SelectItem>
-                    <SelectItem value="devolvido">Devolvido</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: status.cor }}
+                          />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
