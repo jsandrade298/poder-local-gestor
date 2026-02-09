@@ -447,6 +447,7 @@ export type Database = {
           criado_por: string
           data_prazo: string | null
           descricao: string
+          humor: Database["public"]["Enums"]["humor_demanda"] | null
           id: string
           kanban_position: string | null
           kanban_type: string | null
@@ -472,6 +473,7 @@ export type Database = {
           criado_por: string
           data_prazo?: string | null
           descricao: string
+          humor?: Database["public"]["Enums"]["humor_demanda"] | null
           id?: string
           kanban_position?: string | null
           kanban_type?: string | null
@@ -497,6 +499,7 @@ export type Database = {
           criado_por?: string
           data_prazo?: string | null
           descricao?: string
+          humor?: Database["public"]["Enums"]["humor_demanda"] | null
           id?: string
           kanban_position?: string | null
           kanban_type?: string | null
@@ -1329,6 +1332,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "gestor" | "atendente" | "usuario"
+      humor_demanda: "muito_insatisfeito" | "insatisfeito" | "neutro" | "satisfeito" | "muito_satisfeito"
       prioridade_demanda: "baixa" | "media" | "alta" | "urgente"
       status_agenda: "pendente" | "confirmado" | "recusado" | "remarcar"
       status_demanda:
