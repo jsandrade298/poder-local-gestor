@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Download, FileText, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { Upload, Download, FileText, CheckCircle, Loader2, AlertCircle, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface ImportResult {
   success: boolean;
   titulo: string;
   error?: string;
   id?: string;
+  geocodificado?: boolean;
 }
 
 interface ImportCSVDialogDemandasProps {
@@ -17,9 +20,20 @@ interface ImportCSVDialogDemandasProps {
   isImporting: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   importResults?: ImportResult[];
+  importProgress?: {
+    fase: 'importando' | 'geocodificando';
+    atual: number;
+    total: number;
+  };
 }
 
-export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRef, importResults }: ImportCSVDialogDemandasProps) {
+export function ImportCSVDialogDemandas({ 
+  onFileSelect, 
+  isImporting, 
+  fileInputRef, 
+  importResults,
+  importProgress 
+}: ImportCSVDialogDemandasProps) {
   const [open, setOpen] = useState(false);
 
   const downloadTemplate = () => {
@@ -53,8 +67,8 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
         'Rua das Flores',
         '150',
         'Centro',
-        'São Paulo',
-        '01234-567',
+        'Sua Cidade',
+        '00000-000',
         'Próximo à escola',
         '2025-12-31',
         'Demanda solicitada pelos moradores locais'
@@ -67,11 +81,11 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
         'Ana Costa',
         'em_producao',
         'alta',
-        'Avenida Principal',
+        'Avenida Industrial',
         '456',
         'Vila Nova',
-        'São Paulo',
-        '05678-901',
+        'Sua Cidade',
+        '00000-000',
         '',
         '2025-10-15',
         'Reportado por múltiplos munícipes'
@@ -115,17 +129,10 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
     setOpen(newOpen);
   };
 
-  // Função para voltar ao início do processo
-  const handleStartOver = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   // Calcular estatísticas dos resultados
   const successCount = importResults?.filter(r => r.success).length || 0;
   const errorCount = importResults?.filter(r => !r.success).length || 0;
-  const totalCount = importResults?.length || 0;
+  const geocodificadosCount = importResults?.filter(r => r.success && r.geocodificado).length || 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -139,7 +146,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
           {isImporting ? 'Importando...' : 'Importar CSV'}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -155,13 +162,30 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                 <div className="flex items-center gap-3 mb-4">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                   <div>
-                    <h3 className="font-semibold text-lg">Processando arquivo...</h3>
+                    <h3 className="font-semibold text-lg">
+                      {importProgress?.fase === 'geocodificando' 
+                        ? 'Geocodificando endereços...' 
+                        : 'Importando demandas...'}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      Importando as demandas. Aguarde...
+                      {importProgress 
+                        ? `Processando ${importProgress.atual} de ${importProgress.total}`
+                        : 'Aguarde enquanto processamos o arquivo...'}
                     </p>
                   </div>
                 </div>
-                <Progress value={undefined} className="h-2" />
+                {importProgress && (
+                  <Progress 
+                    value={(importProgress.atual / importProgress.total) * 100} 
+                    className="h-2" 
+                  />
+                )}
+                {importProgress?.fase === 'geocodificando' && (
+                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    Obtendo coordenadas GPS dos endereços para exibir no mapa
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
@@ -177,119 +201,84 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                     <AlertCircle className="h-6 w-6 text-red-500" />
                   )}
                   <div>
-                    <h3 className="font-semibold text-lg">Importação Concluída!</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {successCount > 0 
-                        ? `${successCount} demandas importadas com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
-                        : `Não foi possível importar nenhuma demanda. ${errorCount} erros encontrados.`
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                {/* Estatísticas */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-foreground">{totalCount}</div>
-                    <div className="text-sm text-muted-foreground">Total</div>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{successCount}</div>
-                    <div className="text-sm text-muted-foreground">Sucesso</div>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{errorCount}</div>
-                    <div className="text-sm text-muted-foreground">Erros</div>
-                  </div>
-                </div>
-
-                {/* Lista de erros se houver */}
-                {errorCount > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-red-600">Erros encontrados:</h4>
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {importResults
-                        .filter(r => !r.success)
-                        .slice(0, 5) // Mostrar apenas os primeiros 5 erros
-                        .map((result, index) => (
-                          <div key={index} className="text-sm bg-red-50 dark:bg-red-950/20 p-2 rounded">
-                            <strong>{result.titulo}</strong>: {result.error}
-                          </div>
-                        ))
-                      }
-                      {importResults.filter(r => !r.success).length > 5 && (
-                        <div className="text-sm text-muted-foreground">
-                          ... e mais {importResults.filter(r => !r.success).length - 5} erros
-                        </div>
+                    <h3 className="font-semibold text-lg">Importação Concluída</h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Badge variant="secondary" className="text-green-700 bg-green-100">
+                        {successCount} importadas
+                      </Badge>
+                      {errorCount > 0 && (
+                        <Badge variant="secondary" className="text-red-700 bg-red-100">
+                          {errorCount} erros
+                        </Badge>
+                      )}
+                      {geocodificadosCount > 0 && (
+                        <Badge variant="secondary" className="text-blue-700 bg-blue-100">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {geocodificadosCount} geocodificadas
+                        </Badge>
                       )}
                     </div>
                   </div>
-                )}
+                </div>
+                
+                {/* Lista de resultados */}
+                <div className="max-h-[200px] overflow-y-auto space-y-1 mt-4">
+                  {importResults.map((result, index) => (
+                    <div 
+                      key={index}
+                      className={`text-sm p-2 rounded flex items-center gap-2 ${
+                        result.success 
+                          ? 'bg-green-100/50 text-green-800' 
+                          : 'bg-red-100/50 text-red-800'
+                      }`}
+                    >
+                      {result.success ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{result.titulo}</span>
+                          {result.geocodificado && (
+                            <MapPin className="h-3 w-3 text-blue-600 flex-shrink-0" title="Geocodificado" />
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{result.titulo}: {result.error}</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
-                {/* Botões de ação */}
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      handleStartOver();
-                      handleImportClick();
-                    }}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar Outro Arquivo
-                  </Button>
-                  <Button onClick={() => setOpen(false)}>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setOpen(false)}>
                     Fechar
+                  </Button>
+                  <Button onClick={handleImportClick}>
+                    Importar Mais
                   </Button>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Instruções de importação (mostrar apenas se não estiver importando nem mostrando resultados) */}
+          {/* Conteúdo principal - mostrar apenas se não está importando e não há resultados */}
           {!isImporting && (!importResults || importResults.length === 0) && (
             <>
-              {/* Passo a Passo */}
-              <div className="space-y-4">
+              {/* Passo a passo */}
+              <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Passo a Passo</h3>
-                
-                <div className="space-y-3">
-                  <Card className="border-primary/20 bg-primary/5">
+                <div className="space-y-2">
+                  <Card className="border-green-500/20 bg-green-500/5">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">
                           1
                         </div>
                         <div>
-                          <h4 className="font-medium">Baixe a planilha modelo</h4>
+                          <h4 className="font-medium">Baixe o modelo</h4>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Clique no botão abaixo para baixar um arquivo CSV com o formato correto e exemplos de dados.
-                          </p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-2"
-                            onClick={downloadTemplate}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar Modelo CSV
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-orange-500/20 bg-orange-500/5">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                          2
-                        </div>
-                        <div>
-                          <h4 className="font-medium">Preencha seus dados</h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Abra o arquivo no Excel, Google Sheets ou similar. Substitua os dados de exemplo pelos seus dados reais.
-                            <strong>Importante:</strong> As colunas devem estar na ordem exata (A=Título, B=Descrição, C=Munícipe, etc.).
+                            Use o botão abaixo para baixar um arquivo CSV de exemplo com a estrutura correta.
                           </p>
                         </div>
                       </div>
@@ -299,7 +288,24 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                   <Card className="border-green-500/20 bg-green-500/5">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          2
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Preencha os dados</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Abra o modelo no Excel ou Google Sheets e preencha com suas demandas. 
+                            <strong> Preencha o endereço completo para melhor localização no mapa.</strong>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-green-500/20 bg-green-500/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">
                           3
                         </div>
                         <div>
@@ -315,13 +321,14 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                   <Card className="border-blue-500/20 bg-blue-500/5">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">
                           4
                         </div>
                         <div>
                           <h4 className="font-medium">Importe o arquivo</h4>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Clique em "Selecionar Arquivo CSV" abaixo e escolha o arquivo que você preparou.
+                            Clique em "Selecionar Arquivo CSV" abaixo. O sistema irá importar as demandas e 
+                            <strong className="text-blue-700"> automaticamente geocodificar os endereços</strong> para exibição no mapa.
                           </p>
                         </div>
                       </div>
@@ -330,15 +337,38 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                 </div>
               </div>
 
+              {/* Info sobre geocodificação */}
+              <Card className="border-blue-500/30 bg-blue-50 dark:bg-blue-950/20">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-blue-900 dark:text-blue-100">Georeferenciamento Automático</h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Após a importação, o sistema buscará automaticamente as coordenadas GPS de cada demanda 
+                        usando o endereço informado. Para melhores resultados:
+                      </p>
+                      <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
+                        <li>Preencha o <strong>logradouro</strong> completo (ex: "Rua das Flores")</li>
+                        <li>Inclua o <strong>número</strong> do endereço quando possível</li>
+                        <li>Informe o <strong>bairro</strong> e a <strong>cidade</strong></li>
+                        <li>O <strong>CEP</strong> ajuda na precisão</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Informações sobre os campos */}
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Ordem das Colunas (OBRIGATÓRIA)</h3>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                    <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded text-sm text-yellow-800 dark:text-yellow-200">
                       <strong>Atenção:</strong> As colunas devem estar exatamente nesta ordem. Não altere a sequência!
                     </div>
-                    <div className="grid grid-cols-1 gap-2 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      {/* Campos obrigatórios */}
                       <div className="flex items-center gap-2">
                         <div className="bg-primary text-primary-foreground rounded w-6 h-6 flex items-center justify-center text-xs font-bold">A</div>
                         <CheckCircle className="h-4 w-4 text-green-500" />
@@ -354,6 +384,8 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                         <CheckCircle className="h-4 w-4 text-green-500" />
                         <span><strong>Munícipe_nome</strong> (obrigatório)</span>
                       </div>
+                      
+                      {/* Campos opcionais */}
                       <div className="flex items-center gap-2">
                         <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">D</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -374,29 +406,31 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span>Prioridade</span>
                       </div>
+                      
+                      {/* Campos de endereço - destacados */}
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">H</div>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="bg-blue-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">H</div>
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>Logradouro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">I</div>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="bg-blue-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">I</div>
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>Número</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">J</div>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="bg-blue-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">J</div>
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>Bairro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">K</div>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="bg-blue-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">K</div>
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>Cidade</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">L</div>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="bg-blue-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">L</div>
+                        <MapPin className="h-4 w-4 text-blue-500" />
                         <span>CEP</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -407,7 +441,7 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                       <div className="flex items-center gap-2">
                         <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">N</div>
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span>Prazo da demanda (AAAA-MM-DD)</span>
+                        <span>Data Prazo (AAAA-MM-DD)</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="bg-gray-500 text-white rounded w-6 h-6 flex items-center justify-center text-xs font-bold">O</div>
@@ -415,6 +449,10 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                         <span>Observações</span>
                       </div>
                     </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      Campos em azul são usados para geocodificação (localização no mapa)
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -424,19 +462,21 @@ export function ImportCSVDialogDemandas({ onFileSelect, isImporting, fileInputRe
                 <h3 className="text-lg font-semibold">Dicas Importantes</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>• Os campos <strong>titulo</strong>, <strong>descricao</strong> e <strong>municipe_nome</strong> são obrigatórios</p>
-                  <p>• O <strong>municipe_nome</strong> deve corresponder exatamente ao nome de um munícipe já cadastrado (ex: "Maria Silva Santos", "João Carlos Oliveira")</p>
-                  <p>• <strong>responsavel_nome</strong> deve corresponder ao nome de um usuário cadastrado (ex: "João Silva", "Ana Costa")</p>
+                  <p>• O <strong>municipe_nome</strong> deve corresponder exatamente ao nome de um munícipe já cadastrado (ex: "Maria Silva Santos")</p>
+                  <p>• <strong>responsavel_nome</strong> deve corresponder ao nome de um usuário cadastrado</p>
                   <p>• <strong>area_nome</strong> deve corresponder a uma área existente no sistema</p>
-                  <p>• <strong>status</strong> deve ser: aberta, em_andamento, resolvida ou cancelada</p>
-                  <p>• <strong>prioridade</strong> deve ser: baixa, media ou alta</p>
+                  <p>• <strong>status</strong> deve ser: solicitada, em_producao, encaminhado, atendido ou devolvido</p>
+                  <p>• <strong>prioridade</strong> deve ser: baixa, media, alta ou urgente</p>
                   <p>• <strong>data_prazo</strong> deve estar no formato AAAA-MM-DD (ex: 2025-12-31)</p>
                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
                   <p>• Mantenha a codificação UTF-8 ao salvar o arquivo</p>
                 </div>
               </div>
 
+              <Separator />
+
               {/* Botões de ação */}
-              <div className="flex justify-between gap-3 pt-4 border-t">
+              <div className="flex justify-between gap-3">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
