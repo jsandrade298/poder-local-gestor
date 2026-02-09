@@ -10,9 +10,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings } from "lucide-react";
 import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
@@ -45,6 +48,10 @@ export default function Demandas() {
 
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const [isConfigStatusOpen, setIsConfigStatusOpen] = useState(false);
+  
+  // Hook de status dinâmicos
+  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
   // Debounce do termo de busca
   useEffect(() => {
@@ -248,39 +255,7 @@ export default function Demandas() {
   });
 
   const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'default';
-      case 'em_producao': return 'secondary';
-      case 'encaminhado': return 'outline';
-      case 'atendido': return 'default';
-      case 'devolvido': return 'destructive';
-      case 'visitado': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'hsl(var(--chart-1))'; // #3b82f6
-      case 'em_producao': return 'hsl(var(--chart-2))'; // #f59e0b
-      case 'encaminhado': return 'hsl(var(--chart-3))'; // #8b5cf6
-      case 'atendido': return 'hsl(var(--chart-4))'; // #10b981
-      case 'devolvido': return 'hsl(var(--chart-5))'; // #ef4444
-      case 'visitado': return '#06b6d4'; // Ciano
-      default: return 'hsl(var(--muted-foreground))';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'Solicitada';
-      case 'em_producao': return 'Em Produção';
-      case 'encaminhado': return 'Encaminhado';
-      case 'atendido': return 'Atendido';
-      case 'devolvido': return 'Devolvido';
-      case 'visitado': return 'Visitado';
-      default: return status;
-    }
+    return 'outline'; // Sempre outline, a cor vem do hook
   };
 
   const getPrioridadeColor = (prioridade: string) => {
@@ -1191,6 +1166,14 @@ export default function Demandas() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsConfigStatusOpen(true)}
+                  title="Configurar Status"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
                 <ImportCSVDialogDemandas 
                   onFileSelect={handleFileImport}
                   isImporting={importDemandas.isPending}
@@ -1252,12 +1235,17 @@ export default function Demandas() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="em_producao">Em Produção</SelectItem>
-                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
-                    <SelectItem value="atendido">Atendido</SelectItem>
-                    <SelectItem value="devolvido">Devolvido</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: status.cor }}
+                          />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1443,12 +1431,7 @@ export default function Demandas() {
                         <Badge variant="outline" className="text-xs">
                           #{demanda.protocolo}
                         </Badge>
-                        <Badge 
-                          variant={getStatusVariant(demanda.status)}
-                          style={{ backgroundColor: getStatusColor(demanda.status), color: 'white' }}
-                        >
-                          {getStatusLabel(demanda.status)}
-                        </Badge>
+                        <StatusBadge status={demanda.status} size="md" />
                         <Badge 
                           variant="secondary"
                           style={{ backgroundColor: getPrioridadeColor(demanda.prioridade), color: 'white' }}
@@ -1661,6 +1644,12 @@ export default function Demandas() {
           municipesNaoEncontrados={tempImportData?.municipesNaoEncontrados || []}
           municipesExistentes={tempImportData?.municipesExistentes || []}
           onDecisoes={handleValidacaoDecisoes}
+        />
+
+        {/* Modal de Configuração de Status */}
+        <ConfigurarStatusDialog
+          open={isConfigStatusOpen}
+          onOpenChange={setIsConfigStatusOpen}
         />
       </div>
     </div>
