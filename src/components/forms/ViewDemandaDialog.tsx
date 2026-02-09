@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot } from "lucide-react";
 import { HumorBadge, getHumorLabel } from "./HumorSelector";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,30 +72,6 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
   });
 
   if (!demanda) return null;
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'Solicitada';
-      case 'em_producao': return 'Em Produção';
-      case 'encaminhado': return 'Encaminhado';
-      case 'atendido': return 'Atendido';
-      case 'devolvido': return 'Devolvido';
-      case 'visitado': return 'Visitado';
-      default: return status;
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'default';
-      case 'em_producao': return 'secondary';
-      case 'encaminhado': return 'outline';
-      case 'atendido': return 'default';
-      case 'devolvido': return 'destructive';
-      case 'visitado': return 'secondary';
-      default: return 'secondary';
-    }
-  };
 
   const getPrioridadeLabel = (prioridade: string) => {
     switch (prioridade) {
@@ -199,9 +176,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                   <div className="flex-1">
                     <CardTitle className="text-lg">{demanda.titulo}</CardTitle>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant={getStatusVariant(demanda.status)}>
-                        {getStatusLabel(demanda.status)}
-                      </Badge>
+                      <StatusBadge status={demanda.status} size="md" />
                       <Badge 
                         variant="outline"
                         style={{ 
