@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Upload, X, Download, Search, MapPin, Loader2 } from "lucide-react";
+import { HumorSelector, HumorType, getHumorLabel, getHumorEmoji } from "./HumorSelector";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -36,7 +37,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     cep: "",
     complemento: "",
     observacoes: "",
-    resolucao: ""
+    resolucao: "",
+    humor: null as HumorType
   });
 
   const queryClient = useQueryClient();
@@ -205,7 +207,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         cep: demanda.cep || "",
         complemento: demanda.complemento || "",
         observacoes: demanda.observacoes || "",
-        resolucao: demanda.resolucao || ""
+        resolucao: demanda.resolucao || "",
+        humor: demanda.humor || null
       });
     }
   }, [demanda]);
@@ -342,6 +345,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
         resolucao: data.resolucao || null,
+        humor: data.humor || null,
         // Coordenadas atualizadas pela geocodificação
         latitude,
         longitude,
@@ -403,6 +407,32 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         }
       }
 
+      // ========== REGISTRAR MUDANÇA DE STATUS NO PRONTUÁRIO DO MUNÍCIPE ==========
+      if (statusAnterior !== data.status && demanda.municipe_id) {
+        try {
+          console.log('📋 Registrando mudança de status no prontuário do munícipe...');
+          
+          const { error: prontuarioError } = await supabase
+            .from('municipe_atividades')
+            .insert({
+              municipe_id: demanda.municipe_id,
+              created_by: userId,
+              tipo_atividade: 'anotacao',
+              titulo: `Demanda #${demanda.protocolo} - Status alterado`,
+              descricao: `A demanda "${data.titulo}" teve seu status alterado de "${getStatusLabel(statusAnterior)}" para "${getStatusLabel(data.status)}".`,
+              data_atividade: new Date().toISOString()
+            });
+
+          if (prontuarioError) {
+            console.error('Erro ao registrar no prontuário:', prontuarioError);
+          } else {
+            console.log('✅ Mudança de status registrada no prontuário do munícipe');
+          }
+        } catch (prontuarioErr) {
+          console.error('Erro ao registrar atividade no prontuário:', prontuarioErr);
+        }
+      }
+
       if (files.length > 0) {
         await uploadFiles(demanda.id);
       }
@@ -418,6 +448,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       queryClient.invalidateQueries({ queryKey: ['anexos', demanda.id] });
+      queryClient.invalidateQueries({ queryKey: ['municipe-atividades', demanda?.municipe_id] });
       onOpenChange(false);
       setFiles([]);
     },
@@ -672,6 +703,15 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Humorômetro - Humor do Munícipe */}
+              <div className="md:col-span-2">
+                <HumorSelector
+                  value={formData.humor}
+                  onChange={(value) => setFormData(prev => ({ ...prev, humor: value }))}
+                  label="Como o munícipe está se sentindo?"
+                />
               </div>
 
               <div className="space-y-2">
