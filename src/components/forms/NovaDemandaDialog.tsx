@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Plus, Upload, X, ChevronDown, MapPin, Loader2, Search, CheckCircle2 } from "lucide-react";
+import { HumorSelector, HumorType } from "./HumorSelector";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +37,8 @@ export function NovaDemandaDialog() {
     estado: "SP",
     cep: "",
     complemento: "",
-    observacoes: ""
+    observacoes: "",
+    humor: null as HumorType
   });
 
   const { toast } = useToast();
@@ -215,6 +217,7 @@ export function NovaDemandaDialog() {
         cep: data.cep?.replace(/\D/g, '') || null,
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
+        humor: data.humor || null,
         criado_por: user.user.id,
         // Campos de geolocalização - preenchidos pela geocodificação acima
         latitude,
@@ -302,7 +305,8 @@ export function NovaDemandaDialog() {
       estado: "SP",
       cep: "",
       complemento: "",
-      observacoes: ""
+      observacoes: "",
+      humor: null
     });
   };
 
@@ -435,6 +439,15 @@ export function NovaDemandaDialog() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Humorômetro - Humor do Munícipe */}
+              <div className="md:col-span-2">
+                <HumorSelector
+                  value={formData.humor}
+                  onChange={(value) => setFormData(prev => ({ ...prev, humor: value }))}
+                  label="Como o munícipe está se sentindo?"
+                />
               </div>
 
               <div className="space-y-2">
