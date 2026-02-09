@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMapaUnificado, DemandaMapa, MunicipeMapa } from '@/hooks/useMapaUnificado';
+import { useDemandaStatus } from '@/hooks/useDemandaStatus';
 import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
 import { ShapefileUpload } from '@/components/mapa/ShapefileUpload';
@@ -82,25 +83,6 @@ import {
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
-// Cores por status (valores reais do banco)
-const STATUS_COLORS: Record<string, string> = {
-  'solicitada': '#3b82f6',    // Azul
-  'em_producao': '#f59e0b',   // Amarelo/Laranja
-  'encaminhado': '#8b5cf6',   // Roxo
-  'atendido': '#22c55e',      // Verde
-  'devolvido': '#ef4444',     // Vermelho
-  'visitado': '#06b6d4',      // Ciano
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  'solicitada': 'Solicitada',
-  'em_producao': 'Em Produção',
-  'encaminhado': 'Encaminhado',
-  'atendido': 'Atendido',
-  'devolvido': 'Devolvido',
-  'visitado': 'Visitado',
-};
-
 export default function MapaUnificado() {
   // Hook de dados
   const {
@@ -115,6 +97,26 @@ export default function MapaUnificado() {
     isLoading,
     refetch
   } = useMapaUnificado();
+
+  // Hook de status dinâmicos
+  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
+
+  // Criar mapas de cores e labels a partir dos status dinâmicos
+  const STATUS_COLORS = useMemo(() => {
+    const colors: Record<string, string> = {};
+    statusList.forEach(s => {
+      colors[s.slug] = s.cor;
+    });
+    return colors;
+  }, [statusList]);
+
+  const STATUS_LABELS = useMemo(() => {
+    const labels: Record<string, string> = {};
+    statusList.forEach(s => {
+      labels[s.slug] = s.nome;
+    });
+    return labels;
+  }, [statusList]);
 
   // Query client para invalidar queries manualmente
   const queryClient = useQueryClient();
@@ -1012,30 +1014,30 @@ export default function MapaUnificado() {
                     </button>
                     {statusExpanded && (
                       <div className="pt-1 space-y-1">
-                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                          <div key={value} className="flex items-center space-x-2">
+                        {statusList.map((status) => (
+                          <div key={status.slug} className="flex items-center space-x-2">
                             <Checkbox 
-                              id={`status-${value}`}
-                              checked={statusFiltro.includes(value)}
+                              id={`status-${status.slug}`}
+                              checked={statusFiltro.includes(status.slug)}
                               onCheckedChange={(checked) => {
                                 if (checked) {
-                                  setStatusFiltro([...statusFiltro, value]);
+                                  setStatusFiltro([...statusFiltro, status.slug]);
                                 } else {
-                                  setStatusFiltro(statusFiltro.filter(s => s !== value));
+                                  setStatusFiltro(statusFiltro.filter(s => s !== status.slug));
                                 }
                               }}
                             />
                             <label 
-                              htmlFor={`status-${value}`}
+                              htmlFor={`status-${status.slug}`}
                               className="flex items-center gap-2 text-sm cursor-pointer flex-1"
                             >
                               <div 
                                 className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: STATUS_COLORS[value] }}
+                                style={{ backgroundColor: status.cor }}
                               />
-                              {label}
+                              {status.nome}
                               <span className="text-xs text-muted-foreground ml-auto">
-                                ({contagemStatus[value] || 0})
+                                ({contagemStatus[status.slug] || 0})
                               </span>
                             </label>
                           </div>
