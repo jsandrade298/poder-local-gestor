@@ -38,6 +38,7 @@ import {
   ExternalLink,
   Copy,
   CheckCircle,
+  Check,
   AlertTriangle,
   Loader2,
   Flame,
@@ -2008,11 +2009,13 @@ export default function MapaUnificado() {
                     clusterSelecionado.demandas.map((demanda) => (
                       <Card 
                         key={demanda.id} 
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => setDemandaModalId(demanda.id)}
+                        className="hover:bg-muted/50 transition-colors"
                       >
                         <CardContent className="p-3">
-                          <div className="flex items-start gap-2">
+                          <div 
+                            className="flex items-start gap-2 cursor-pointer"
+                            onClick={() => setDemandaModalId(demanda.id)}
+                          >
                             <div 
                               className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: (demanda.area_cor || '#3b82f6') + '20' }}
@@ -2045,6 +2048,36 @@ export default function MapaUnificado() {
                             </div>
                             <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
+                          {/* Botão Adicionar à Rota */}
+                          {demanda.latitude && demanda.longitude && (
+                            <div className="mt-2 pt-2 border-t">
+                              <Button
+                                variant={pontosRota.find(p => p.id === demanda.id) ? "secondary" : "outline"}
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (pontosRota.find(p => p.id === demanda.id)) {
+                                    removerDaRota(demanda.id);
+                                  } else {
+                                    adicionarARota(demanda);
+                                  }
+                                }}
+                              >
+                                {pontosRota.find(p => p.id === demanda.id) ? (
+                                  <>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Na rota ({pontosRota.findIndex(p => p.id === demanda.id) + 1}º)
+                                  </>
+                                ) : (
+                                  <>
+                                    <Route className="h-3 w-3 mr-1" />
+                                    Adicionar à Rota
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))
@@ -2060,17 +2093,19 @@ export default function MapaUnificado() {
                     clusterSelecionado.municipes.map((municipe) => (
                       <Card 
                         key={municipe.id} 
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => {
-                          const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
-                          if (municipeCompleto) {
-                            setMunicipeParaDetalhes(municipeCompleto);
-                            setMunicipeDetalhesOpen(true);
-                          }
-                        }}
+                        className="hover:bg-muted/50 transition-colors"
                       >
                         <CardContent className="p-3">
-                          <div className="flex items-start gap-2">
+                          <div 
+                            className="flex items-start gap-2 cursor-pointer"
+                            onClick={() => {
+                              const municipeCompleto = municipesRaw.find(m => m.id === municipe.id);
+                              if (municipeCompleto) {
+                                setMunicipeParaDetalhes(municipeCompleto);
+                                setMunicipeDetalhesOpen(true);
+                              }
+                            }}
+                          >
                             <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
                               <Users className="h-4 w-4 text-green-600" />
                             </div>
@@ -2109,6 +2144,36 @@ export default function MapaUnificado() {
                             </div>
                             <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2" />
                           </div>
+                          {/* Botão Adicionar à Rota */}
+                          {municipe.latitude && municipe.longitude && (
+                            <div className="mt-2 pt-2 border-t">
+                              <Button
+                                variant={pontosRota.find(p => p.id === municipe.id) ? "secondary" : "outline"}
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (pontosRota.find(p => p.id === municipe.id)) {
+                                    removerDaRota(municipe.id);
+                                  } else {
+                                    adicionarARota(municipe);
+                                  }
+                                }}
+                              >
+                                {pontosRota.find(p => p.id === municipe.id) ? (
+                                  <>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Na rota ({pontosRota.findIndex(p => p.id === municipe.id) + 1}º)
+                                  </>
+                                ) : (
+                                  <>
+                                    <Route className="h-3 w-3 mr-1" />
+                                    Adicionar à Rota
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))
