@@ -13,6 +13,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from '@/lib/dateUtils';
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,9 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const [municipeOpen, setMunicipeOpen] = useState(false);
   const queryClient = useQueryClient();
+  
+  // Hook de status dinâmicos
+  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
   // Buscar todas as demandas (permitindo adicionar a múltiplos kanbans)
   const { data: demandas = [], isLoading } = useQuery({
@@ -189,30 +194,6 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
     return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesPrioridade && matchesResponsavel;
   });
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'Solicitada';
-      case 'em_producao': return 'Em Produção';
-      case 'encaminhado': return 'Encaminhado';
-      case 'atendido': return 'Atendido';
-      case 'devolvido': return 'Devolvido';
-      case 'visitado': return 'Visitado';
-      default: return status;
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'solicitada': return 'default';
-      case 'em_producao': return 'secondary';
-      case 'encaminhado': return 'outline';
-      case 'atendido': return 'default';
-      case 'devolvido': return 'destructive';
-      case 'visitado': return 'secondary';
-      default: return 'secondary';
-    }
-  };
-
   const getPrioridadeLabel = (prioridade: string) => {
     switch (prioridade) {
       case 'baixa': return 'Baixa';
@@ -309,12 +290,17 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="solicitada">Solicitada</SelectItem>
-                    <SelectItem value="em_producao">Em Produção</SelectItem>
-                    <SelectItem value="encaminhado">Encaminhado</SelectItem>
-                    <SelectItem value="atendido">Atendido</SelectItem>
-                    <SelectItem value="devolvido">Devolvido</SelectItem>
-                    <SelectItem value="visitado">Visitado</SelectItem>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: status.cor }}
+                          />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -557,9 +543,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                         <span className="text-sm">{getAreaNome(demanda.area_id)}</span>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(demanda.status)}>
-                          {getStatusLabel(demanda.status)}
-                        </Badge>
+                        <StatusBadge status={demanda.status} size="sm" />
                       </TableCell>
                       <TableCell>
                         <Badge variant={getPrioridadeVariant(demanda.prioridade)}>
