@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
+import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
 
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
@@ -43,6 +44,11 @@ export default function Municipes() {
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResults, setImportResults] = useState<any[]>([]);
+  const [importProgress, setImportProgress] = useState<{
+    fase: 'importando' | 'geocodificando';
+    atual: number;
+    total: number;
+  } | undefined>(undefined);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
   const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
@@ -306,9 +312,28 @@ export default function Municipes() {
   // Função para processar CSV importado
   const importMunicipes = useMutation({
     mutationFn: async (municipes: any[]) => {
-      const results = [];
+      console.log(`📥 Iniciando importação de ${municipes.length} munícipes`);
       
-      for (const municipe of municipes) {
+      const results: Array<{
+        success: boolean;
+        nome: string;
+        error?: string;
+        id?: string;
+        geocodificado?: boolean;
+        logradouro?: string;
+        numero?: string;
+        bairro?: string;
+        cidade?: string;
+        cep?: string;
+      }> = [];
+      
+      // FASE 1: Importar munícipes
+      setImportProgress({ fase: 'importando', atual: 0, total: municipes.length });
+      
+      for (let i = 0; i < municipes.length; i++) {
+        const municipe = municipes[i];
+        setImportProgress({ fase: 'importando', atual: i + 1, total: municipes.length });
+        
         try {
           // Montar endereço completo
           let endereco = '';
@@ -329,7 +354,8 @@ export default function Municipes() {
               cidade: municipe.cidade || 'São Paulo',
               cep: municipe.cep || null,
               data_nascimento: municipe.data_nascimento || null,
-              observacoes: municipe.observacoes || null
+              observacoes: municipe.observacoes || null,
+              geocodificado: false
             })
             .select('id')
             .single();
@@ -346,8 +372,6 @@ export default function Municipes() {
                 tag_id: tagId
               }));
               
-              console.log(`📋 Dados de inserção das tags:`, tagInserts);
-              
               const { error: tagError } = await supabase
                 .from('municipe_tags')
                 .insert(tagInserts);
@@ -359,8 +383,6 @@ export default function Municipes() {
               }
             } else if (municipe.tagId) {
               // Compatibilidade com formato antigo (uma única tag)
-              console.log(`📋 Inserindo tag única para munícipe ${municipe.nome}: ${municipe.tagId}`);
-              
               const { error: tagError } = await supabase
                 .from('municipe_tags')
                 .insert({
@@ -370,33 +392,103 @@ export default function Municipes() {
               
               if (tagError) {
                 console.warn(`❌ Erro ao associar tag para ${municipe.nome}:`, tagError);
-              } else {
-                console.log(`✅ Tag associada com sucesso para ${municipe.nome}`);
               }
             }
             
-            results.push({ success: true, nome: municipe.nome, id: data.id });
+            results.push({ 
+              success: true, 
+              nome: municipe.nome, 
+              id: data.id,
+              geocodificado: false,
+              logradouro: municipe.logradouro,
+              numero: municipe.numero,
+              bairro: municipe.bairro,
+              cidade: municipe.cidade,
+              cep: municipe.cep
+            });
           }
         } catch (err) {
           results.push({ success: false, nome: municipe.nome, error: 'Erro inesperado' });
         }
       }
       
+      // FASE 2: Geocodificar munícipes importados com sucesso
+      const municipesSucesso = results.filter(r => r.success && r.id);
+      const municipesComEndereco = municipesSucesso.filter(r => 
+        r.logradouro || r.bairro || r.cidade
+      );
+      
+      if (municipesComEndereco.length > 0) {
+        console.log(`🗺️ Iniciando geocodificação de ${municipesComEndereco.length} munícipes...`);
+        setImportProgress({ fase: 'geocodificando', atual: 0, total: municipesComEndereco.length });
+        
+        for (let i = 0; i < municipesComEndereco.length; i++) {
+          const mun = municipesComEndereco[i];
+          setImportProgress({ fase: 'geocodificando', atual: i + 1, total: municipesComEndereco.length });
+          
+          try {
+            const coordenadas = await geocodificarEndereco(
+              mun.logradouro || '',
+              mun.numero || '',
+              mun.bairro || '',
+              mun.cidade || '',
+              '' // Estado será inferido pela API de geocodificação
+            );
+            
+            if (coordenadas) {
+              const { error: updateError } = await supabase
+                .from('municipes')
+                .update({
+                  latitude: coordenadas.latitude,
+                  longitude: coordenadas.longitude,
+                  geocodificado: true
+                })
+                .eq('id', mun.id);
+              
+              if (!updateError) {
+                const resultIndex = results.findIndex(r => r.id === mun.id);
+                if (resultIndex !== -1) {
+                  results[resultIndex].geocodificado = true;
+                }
+                console.log(`✅ Geocodificado: ${mun.nome} (${coordenadas.fonte})`);
+              }
+            } else {
+              console.log(`⚠️ Não foi possível geocodificar: ${mun.nome}`);
+            }
+            
+            // Pequena pausa entre geocodificações para não sobrecarregar APIs
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+          } catch (err) {
+            console.error(`❌ Erro ao geocodificar ${mun.nome}:`, err);
+          }
+        }
+      }
+      
+      setImportProgress(undefined);
       return results;
     },
     onSuccess: (results) => {
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
+      const geocodificadosCount = results.filter(r => r.success && r.geocodificado).length;
       
       setImportResults(results);
       queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
       
-      // Não usar toast aqui - mostrar no modal
-      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`);
+      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros, ${geocodificadosCount} geocodificados`);
+      
+      if (geocodificadosCount > 0) {
+        toast({
+          title: "Importação concluída!",
+          description: `${successCount} munícipes importados, ${geocodificadosCount} geocodificados!`
+        });
+      }
     },
     onError: (error) => {
+      setImportProgress(undefined);
       setImportResults([{ success: false, nome: 'Erro', error: error.message }]);
       console.error('❌ Erro na importação:', error);
     }
@@ -945,6 +1037,7 @@ export default function Municipes() {
               isImporting={importMunicipes.isPending}
               fileInputRef={fileInputRef}
               importResults={importResults}
+              importProgress={importProgress}
             />
             <Button 
               variant="outline" 
