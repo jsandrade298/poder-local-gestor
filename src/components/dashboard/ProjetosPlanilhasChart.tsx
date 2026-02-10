@@ -24,15 +24,14 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
 
   if (!data.length) {
     return (
-      <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
+      <Card className="border border-border/50 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
-            Projetos & Planilhas
+          <CardTitle className="text-base font-semibold">
+            Projetos & Planilhas por Status
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-8">
+          <p className="text-sm text-muted-foreground text-center py-12">
             Nenhum projeto ou planilha cadastrado
           </p>
         </CardContent>
@@ -41,10 +40,9 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
+    <Card className="border border-border/50 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
           Projetos & Planilhas por Status
           <span className="text-xs font-normal text-muted-foreground ml-auto">
             {totalProjetos} proj · {totalPlanilhas} plan
@@ -76,7 +74,7 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
               />
               <Legend
                 formatter={(value) => (
-                  <span className="text-xs text-foreground">
+                  <span className="text-[11px] text-foreground">
                     {value === "projetos" ? "Projetos" : "Planilhas"}
                   </span>
                 )}
