@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3 } from "lucide-react";
 import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
@@ -24,7 +24,7 @@ import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { toast } from "sonner";
 import { formatInTimeZone } from 'date-fns-tz';
 import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +55,7 @@ export default function Demandas() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isConfigStatusOpen, setIsConfigStatusOpen] = useState(false);
   
@@ -1265,6 +1266,15 @@ export default function Demandas() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/balanco-demandas")}
+                  title="Balanço de Demandas"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Balanço
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
