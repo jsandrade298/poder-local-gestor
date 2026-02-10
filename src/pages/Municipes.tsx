@@ -1240,6 +1240,7 @@ export default function Municipes() {
               fileInputRef={fileInputRef}
               importResults={importResults}
               importProgress={importProgress}
+              onClearResults={() => setImportResults([])}
             />
             <Button 
               variant="outline" 
