@@ -115,7 +115,6 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     };
     return origemMap[origem] || origem;
   };
-  };
 
   const getResponsavelNome = (responsavelId: string | undefined) => {
     if (!responsavelId) return 'Não definido';
