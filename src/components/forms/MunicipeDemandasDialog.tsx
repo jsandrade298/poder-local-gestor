@@ -2,11 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Calendar, User, Building2, AlertCircle } from "lucide-react";
+import { FileText, Calendar, User, Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useNavigate } from "react-router-dom";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
 interface MunicipeDemandasDialogProps {
   municipe: any;
@@ -16,6 +17,8 @@ interface MunicipeDemandasDialogProps {
 
 export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: MunicipeDemandasDialogProps) {
   const navigate = useNavigate();
+  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
+
   // Buscar demandas do munícipe
   const { data: demandas = [], isLoading } = useQuery({
     queryKey: ['demandas-municipe', municipe?.id],
@@ -43,18 +46,6 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
     },
     enabled: !!municipe?.id && open
   });
-
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'solicitada': { label: 'Solicitada', variant: 'default' as const, color: '#3B82F6' },
-      'em_producao': { label: 'Em Produção', variant: 'secondary' as const, color: '#F59E0B' },
-      'encaminhado': { label: 'Encaminhado', variant: 'secondary' as const, color: '#F97316' },
-      'devolvido': { label: 'Devolvido', variant: 'destructive' as const, color: '#EF4444' },
-      'visitado': { label: 'Visitado', variant: 'secondary' as const, color: '#06B6D4' },
-      'atendido': { label: 'Atendido', variant: 'secondary' as const, color: '#10B981' }
-    };
-    return statusMap[status as keyof typeof statusMap] || statusMap.solicitada;
-  };
 
   // Buscar os nomes dos responsáveis separadamente
   const { data: responsaveis = [] } = useQuery({
@@ -89,6 +80,13 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
     return prioridadeMap[prioridade as keyof typeof prioridadeMap] || prioridadeMap.media;
   };
 
+  // Contar demandas por status (dinâmico)
+  const statusCounts: Record<string, number> = {};
+  demandas.forEach((d) => {
+    const s = d.status || "solicitada";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+
   if (!municipe) return null;
 
   return (
@@ -105,103 +103,45 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
-          {/* Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <Card>
-              <CardContent className="p-4">
+          {/* Estatísticas dinâmicas */}
+          <div className="flex flex-wrap gap-3">
+            {/* Total */}
+            <Card className="flex-shrink-0">
+              <CardContent className="p-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium">Total</p>
-                    <p className="text-xl font-bold">{demandas.length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-500" />
-                  <div>
-                    <p className="text-sm font-medium">Solicitadas</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      {demandas.filter(d => d.status === 'solicitada').length}
-                    </p>
+                    <p className="text-xs font-medium text-muted-foreground">Total</p>
+                    <p className="text-lg font-bold">{demandas.length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                  <div>
-                    <p className="text-sm font-medium">Em Produção</p>
-                    <p className="text-xl font-bold text-yellow-600">
-                      {demandas.filter(d => d.status === 'em_producao').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-orange-500" />
-                  <div>
-                    <p className="text-sm font-medium">Encaminhado</p>
-                    <p className="text-xl font-bold text-orange-600">
-                      {demandas.filter(d => d.status === 'encaminhado').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-cyan-500" />
-                  <div>
-                    <p className="text-sm font-medium">Visitado</p>
-                    <p className="text-xl font-bold text-cyan-600">
-                      {demandas.filter(d => d.status === 'visitado').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-green-500" />
-                  <div>
-                    <p className="text-sm font-medium">Atendidas</p>
-                    <p className="text-xl font-bold text-green-600">
-                      {demandas.filter(d => d.status === 'atendido').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <div>
-                    <p className="text-sm font-medium">Devolvidas</p>
-                    <p className="text-xl font-bold text-red-600">
-                      {demandas.filter(d => d.status === 'devolvido').length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Status dinâmicos - só mostra os que têm contagem > 0 ou que estão na statusList */}
+            {statusList.map((status) => {
+              const count = statusCounts[status.slug] || 0;
+              return (
+                <Card key={status.id} className="flex-shrink-0">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: status.cor }}
+                      />
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {status.nome}
+                        </p>
+                        <p className="text-lg font-bold" style={{ color: status.cor }}>
+                          {count}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Lista de Demandas */}
@@ -235,7 +175,8 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                   </TableHeader>
                   <TableBody>
                     {demandas.map((demanda) => {
-                      const statusBadge = getStatusBadge(demanda.status);
+                      const statusColor = getStatusColor(demanda.status);
+                      const statusLabel = getStatusLabel(demanda.status);
                       const prioridadeBadge = getPrioridadeBadge(demanda.prioridade);
                       
                       return (
@@ -262,14 +203,14 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
                           </TableCell>
                           <TableCell>
                             <Badge 
-                              variant={statusBadge.variant}
+                              variant="secondary"
                               style={{ 
-                                backgroundColor: `${statusBadge.color}20`,
-                                borderColor: statusBadge.color,
-                                color: statusBadge.color
+                                backgroundColor: `${statusColor}20`,
+                                borderColor: statusColor,
+                                color: statusColor
                               }}
                             >
-                              {statusBadge.label}
+                              {statusLabel}
                             </Badge>
                           </TableCell>
                           <TableCell>
