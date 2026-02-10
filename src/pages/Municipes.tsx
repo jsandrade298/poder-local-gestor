@@ -150,6 +150,24 @@ export default function Municipes() {
     refetchOnReconnect: true // Apenas refetch na reconexão
   });
 
+  // Buscar contagem de demandas por munícipe (leve: só IDs)
+  const { data: demandasCountMap = new Map() } = useQuery({
+    queryKey: ['demandas-count-by-municipe'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demandas')
+        .select('municipe_id');
+      if (error) throw error;
+      const countMap = new Map<string, number>();
+      (data || []).forEach((d: any) => {
+        countMap.set(d.municipe_id, (countMap.get(d.municipe_id) || 0) + 1);
+      });
+      return countMap;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   // Buscar cidades únicas para o filtro
   const { data: cidades = [] } = useQuery({
     queryKey: ['cidades-municipes'],
@@ -1440,13 +1458,14 @@ export default function Municipes() {
                   <TableHead>Contato</TableHead>
                   <TableHead>Endereço</TableHead>
                   <TableHead>Tags</TableHead>
+                  <TableHead className="text-center">Demandas</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                         Carregando munícipes...
@@ -1455,7 +1474,7 @@ export default function Municipes() {
                   </TableRow>
                 ) : paginatedMunicipes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Nenhum munícipe encontrado
                     </TableCell>
                   </TableRow>
@@ -1523,6 +1542,28 @@ export default function Municipes() {
                             <span className="text-xs text-muted-foreground">Sem tags</span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const count = demandasCountMap.get(municipe.id) || 0;
+                          if (count === 0) {
+                            return <span className="text-xs text-muted-foreground">—</span>;
+                          }
+                          return (
+                            <Badge
+                              variant="secondary"
+                              className="cursor-pointer hover:bg-primary/20 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMunicipeParaDemandas(municipe);
+                                setShowDemandasDialog(true);
+                              }}
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              {count}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
