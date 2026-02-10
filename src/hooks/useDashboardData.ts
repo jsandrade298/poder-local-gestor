@@ -19,10 +19,13 @@ export function useDashboardData() {
       while (hasMore) {
         const { data, error, count } = await supabase
           .from("demandas")
-          .select("*, areas(nome), municipes(nome_completo)", { count: "exact" })
+          .select("*, areas(nome), municipes(nome)", { count: "exact" })
           .order("created_at", { ascending: false })
           .range(offset, offset + BATCH - 1);
-        if (error) { logError("Dashboard demandas:", error); throw error; }
+        if (error) {
+          logError("Dashboard demandas:", error);
+          throw error;
+        }
         if (offset === 0 && count !== null) total = count;
         if (data && data.length > 0) {
           all = [...all, ...data];
@@ -33,45 +36,24 @@ export function useDashboardData() {
       }
       return all;
     },
+    retry: 2,
+    staleTime: 30000,
   });
 
-  // ── Munícipes count ──
-  const { data: municipes = [], isLoading: isLoadingMunicipes } = useQuery({
-    queryKey: ["municipes-dashboard"],
+  // ── Munícipes (count only - lightweight) ──
+  const { data: totalMunicipes = 0, isLoading: isLoadingMunicipes } = useQuery({
+    queryKey: ["municipes-dashboard-count"],
     queryFn: async () => {
-      let all: any[] = [];
-      let from = 0;
-      const size = 1000;
-      let hasMore = true;
-      let total = 0;
-      while (hasMore) {
-        const { data, error, count } = await supabase
-          .from("municipes")
-          .select("id, created_at", { count: "exact" })
-          .range(from, from + size - 1);
-        if (error) { logError("Dashboard municipes:", error); throw error; }
-        if (from === 0 && count !== null) total = count;
-        if (data && data.length > 0) {
-          all = [...all, ...data];
-          hasMore = data.length === size;
-          from += size;
-        } else hasMore = false;
-        if (total > 0 && all.length >= total) hasMore = false;
+      const { count, error } = await supabase
+        .from("municipes")
+        .select("id", { count: "exact", head: true });
+      if (error) {
+        logError("Dashboard municipes count:", error);
+        throw error;
       }
-      return all;
+      return count || 0;
     },
-  });
-
-  // ── Planos de Ação + status_acao ──
-  const { data: planosAcao = [], isLoading: isLoadingPlanos } = useQuery({
-    queryKey: ["planos-acao-dashboard"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("planos_acao")
-        .select("*, status_acao(nome, cor), eixos(nome, cor)");
-      if (error) throw error;
-      return data || [];
-    },
+    staleTime: 60000,
   });
 
   // ── Projetos & Planilhas ──
@@ -80,22 +62,11 @@ export function useDashboardData() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projetos_plano")
-        .select("id, titulo, tipo, status, data_inicio, data_fim, created_at");
+        .select("id, titulo, tipo, status, data_inicio, data_fim");
       if (error) throw error;
       return data || [];
     },
-  });
-
-  // ── Tarefas de Projetos ──
-  const { data: tarefas = [], isLoading: isLoadingTarefas } = useQuery({
-    queryKey: ["projeto-tarefas-dashboard"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projeto_tarefas")
-        .select("id, titulo, data_fim, percentual, projeto_id");
-      if (error) throw error;
-      return data || [];
-    },
+    staleTime: 30000,
   });
 
   // ═══════════════════════════════════════════
@@ -104,32 +75,65 @@ export function useDashboardData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // ── KPIs ──
   const totalDemandas = demandas.length;
-  const totalMunicipes = municipes.length;
-  const totalPlanosAcao = planosAcao.length;
 
-  // Demandas abertas = não concluídas (slug != atendido && slug != devolvido)
+  // Demandas abertas = não concluídas
   const closedSlugs = ["atendido", "devolvido", "concluido", "arquivado"];
   const demandasAbertas = demandas.filter(
     (d) => !closedSlugs.includes(d.status || "")
   ).length;
 
+  const demandasAtendidas = demandas.filter((d) => d.status === "atendido").length;
   const taxaConclusao =
-    totalDemandas > 0
-      ? Math.round(
-          (demandas.filter((d) => d.status === "atendido").length /
-            totalDemandas) *
-            100
-        )
-      : 0;
+    totalDemandas > 0 ? Math.round((demandasAtendidas / totalDemandas) * 100) : 0;
 
-  // Demandas em atraso (com data_prazo, não concluídas)
+  // ── Demandas em atraso ──
   const demandasComAtraso = demandas.filter((d) => {
     if (!d.data_prazo || closedSlugs.includes(d.status || "")) return false;
     return today > new Date(d.data_prazo);
   });
   const demandasEmAtraso = demandasComAtraso.length;
+
+  // ── Humorômetro ──
+  const humorValues: Record<string, number> = {
+    muito_insatisfeito: 1,
+    insatisfeito: 2,
+    neutro: 3,
+    satisfeito: 4,
+    muito_satisfeito: 5,
+  };
+  const humorEmojis: Record<string, string> = {
+    muito_insatisfeito: "😡",
+    insatisfeito: "😞",
+    neutro: "😐",
+    satisfeito: "😊",
+    muito_satisfeito: "😍",
+  };
+
+  const demandasComHumor = demandas.filter((d) => d.humor && humorValues[d.humor]);
+  const humorTotal = demandasComHumor.reduce(
+    (sum, d) => sum + (humorValues[d.humor] || 0),
+    0
+  );
+  const humorMedia =
+    demandasComHumor.length > 0 ? humorTotal / demandasComHumor.length : 0;
+
+  // Map average to closest emoji
+  let humorMediaSlug = "neutro";
+  if (humorMedia > 0) {
+    if (humorMedia <= 1.5) humorMediaSlug = "muito_insatisfeito";
+    else if (humorMedia <= 2.5) humorMediaSlug = "insatisfeito";
+    else if (humorMedia <= 3.5) humorMediaSlug = "neutro";
+    else if (humorMedia <= 4.5) humorMediaSlug = "satisfeito";
+    else humorMediaSlug = "muito_satisfeito";
+  }
+
+  // Count per humor level
+  const humorDistribuicao = Object.entries(humorValues).map(([slug, _]) => ({
+    slug,
+    emoji: humorEmojis[slug],
+    count: demandas.filter((d) => d.humor === slug).length,
+  }));
 
   // ── Demandas por Status (donut chart) ──
   const statusCountMap: Record<string, number> = {};
@@ -143,8 +147,7 @@ export function useDashboardData() {
       name: getStatusLabel(slug),
       slug,
       value: count,
-      percent:
-        totalDemandas > 0 ? Math.round((count / totalDemandas) * 100) : 0,
+      percent: totalDemandas > 0 ? Math.round((count / totalDemandas) * 100) : 0,
       color: getStatusColor(slug),
     }))
     .sort((a, b) => b.value - a.value);
@@ -158,17 +161,17 @@ export function useDashboardData() {
     areaStatusAcc[area][s] = (areaStatusAcc[area][s] || 0) + 1;
   });
 
-  // Get unique statuses used
   const uniqueStatuses = Array.from(
     new Set(demandas.map((d) => d.status || "solicitada"))
   );
 
-  const areaTotals = Object.entries(areaStatusAcc).map(([area, statuses]) => ({
-    area,
-    total: Object.values(statuses).reduce((a, b) => a + b, 0),
-    statuses,
-  }));
-  areaTotals.sort((a, b) => b.total - a.total);
+  const areaTotals = Object.entries(areaStatusAcc)
+    .map(([area, statuses]) => ({
+      area,
+      total: Object.values(statuses).reduce((a, b) => a + b, 0),
+      statuses,
+    }))
+    .sort((a, b) => b.total - a.total);
 
   const top5Areas = areaTotals.slice(0, 5).map((item) => {
     const row: Record<string, any> = { name: item.area };
@@ -179,34 +182,11 @@ export function useDashboardData() {
     return row;
   });
 
-  // ── Planos de Ação por Status (bar chart) ──
-  const planosStatusAcc: Record<string, { count: number; cor: string }> = {};
-  planosAcao.forEach((p: any) => {
-    const statusNome = p.status_acao?.nome || "Sem status";
-    const statusCor = p.status_acao?.cor || "#6b7280";
-    if (!planosStatusAcc[statusNome])
-      planosStatusAcc[statusNome] = { count: 0, cor: statusCor };
-    planosStatusAcc[statusNome].count += 1;
-  });
-  const planosPorStatus = Object.entries(planosStatusAcc).map(
-    ([nome, { count, cor }]) => ({
-      name: nome,
-      value: count,
-      color: cor,
-    })
-  );
-
-  // Planos concluídos
-  const planosConcluidos = planosAcao.filter((p: any) => p.concluida).length;
-  const planosAtivos = totalPlanosAcao - planosConcluidos;
-
   // ── Projetos & Planilhas por Status ──
-  const projetosCount = projetos.filter((p: any) => p.tipo === "projeto").length;
-  const planilhasCount = projetos.filter(
-    (p: any) => p.tipo === "planilha"
-  ).length;
-
-  const projetosPorStatus: Record<string, { projetos: number; planilhas: number }> = {};
+  const projetosPorStatus: Record<
+    string,
+    { projetos: number; planilhas: number }
+  > = {};
   projetos.forEach((p: any) => {
     const s = p.status || "planejado";
     if (!projetosPorStatus[s])
@@ -230,12 +210,6 @@ export function useDashboardData() {
     })
   );
 
-  // ── Tarefas em atraso (projetos) ──
-  const tarefasEmAtraso = tarefas.filter((t: any) => {
-    if (!t.data_fim || (t.percentual && t.percentual >= 100)) return false;
-    return today > new Date(t.data_fim);
-  }).length;
-
   // ── Demandas em atraso detalhadas ──
   const demandasAtrasoDetalhadas = demandasComAtraso
     .map((demanda) => {
@@ -257,7 +231,6 @@ export function useDashboardData() {
     })
     .sort((a, b) => b.diasAtraso - a.diasAtraso);
 
-  // Atraso por faixas
   const demandasAtraso30 = demandasAtrasoDetalhadas.filter(
     (d) => d.diasAtraso > 30
   ).length;
@@ -269,32 +242,28 @@ export function useDashboardData() {
   ).length;
 
   return {
-    isLoading:
-      isLoadingDemandas ||
-      isLoadingMunicipes ||
-      isLoadingPlanos ||
-      isLoadingProjetos ||
-      isLoadingTarefas,
+    isLoading: isLoadingDemandas || isLoadingMunicipes || isLoadingProjetos,
 
     kpis: {
       totalDemandas,
       demandasAbertas,
       demandasEmAtraso,
       totalMunicipes,
-      totalPlanosAcao,
-      planosAtivos,
-      planosConcluidos,
-      projetosCount,
-      planilhasCount,
-      tarefasEmAtraso,
       taxaConclusao,
+    },
+
+    humor: {
+      media: humorMedia,
+      mediaSlug: humorMediaSlug,
+      emoji: humorEmojis[humorMediaSlug] || "😐",
+      total: demandasComHumor.length,
+      distribuicao: humorDistribuicao,
     },
 
     charts: {
       demandasPorStatus,
       top5Areas,
       uniqueStatuses,
-      planosPorStatus,
       projetosPlanilhasStatus,
     },
 
@@ -306,7 +275,6 @@ export function useDashboardData() {
       demandasAtrasoDetalhadas,
     },
 
-    // Pass helpers for chart coloring
     getStatusLabel,
     getStatusColor,
     statusList,
