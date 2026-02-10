@@ -124,19 +124,19 @@ export function MunicipeDemandasDialog({ municipe, open, onOpenChange }: Municip
               return (
                 <Card key={status.id} className="flex-shrink-0">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-3 w-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: status.cor }}
-                      />
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <div
+                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: status.cor }}
+                        />
+                        <p className="text-xs font-medium text-muted-foreground leading-none">
                           {status.nome}
                         </p>
-                        <p className="text-lg font-bold" style={{ color: status.cor }}>
-                          {count}
-                        </p>
                       </div>
+                      <p className="text-lg font-bold" style={{ color: status.cor }}>
+                        {count}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
