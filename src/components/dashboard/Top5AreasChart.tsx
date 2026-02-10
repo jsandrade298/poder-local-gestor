@@ -25,15 +25,14 @@ export function Top5AreasChart({
 }: Top5AreasChartProps) {
   if (!data.length) {
     return (
-      <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
+      <Card className="border border-border/50 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          <CardTitle className="text-base font-semibold">
             Top 5 Áreas × Status
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-8">
+          <p className="text-sm text-muted-foreground text-center py-12">
             Nenhuma demanda com área atribuída
           </p>
         </CardContent>
@@ -42,10 +41,9 @@ export function Top5AreasChart({
   }
 
   return (
-    <Card className="backdrop-blur-sm bg-card/95 border border-border/50 shadow-lg">
+    <Card className="border border-border/50 shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+        <CardTitle className="text-base font-semibold">
           Top 5 Áreas × Status
         </CardTitle>
       </CardHeader>
@@ -62,12 +60,12 @@ export function Top5AreasChart({
                 horizontal={false}
                 className="opacity-30"
               />
-              <XAxis type="number" tick={{ fontSize: 12 }} />
+              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
               <YAxis
                 dataKey="name"
                 type="category"
-                width={120}
-                tick={{ fontSize: 12 }}
+                width={110}
+                tick={{ fontSize: 11 }}
               />
               <Tooltip
                 contentStyle={{
@@ -81,15 +79,14 @@ export function Top5AreasChart({
                   value,
                   getStatusLabel(name),
                 ]}
-                labelFormatter={(label) => `${label}`}
               />
               <Legend
                 formatter={(value) => (
-                  <span className="text-xs text-foreground">
+                  <span className="text-[11px] text-foreground">
                     {getStatusLabel(value)}
                   </span>
                 )}
-                wrapperStyle={{ fontSize: "12px" }}
+                wrapperStyle={{ fontSize: "11px" }}
               />
               {statuses.map((status) => (
                 <Bar
@@ -98,7 +95,6 @@ export function Top5AreasChart({
                   stackId="a"
                   fill={getStatusColor(status)}
                   name={status}
-                  radius={[0, 0, 0, 0]}
                 />
               ))}
             </BarChart>
