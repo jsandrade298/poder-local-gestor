@@ -39,7 +39,8 @@ export function NovaDemandaDialog() {
     cep: "",
     complemento: "",
     observacoes: "",
-    humor: null as HumorType
+    humor: null as HumorType,
+    origem: ""
   });
 
   const { toast } = useToast();
@@ -220,6 +221,7 @@ export function NovaDemandaDialog() {
         complemento: data.complemento || null,
         observacoes: data.observacoes || null,
         humor: data.humor || null,
+        origem: data.origem || null,
         criado_por: user.user.id,
         // Campos de geolocalização - preenchidos pela geocodificação acima
         latitude,
@@ -308,7 +310,8 @@ export function NovaDemandaDialog() {
       cep: "",
       complemento: "",
       observacoes: "",
-      humor: null
+      humor: null,
+      origem: ""
     });
   };
 
@@ -652,6 +655,31 @@ export function NovaDemandaDialog() {
                   onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="origem">Origem da Demanda</Label>
+              <Select
+                value={formData.origem}
+                onValueChange={(value) => 
+                  setFormData(prev => ({ ...prev, origem: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp_mandato">WhatsApp Mandato</SelectItem>
+                  <SelectItem value="whatsapp_assessoria">WhatsApp Assessoria</SelectItem>
+                  <SelectItem value="whatsapp_parlamentar">WhatsApp Parlamentar</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="tiktok">Tiktok</SelectItem>
+                  <SelectItem value="gabinete">Gabinete</SelectItem>
+                  <SelectItem value="em_agenda">Em Agenda</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
