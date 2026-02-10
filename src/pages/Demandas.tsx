@@ -54,7 +54,7 @@ export default function Demandas() {
   const [pageSize, setPageSize] = useState<number | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isConfigStatusOpen, setIsConfigStatusOpen] = useState(false);
@@ -178,10 +178,6 @@ export default function Demandas() {
         if (atividadeId) {
           setHighlightedActivityId(atividadeId);
         }
-        
-        // Limpar os parâmetros da URL após o redirecionamento
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
       }
     }
     
@@ -189,6 +185,12 @@ export default function Demandas() {
     const responsavelParam = searchParams.get('responsavel');
     if (responsavelParam) {
       setResponsavelFilter(responsavelParam);
+    }
+
+    // Limpar parâmetros da URL após aplicar filtros, para permitir limpeza manual
+    if (atrasoParam || areaParam || protocolo || demandaId || responsavelParam) {
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
     }
   }, [searchParams, demandas]);
 
