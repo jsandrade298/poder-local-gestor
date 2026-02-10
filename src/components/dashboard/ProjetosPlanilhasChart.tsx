@@ -50,21 +50,27 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-80">
+        <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
-              barCategoryGap="15%"
-              barGap={2}
+              layout="vertical"
+              margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              barCategoryGap="25%"
+              barGap={3}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                vertical={false}
+                horizontal={false}
                 className="opacity-30"
               />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+              <YAxis
+                dataKey="name"
+                type="category"
+                width={110}
+                tick={{ fontSize: 11 }}
+              />
               <Tooltip
                 contentStyle={{
                   borderRadius: "8px",
@@ -73,6 +79,10 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
                   color: "hsl(var(--popover-foreground))",
                   fontSize: "13px",
                 }}
+                formatter={(value: number, name: string) => [
+                  value,
+                  name === "projetos" ? "Projetos" : "Planilhas",
+                ]}
               />
               <Legend
                 formatter={(value) => (
@@ -85,13 +95,13 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
                 dataKey="projetos"
                 fill="#8b5cf6"
                 name="projetos"
-                radius={[4, 4, 0, 0]}
+                radius={[0, 4, 4, 0]}
               />
               <Bar
                 dataKey="planilhas"
                 fill="#06b6d4"
                 name="planilhas"
-                radius={[4, 4, 0, 0]}
+                radius={[0, 4, 4, 0]}
               />
             </BarChart>
           </ResponsiveContainer>
