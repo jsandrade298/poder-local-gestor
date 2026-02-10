@@ -150,49 +150,41 @@ export default function Demandas() {
   
   useEffect(() => {
     const atrasoParam = searchParams.get('atraso');
-    if (atrasoParam) {
-      setAtrasoFilter(atrasoParam);
-    }
-    
-    // Aplicar filtro de área se vier da página de Áreas
     const areaParam = searchParams.get('area');
-    if (areaParam) {
-      setAreaFilter(areaParam);
-    }
-    
-    // Processar redirecionamento de notificação ou de outros locais
     const protocolo = searchParams.get('protocolo');
     const demandaId = searchParams.get('id');
     const atividadeId = searchParams.get('atividade');
-    
+    const responsavelParam = searchParams.get('responsavel');
+
+    const hasAnyParam = atrasoParam || areaParam || protocolo || demandaId || responsavelParam;
+    if (!hasAnyParam) return;
+
+    // Aplicar filtros vindos de outras páginas
+    if (atrasoParam) setAtrasoFilter(atrasoParam);
+    if (areaParam) setAreaFilter(areaParam);
+    if (responsavelParam) setResponsavelFilter(responsavelParam);
+
+    // Processar redirecionamento de notificação ou de outros locais
     if ((protocolo || demandaId) && demandas.length > 0) {
-      // Encontrar e abrir a demanda específica
-      const demanda = demandas?.find(d => 
+      const demanda = demandas?.find(d =>
         protocolo ? d.protocolo === protocolo : d.id === demandaId
       );
       if (demanda) {
         setSelectedDemanda(demanda);
         setIsViewDialogOpen(true);
-        
-        // Se há uma atividade específica, destacá-la
         if (atividadeId) {
           setHighlightedActivityId(atividadeId);
         }
       }
     }
-    
-    // Aplicar filtro de responsável se vier da página de Usuários
-    const responsavelParam = searchParams.get('responsavel');
-    if (responsavelParam) {
-      setResponsavelFilter(responsavelParam);
-    }
 
-    // Limpar parâmetros da URL após aplicar filtros, para permitir limpeza manual
-    if (atrasoParam || areaParam || protocolo || demandaId || responsavelParam) {
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+    // Limpar parâmetros da URL via React Router (garante que o state seja atualizado)
+    // Só limpa quando não precisa esperar demandas carregarem
+    const needsDemandas = protocolo || demandaId;
+    if (!needsDemandas || demandas.length > 0) {
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, demandas]);
+  }, [searchParams, demandas, setSearchParams]);
 
 
   const { data: areas = [] } = useQuery({
@@ -306,10 +298,11 @@ export default function Demandas() {
     // Filtro de atraso
     let matchesAtraso = true;
     if (atrasoFilter !== "all") {
-      if (!demanda.data_prazo || demanda.status === 'atendido' || demanda.status === 'devolvido') {
+      if (!demanda.data_prazo || ['atendido', 'devolvido', 'concluido', 'arquivado'].includes(demanda.status || '')) {
         matchesAtraso = false;
       } else {
-        const today = new Date('2025-09-03'); // Data atual para teste
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const prazo = new Date(demanda.data_prazo);
         const isOverdue = today > prazo;
         
@@ -321,7 +314,7 @@ export default function Demandas() {
           } else {
             const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
             const minDays = parseInt(atrasoFilter);
-            matchesAtraso = diasAtraso > minDays;
+            matchesAtraso = diasAtraso >= minDays;
           }
         }
       }
