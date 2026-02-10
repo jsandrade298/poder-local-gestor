@@ -98,6 +98,23 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     const today = new Date();
     const prazo = new Date(dataPrazo);
     return today > prazo;
+
+  };
+
+  const getOrigemLabel = (origem: string) => {
+    const origemMap: Record<string, string> = {
+      'whatsapp_mandato': 'WhatsApp Mandato',
+      'whatsapp_assessoria': 'WhatsApp Assessoria',
+      'whatsapp_parlamentar': 'WhatsApp Parlamentar',
+      'instagram': 'Instagram',
+      'facebook': 'Facebook',
+      'tiktok': 'Tiktok',
+      'gabinete': 'Gabinete',
+      'em_agenda': 'Em Agenda',
+      'outro': 'Outro'
+    };
+    return origemMap[origem] || origem;
+  };
   };
 
   const getResponsavelNome = (responsavelId: string | undefined) => {
@@ -270,6 +287,15 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                         <strong>Responsável:</strong> {getResponsavelNome(demanda.responsavel_id)}
                       </span>
                     </div>
+
+                    {demanda.origem && (
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          <strong>Origem:</strong> {getOrigemLabel(demanda.origem)}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3">
