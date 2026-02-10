@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Palette } from "lucide-react";
+import { Palette, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { logError } from "@/lib/errorUtils";
 
@@ -36,7 +36,8 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
     descricao: "",
     prioridade: "media",
     posicao: "a_fazer",
-    cor: "#3B82F6"
+    cor: "#3B82F6",
+    data_prazo: ""
   });
 
   const queryClient = useQueryClient();
@@ -63,7 +64,8 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
         descricao: tarefa.descricao || "",
         prioridade: tarefa.prioridade || "media",
         posicao: tarefa.kanban_position || "a_fazer",
-        cor: tarefa.cor || "#3B82F6"
+        cor: tarefa.cor || "#3B82F6",
+        data_prazo: tarefa.data_prazo || ""
       });
 
       // Carregar colaboradores da tarefa
@@ -105,6 +107,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
           prioridade: tarefaData.prioridade,
           kanban_position: tarefaData.posicao,
           cor: tarefaData.cor,
+          data_prazo: tarefaData.data_prazo || null,
           completed: tarefaData.posicao === 'feito',
           completed_at: tarefaData.posicao === 'feito' ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
@@ -156,7 +159,6 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
 
           if (notificacoesError) {
             logError('Erro ao criar notificações:', notificacoesError);
-            // Não falha a operação por causa das notificações
           }
         }
       }
@@ -230,12 +232,12 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
                   {colaboradores.map((colaborador) => (
                     <div key={colaborador.id} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`colaborador-${colaborador.id}`}
+                        id={`edit-colaborador-${colaborador.id}`}
                         checked={colaboradoresSelecionados.includes(colaborador.id)}
                         onCheckedChange={() => handleColaboradorToggle(colaborador.id)}
                       />
                       <Label 
-                        htmlFor={`colaborador-${colaborador.id}`}
+                        htmlFor={`edit-colaborador-${colaborador.id}`}
                         className="text-sm cursor-pointer"
                       >
                         {colaborador.nome}
@@ -284,6 +286,20 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
             </div>
           </div>
 
+          {/* Campo de prazo */}
+          <div className="space-y-2">
+            <Label htmlFor="data_prazo" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Data de Prazo
+            </Label>
+            <Input
+              id="data_prazo"
+              type="date"
+              value={formData.data_prazo}
+              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value })}
+            />
+          </div>
+
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
@@ -304,7 +320,6 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
               ))}
             </div>
           </div>
-
 
           <div className="flex justify-end gap-2 pt-4">
             <Button
