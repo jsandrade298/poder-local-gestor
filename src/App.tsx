@@ -16,6 +16,7 @@ import Demandas from "./pages/Demandas";
 import Municipes from "./pages/Municipes";
 import Kanban from "./pages/Kanban";
 import PlanoAcao from "./pages/PlanoAcao";
+import PlanoAcaoDetalhe from "./pages/PlanoAcaoDetalhe";
 import SolicitarAgenda from "./pages/SolicitarAgenda";
 import WhatsApp from "./pages/WhatsApp";
 import ConfiguracoesWhatsApp from "./pages/ConfiguracoesWhatsApp";
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/municipes" element={<Municipes />} />
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/plano-acao" element={<PlanoAcao />} />
+              <Route path="/plano-acao/:id" element={<PlanoAcaoDetalhe />} />
               <Route path="/solicitar-agenda" element={<SolicitarAgenda />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/configuracoes-whatsapp" element={<ConfiguracoesWhatsApp />} />
@@ -59,7 +61,6 @@ const App = () => (
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/config" element={<Configuracoes />} />
               <Route path="/mapa" element={<MapaUnificado />} />
-              {/* Rota do Mapa Cruzado removida - funcionalidade integrada ao Mapa principal */}
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
