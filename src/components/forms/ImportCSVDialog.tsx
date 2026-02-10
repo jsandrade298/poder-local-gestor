@@ -13,6 +13,7 @@ interface ImportResult {
   error?: string;
   id?: string;
   geocodificado?: boolean;
+  action?: 'criado' | 'atualizado';
 }
 
 interface ImportCSVDialogProps {
@@ -151,6 +152,8 @@ export function ImportCSVDialog({
   const errorCount = importResults?.filter(r => !r.success).length || 0;
   const totalCount = importResults?.length || 0;
   const geocodificadosCount = importResults?.filter(r => r.success && r.geocodificado).length || 0;
+  const criadosCount = importResults?.filter(r => r.success && r.action === 'criado').length || 0;
+  const atualizadosCount = importResults?.filter(r => r.success && r.action === 'atualizado').length || 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -233,7 +236,7 @@ export function ImportCSVDialog({
                     <h3 className="font-semibold text-lg">Importação Concluída!</h3>
                     <p className="text-sm text-muted-foreground">
                       {successCount > 0 
-                        ? `${successCount} munícipes importados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
+                        ? `${successCount} munícipes processados com sucesso${criadosCount > 0 ? ` (${criadosCount} criados` : ''}${atualizadosCount > 0 ? `${criadosCount > 0 ? ', ' : '('}${atualizadosCount} atualizados` : ''}${(criadosCount > 0 || atualizadosCount > 0) ? ')' : ''}${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`
                         : `Nenhum munícipe importado. ${errorCount} erros encontrados.`
                       }
                     </p>
@@ -242,9 +245,16 @@ export function ImportCSVDialog({
                 
                 {/* Badges de resumo */}
                 <div className="flex gap-2 mb-4 flex-wrap">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    ✅ {successCount} importados
-                  </Badge>
+                  {criadosCount > 0 && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      ✅ {criadosCount} criados
+                    </Badge>
+                  )}
+                  {atualizadosCount > 0 && (
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                      🔄 {atualizadosCount} atualizados
+                    </Badge>
+                  )}
                   {geocodificadosCount > 0 && (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                       📍 {geocodificadosCount} geocodificados
@@ -265,12 +275,19 @@ export function ImportCSVDialog({
                         <>
                           <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
                           <span className="truncate">{result.nome}</span>
-                          {result.geocodificado && (
-                            <Badge variant="outline" className="text-xs ml-auto flex-shrink-0">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              GPS
-                            </Badge>
-                          )}
+                          <div className="flex gap-1 ml-auto flex-shrink-0">
+                            {result.action === 'atualizado' && (
+                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                                Atualizado
+                              </Badge>
+                            )}
+                            {result.geocodificado && (
+                              <Badge variant="outline" className="text-xs">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                GPS
+                              </Badge>
+                            )}
+                          </div>
                         </>
                       ) : (
                         <>
