@@ -22,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
 import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { ConfirmarNovasTagsDialog, NewTagData } from "@/components/forms/ConfirmarNovasTagsDialog";
@@ -33,6 +34,8 @@ export default function Municipes() {
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
+  const [demandaFilter, setDemandaFilter] = useState("all");
+  const [demandaStatusFilter, setDemandaStatusFilter] = useState("all");
   const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -67,6 +70,7 @@ export default function Municipes() {
   const [itemsPerPage, setItemsPerPage] = useState(100);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
 
   // Buscar munícipes com suas tags - SEM LIMITE
@@ -150,23 +154,29 @@ export default function Municipes() {
     refetchOnReconnect: true // Apenas refetch na reconexão
   });
 
-  // Buscar contagem de demandas por munícipe (leve: só IDs)
-  const { data: demandasCountMap = new Map() } = useQuery({
+  // Buscar contagem de demandas por munícipe e status (leve: só IDs e status)
+  const { data: demandasData = { countMap: new Map(), statusMap: new Map() } } = useQuery({
     queryKey: ['demandas-count-by-municipe'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demandas')
-        .select('municipe_id');
+        .select('municipe_id, status');
       if (error) throw error;
       const countMap = new Map<string, number>();
+      const statusMap = new Map<string, Set<string>>();
       (data || []).forEach((d: any) => {
         countMap.set(d.municipe_id, (countMap.get(d.municipe_id) || 0) + 1);
+        if (!statusMap.has(d.municipe_id)) statusMap.set(d.municipe_id, new Set());
+        statusMap.get(d.municipe_id)!.add(d.status || 'solicitada');
       });
-      return countMap;
+      return { countMap, statusMap };
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  const demandasCountMap = demandasData.countMap;
+  const demandasStatusMap = demandasData.statusMap;
 
   // Buscar cidades únicas para o filtro
   const { data: cidades = [] } = useQuery({
@@ -232,8 +242,24 @@ export default function Municipes() {
 
     const matchesCidade = cidadeFilter === "all" ||
       municipe.cidade?.toLowerCase() === cidadeFilter.toLowerCase();
+
+    // Filtro de demandas
+    const demandaCount = demandasCountMap.get(municipe.id) || 0;
+    const municipeStatuses = demandasStatusMap.get(municipe.id);
+    let matchesDemanda = true;
+    if (demandaFilter === "com_demanda") {
+      matchesDemanda = demandaCount > 0;
+    } else if (demandaFilter === "sem_demanda") {
+      matchesDemanda = demandaCount === 0;
+    }
+
+    // Sub-filtro por status de demanda
+    let matchesDemandaStatus = true;
+    if (demandaStatusFilter !== "all") {
+      matchesDemandaStatus = !!municipeStatuses && municipeStatuses.has(demandaStatusFilter);
+    }
     
-    return matchesSearch && matchesTag && matchesBairro && matchesCidade;
+    return matchesSearch && matchesTag && matchesBairro && matchesCidade && matchesDemanda && matchesDemandaStatus;
   });
 
   // Calcular paginação
@@ -253,6 +279,8 @@ export default function Municipes() {
     setTagFilter("all");
     setBairroFilter("all");
     setCidadeFilter("all");
+    setDemandaFilter("all");
+    setDemandaStatusFilter("all");
     resetPage();
   };
 
@@ -1278,7 +1306,7 @@ export default function Municipes() {
             <CardTitle className="text-base font-semibold">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
                   Buscar
@@ -1368,6 +1396,57 @@ export default function Municipes() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Demandas
+                </label>
+                <Select value={demandaFilter} onValueChange={(value) => {
+                  setDemandaFilter(value);
+                  if (value === "sem_demanda") setDemandaStatusFilter("all");
+                  resetPage();
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="com_demanda">Com demandas</SelectItem>
+                    <SelectItem value="sem_demanda">Sem demandas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {demandaFilter !== "sem_demanda" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Status da Demanda
+                  </label>
+                  <Select value={demandaStatusFilter} onValueChange={(value) => {
+                    setDemandaStatusFilter(value);
+                    if (value !== "all" && demandaFilter === "all") setDemandaFilter("com_demanda");
+                    resetPage();
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      {statusList.map((status) => (
+                        <SelectItem key={status.id} value={status.slug}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full" 
+                              style={{ backgroundColor: status.cor }}
+                            />
+                            {status.nome}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="flex items-end">
                 <Button 
