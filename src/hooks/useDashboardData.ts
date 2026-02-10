@@ -232,13 +232,13 @@ export function useDashboardData() {
     .sort((a, b) => b.diasAtraso - a.diasAtraso);
 
   const demandasAtraso30 = demandasAtrasoDetalhadas.filter(
-    (d) => d.diasAtraso > 30
+    (d) => d.diasAtraso >= 30
   ).length;
   const demandasAtraso60 = demandasAtrasoDetalhadas.filter(
-    (d) => d.diasAtraso > 60
+    (d) => d.diasAtraso >= 60
   ).length;
   const demandasAtraso90 = demandasAtrasoDetalhadas.filter(
-    (d) => d.diasAtraso > 90
+    (d) => d.diasAtraso >= 90
   ).length;
 
   return {
