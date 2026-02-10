@@ -43,15 +43,15 @@ export function StatusDonutChart({ title, data, total }: StatusDonutChartProps) 
       <CardContent>
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {/* Donut */}
-          <div className="relative w-60 h-60 flex-shrink-0">
+          <div className="relative w-72 h-72 flex-shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={68}
-                  outerRadius={110}
+                  innerRadius={78}
+                  outerRadius={130}
                   paddingAngle={2}
                   dataKey="value"
                   stroke="none"
