@@ -482,22 +482,22 @@ export default function PlanoAcaoDetalhe() {
     const valor = linha.dados?.[col.id];
     const isEd = editingCell?.linhaId === linha.id && editingCell?.colunaId === col.id;
 
-    if (col.tipo === "checkbox") return <div className="flex items-center justify-center"><Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} /></div>;
+    if (col.tipo === "checkbox") return <div className="flex items-center justify-center h-8"><Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} /></div>;
 
     if (col.tipo === "status" || col.tipo === "select") {
       const opcoes = parseOpcoes(col); const sel = opcoes.find((o: any) => o.valor === valor);
       return <Select value={valor || ""} onValueChange={(v) => setCellSelectValue(linha.id, col.id, v)}>
-        <SelectTrigger className="h-7 text-xs border-0 bg-transparent hover:bg-muted/50">{sel ? <Badge variant="secondary" className="text-xs" style={{ backgroundColor: `${sel.cor}15`, color: sel.cor }}>{sel.valor}</Badge> : <SelectValue placeholder="—" />}</SelectTrigger>
+        <SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden">{sel ? <Badge variant="secondary" className="text-[11px] px-1.5 py-0 truncate max-w-full" style={{ backgroundColor: `${sel.cor}15`, color: sel.cor }}>{sel.valor}</Badge> : <SelectValue placeholder="—" />}</SelectTrigger>
         <SelectContent>{opcoes.map((o: any, i: number) => <SelectItem key={i} value={o.valor}><div className="flex items-center gap-2">{o.cor && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: o.cor }} />}{o.valor}</div></SelectItem>)}</SelectContent>
       </Select>;
     }
 
-    if (col.tipo === "responsavel") return <Select value={valor || ""} onValueChange={(v) => setCellSelectValue(linha.id, col.id, v)}><SelectTrigger className="h-7 text-xs border-0 bg-transparent hover:bg-muted/50"><SelectValue placeholder="—" /></SelectTrigger><SelectContent>{profiles.map((p: any) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}</SelectContent></Select>;
+    if (col.tipo === "responsavel") return <Select value={valor || ""} onValueChange={(v) => setCellSelectValue(linha.id, col.id, v)}><SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden"><SelectValue placeholder="—" /></SelectTrigger><SelectContent>{profiles.map((p: any) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}</SelectContent></Select>;
 
-    if (isEd) return <Input autoFocus value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveCellEdit} onKeyDown={(e) => { if (e.key === "Enter") saveCellEdit(); if (e.key === "Escape") setEditingCell(null); }} type={col.tipo === "numero" ? "number" : col.tipo === "data" ? "date" : "text"} className="h-7 text-xs border-0 rounded-none focus-visible:ring-1" />;
+    if (isEd) return <Input autoFocus value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveCellEdit} onKeyDown={(e) => { if (e.key === "Enter") saveCellEdit(); if (e.key === "Escape") setEditingCell(null); }} type={col.tipo === "numero" ? "number" : col.tipo === "data" ? "date" : "text"} className="h-8 text-xs border-0 rounded-none focus-visible:ring-1 focus-visible:ring-inset" />;
 
-    return <div className="cursor-pointer hover:bg-muted/30 transition-colors px-2 py-1.5 text-sm truncate" onClick={() => startEditCell(linha.id, col.id, valor)}>
-      {col.tipo === "data" && valor ? (() => { try { return format(parseISO(valor), "dd/MM/yyyy"); } catch { return valor; } })() : valor || <span className="text-muted-foreground/40">—</span>}
+    return <div className="cursor-pointer hover:bg-muted/30 transition-colors px-2 h-8 flex items-center text-sm overflow-hidden" onClick={() => startEditCell(linha.id, col.id, valor)}>
+      <span className="truncate">{col.tipo === "data" && valor ? (() => { try { return format(parseISO(valor), "dd/MM/yyyy"); } catch { return valor; } })() : valor || <span className="text-muted-foreground/40">—</span>}</span>
     </div>;
   };
 
@@ -633,7 +633,7 @@ export default function PlanoAcaoDetalhe() {
                         <th className="sticky z-20 bg-muted/30 border-b border-r w-9 p-0" style={{ left: 40 + getColWidth(colunas[0]?.id || "", 200) }} />
                         {/* Scrollable columns */}
                         {colunas.slice(1).map((col: any, i: number) => (
-                          <th key={col.id} className="border-b border-r p-0 group" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id) }}>
+                          <th key={col.id} className="border-b border-r p-0 group" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id) }}>
                             <div className="flex items-center justify-between px-2 py-2 relative">
                               <span className="text-xs font-medium truncate">{col.nome}</span>
                               {renderColMenu(col, i + 1)}
@@ -657,12 +657,12 @@ export default function PlanoAcaoDetalhe() {
                         const stickyLeft2 = 40 + getColWidth(firstCol?.id || "", 200);
 
                         return (
-                          <tr key={linha.id} className="group align-top hover:bg-muted/20">
+                          <tr key={linha.id} className="group hover:bg-muted/20">
                             {/* # (sticky) */}
-                            <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/20 border-b border-r text-center text-xs text-muted-foreground p-2">{idx + 1}</td>
+                            <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9">{idx + 1}</td>
                             {/* First column (sticky) */}
                             {firstCol && (
-                              <td className="sticky z-10 bg-background group-hover:bg-muted/20 border-b border-r p-0" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id) }}>
+                              <td className="sticky z-10 bg-background group-hover:bg-muted/20 border-b border-r p-0 overflow-hidden" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id) }}>
                                 {renderCell(firstCol, linha)}
                               </td>
                             )}
@@ -674,12 +674,12 @@ export default function PlanoAcaoDetalhe() {
                             </td>
                             {/* Scrollable columns */}
                             {colunas.slice(1).map((col: any) => (
-                              <td key={col.id} className="border-b border-r p-0" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id) }}>
+                              <td key={col.id} className="border-b border-r p-0 overflow-hidden" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id) }}>
                                 {renderCell(col, linha)}
                               </td>
                             ))}
                             {/* Atualizações cell */}
-                            <td className="border-b border-r p-0 align-top" style={{ width: 280, minWidth: 280 }}>
+                            <td className="border-b border-r p-0 align-top" style={{ width: 280, minWidth: 280, maxWidth: 280 }}>
                               <div className="px-2 py-1.5">
                                 {updates.length === 0 && !isExpanded ? (
                                   <button className="text-xs text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1" onClick={() => toggleExpanded(linha.id)}>
