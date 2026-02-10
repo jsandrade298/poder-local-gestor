@@ -482,7 +482,7 @@ export default function PlanoAcaoDetalhe() {
     const valor = linha.dados?.[col.id];
     const isEd = editingCell?.linhaId === linha.id && editingCell?.colunaId === col.id;
 
-    if (col.tipo === "checkbox") return <div className="flex items-center justify-center h-8"><Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} /></div>;
+    if (col.tipo === "checkbox") return <div className="flex items-center justify-center h-8 px-3"><Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} /></div>;
 
     if (col.tipo === "status" || col.tipo === "select") {
       const opcoes = parseOpcoes(col); const sel = opcoes.find((o: any) => o.valor === valor);
@@ -505,7 +505,7 @@ export default function PlanoAcaoDetalhe() {
   const renderModalField = (col: any) => {
     const valor = linhaFormData[col.id];
 
-    if (col.tipo === "checkbox") return <Checkbox checked={!!valor} onCheckedChange={(checked) => { updateLocalField(col.id, !!checked); persistField(col.id, !!checked); }} />;
+    if (col.tipo === "checkbox") return <div className="flex items-center py-1.5"><Checkbox checked={!!valor} onCheckedChange={(checked) => { updateLocalField(col.id, !!checked); persistField(col.id, !!checked); }} /></div>;
 
     if (col.tipo === "status" || col.tipo === "select") {
       const opcoes = parseOpcoes(col);
@@ -618,11 +618,11 @@ export default function PlanoAcaoDetalhe() {
                     <thead>
                       <tr className="bg-muted/30">
                         {/* Sticky: # + first column + expand */}
-                        <th className="sticky left-0 z-20 bg-muted/30 border-b border-r w-10 text-center text-xs font-medium text-muted-foreground p-0">
+                        <th className="sticky left-0 z-30 bg-muted/30 border-b border-r w-10 text-center text-xs font-medium text-muted-foreground p-0" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
                           <div className="px-2 py-2.5">#</div>
                         </th>
                         {colunas[0] && (
-                          <th className="sticky z-20 bg-muted/30 border-b border-r p-0 group" style={{ left: 40, width: getColWidth(colunas[0].id), minWidth: getColWidth(colunas[0].id) }}>
+                          <th className="sticky z-30 bg-muted/30 border-b border-r p-0 group" style={{ left: 40, width: getColWidth(colunas[0].id), minWidth: getColWidth(colunas[0].id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
                             <div className="flex items-center justify-between px-2 py-2 relative">
                               <span className="text-xs font-medium truncate">{colunas[0].nome}</span>
                               {renderColMenu(colunas[0], 0)}
@@ -630,7 +630,6 @@ export default function PlanoAcaoDetalhe() {
                             </div>
                           </th>
                         )}
-                        <th className="sticky z-20 bg-muted/30 border-b border-r w-9 p-0" style={{ left: 40 + getColWidth(colunas[0]?.id || "", 200) }} />
                         {/* Scrollable columns */}
                         {colunas.slice(1).map((col: any, i: number) => (
                           <th key={col.id} className="border-b border-r p-0 group" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id) }}>
@@ -654,24 +653,20 @@ export default function PlanoAcaoDetalhe() {
                         const updates = atualizacoesByLinha[linha.id] || [];
                         const isExpanded = expandedLinhas.has(linha.id);
                         const firstCol = colunas[0];
-                        const stickyLeft2 = 40 + getColWidth(firstCol?.id || "", 200);
 
                         return (
                           <tr key={linha.id} className="group hover:bg-muted/20">
                             {/* # (sticky) */}
-                            <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9">{idx + 1}</td>
-                            {/* First column (sticky) */}
+                            <td className="sticky left-0 z-20 bg-background group-hover:bg-muted/20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>{idx + 1}</td>
+                            {/* First column (sticky) — with expand button inside */}
                             {firstCol && (
-                              <td className="sticky z-10 bg-background group-hover:bg-muted/20 border-b border-r p-0 overflow-hidden" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id) }}>
-                                {renderCell(firstCol, linha)}
+                              <td className="sticky z-20 bg-background group-hover:bg-muted/20 border-b border-r p-0 overflow-hidden" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
+                                <div className="flex items-center h-8">
+                                  <div className="flex-1 min-w-0">{renderCell(firstCol, linha)}</div>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mr-0.5" onClick={() => openLinhaModal(linha)}><Expand className="h-3 w-3" /></Button>
+                                </div>
                               </td>
                             )}
-                            {/* Expand button (sticky) */}
-                            <td className="sticky z-10 bg-background group-hover:bg-muted/20 border-b border-r p-0" style={{ left: stickyLeft2 }}>
-                              <div className="flex items-center justify-center h-full py-1">
-                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => openLinhaModal(linha)}><Expand className="h-3 w-3" /></Button>
-                              </div>
-                            </td>
                             {/* Scrollable columns */}
                             {colunas.slice(1).map((col: any) => (
                               <td key={col.id} className="border-b border-r p-0 overflow-hidden" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id) }}>
@@ -765,7 +760,7 @@ export default function PlanoAcaoDetalhe() {
           <DialogHeader className="flex-shrink-0"><DialogTitle>{editingTarefa ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle></DialogHeader>
           <Tabs value={editingTarefa ? tarefaModalTab : "detalhes"} onValueChange={setTarefaModalTab} className="flex-1 min-h-0 flex flex-col">
             {editingTarefa && <TabsList className="grid w-full grid-cols-2 flex-shrink-0"><TabsTrigger value="detalhes">Detalhes</TabsTrigger><TabsTrigger value="atualizacoes">Atualizações{tarefaAtualizacoes.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{tarefaAtualizacoes.length}</Badge>}</TabsTrigger></TabsList>}
-            <TabsContent value="detalhes" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4">
+            <TabsContent value="detalhes" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4 px-1 -mx-1">
               <div className="space-y-2"><Label>Título *</Label><Input value={tarefaTitulo} onChange={(e) => setTarefaTitulo(e.target.value)} placeholder="Ex: Licitação" /></div>
               <div className="space-y-2"><Label>Descrição</Label><Textarea value={tarefaDescricao} onChange={(e) => setTarefaDescricao(e.target.value)} rows={2} /></div>
               <div className="space-y-2"><Label>Responsável</Label><Input value={tarefaResponsavel} onChange={(e) => setTarefaResponsavel(e.target.value)} placeholder="Nome" /></div>
@@ -789,7 +784,7 @@ export default function PlanoAcaoDetalhe() {
       <Dialog open={showAddColuna} onOpenChange={setShowAddColuna}>
         <DialogContent className="sm:max-w-[450px] max-h-[85vh] flex flex-col">
           <DialogHeader className="flex-shrink-0"><DialogTitle>Nova Coluna</DialogTitle></DialogHeader>
-          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto px-1 -mx-1">
             <div className="space-y-2"><Label>Nome *</Label><Input value={colunaNome} onChange={(e) => setColunaNome(e.target.value)} placeholder="Ex: Observações" /></div>
             <div className="space-y-2"><Label>Tipo</Label><Select value={colunaTipo} onValueChange={setColunaTipo}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(colunaTipoLabels).filter(([k]) => k !== "select").map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}</SelectContent></Select></div>
             {colunaTipo === "status" && (
@@ -833,7 +828,7 @@ export default function PlanoAcaoDetalhe() {
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="atualizacoes">Atualizações{linhaAtualizacoes.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{linhaAtualizacoes.length}</Badge>}</TabsTrigger>
             </TabsList>
-            <TabsContent value="dados" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4">
+            <TabsContent value="dados" className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-4 px-1 -mx-1">
               {colunas.map((col: any) => (
                 <div key={col.id} className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground uppercase tracking-wider">{col.nome}</Label>
