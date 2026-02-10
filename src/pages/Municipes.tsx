@@ -24,6 +24,8 @@ import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
 import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
+import { ConfirmarNovasTagsDialog, NewTagData } from "@/components/forms/ConfirmarNovasTagsDialog";
+import { ConfirmarDuplicadosDialog, DuplicateMatch } from "@/components/forms/ConfirmarDuplicadosDialog";
 
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
@@ -52,6 +54,14 @@ export default function Municipes() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [municipeToDelete, setMunicipeToDelete] = useState<any>(null);
   const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
+  // Estados para fluxo de pré-importação (tags novas + duplicados)
+  const [pendingMunicipes, setPendingMunicipes] = useState<any[]>([]);
+  const [pendingTagMap, setPendingTagMap] = useState<Map<string, string>>(new Map());
+  const [pendingNewTags, setPendingNewTags] = useState<string[]>([]);
+  const [pendingDuplicates, setPendingDuplicates] = useState<DuplicateMatch[]>([]);
+  const [showConfirmTagsDialog, setShowConfirmTagsDialog] = useState(false);
+  const [showConfirmDuplicatesDialog, setShowConfirmDuplicatesDialog] = useState(false);
+  const [pendingRawTagNames, setPendingRawTagNames] = useState<Map<string, string>>(new Map()); // lowercase -> original
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(100);
@@ -309,10 +319,25 @@ export default function Municipes() {
     });
   };
 
-  // Função para processar CSV importado
+  // Helper para limpar telefone para comparação
+  const cleanPhoneNumber = (phone: string): string => {
+    return phone.replace(/\D/g, '').replace(/^55/, ''); // Remove não-dígitos e DDI 55
+  };
+
+  // Função para processar CSV importado (com suporte a updates)
   const importMunicipes = useMutation({
-    mutationFn: async (municipes: any[]) => {
-      console.log(`📥 Iniciando importação de ${municipes.length} munícipes`);
+    mutationFn: async ({ municipesToImport, duplicatesResolved, tagMap }: { 
+      municipesToImport: any[]; 
+      duplicatesResolved: DuplicateMatch[];
+      tagMap: Map<string, string>;
+    }) => {
+      console.log(`📥 Iniciando importação de ${municipesToImport.length} munícipes`);
+      
+      // Separar novos e atualizações
+      const duplicateMap = new Map<number, DuplicateMatch>();
+      duplicatesResolved.forEach(d => {
+        duplicateMap.set(d.csvIndex, d);
+      });
       
       const results: Array<{
         success: boolean;
@@ -325,14 +350,18 @@ export default function Municipes() {
         bairro?: string;
         cidade?: string;
         cep?: string;
+        action?: 'criado' | 'atualizado';
       }> = [];
       
-      // FASE 1: Importar munícipes
-      setImportProgress({ fase: 'importando', atual: 0, total: municipes.length });
+      // FASE 1: Importar/Atualizar munícipes
+      setImportProgress({ fase: 'importando', atual: 0, total: municipesToImport.length });
       
-      for (let i = 0; i < municipes.length; i++) {
-        const municipe = municipes[i];
-        setImportProgress({ fase: 'importando', atual: i + 1, total: municipes.length });
+      for (let i = 0; i < municipesToImport.length; i++) {
+        const municipe = municipesToImport[i];
+        setImportProgress({ fase: 'importando', atual: i + 1, total: municipesToImport.length });
+        
+        const duplicate = duplicateMap.get(municipe._csvIndex);
+        const isUpdate = duplicate?.action === 'atualizar';
         
         try {
           // Montar endereço completo
@@ -343,31 +372,99 @@ export default function Municipes() {
             if (municipe.complemento) endereco += ` - ${municipe.complemento}`;
           }
 
-          const { data, error } = await supabase
-            .from('municipes')
-            .insert({
-              nome: municipe.nome,
-              telefone: municipe.telefone || null,
-              email: municipe.email || null,
-              endereco: endereco || null,
-              bairro: municipe.bairro || null,
-              cidade: municipe.cidade || 'São Paulo',
-              cep: municipe.cep || null,
-              data_nascimento: municipe.data_nascimento || null,
-              observacoes: municipe.observacoes || null,
-              geocodificado: false
-            })
-            .select('id')
-            .single();
+          // Resolver tagIds usando o tagMap atualizado
+          const tagIds: string[] = [];
+          if (municipe._rawTagNames && municipe._rawTagNames.length > 0) {
+            for (const rawName of municipe._rawTagNames) {
+              const tagId = tagMap.get(rawName.toLowerCase());
+              if (tagId) tagIds.push(tagId);
+            }
+          }
 
-          if (error) {
-            results.push({ success: false, nome: municipe.nome, error: error.message });
+          let resultId: string;
+
+          if (isUpdate && duplicate) {
+            // ATUALIZAR munícipe existente - só campos com dados novos
+            const existingId = duplicate.existingMunicipe.id;
+            const updateData: any = {};
+            
+            if (municipe.nome) updateData.nome = municipe.nome;
+            if (municipe.email) updateData.email = municipe.email;
+            if (endereco) updateData.endereco = endereco;
+            if (municipe.bairro) updateData.bairro = municipe.bairro;
+            if (municipe.cidade) updateData.cidade = municipe.cidade;
+            if (municipe.cep) updateData.cep = municipe.cep;
+            if (municipe.data_nascimento) updateData.data_nascimento = municipe.data_nascimento;
+            if (municipe.observacoes) updateData.observacoes = municipe.observacoes;
+            // Reset geocoding se endereço mudou
+            if (endereco || municipe.bairro || municipe.cidade) {
+              updateData.geocodificado = false;
+            }
+            
+            const { error } = await supabase
+              .from('municipes')
+              .update(updateData)
+              .eq('id', existingId);
+
+            if (error) {
+              results.push({ success: false, nome: municipe.nome, error: error.message });
+              continue;
+            }
+            
+            resultId = existingId;
+            
+            // Para updates, adicionar tags novas (sem remover as existentes)
+            if (tagIds.length > 0) {
+              for (const tagId of tagIds) {
+                await supabase
+                  .from('municipe_tags')
+                  .upsert({ municipe_id: existingId, tag_id: tagId }, { onConflict: 'municipe_id,tag_id' })
+                  .select();
+              }
+            }
+            
+            results.push({ 
+              success: true, 
+              nome: municipe.nome, 
+              id: existingId,
+              geocodificado: false,
+              logradouro: municipe.logradouro,
+              numero: municipe.numero,
+              bairro: municipe.bairro,
+              cidade: municipe.cidade,
+              cep: municipe.cep,
+              action: 'atualizado'
+            });
+            
           } else {
-            // Se tem tags, tentar associar múltiplas tags
-            if (municipe.tagIds && municipe.tagIds.length > 0) {
-              console.log(`📋 Inserindo ${municipe.tagIds.length} tags para munícipe ${municipe.nome}:`, municipe.tagIds);
-              
-              const tagInserts = municipe.tagIds.map((tagId: string) => ({
+            // CRIAR novo munícipe
+            const { data, error } = await supabase
+              .from('municipes')
+              .insert({
+                nome: municipe.nome,
+                telefone: municipe.telefone || null,
+                email: municipe.email || null,
+                endereco: endereco || null,
+                bairro: municipe.bairro || null,
+                cidade: municipe.cidade || 'São Paulo',
+                cep: municipe.cep || null,
+                data_nascimento: municipe.data_nascimento || null,
+                observacoes: municipe.observacoes || null,
+                geocodificado: false
+              })
+              .select('id')
+              .single();
+
+            if (error) {
+              results.push({ success: false, nome: municipe.nome, error: error.message });
+              continue;
+            }
+            
+            resultId = data.id;
+
+            // Associar tags
+            if (tagIds.length > 0) {
+              const tagInserts = tagIds.map(tagId => ({
                 municipe_id: data.id,
                 tag_id: tagId
               }));
@@ -378,20 +475,6 @@ export default function Municipes() {
               
               if (tagError) {
                 console.warn(`❌ Erro ao associar tags para ${municipe.nome}:`, tagError);
-              } else {
-                console.log(`✅ ${tagInserts.length} tags associadas com sucesso para ${municipe.nome}`);
-              }
-            } else if (municipe.tagId) {
-              // Compatibilidade com formato antigo (uma única tag)
-              const { error: tagError } = await supabase
-                .from('municipe_tags')
-                .insert({
-                  municipe_id: data.id,
-                  tag_id: municipe.tagId
-                });
-              
-              if (tagError) {
-                console.warn(`❌ Erro ao associar tag para ${municipe.nome}:`, tagError);
               }
             }
             
@@ -404,7 +487,8 @@ export default function Municipes() {
               numero: municipe.numero,
               bairro: municipe.bairro,
               cidade: municipe.cidade,
-              cep: municipe.cep
+              cep: municipe.cep,
+              action: 'criado'
             });
           }
         } catch (err) {
@@ -412,7 +496,7 @@ export default function Municipes() {
         }
       }
       
-      // FASE 2: Geocodificar munícipes importados com sucesso
+      // FASE 2: Geocodificar munícipes importados/atualizados com sucesso
       const municipesSucesso = results.filter(r => r.success && r.id);
       const municipesComEndereco = municipesSucesso.filter(r => 
         r.logradouro || r.bairro || r.cidade
@@ -432,7 +516,7 @@ export default function Municipes() {
               mun.numero || '',
               mun.bairro || '',
               mun.cidade || '',
-              '' // Estado será inferido pela API de geocodificação
+              ''
             );
             
             if (coordenadas) {
@@ -456,7 +540,6 @@ export default function Municipes() {
               console.log(`⚠️ Não foi possível geocodificar: ${mun.nome}`);
             }
             
-            // Pequena pausa entre geocodificações para não sobrecarregar APIs
             await new Promise(resolve => setTimeout(resolve, 200));
             
           } catch (err) {
@@ -472,20 +555,21 @@ export default function Municipes() {
       const successCount = results.filter(r => r.success).length;
       const errorCount = results.filter(r => !r.success).length;
       const geocodificadosCount = results.filter(r => r.success && r.geocodificado).length;
+      const atualizadosCount = results.filter(r => r.success && r.action === 'atualizado').length;
+      const criadosCount = results.filter(r => r.success && r.action === 'criado').length;
       
       setImportResults(results);
       queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
       
-      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros, ${geocodificadosCount} geocodificados`);
+      console.log(`✅ Importação concluída: ${criadosCount} criados, ${atualizadosCount} atualizados, ${errorCount} erros, ${geocodificadosCount} geocodificados`);
       
-      if (geocodificadosCount > 0) {
-        toast({
-          title: "Importação concluída!",
-          description: `${successCount} munícipes importados, ${geocodificadosCount} geocodificados!`
-        });
-      }
+      toast({
+        title: "Importação concluída!",
+        description: `${criadosCount} criados, ${atualizadosCount} atualizados${geocodificadosCount > 0 ? `, ${geocodificadosCount} geocodificados` : ''}.`
+      });
     },
     onError: (error) => {
       setImportProgress(undefined);
@@ -493,6 +577,122 @@ export default function Municipes() {
       console.error('❌ Erro na importação:', error);
     }
   });
+
+  // ==== FLUXO DE PRÉ-IMPORTAÇÃO ====
+
+  // Passo final: iniciar importação de fato
+  const proceedWithImport = (
+    municipesToImport: any[], 
+    duplicatesResolved: DuplicateMatch[],
+    tagMap: Map<string, string>
+  ) => {
+    setImportResults([]);
+    importMunicipes.mutate({ municipesToImport, duplicatesResolved, tagMap });
+  };
+
+  // Após resolver duplicados → iniciar importação
+  const handleConfirmDuplicates = (resolved: DuplicateMatch[]) => {
+    setShowConfirmDuplicatesDialog(false);
+    proceedWithImport(pendingMunicipes, resolved, pendingTagMap);
+  };
+
+  // Checar duplicados e decidir próximo passo
+  const checkDuplicatesAndProceed = (municipesToCheck: any[], tagMap: Map<string, string>) => {
+    // Buscar duplicados por telefone
+    const duplicates: DuplicateMatch[] = [];
+    
+    municipesToCheck.forEach((csvMunicipe, index) => {
+      if (csvMunicipe.telefone && csvMunicipe.telefone.trim() !== '') {
+        const csvPhone = cleanPhoneNumber(csvMunicipe.telefone);
+        if (csvPhone.length >= 10) {
+          // Procurar nos munícipes existentes do banco
+          const existing = municipes.find(m => {
+            if (!m.telefone) return false;
+            return cleanPhoneNumber(m.telefone) === csvPhone;
+          });
+          
+          if (existing) {
+            duplicates.push({
+              csvIndex: csvMunicipe._csvIndex,
+              csvData: csvMunicipe,
+              existingMunicipe: existing,
+              action: 'atualizar' // padrão: atualizar
+            });
+          }
+        }
+      }
+    });
+    
+    if (duplicates.length > 0) {
+      setPendingDuplicates(duplicates);
+      setPendingMunicipes(municipesToCheck);
+      setPendingTagMap(tagMap);
+      setShowConfirmDuplicatesDialog(true);
+    } else {
+      // Sem duplicados → importar direto
+      proceedWithImport(municipesToCheck, [], tagMap);
+    }
+  };
+
+  // Após confirmar tags novas → criar no Supabase e seguir
+  const handleConfirmNewTags = async (tagsToCreate: NewTagData[]) => {
+    setShowConfirmTagsDialog(false);
+    
+    const updatedTagMap = new Map(pendingTagMap);
+    
+    for (const tag of tagsToCreate) {
+      try {
+        const { data, error } = await supabase
+          .from('tags')
+          .insert({ nome: tag.nome, cor: tag.cor })
+          .select('id')
+          .single();
+        
+        if (error) {
+          console.warn(`❌ Erro ao criar tag "${tag.nome}":`, error);
+          // Tentar buscar se já existir
+          const { data: existing } = await supabase
+            .from('tags')
+            .select('id')
+            .ilike('nome', tag.nome)
+            .single();
+          if (existing) {
+            updatedTagMap.set(tag.nome.toLowerCase(), existing.id);
+          }
+        } else if (data) {
+          updatedTagMap.set(tag.nome.toLowerCase(), data.id);
+          console.log(`✅ Tag "${tag.nome}" criada com cor ${tag.cor}`);
+        }
+      } catch (err) {
+        console.error(`❌ Erro ao criar tag "${tag.nome}":`, err);
+      }
+    }
+    
+    // Reatribuir tagIds nos munícipes com o mapa atualizado
+    const updatedMunicipes = pendingMunicipes.map(m => {
+      if (m._rawTagNames && m._rawTagNames.length > 0) {
+        const tagIds: string[] = [];
+        for (const rawName of m._rawTagNames) {
+          const tagId = updatedTagMap.get(rawName.toLowerCase());
+          if (tagId) tagIds.push(tagId);
+        }
+        return { ...m, tagIds };
+      }
+      return m;
+    });
+    
+    setPendingTagMap(updatedTagMap);
+    setPendingMunicipes(updatedMunicipes);
+    
+    // Próximo passo: checar duplicados
+    checkDuplicatesAndProceed(updatedMunicipes, updatedTagMap);
+  };
+
+  // Pular criação de tags → seguir para duplicados
+  const handleSkipNewTags = () => {
+    setShowConfirmTagsDialog(false);
+    checkDuplicatesAndProceed(pendingMunicipes, pendingTagMap);
+  };
 
   // Função para processar arquivo CSV
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -557,11 +757,15 @@ export default function Municipes() {
           .select('id, nome');
         
         const tagMap = new Map(existingTags?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
+        
+        // Coletar todas as tags novas (não existem no sistema)
+        const allNewTagNames = new Set<string>(); // nomes originais
+        const rawTagNamesMap = new Map<string, string>(); // lowercase -> original
 
         // Processar dados
-        const municipes = lines.slice(1).map((line, index) => {
+        const parsedMunicipes = lines.slice(1).map((line, index) => {
           const values = line.split(separator).map(v => v.replace(/"/g, '').trim());
-          const municipe: any = {};
+          const municipe: any = { _csvIndex: index };
 
           Object.keys(expectedColumns).forEach(key => {
             const possibleHeaders = expectedColumns[key as keyof typeof expectedColumns];
@@ -569,21 +773,18 @@ export default function Municipes() {
             
             if (headerIndex !== -1 && values[headerIndex]) {
               if (key === 'data_nascimento') {
-                // Tentar converter data no formato brasileiro DD/MM/AAAA
                 const dateValue = values[headerIndex];
                 if (dateValue && dateValue !== '') {
                   try {
                     let date: Date;
                     
-                    // Verificar se está no formato brasileiro DD/MM/AAAA ou DD/MM/AA
                     if (dateValue.includes('/')) {
                       const parts = dateValue.split('/');
                       if (parts.length === 3) {
                         const day = parseInt(parts[0]);
-                        const month = parseInt(parts[1]) - 1; // Mês é 0-indexado no JS
+                        const month = parseInt(parts[1]) - 1;
                         let year = parseInt(parts[2]);
                         
-                        // Se ano tem 2 dígitos, assumir 19xx ou 20xx
                         if (year < 100) {
                           year = year > 30 ? 1900 + year : 2000 + year;
                         }
@@ -593,7 +794,6 @@ export default function Municipes() {
                         date = new Date(dateValue);
                       }
                     } else {
-                      // Formato ISO ou outro
                       date = new Date(dateValue);
                     }
                     
@@ -601,56 +801,46 @@ export default function Municipes() {
                       municipe[key] = date.toISOString().split('T')[0];
                     }
                   } catch {
-                     // Ignorar datas inválidas
-                   }
-                 }
-                } else if (key === 'tag' || key === 'tags') {
-                  // Processar múltiplas tags - separadas por vírgula, ponto e vírgula, ou pipe
-                  const tagNames = values[headerIndex];
-                  if (tagNames && tagNames.trim() !== '') {
-                    console.log(`📋 Processando tags para ${municipe.nome || 'N/A'}: "${tagNames}"`);
-                    
-                    // Separar tags usando regex para múltiplos separadores
-                    const tagList = tagNames.split(/[,;|]/)
-                      .map(name => name.trim())
-                      .filter(name => name !== '');
-                    
-                    // Processar as tags (já limpos)
-                    const cleanTagList = tagList.map(name => name.toLowerCase());
-                    
-                    console.log(`📋 Tags encontradas: ${cleanTagList.join(', ')}`);
-                    
-                    const tagIds: string[] = [];
-                    cleanTagList.forEach(tagName => {
-                      const tagId = tagMap.get(tagName);
-                      if (tagId) {
-                        tagIds.push(tagId);
-                        console.log(`✅ Tag "${tagName}" encontrada com ID: ${tagId}`);
-                      } else {
-                        console.log(`❌ Tag "${tagName}" não encontrada no sistema`);
-                      }
-                    });
-                    
-                    if (tagIds.length > 0) {
-                      municipe.tagIds = tagIds;
-                      console.log(`📋 Total de ${tagIds.length} tags associadas ao munícipe ${municipe.nome || 'N/A'}`);
-                    }
+                    // Ignorar datas inválidas
                   }
-                } else {
-                  municipe[key] = values[headerIndex];
                 }
+              } else if (key === 'tag' || key === 'tags') {
+                const tagNames = values[headerIndex];
+                if (tagNames && tagNames.trim() !== '') {
+                  const tagList = tagNames.split(/[,|]/)
+                    .map(name => name.trim())
+                    .filter(name => name !== '');
+                  
+                  // Armazenar nomes brutos para uso posterior
+                  municipe._rawTagNames = tagList;
+                  
+                  const tagIds: string[] = [];
+                  tagList.forEach(rawName => {
+                    const lowerName = rawName.toLowerCase();
+                    const tagId = tagMap.get(lowerName);
+                    if (tagId) {
+                      tagIds.push(tagId);
+                    } else {
+                      // Tag não existe - marcar como nova
+                      allNewTagNames.add(rawName);
+                      rawTagNamesMap.set(lowerName, rawName);
+                    }
+                  });
+                  
+                  if (tagIds.length > 0) {
+                    municipe.tagIds = tagIds;
+                  }
+                }
+              } else {
+                municipe[key] = values[headerIndex];
               }
-            });
+            }
+          });
 
-            console.log(`📋 Linha ${index + 2}: ${JSON.stringify(municipe)}`);
-            return municipe;
-        }).filter(m => {
-          const hasName = m.nome && m.nome.trim() !== '';
-          console.log(`📋 Munícipe ${m.nome || 'sem nome'}: ${hasName ? 'válido' : 'inválido'}`);
-          return hasName;
-        }); // Só importar se tiver nome
+          return municipe;
+        }).filter(m => m.nome && m.nome.trim() !== '');
 
-        if (municipes.length === 0) {
+        if (parsedMunicipes.length === 0) {
           toast({
             title: "Nenhum dado válido",
             description: "Não foram encontrados munícipes válidos no arquivo. Certifique-se de que há uma coluna 'nome'.",
@@ -659,9 +849,23 @@ export default function Municipes() {
           return;
         }
 
-        // Limpar resultados anteriores antes de nova importação
+        console.log(`📋 ${parsedMunicipes.length} munícipes válidos, ${allNewTagNames.size} tags novas`);
+
+        // Armazenar dados para o fluxo de confirmação
+        setPendingMunicipes(parsedMunicipes);
+        setPendingTagMap(tagMap);
+        setPendingRawTagNames(rawTagNamesMap);
         setImportResults([]);
-        importMunicipes.mutate(municipes);
+
+        // Se há tags novas → mostrar dialog de confirmação
+        if (allNewTagNames.size > 0) {
+          setPendingNewTags(Array.from(allNewTagNames));
+          setShowConfirmTagsDialog(true);
+        } else {
+          // Sem tags novas → checar duplicados direto
+          checkDuplicatesAndProceed(parsedMunicipes, tagMap);
+        }
+        
       } catch (error) {
         toast({
           title: "Erro ao processar arquivo",
@@ -671,10 +875,8 @@ export default function Municipes() {
       }
     };
     
-    // Forçar codificação UTF-8 para resolver problemas de caracteres especiais
     reader.readAsText(file, 'UTF-8');
     
-    // Limpar input para permitir re-upload do mesmo arquivo
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -1705,6 +1907,23 @@ export default function Municipes() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Dialog para confirmar criação de novas tags */}
+        <ConfirmarNovasTagsDialog
+          open={showConfirmTagsDialog}
+          onOpenChange={setShowConfirmTagsDialog}
+          newTags={pendingNewTags}
+          onConfirm={handleConfirmNewTags}
+          onSkip={handleSkipNewTags}
+        />
+
+        {/* Dialog para confirmar duplicados */}
+        <ConfirmarDuplicadosDialog
+          open={showConfirmDuplicatesDialog}
+          onOpenChange={setShowConfirmDuplicatesDialog}
+          duplicates={pendingDuplicates}
+          onConfirm={handleConfirmDuplicates}
+        />
 
         
       </div>
