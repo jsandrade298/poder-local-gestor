@@ -6,10 +6,11 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { formatDateTime } from '@/lib/dateUtils';
+import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
 import { logError } from '@/lib/errorUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
@@ -40,6 +41,9 @@ interface Demanda {
   tipo?: 'demanda' | 'tarefa';
   tarefa_responsavel_id?: string;
   eixo_id?: string;
+  checklist_total?: number;
+  checklist_done?: number;
+  comentarios_count?: number;
 }
 
 interface Tarefa {
@@ -152,6 +156,41 @@ export default function Kanban() {
           tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
         ) || [];
       }
+
+      // ── Batch fetch checklist counts para todas as tarefas ──
+      const tarefaIds = tarefasData.map(t => t.id);
+      let checklistCounts: Record<string, { total: number; done: number }> = {};
+      let commentCounts: Record<string, number> = {};
+
+      if (tarefaIds.length > 0) {
+        // Checklist items
+        const { data: checklistData } = await supabase
+          .from('tarefa_checklist_items')
+          .select('tarefa_id, concluido')
+          .in('tarefa_id', tarefaIds);
+
+        if (checklistData) {
+          for (const item of checklistData) {
+            if (!checklistCounts[item.tarefa_id]) {
+              checklistCounts[item.tarefa_id] = { total: 0, done: 0 };
+            }
+            checklistCounts[item.tarefa_id].total++;
+            if (item.concluido) checklistCounts[item.tarefa_id].done++;
+          }
+        }
+
+        // Comentários count
+        const { data: commentData } = await supabase
+          .from('tarefa_comentarios')
+          .select('tarefa_id')
+          .in('tarefa_id', tarefaIds);
+
+        if (commentData) {
+          for (const item of commentData) {
+            commentCounts[item.tarefa_id] = (commentCounts[item.tarefa_id] || 0) + 1;
+          }
+        }
+      }
       
       // Combinar tarefas formatadas
       const tarefasFormatadas = tarefasData?.map(tarefa => ({
@@ -162,12 +201,15 @@ export default function Kanban() {
         status: tarefa.completed ? 'atendido' : 'solicitada',
         kanban_position: tarefa.kanban_position,
         prioridade: tarefa.prioridade,
-        data_prazo: null,
+        data_prazo: tarefa.data_prazo || null,
         created_at: tarefa.created_at,
         responsavel_id: tarefa.responsavel_id || tarefa.created_by,
         tipo: 'tarefa' as const,
         cor: tarefa.cor || '#3B82F6',
-        colaboradores: tarefa.tarefa_colaboradores?.map((tc: any) => tc.colaborador) || []
+        colaboradores: tarefa.tarefa_colaboradores?.map((tc: any) => tc.colaborador) || [],
+        checklist_total: checklistCounts[tarefa.id]?.total || 0,
+        checklist_done: checklistCounts[tarefa.id]?.done || 0,
+        comentarios_count: commentCounts[tarefa.id] || 0,
       })) || [];
       
       return [...demandasCompletas, ...tarefasFormatadas];
@@ -255,8 +297,6 @@ export default function Kanban() {
             if (selectedUserCorreto !== selectedUser) {
               console.log('🔄 Mudando selectedUser para:', selectedUserCorreto);
               setSelectedUser(selectedUserCorreto);
-              // Aguardar o kanban recarregar com o novo usuário
-              // O modal será aberto na próxima renderização quando a tarefa estiver disponível
             } else {
               toast.error("Tarefa não encontrada neste kanban");
             }
@@ -433,7 +473,8 @@ export default function Kanban() {
   const isOverdue = (dataPrazo: string | null) => {
     if (!dataPrazo) return false;
     const today = new Date();
-    const prazo = new Date(dataPrazo);
+    today.setHours(0, 0, 0, 0);
+    const prazo = new Date(dataPrazo.includes('T') ? dataPrazo : dataPrazo + 'T12:00:00');
     return today > prazo;
   };
 
@@ -716,6 +757,27 @@ export default function Kanban() {
                                       {demanda.descricao}
                                     </p>
                                   )}
+
+                                  {/* ── Indicador de checklist (apenas tarefas) ── */}
+                                  {demanda.tipo === 'tarefa' && (demanda as any).checklist_total > 0 && (
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <div className="flex items-center gap-1">
+                                          <CheckSquare className="h-3 w-3" />
+                                          <span>
+                                            {(demanda as any).checklist_done}/{(demanda as any).checklist_total}
+                                          </span>
+                                        </div>
+                                        <span>
+                                          {Math.round(((demanda as any).checklist_done / (demanda as any).checklist_total) * 100)}%
+                                        </span>
+                                      </div>
+                                      <Progress 
+                                        value={Math.round(((demanda as any).checklist_done / (demanda as any).checklist_total) * 100)} 
+                                        className="h-1.5" 
+                                      />
+                                    </div>
+                                  )}
                                   
                                   <div className="flex items-center justify-between">
                                     <Badge 
@@ -734,7 +796,7 @@ export default function Kanban() {
                                         isOverdue(demanda.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
                                       }`}>
                                         <Calendar className="h-3 w-3" />
-                                        {formatDateTime(demanda.data_prazo)}
+                                        {formatDateOnly(demanda.data_prazo)}
                                         {isOverdue(demanda.data_prazo) && (
                                           <AlertTriangle className="h-3 w-3 ml-1" />
                                         )}
@@ -767,6 +829,14 @@ export default function Kanban() {
                                   {demanda.tipo === 'tarefa' && (demanda as any).colaboradores?.length > 0 && (
                                     <div className="text-xs text-muted-foreground">
                                       <strong>Colaboradores:</strong> {(demanda as any).colaboradores.map((c: any) => c.nome).join(', ')}
+                                    </div>
+                                  )}
+
+                                  {/* ── Badges de comentários (apenas tarefas com comentários) ── */}
+                                  {demanda.tipo === 'tarefa' && (demanda as any).comentarios_count > 0 && (
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <MessageSquare className="h-3 w-3" />
+                                      <span>{(demanda as any).comentarios_count} comentário{(demanda as any).comentarios_count !== 1 ? 's' : ''}</span>
                                     </div>
                                   )}
                                 </CardContent>
