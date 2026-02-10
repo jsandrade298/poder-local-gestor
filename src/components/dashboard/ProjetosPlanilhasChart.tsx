@@ -55,6 +55,8 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
             <BarChart
               data={data}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              barCategoryGap="20%"
+              barGap={4}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -84,14 +86,14 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
                 fill="#8b5cf6"
                 name="projetos"
                 radius={[4, 4, 0, 0]}
-                maxBarSize={40}
+                maxBarSize={70}
               />
               <Bar
                 dataKey="planilhas"
                 fill="#06b6d4"
                 name="planilhas"
                 radius={[4, 4, 0, 0]}
-                maxBarSize={40}
+                maxBarSize={70}
               />
             </BarChart>
           </ResponsiveContainer>
