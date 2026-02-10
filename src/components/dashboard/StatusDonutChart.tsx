@@ -43,15 +43,15 @@ export function StatusDonutChart({ title, data, total }: StatusDonutChartProps) 
       <CardContent>
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {/* Donut */}
-          <div className="relative w-48 h-48 flex-shrink-0">
+          <div className="relative w-60 h-60 flex-shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={54}
-                  outerRadius={85}
+                  innerRadius={68}
+                  outerRadius={110}
                   paddingAngle={2}
                   dataKey="value"
                   stroke="none"
@@ -79,7 +79,7 @@ export function StatusDonutChart({ title, data, total }: StatusDonutChartProps) 
             </ResponsiveContainer>
             {/* Center label */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-bold text-foreground">
+              <span className="text-3xl font-bold text-foreground">
                 {total}
               </span>
               <span className="text-[11px] text-muted-foreground">total</span>
@@ -88,7 +88,7 @@ export function StatusDonutChart({ title, data, total }: StatusDonutChartProps) 
 
           {/* Legend */}
           <div className="flex-1 w-full">
-            <div className="space-y-1 max-h-[220px] overflow-y-auto">
+            <div className="space-y-1 max-h-[260px] overflow-y-auto">
               {data.map((item) => (
                 <div
                   key={item.slug}
