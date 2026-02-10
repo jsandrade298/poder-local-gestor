@@ -1302,22 +1302,23 @@ export default function Demandas() {
 
         {/* Filtros */}
         <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Filter className="h-4 w-4" />
               Filtros
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
-              <div className="relative xl:col-span-2">
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+          <CardContent className="space-y-3">
+            {/* Linha 1: Buscar + filtros principais */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div className="sm:col-span-2 xl:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Buscar
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
-                    placeholder="Buscar por título, protocolo ou munícipe..."
+                    placeholder="Título, protocolo ou munícipe..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -1326,12 +1327,12 @@ export default function Demandas() {
               </div>
               
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Status
                 </label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os status</SelectItem>
@@ -1351,12 +1352,12 @@ export default function Demandas() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Área
                 </label>
                 <Select value={areaFilter} onValueChange={setAreaFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Área" />
+                    <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as áreas</SelectItem>
@@ -1370,12 +1371,12 @@ export default function Demandas() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Munícipe
                 </label>
                 <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Munícipe" />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os munícipes</SelectItem>
@@ -1391,12 +1392,12 @@ export default function Demandas() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Responsável
                 </label>
                 <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Responsável" />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os responsáveis</SelectItem>
@@ -1408,14 +1409,17 @@ export default function Demandas() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
+            {/* Linha 2: Localização + Atraso + Período */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Cidade
                 </label>
                 <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Cidade" />
+                    <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as cidades</SelectItem>
@@ -1429,12 +1433,12 @@ export default function Demandas() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Bairro
                 </label>
                 <Select value={bairroFilter} onValueChange={setBairroFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Bairro" />
+                    <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os bairros</SelectItem>
@@ -1448,12 +1452,12 @@ export default function Demandas() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Atraso
                 </label>
                 <Select value={atrasoFilter} onValueChange={setAtrasoFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Atraso" />
+                    <SelectValue placeholder="Sem filtro" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Sem filtro de atraso</SelectItem>
@@ -1465,40 +1469,39 @@ export default function Demandas() {
                 </Select>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  De
+              {/* Período agrupado */}
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Período de criação
                 </label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  max={dateTo || undefined}
-                  className="w-full"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    max={dateTo || undefined}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground flex-shrink-0">até</span>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    min={dateFrom || undefined}
+                    className="flex-1"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Até
-                </label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  min={dateFrom || undefined}
-                  className="w-full"
-                />
+              <div className="flex items-end">
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Limpar Filtros
+                </Button>
               </div>
-
             </div>
-            
-            {/* Linha separada para controles inferiores */}
-            <div className="flex items-center justify-between pt-4">
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar Filtros
-              </Button>
-              
+
+            {/* Controles de paginação */}
+            <div className="flex items-center justify-end pt-2 border-t border-border/30">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Mostrar:</span>
