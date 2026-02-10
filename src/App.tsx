@@ -27,6 +27,7 @@ import Areas from "./pages/Areas";
 import Usuarios from "./pages/Usuarios";
 import Configuracoes from "./pages/Configuracoes";
 import MapaUnificado from "./pages/MapaUnificado";
+import BalancoDemandas from "./pages/BalancoDemandas";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/usuarios" element={<Usuarios />} />
               <Route path="/config" element={<Configuracoes />} />
               <Route path="/mapa" element={<MapaUnificado />} />
+              <Route path="/balanco-demandas" element={<BalancoDemandas />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
