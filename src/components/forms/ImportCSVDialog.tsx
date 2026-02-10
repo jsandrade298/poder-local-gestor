@@ -26,6 +26,7 @@ interface ImportCSVDialogProps {
     atual: number;
     total: number;
   };
+  onClearResults?: () => void;
 }
 
 export function ImportCSVDialog({ 
@@ -33,7 +34,8 @@ export function ImportCSVDialog({
   isImporting, 
   fileInputRef, 
   importResults,
-  importProgress 
+  importProgress,
+  onClearResults
 }: ImportCSVDialogProps) {
   const [open, setOpen] = useState(false);
   const [showingResults, setShowingResults] = useState(false);
@@ -142,6 +144,9 @@ export function ImportCSVDialog({
   // Função para voltar ao início do processo
   const handleStartOver = () => {
     setShowingResults(false);
+    if (onClearResults) {
+      onClearResults();
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
