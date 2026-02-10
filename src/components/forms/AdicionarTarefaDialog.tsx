@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Palette } from "lucide-react";
+import { Plus, Palette, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 interface AdicionarTarefaDialogProps {
@@ -34,7 +34,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
     descricao: "",
     prioridade: "media",
     posicao: "a_fazer",
-    cor: "#3B82F6"
+    cor: "#3B82F6",
+    data_prazo: ""
   });
 
   const queryClient = useQueryClient();
@@ -81,6 +82,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           kanban_position: tarefa.posicao,
           kanban_type: kanbanType,
           cor: tarefa.cor,
+          data_prazo: tarefa.data_prazo || null,
           created_by: userId
         })
         .select()
@@ -118,7 +120,6 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
 
         if (notificacoesError) {
           console.error('Erro ao criar notificações:', notificacoesError);
-          // Não falha a operação por causa das notificações
         }
       }
 
@@ -132,7 +133,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         descricao: "",
         prioridade: "media",
         posicao: "a_fazer",
-        cor: "#3B82F6"
+        cor: "#3B82F6",
+        data_prazo: ""
       });
       setColaboradoresSelecionados([]);
       setOpen(false);
@@ -168,7 +170,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           Adicionar Tarefa
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
         </DialogHeader>
@@ -257,6 +259,20 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Campo de prazo */}
+          <div className="space-y-2">
+            <Label htmlFor="data_prazo" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Data de Prazo
+            </Label>
+            <Input
+              id="data_prazo"
+              type="date"
+              value={formData.data_prazo}
+              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value })}
+            />
           </div>
 
           <div className="space-y-2">
