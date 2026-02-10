@@ -39,7 +39,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     complemento: "",
     observacoes: "",
     resolucao: "",
-    humor: null as HumorType
+    humor: null as HumorType,
+    origem: ""
   });
 
   const queryClient = useQueryClient();
@@ -203,7 +204,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         complemento: demanda.complemento || "",
         observacoes: demanda.observacoes || "",
         resolucao: demanda.resolucao || "",
-        humor: demanda.humor || null
+        humor: demanda.humor || null,
+        origem: demanda.origem || ""
       });
     }
   }, [demanda]);
@@ -333,6 +335,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         observacoes: data.observacoes || null,
         resolucao: data.resolucao || null,
         humor: data.humor || null,
+        origem: data.origem || null,
         // Coordenadas atualizadas pela geocodificação
         latitude,
         longitude,
@@ -905,6 +908,31 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                   onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="origem">Origem da Demanda</Label>
+              <Select
+                value={formData.origem}
+                onValueChange={(value) => 
+                  setFormData(prev => ({ ...prev, origem: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp_mandato">WhatsApp Mandato</SelectItem>
+                  <SelectItem value="whatsapp_assessoria">WhatsApp Assessoria</SelectItem>
+                  <SelectItem value="whatsapp_parlamentar">WhatsApp Parlamentar</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="tiktok">Tiktok</SelectItem>
+                  <SelectItem value="gabinete">Gabinete</SelectItem>
+                  <SelectItem value="em_agenda">Em Agenda</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
