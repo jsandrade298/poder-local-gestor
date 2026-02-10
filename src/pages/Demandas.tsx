@@ -36,6 +36,8 @@ export default function Demandas() {
   const [cidadeFilter, setCidadeFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
   const [atrasoFilter, setAtrasoFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedDemanda, setSelectedDemanda] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -322,9 +324,29 @@ export default function Demandas() {
       }
     }
 
-      return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso;
+    // Filtro de período (data de criação)
+    let matchesDateRange = true;
+    if (dateFrom || dateTo) {
+      const createdAt = demanda.created_at ? new Date(demanda.created_at) : null;
+      if (!createdAt) {
+        matchesDateRange = false;
+      } else {
+        if (dateFrom) {
+          const from = new Date(dateFrom);
+          from.setHours(0, 0, 0, 0);
+          if (createdAt < from) matchesDateRange = false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          if (createdAt > to) matchesDateRange = false;
+        }
+      }
+    }
+
+      return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso && matchesDateRange;
     });
-  }, [demandas, debouncedSearchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
+  }, [demandas, debouncedSearchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo]);
 
   // Paginação para dados filtrados (quando pageSize !== "all")
   const paginatedDemandas = pageSize === "all" 
@@ -337,7 +359,7 @@ export default function Demandas() {
   // Resetar página quando mudar filtros (exceto search)
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter]);
+  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo]);
 
 
   // Mutação para excluir demanda
@@ -412,6 +434,8 @@ export default function Demandas() {
     setCidadeFilter("all");
     setBairroFilter("all");
     setAtrasoFilter("all");
+    setDateFrom("");
+    setDateTo("");
   };
 
   // Função para exportar CSV
@@ -1285,7 +1309,7 @@ export default function Demandas() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
               <div className="relative xl:col-span-2">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
                   Buscar
@@ -1439,6 +1463,32 @@ export default function Demandas() {
                     <SelectItem value="90">Mais de 90 dias</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  De
+                </label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  max={dateTo || undefined}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Até
+                </label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  min={dateFrom || undefined}
+                  className="w-full"
+                />
               </div>
 
             </div>
