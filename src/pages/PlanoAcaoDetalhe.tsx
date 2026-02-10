@@ -618,11 +618,11 @@ export default function PlanoAcaoDetalhe() {
                     <thead>
                       <tr className="bg-muted/30">
                         {/* Sticky: # + first column + expand */}
-                        <th className="sticky left-0 z-30 bg-muted/30 border-b border-r w-10 text-center text-xs font-medium text-muted-foreground p-0" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
+                        <th className="sticky left-0 z-30 bg-muted border-b border-r w-10 text-center text-xs font-medium text-muted-foreground p-0" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
                           <div className="px-2 py-2.5">#</div>
                         </th>
                         {colunas[0] && (
-                          <th className="sticky z-30 bg-muted/30 border-b border-r p-0 group" style={{ left: 40, width: getColWidth(colunas[0].id), minWidth: getColWidth(colunas[0].id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
+                          <th className="sticky z-30 bg-muted border-b border-r p-0 group" style={{ left: 40, width: getColWidth(colunas[0].id), minWidth: getColWidth(colunas[0].id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
                             <div className="flex items-center justify-between px-2 py-2 relative">
                               <span className="text-xs font-medium truncate">{colunas[0].nome}</span>
                               {renderColMenu(colunas[0], 0)}
@@ -657,10 +657,10 @@ export default function PlanoAcaoDetalhe() {
                         return (
                           <tr key={linha.id} className="group hover:bg-muted/20">
                             {/* # (sticky) */}
-                            <td className="sticky left-0 z-20 bg-background group-hover:bg-muted/20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>{idx + 1}</td>
+                            <td className="sticky left-0 z-20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9 bg-background" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>{idx + 1}</td>
                             {/* First column (sticky) — with expand button inside */}
                             {firstCol && (
-                              <td className="sticky z-20 bg-background group-hover:bg-muted/20 border-b border-r p-0 overflow-hidden" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
+                              <td className="sticky z-20 border-b border-r p-0 overflow-hidden bg-background" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
                                 <div className="flex items-center h-8">
                                   <div className="flex-1 min-w-0">{renderCell(firstCol, linha)}</div>
                                   <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mr-0.5" onClick={() => openLinhaModal(linha)}><Expand className="h-3 w-3" /></Button>
