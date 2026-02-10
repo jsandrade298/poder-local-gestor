@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tag, Plus, Check, X } from "lucide-react";
+import { Tag, Plus, X } from "lucide-react";
 
 const colorOptions = [
   "#3b82f6", // blue
@@ -51,10 +50,8 @@ export function ConfirmarNovasTagsDialog({
   onConfirm,
   onSkip
 }: ConfirmarNovasTagsDialogProps) {
-  // Inicializar cada tag com uma cor aleatória diferente
   const [tagColors, setTagColors] = useState<Record<string, string>>({});
 
-  // Atualizar quando newTags mudam
   useEffect(() => {
     if (newTags.length > 0) {
       const initial: Record<string, string> = {};
@@ -79,59 +76,57 @@ export function ConfirmarNovasTagsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5 text-blue-500" />
             Novas Tags Encontradas
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-          <p className="text-sm text-muted-foreground">
-            A planilha contém <strong>{newTags.length} tag{newTags.length > 1 ? 's' : ''}</strong> que 
-            ainda não existe{newTags.length > 1 ? 'm' : ''} no sistema. 
-            Escolha uma cor para cada tag e confirme a criação, ou pule para importar sem essas tags.
-          </p>
+        <p className="text-sm text-muted-foreground flex-shrink-0">
+          A planilha contém <strong>{newTags.length} tag{newTags.length > 1 ? 's' : ''}</strong> que 
+          ainda não existe{newTags.length > 1 ? 'm' : ''} no sistema. 
+          Escolha uma cor para cada tag e confirme a criação, ou pule para importar sem essas tags.
+        </p>
 
-          <ScrollArea className="flex-1 max-h-[400px] pr-4">
-            <div className="space-y-4">
-              {newTags.map((tagName) => (
-                <div key={tagName} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      style={{ backgroundColor: tagColors[tagName], color: 'white' }}
-                      className="text-sm px-3 py-1"
-                    >
-                      {tagName}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      {colorNames[tagColors[tagName]] || 'Cor'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex gap-2 flex-wrap">
-                    {colorOptions.map((color) => (
-                      <button
-                        key={color}
-                        className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
-                          tagColors[tagName] === color 
-                            ? 'border-foreground scale-110 ring-2 ring-offset-2 ring-offset-background' 
-                            : 'border-transparent'
-                        }`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => handleColorChange(tagName, color)}
-                        title={colorNames[color]}
-                      />
-                    ))}
-                  </div>
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
+          <div className="space-y-4 pb-2">
+            {newTags.map((tagName) => (
+              <div key={tagName} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge 
+                    style={{ backgroundColor: tagColors[tagName], color: 'white' }}
+                    className="text-sm px-3 py-1"
+                  >
+                    {tagName}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {colorNames[tagColors[tagName]] || 'Cor'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
+                
+                <div className="flex gap-2 flex-wrap">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color}
+                      className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
+                        tagColors[tagName] === color 
+                          ? 'border-foreground scale-110 ring-2 ring-offset-2 ring-offset-background' 
+                          : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => handleColorChange(tagName, color)}
+                      title={colorNames[color]}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <DialogFooter className="flex gap-2 sm:justify-between">
+        <DialogFooter className="flex gap-2 sm:justify-between flex-shrink-0 pt-4 border-t">
           <Button variant="outline" onClick={onSkip} className="gap-2">
             <X className="h-4 w-4" />
             Pular (não criar tags)
