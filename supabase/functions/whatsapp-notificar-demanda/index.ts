@@ -10,6 +10,7 @@ interface NotificacaoDemanda {
   demanda_id: string;
   municipe_nome: string;
   municipe_telefone: string;
+  municipe_bairro?: string;
   status: string;
   status_anterior?: string;
   titulo_demanda: string;
@@ -61,12 +62,21 @@ serve(async (req: Request) => {
       throw new Error('Configurações incompletas');
     }
 
-    // Personalizar mensagem
+    // Personalizar mensagem - substituir TODAS as variáveis
+    const primeiroNome = (notificacao.municipe_nome || '').split(' ')[0];
+    const agora = new Date();
+    const dataAtual = agora.toLocaleDateString('pt-BR');
+    const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     const mensagemPersonalizada = mensagemTemplate
-      .replace('{nome}', notificacao.municipe_nome)
-      .replace('{status}', notificacao.status)
-      .replace('{protocolo}', notificacao.protocolo)
-      .replace('{titulo}', notificacao.titulo_demanda);
+      .replace(/\{nome\}/gi, notificacao.municipe_nome || '')
+      .replace(/\{primeiro_nome\}/gi, primeiroNome)
+      .replace(/\{status\}/gi, notificacao.status || '')
+      .replace(/\{protocolo\}/gi, notificacao.protocolo || '')
+      .replace(/\{titulo\}/gi, notificacao.titulo_demanda || '')
+      .replace(/\{bairro\}/gi, notificacao.municipe_bairro || '')
+      .replace(/\{data\}/gi, dataAtual)
+      .replace(/\{hora\}/gi, horaAtual);
 
     // Enviar via WhatsApp
     const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
