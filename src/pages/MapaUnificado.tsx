@@ -6,7 +6,7 @@ import { ClusterMap } from '@/components/mapa/ClusterMap';
 import { HeatmapControls } from '@/components/mapa/HeatmapControls';
 import { ShapefileUpload } from '@/components/mapa/ShapefileUpload';
 import { VotosUpload } from '@/components/mapa/VotosUpload';
-import { useCamadasGeograficas } from '@/hooks/useCamadasGeograficas';
+import { useCamadasGeograficas, EstiloContorno } from '@/hooks/useCamadasGeograficas';
 import { useDadosEleitorais } from '@/hooks/useDadosEleitorais';
 import { useRotas, Rota } from '@/hooks/useRotas';
 import { calcularEstatisticasPorRegiao, getFeatureName, filtrarPorRegiao } from '@/lib/geoUtils';
@@ -131,6 +131,7 @@ export default function MapaUnificado() {
     toggleVisibilidade,
     atualizarCor,
     atualizarOpacidade,
+    atualizarPropriedades,
     removerCamada,
     isLoading: isLoadingCamadas
   } = useCamadasGeograficas();
@@ -1453,7 +1454,10 @@ export default function MapaUnificado() {
                               <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <div 
                                   className="w-4 h-4 rounded flex-shrink-0"
-                                  style={{ backgroundColor: camada.cor_padrao }}
+                                  style={{ 
+                                    backgroundColor: camada.propriedades?.preenchimento !== false ? camada.cor_padrao : 'transparent',
+                                    border: `2px ${camada.propriedades?.estilo_contorno === 'pontilhado' ? 'dotted' : camada.propriedades?.estilo_contorno === 'tracado' ? 'dashed' : 'solid'} ${camada.cor_padrao}`
+                                  }}
                                 />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium truncate">{camada.nome}</p>
@@ -1477,7 +1481,7 @@ export default function MapaUnificado() {
                                   )}
                                 </Button>
                                 
-                                {/* Popover de Cor e Opacidade */}
+                                {/* Popover de Estilo Visual */}
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <Button
@@ -1490,6 +1494,7 @@ export default function MapaUnificado() {
                                   </PopoverTrigger>
                                   <PopoverContent className="w-72" align="end">
                                     <div className="space-y-4">
+                                      {/* Cor */}
                                       <div className="space-y-2">
                                         <label className="text-sm font-medium">Cor da camada</label>
                                         <div className="flex gap-2">
@@ -1508,6 +1513,7 @@ export default function MapaUnificado() {
                                         </div>
                                       </div>
                                       
+                                      {/* Opacidade */}
                                       <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                           Opacidade: {Math.round((camada.opacidade || 0.5) * 100)}%
@@ -1525,6 +1531,100 @@ export default function MapaUnificado() {
                                           step={5}
                                           className="w-full"
                                         />
+                                      </div>
+
+                                      {/* Separador visual */}
+                                      <div className="border-t pt-3 space-y-3">
+                                        {/* Preenchimento */}
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-sm font-medium">Preenchimento</label>
+                                          <Switch
+                                            checked={camada.propriedades?.preenchimento !== false}
+                                            onCheckedChange={(checked) => {
+                                              atualizarPropriedades.mutate({
+                                                id: camada.id,
+                                                propriedades: { preenchimento: checked }
+                                              });
+                                            }}
+                                          />
+                                        </div>
+
+                                        {/* Estilo do Contorno */}
+                                        <div className="space-y-1.5">
+                                          <label className="text-sm font-medium">Estilo do contorno</label>
+                                          <Select
+                                            value={camada.propriedades?.estilo_contorno || 'solido'}
+                                            onValueChange={(value: EstiloContorno) => {
+                                              atualizarPropriedades.mutate({
+                                                id: camada.id,
+                                                propriedades: { estilo_contorno: value }
+                                              });
+                                            }}
+                                          >
+                                            <SelectTrigger className="h-8 text-sm">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="solido">
+                                                <span className="flex items-center gap-2">
+                                                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="currentColor" strokeWidth="2" /></svg>
+                                                  Linha
+                                                </span>
+                                              </SelectItem>
+                                              <SelectItem value="tracado">
+                                                <span className="flex items-center gap-2">
+                                                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" /></svg>
+                                                  Traçado
+                                                </span>
+                                              </SelectItem>
+                                              <SelectItem value="pontilhado">
+                                                <span className="flex items-center gap-2">
+                                                  <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="currentColor" strokeWidth="2" strokeDasharray="2 4" /></svg>
+                                                  Pontilhado
+                                                </span>
+                                              </SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+
+                                        {/* Espessura do Contorno */}
+                                        <div className="space-y-1.5">
+                                          <label className="text-sm font-medium">
+                                            Espessura: {camada.propriedades?.espessura_contorno || 1}px
+                                          </label>
+                                          <Slider
+                                            value={[camada.propriedades?.espessura_contorno || 1]}
+                                            onValueChange={([value]) => {
+                                              atualizarPropriedades.mutate({
+                                                id: camada.id,
+                                                propriedades: { espessura_contorno: value }
+                                              });
+                                            }}
+                                            max={6}
+                                            min={1}
+                                            step={0.5}
+                                            className="w-full"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Preview visual */}
+                                      <div className="border-t pt-3">
+                                        <label className="text-xs text-muted-foreground mb-1.5 block">Prévia</label>
+                                        <svg viewBox="0 0 200 40" width="100%" height="40" className="rounded border bg-muted/30" preserveAspectRatio="none">
+                                          <rect
+                                            x="8" y="5" width="184" height="30" rx="4"
+                                            fill={camada.propriedades?.preenchimento !== false ? camada.cor_padrao : 'transparent'}
+                                            fillOpacity={camada.propriedades?.preenchimento !== false ? (camada.opacidade || 0.5) : 0}
+                                            stroke={camada.cor_padrao}
+                                            strokeWidth={camada.propriedades?.espessura_contorno || 1}
+                                            strokeDasharray={
+                                              camada.propriedades?.estilo_contorno === 'tracado' ? '10 6' :
+                                              camada.propriedades?.estilo_contorno === 'pontilhado' ? '3 5' :
+                                              undefined
+                                            }
+                                          />
+                                        </svg>
                                       </div>
                                     </div>
                                   </PopoverContent>
