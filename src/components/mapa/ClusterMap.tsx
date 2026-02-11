@@ -324,6 +324,117 @@ function HeatmapControl({
   return null;
 }
 
+// ====================================================================
+// Componente de controle de arraste rotacionado
+// Quando o mapa está rotacionado via CSS, o arraste nativo do Leaflet
+// não corresponde à direção visual. Este componente corrige isso
+// interceptando os eventos de mouse/touch e aplicando a rotação inversa.
+// ====================================================================
+function RotationDragHandler({ rotation }: { rotation: number }) {
+  const map = useMap();
+  const isDragging = useRef(false);
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const lastTouchPos = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    // Se não há rotação, usar arraste nativo do Leaflet
+    if (rotation === 0) {
+      map.dragging.enable();
+      return;
+    }
+
+    // Desabilitar arraste nativo e implementar arraste rotacionado
+    map.dragging.disable();
+
+    const container = map.getContainer();
+    const rad = -rotation * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // --- Mouse handlers ---
+    const onMouseDown = (e: MouseEvent) => {
+      // Só botão esquerdo, ignorar se for sobre controles do Leaflet
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('.leaflet-control') || target.closest('.leaflet-popup')) return;
+      
+      isDragging.current = true;
+      lastPos.current = { x: e.clientX, y: e.clientY };
+      container.style.cursor = 'grabbing';
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !lastPos.current) return;
+
+      const dx = e.clientX - lastPos.current.x;
+      const dy = e.clientY - lastPos.current.y;
+
+      // Rotacionar os deltas para coordenadas do mapa
+      const rdx = dx * cos - dy * sin;
+      const rdy = dx * sin + dy * cos;
+
+      map.panBy([-rdx, -rdy], { animate: false });
+      lastPos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      lastPos.current = null;
+      container.style.cursor = '';
+    };
+
+    // --- Touch handlers ---
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('.leaflet-control') || target.closest('.leaflet-popup')) return;
+      
+      const touch = e.touches[0];
+      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !lastTouchPos.current) return;
+
+      const touch = e.touches[0];
+      const dx = touch.clientX - lastTouchPos.current.x;
+      const dy = touch.clientY - lastTouchPos.current.y;
+
+      const rdx = dx * cos - dy * sin;
+      const rdy = dx * sin + dy * cos;
+
+      map.panBy([-rdx, -rdy], { animate: false });
+      lastTouchPos.current = { x: touch.clientX, y: touch.clientY };
+      e.preventDefault();
+    };
+
+    const onTouchEnd = () => {
+      lastTouchPos.current = null;
+    };
+
+    container.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      container.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      map.dragging.enable();
+      container.style.cursor = '';
+    };
+  }, [map, rotation]);
+
+  return null;
+}
+
 
 interface ClusterMapProps {
   demandas: DemandaMapa[];
@@ -357,8 +468,8 @@ interface ClusterMapProps {
 export function ClusterMap({
   demandas,
   municipes,
-  areas = [], // Valor padrão para evitar erros
-  categorias = [], // Lista de categorias
+  areas = [],
+  categorias = [],
   centro,
   zoom = 13,
   onDemandaClick,
@@ -378,6 +489,37 @@ export function ClusterMap({
   tipoFiltro = 'todos',
   clusterEnabled = true
 }: ClusterMapProps) {
+
+  // ============================
+  // Estado de rotação do mapa
+  // ============================
+  const [rotation, setRotation] = useState(0);
+
+  // Fator de escala para preencher os cantos ao rotacionar.
+  // A fórmula |sin(θ)| + |cos(θ)| garante que o retângulo rotacionado
+  // cubra 100% da viewport sem expor cantos vazios.
+  const rotationScale = useMemo(() => {
+    const rad = rotation * Math.PI / 180;
+    return Math.abs(Math.sin(rad)) + Math.abs(Math.cos(rad));
+  }, [rotation]);
+
+  const handleRotateLeft = useCallback(() => {
+    setRotation(prev => prev - 15);
+  }, []);
+
+  const handleRotateRight = useCallback(() => {
+    setRotation(prev => prev + 15);
+  }, []);
+
+  const handleRotateReset = useCallback(() => {
+    setRotation(0);
+  }, []);
+
+  // Normalizar ângulo para exibição (0-360)
+  const displayAngle = useMemo(() => {
+    return ((rotation % 360) + 360) % 360;
+  }, [rotation]);
+
   // Mapa de categorias por ID para acesso rápido
   const categoriasMap = useMemo(() => {
     const map = new Map<string, CategoriaMapa>();
@@ -401,7 +543,6 @@ export function ClusterMap({
     ];
     
     if (allPoints.length === 0) {
-      // Centro padrão: Santo André, SP
       return [-23.6639, -46.5310] as [number, number];
     }
     
@@ -439,541 +580,671 @@ export function ClusterMap({
   };
 
   return (
-    <MapContainer
-      center={centroCalculado}
-      zoom={zoom}
-      style={{ height: '100%', width: '100%', minHeight: '400px' }}
-      className="rounded-lg z-0"
+    <div 
+      className="relative w-full h-full overflow-hidden"
+      style={{ minHeight: '400px' }}
     >
-      <LayersControl position="topright">
-        {/* Camadas base */}
-        <LayersControl.BaseLayer checked name="🗺️ Mapa de Ruas">
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
-        
-        <LayersControl.BaseLayer name="🛰️ Satélite">
-          <TileLayer
-            attribution='&copy; Esri'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-        </LayersControl.BaseLayer>
-
-        <LayersControl.BaseLayer name="🏙️ Satélite com Rótulos">
-          <TileLayer
-            attribution='&copy; Esri'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-          />
-        </LayersControl.BaseLayer>
-
-        <LayersControl.BaseLayer name="⬜ Em Branco">
-          <TileLayer
-            attribution=''
-            url=""
-            opacity={0}
-          />
-        </LayersControl.BaseLayer>
-      </LayersControl>
-
-      {/* Camadas Geográficas (Shapefiles) */}
-      {camadasGeograficas.map(camada => (
-        <GeoJSONLayer
-          key={camada.id}
-          data={camada.geojson}
-          cor={camada.cor_padrao}
-          opacidade={camada.opacidade}
-          nome={camada.nome}
-          // PASSANDO DADOS PARA CÁLCULOS AVANÇADOS
-          demandas={demandas}
-          areas={areas}
-          estatisticas={estatisticasPorRegiao?.get(camada.id)}
-          votosPorRegiao={votosPorCamada?.get(camada.id)}
-          totalEleitoresPorRegiao={totalEleitoresPorCamada?.get(camada.id)}
-          modoVisualizacao={modoVisualizacao}
-          tipoFiltro={tipoFiltro}
-          colorirPorDensidade={colorirPorDensidade}
-          onFeatureClick={(feature, nomeRegiao) => {
-            if (onRegiaoClick) {
-              onRegiaoClick(camada.id, feature, nomeRegiao);
-            }
-          }}
-        />
-      ))}
-
-      {/* Camada de Heatmap */}
-      <HeatmapControl 
-        demandas={demandas}
-        municipes={municipes}
-        heatmapType={heatmapType}
-        heatmapVisible={heatmapVisible}
-      />
-
-      {/* Marcadores de Demandas e Munícipes */}
-      {!heatmapVisible && clusterEnabled && (
-        <MarkerClusterGroup
-          chunkedLoading
-          maxClusterRadius={60}
-          zoomToBoundsOnClick={false}
-          spiderfyOnMaxZoom
-          showCoverageOnHover={false}
-          spiderfyDistanceMultiplier={1.5}
-          eventHandlers={{
-            clusterclick: handleClusterClick
-          }}
-          iconCreateFunction={(cluster) => {
-            const markers = cluster.getAllChildMarkers();
-            let demandasCount = 0;
-            let municipesCount = 0;
-            
-            markers.forEach((marker: any) => {
-              const tipo = marker.options?.data?.tipo;
-              if (tipo === 'demanda') demandasCount++;
-              else if (tipo === 'municipe') municipesCount++;
-            });
-            
-            const total = demandasCount + municipesCount;
-            
-            // Definir tamanho baseado na quantidade
-            let size = 36;
-            let fontSize = 12;
-            if (total > 10) { size = 44; fontSize = 13; }
-            if (total > 30) { size = 52; fontSize = 14; }
-            if (total > 50) { size = 60; fontSize = 15; }
-            
-            // Se só tem um tipo, usar cor sólida
-            if (municipesCount === 0) {
-              return L.divIcon({
-                html: `<div style="
-                  background: linear-gradient(135deg, #ef4444, #dc2626);
-                  width: ${size}px;
-                  height: ${size}px;
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: white;
-                  font-weight: bold;
-                  font-size: ${fontSize}px;
-                  border: 3px solid white;
-                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-                  cursor: pointer;
-                ">${total}</div>`,
-                className: 'custom-cluster-icon',
-                iconSize: L.point(size, size)
-              });
-            }
-            
-            if (demandasCount === 0) {
-              return L.divIcon({
-                html: `<div style="
-                  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-                  width: ${size}px;
-                  height: ${size}px;
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: white;
-                  font-weight: bold;
-                  font-size: ${fontSize}px;
-                  border: 3px solid white;
-                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-                ">${total}</div>`,
-                className: 'custom-cluster-icon',
-                iconSize: L.point(size, size)
-              });
-            }
-            
-            // Cluster misto - criar ícone de pizza/dividido
-            const demandaPercent = (demandasCount / total) * 100;
-            
-            // Usar conic-gradient para efeito de pizza
-            return L.divIcon({
-              html: `
-                <div style="
-                  width: ${size}px;
-                  height: ${size}px;
-                  border-radius: 50%;
-                  background: conic-gradient(
-                    #ef4444 0% ${demandaPercent}%,
-                    #8b5cf6 ${demandaPercent}% 100%
-                  );
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  border: 3px solid white;
-                  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-                  position: relative;
-                ">
-                  <div style="
-                    background: white;
-                    width: ${size - 16}px;
-                    height: ${size - 16}px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: bold;
-                    font-size: ${fontSize}px;
-                    color: #374151;
-                  ">${total}</div>
-                </div>
-                <div style="
-                  position: absolute;
-                  bottom: -18px;
-                  left: 50%;
-                  transform: translateX(-50%);
-                  display: flex;
-                  gap: 2px;
-                  font-size: 9px;
-                  font-weight: 600;
-                  white-space: nowrap;
-                ">
-                  <span style="color: #ef4444;">${demandasCount}D</span>
-                  <span style="color: #8b5cf6;">${municipesCount}M</span>
-                </div>
-              `,
-              className: 'custom-cluster-icon-mixed',
-              iconSize: L.point(size, size + 20),
-              iconAnchor: L.point(size / 2, size / 2)
-            });
-          }}
+      {/* ============================================= */}
+      {/* Container rotacionado do mapa                 */}
+      {/* O scale compensa os cantos vazios ao girar    */}
+      {/* ============================================= */}
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          transform: `rotate(${rotation}deg) scale(${rotationScale})`,
+          transformOrigin: 'center center',
+          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <MapContainer
+          center={centroCalculado}
+          zoom={zoom}
+          style={{ height: '100%', width: '100%' }}
+          className="rounded-lg z-0"
         >
-          {/* Marcadores de Demandas (com cluster) */}
-          {mostrarDemandas && demandas.map((demanda) => (
-            demanda.latitude && demanda.longitude && (
-              <Marker
-                key={`demanda-${demanda.id}`}
-                position={[demanda.latitude, demanda.longitude]}
-                icon={createDemandaIcon(demanda.status)}
-                data={{ tipo: 'demanda', item: demanda }}
-                eventHandlers={{
-                  click: () => onDemandaClick?.(demanda)
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[220px]">
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div>
-                        <span className="font-semibold text-sm block">{demanda.titulo}</span>
-                        <span className="text-xs text-gray-500">{demanda.protocolo}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      {demanda.status && (
-                        <div className="flex items-center gap-1">
-                          <strong>Status:</strong>
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs h-5"
-                            style={{ 
-                              backgroundColor: STATUS_COLORS[demanda.status] + '20',
-                              borderColor: STATUS_COLORS[demanda.status],
-                              color: STATUS_COLORS[demanda.status]
-                            }}
-                          >
-                            {demanda.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      {demanda.area_nome && (
-                        <p><strong>Área:</strong> {demanda.area_nome}</p>
-                      )}
-                      
-                      {demanda.municipe_nome && (
-                        <p><strong>Solicitante:</strong> {demanda.municipe_nome}</p>
-                      )}
-                      
-                      {demanda.bairro && (
-                        <p className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {demanda.bairro}
-                          {demanda.cidade && `, ${demanda.cidade}`}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="mt-2 pt-2 border-t flex gap-2">
-                      {demanda.municipe_telefone && (
-                        <a
-                          href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
-                        >
-                          <Phone className="h-3 w-3" />
-                          WhatsApp
-                        </a>
-                      )}
-                      <button
-                        onClick={() => onDemandaClick?.(demanda)}
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Ver detalhes
-                      </button>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
+          {/* Handler de arraste corrigido para rotação */}
+          <RotationDragHandler rotation={rotation} />
+
+          <LayersControl position="topright">
+            {/* Camadas base */}
+            <LayersControl.BaseLayer checked name="🗺️ Mapa de Ruas">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </LayersControl.BaseLayer>
+            
+            <LayersControl.BaseLayer name="🛰️ Satélite">
+              <TileLayer
+                attribution='&copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              />
+            </LayersControl.BaseLayer>
+
+            <LayersControl.BaseLayer name="🏙️ Satélite com Rótulos">
+              <TileLayer
+                attribution='&copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+              />
+            </LayersControl.BaseLayer>
+
+            <LayersControl.BaseLayer name="⬜ Em Branco">
+              <TileLayer
+                attribution=''
+                url=""
+                opacity={0}
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
+
+          {/* Camadas Geográficas (Shapefiles) */}
+          {camadasGeograficas.map(camada => (
+            <GeoJSONLayer
+              key={camada.id}
+              data={camada.geojson}
+              cor={camada.cor_padrao}
+              opacidade={camada.opacidade}
+              nome={camada.nome}
+              demandas={demandas}
+              areas={areas}
+              estatisticas={estatisticasPorRegiao?.get(camada.id)}
+              votosPorRegiao={votosPorCamada?.get(camada.id)}
+              totalEleitoresPorRegiao={totalEleitoresPorCamada?.get(camada.id)}
+              modoVisualizacao={modoVisualizacao}
+              tipoFiltro={tipoFiltro}
+              colorirPorDensidade={colorirPorDensidade}
+              onFeatureClick={(feature, nomeRegiao) => {
+                if (onRegiaoClick) {
+                  onRegiaoClick(camada.id, feature, nomeRegiao);
+                }
+              }}
+            />
           ))}
 
-          {/* Marcadores de Munícipes (com cluster) */}
-          {mostrarMunicipes && municipes.map((municipe) => (
-            municipe.latitude && municipe.longitude && (
-              <Marker
-                key={`municipe-${municipe.id}`}
-                position={[municipe.latitude, municipe.longitude]}
-                icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
-                data={{ tipo: 'municipe', item: municipe }}
-                eventHandlers={{
-                  click: () => onMunicipeClick?.(municipe)
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[200px]">
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                        <User className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <span className="font-semibold text-sm">{municipe.nome}</span>
+          {/* Camada de Heatmap */}
+          <HeatmapControl 
+            demandas={demandas}
+            municipes={municipes}
+            heatmapType={heatmapType}
+            heatmapVisible={heatmapVisible}
+          />
+
+          {/* Marcadores de Demandas e Munícipes COM Cluster */}
+          {!heatmapVisible && clusterEnabled && (
+            <MarkerClusterGroup
+              chunkedLoading
+              maxClusterRadius={60}
+              zoomToBoundsOnClick={false}
+              spiderfyOnMaxZoom
+              showCoverageOnHover={false}
+              spiderfyDistanceMultiplier={1.5}
+              eventHandlers={{
+                clusterclick: handleClusterClick
+              }}
+              iconCreateFunction={(cluster) => {
+                const markers = cluster.getAllChildMarkers();
+                let demandasCount = 0;
+                let municipesCount = 0;
+                
+                markers.forEach((marker: any) => {
+                  const tipo = marker.options?.data?.tipo;
+                  if (tipo === 'demanda') demandasCount++;
+                  else if (tipo === 'municipe') municipesCount++;
+                });
+                
+                const total = demandasCount + municipesCount;
+                
+                let size = 36;
+                let fontSize = 12;
+                if (total > 10) { size = 44; fontSize = 13; }
+                if (total > 30) { size = 52; fontSize = 14; }
+                if (total > 50) { size = 60; fontSize = 15; }
+                
+                if (municipesCount === 0) {
+                  return L.divIcon({
+                    html: `<div style="
+                      background: linear-gradient(135deg, #ef4444, #dc2626);
+                      width: ${size}px;
+                      height: ${size}px;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: white;
+                      font-weight: bold;
+                      font-size: ${fontSize}px;
+                      border: 3px solid white;
+                      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                      cursor: pointer;
+                    ">${total}</div>`,
+                    className: 'custom-cluster-icon',
+                    iconSize: L.point(size, size)
+                  });
+                }
+                
+                if (demandasCount === 0) {
+                  return L.divIcon({
+                    html: `<div style="
+                      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                      width: ${size}px;
+                      height: ${size}px;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: white;
+                      font-weight: bold;
+                      font-size: ${fontSize}px;
+                      border: 3px solid white;
+                      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                    ">${total}</div>`,
+                    className: 'custom-cluster-icon',
+                    iconSize: L.point(size, size)
+                  });
+                }
+                
+                const demandaPercent = (demandasCount / total) * 100;
+                
+                return L.divIcon({
+                  html: `
+                    <div style="
+                      width: ${size}px;
+                      height: ${size}px;
+                      border-radius: 50%;
+                      background: conic-gradient(
+                        #ef4444 0% ${demandaPercent}%,
+                        #8b5cf6 ${demandaPercent}% 100%
+                      );
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      border: 3px solid white;
+                      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                      position: relative;
+                    ">
+                      <div style="
+                        background: white;
+                        width: ${size - 16}px;
+                        height: ${size - 16}px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: ${fontSize}px;
+                        color: #374151;
+                      ">${total}</div>
                     </div>
-                    
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      {municipe.telefone && (
-                        <p className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {municipe.telefone}
-                        </p>
-                      )}
-                      
-                      {municipe.bairro && (
-                        <p className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {municipe.bairro}
-                          {municipe.cidade && `, ${municipe.cidade}`}
-                        </p>
-                      )}
-                      
-                      {municipe.tags && municipe.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {municipe.tags.slice(0, 3).map((tag: any) => (
-                            <Badge 
-                              key={tag.id || tag.nome} 
-                              variant="outline" 
-                              className="text-xs h-4 px-1"
-                              style={{
-                                backgroundColor: (tag.cor || '#6b7280') + '20',
-                                borderColor: tag.cor || '#6b7280',
-                              }}
-                            >
-                              {tag.nome}
-                            </Badge>
-                          ))}
-                          {municipe.tags.length > 3 && (
-                            <Badge variant="outline" className="text-xs h-5">
-                              +{municipe.tags.length - 3}
-                            </Badge>
+                    <div style="
+                      position: absolute;
+                      bottom: -18px;
+                      left: 50%;
+                      transform: translateX(-50%);
+                      display: flex;
+                      gap: 2px;
+                      font-size: 9px;
+                      font-weight: 600;
+                      white-space: nowrap;
+                    ">
+                      <span style="color: #ef4444;">${demandasCount}D</span>
+                      <span style="color: #8b5cf6;">${municipesCount}M</span>
+                    </div>
+                  `,
+                  className: 'custom-cluster-icon-mixed',
+                  iconSize: L.point(size, size + 20),
+                  iconAnchor: L.point(size / 2, size / 2)
+                });
+              }}
+            >
+              {/* Marcadores de Demandas (com cluster) */}
+              {mostrarDemandas && demandas.map((demanda) => (
+                demanda.latitude && demanda.longitude && (
+                  <Marker
+                    key={`demanda-${demanda.id}`}
+                    position={[demanda.latitude, demanda.longitude]}
+                    icon={createDemandaIcon(demanda.status)}
+                    data={{ tipo: 'demanda', item: demanda }}
+                    eventHandlers={{
+                      click: () => onDemandaClick?.(demanda)
+                    }}
+                  >
+                    <Popup>
+                      <div className="min-w-[220px]">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-red-600" />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-sm block">{demanda.titulo}</span>
+                            <span className="text-xs text-gray-500">{demanda.protocolo}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1.5 text-xs text-gray-600">
+                          {demanda.status && (
+                            <div className="flex items-center gap-1">
+                              <strong>Status:</strong>
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs h-5"
+                                style={{ 
+                                  backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                                  borderColor: STATUS_COLORS[demanda.status],
+                                  color: STATUS_COLORS[demanda.status]
+                                }}
+                              >
+                                {demanda.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {demanda.area_nome && (
+                            <p><strong>Área:</strong> {demanda.area_nome}</p>
+                          )}
+                          
+                          {demanda.municipe_nome && (
+                            <p><strong>Solicitante:</strong> {demanda.municipe_nome}</p>
+                          )}
+                          
+                          {demanda.bairro && (
+                            <p className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {demanda.bairro}
+                              {demanda.cidade && `, ${demanda.cidade}`}
+                            </p>
                           )}
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-2 pt-2 border-t flex gap-2">
-                      {municipe.telefone && (
-                        <a
-                          href={formatWhatsAppLink(municipe.telefone) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
-                        >
-                          <Phone className="h-3 w-3" />
-                          WhatsApp
-                        </a>
-                      )}
-                      <button
-                        onClick={() => onMunicipeClick?.(municipe)}
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Ver detalhes
-                      </button>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          ))}
-        </MarkerClusterGroup>
-      )}
-
-      {/* Marcadores SEM Cluster (quando cluster desabilitado) */}
-      {!heatmapVisible && !clusterEnabled && (
-        <>
-          {/* Marcadores de Demandas (sem cluster) */}
-          {mostrarDemandas && demandas.map((demanda) => (
-            demanda.latitude && demanda.longitude && (
-              <Marker
-                key={`demanda-nc-${demanda.id}`}
-                position={[demanda.latitude, demanda.longitude]}
-                icon={createDemandaIcon(demanda.status)}
-                eventHandlers={{
-                  click: () => onDemandaClick?.(demanda)
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[220px]">
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div>
-                        <span className="font-semibold text-sm block">{demanda.titulo}</span>
-                        <span className="text-xs text-gray-500">{demanda.protocolo}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      {demanda.status && (
-                        <div className="flex items-center gap-1">
-                          <strong>Status:</strong>
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs h-5"
-                            style={{ 
-                              backgroundColor: STATUS_COLORS[demanda.status] + '20',
-                              borderColor: STATUS_COLORS[demanda.status],
-                              color: STATUS_COLORS[demanda.status]
-                            }}
+                        
+                        <div className="mt-2 pt-2 border-t flex gap-2">
+                          {demanda.municipe_telefone && (
+                            <a
+                              href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                            >
+                              <Phone className="h-3 w-3" />
+                              WhatsApp
+                            </a>
+                          )}
+                          <button
+                            onClick={() => onDemandaClick?.(demanda)}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
                           >
-                            {demanda.status.replace('_', ' ')}
-                          </Badge>
+                            <ExternalLink className="h-3 w-3" />
+                            Ver detalhes
+                          </button>
                         </div>
-                      )}
-                      
-                      {demanda.area_nome && (
-                        <p><strong>Área:</strong> {demanda.area_nome}</p>
-                      )}
-                      
-                      {demanda.municipe_nome && (
-                        <p><strong>Solicitante:</strong> {demanda.municipe_nome}</p>
-                      )}
-                      
-                      {demanda.bairro && (
-                        <p className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {demanda.bairro}
-                          {demanda.cidade && `, ${demanda.cidade}`}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="mt-2 pt-2 border-t flex gap-2">
-                      {demanda.municipe_telefone && (
-                        <a
-                          href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
-                        >
-                          <Phone className="h-3 w-3" />
-                          WhatsApp
-                        </a>
-                      )}
-                      <button
-                        onClick={() => onDemandaClick?.(demanda)}
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Ver detalhes
-                      </button>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          ))}
-
-          {/* Marcadores de Munícipes (sem cluster) */}
-          {mostrarMunicipes && municipes.map((municipe) => (
-            municipe.latitude && municipe.longitude && (
-              <Marker
-                key={`municipe-nc-${municipe.id}`}
-                position={[municipe.latitude, municipe.longitude]}
-                icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
-                eventHandlers={{
-                  click: () => onMunicipeClick?.(municipe)
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[200px]">
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                        <User className="h-4 w-4 text-purple-600" />
                       </div>
-                      <span className="font-semibold text-sm">{municipe.nome}</span>
-                    </div>
-                    
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      {municipe.telefone && (
-                        <p className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {municipe.telefone}
-                        </p>
-                      )}
-                      
-                      {municipe.bairro && (
-                        <p className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {municipe.bairro}
-                          {municipe.cidade && `, ${municipe.cidade}`}
-                        </p>
-                      )}
-                      
-                      {municipe.total_demandas !== undefined && municipe.total_demandas > 0 && (
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          <span>{municipe.total_demandas} demanda{municipe.total_demandas !== 1 ? 's' : ''}</span>
+                    </Popup>
+                  </Marker>
+                )
+              ))}
+
+              {/* Marcadores de Munícipes (com cluster) */}
+              {mostrarMunicipes && municipes.map((municipe) => (
+                municipe.latitude && municipe.longitude && (
+                  <Marker
+                    key={`municipe-${municipe.id}`}
+                    position={[municipe.latitude, municipe.longitude]}
+                    icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
+                    data={{ tipo: 'municipe', item: municipe }}
+                    eventHandlers={{
+                      click: () => onMunicipeClick?.(municipe)
+                    }}
+                  >
+                    <Popup>
+                      <div className="min-w-[200px]">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                            <User className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <span className="font-semibold text-sm">{municipe.nome}</span>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-2 pt-2 border-t flex gap-2">
-                      {municipe.telefone && (
-                        <a
-                          href={formatWhatsAppLink(municipe.telefone) || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
-                        >
-                          <Phone className="h-3 w-3" />
-                          WhatsApp
-                        </a>
-                      )}
-                      <button
-                        onClick={() => onMunicipeClick?.(municipe)}
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Ver detalhes
-                      </button>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          ))}
-        </>
-      )}
-    </MapContainer>
+                        
+                        <div className="space-y-1.5 text-xs text-gray-600">
+                          {municipe.telefone && (
+                            <p className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {municipe.telefone}
+                            </p>
+                          )}
+                          
+                          {municipe.bairro && (
+                            <p className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {municipe.bairro}
+                              {municipe.cidade && `, ${municipe.cidade}`}
+                            </p>
+                          )}
+                          
+                          {municipe.tags && municipe.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {municipe.tags.slice(0, 3).map((tag: any) => (
+                                <Badge 
+                                  key={tag.id || tag.nome} 
+                                  variant="outline" 
+                                  className="text-xs h-4 px-1"
+                                  style={{
+                                    backgroundColor: (tag.cor || '#6b7280') + '20',
+                                    borderColor: tag.cor || '#6b7280',
+                                  }}
+                                >
+                                  {tag.nome}
+                                </Badge>
+                              ))}
+                              {municipe.tags.length > 3 && (
+                                <Badge variant="outline" className="text-xs h-5">
+                                  +{municipe.tags.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="mt-2 pt-2 border-t flex gap-2">
+                          {municipe.telefone && (
+                            <a
+                              href={formatWhatsAppLink(municipe.telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                            >
+                              <Phone className="h-3 w-3" />
+                              WhatsApp
+                            </a>
+                          )}
+                          <button
+                            onClick={() => onMunicipeClick?.(municipe)}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver detalhes
+                          </button>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              ))}
+            </MarkerClusterGroup>
+          )}
+
+          {/* Marcadores SEM Cluster (quando cluster desabilitado) */}
+          {!heatmapVisible && !clusterEnabled && (
+            <>
+              {/* Marcadores de Demandas (sem cluster) */}
+              {mostrarDemandas && demandas.map((demanda) => (
+                demanda.latitude && demanda.longitude && (
+                  <Marker
+                    key={`demanda-nc-${demanda.id}`}
+                    position={[demanda.latitude, demanda.longitude]}
+                    icon={createDemandaIcon(demanda.status)}
+                    eventHandlers={{
+                      click: () => onDemandaClick?.(demanda)
+                    }}
+                  >
+                    <Popup>
+                      <div className="min-w-[220px]">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-red-600" />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-sm block">{demanda.titulo}</span>
+                            <span className="text-xs text-gray-500">{demanda.protocolo}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1.5 text-xs text-gray-600">
+                          {demanda.status && (
+                            <div className="flex items-center gap-1">
+                              <strong>Status:</strong>
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs h-5"
+                                style={{ 
+                                  backgroundColor: STATUS_COLORS[demanda.status] + '20',
+                                  borderColor: STATUS_COLORS[demanda.status],
+                                  color: STATUS_COLORS[demanda.status]
+                                }}
+                              >
+                                {demanda.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {demanda.area_nome && (
+                            <p><strong>Área:</strong> {demanda.area_nome}</p>
+                          )}
+                          
+                          {demanda.municipe_nome && (
+                            <p><strong>Solicitante:</strong> {demanda.municipe_nome}</p>
+                          )}
+                          
+                          {demanda.bairro && (
+                            <p className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {demanda.bairro}
+                              {demanda.cidade && `, ${demanda.cidade}`}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="mt-2 pt-2 border-t flex gap-2">
+                          {demanda.municipe_telefone && (
+                            <a
+                              href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                            >
+                              <Phone className="h-3 w-3" />
+                              WhatsApp
+                            </a>
+                          )}
+                          <button
+                            onClick={() => onDemandaClick?.(demanda)}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver detalhes
+                          </button>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              ))}
+
+              {/* Marcadores de Munícipes (sem cluster) */}
+              {mostrarMunicipes && municipes.map((municipe) => (
+                municipe.latitude && municipe.longitude && (
+                  <Marker
+                    key={`municipe-nc-${municipe.id}`}
+                    position={[municipe.latitude, municipe.longitude]}
+                    icon={createMunicipeIcon(municipe.nome, getCategoria(municipe.categoria_id))}
+                    eventHandlers={{
+                      click: () => onMunicipeClick?.(municipe)
+                    }}
+                  >
+                    <Popup>
+                      <div className="min-w-[200px]">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                            <User className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <span className="font-semibold text-sm">{municipe.nome}</span>
+                        </div>
+                        
+                        <div className="space-y-1.5 text-xs text-gray-600">
+                          {municipe.telefone && (
+                            <p className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {municipe.telefone}
+                            </p>
+                          )}
+                          
+                          {municipe.bairro && (
+                            <p className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {municipe.bairro}
+                              {municipe.cidade && `, ${municipe.cidade}`}
+                            </p>
+                          )}
+                          
+                          {municipe.total_demandas !== undefined && municipe.total_demandas > 0 && (
+                            <div className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              <span>{municipe.total_demandas} demanda{municipe.total_demandas !== 1 ? 's' : ''}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="mt-2 pt-2 border-t flex gap-2">
+                          {municipe.telefone && (
+                            <a
+                              href={formatWhatsAppLink(municipe.telefone) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                            >
+                              <Phone className="h-3 w-3" />
+                              WhatsApp
+                            </a>
+                          )}
+                          <button
+                            onClick={() => onMunicipeClick?.(municipe)}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver detalhes
+                          </button>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              ))}
+            </>
+          )}
+        </MapContainer>
+      </div>
+
+      {/* ============================================= */}
+      {/* CONTROLES DE ROTAÇÃO                          */}
+      {/* Posicionados fora da área rotacionada para    */}
+      {/* permanecerem fixos e sempre acessíveis.       */}
+      {/* Funciona inclusive em tela cheia.              */}
+      {/* ============================================= */}
+      <div
+        className="absolute bottom-6 left-4 z-[1000] flex flex-col items-center gap-1 select-none"
+        style={{ pointerEvents: 'auto' }}
+      >
+        {/* Bússola / Indicador de direção */}
+        <div
+          className="relative flex items-center justify-center mb-1"
+          style={{ width: 48, height: 48 }}
+        >
+          {/* Anel externo da bússola */}
+          <div
+            className="absolute inset-0 rounded-full border-2 border-white/80 bg-white/90 dark:bg-gray-800/90 dark:border-gray-600/80"
+            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+          />
+          {/* Agulha da bússola - gira inversamente à rotação do mapa */}
+          <svg
+            viewBox="0 0 48 48"
+            className="absolute inset-0"
+            style={{
+              transform: `rotate(${-rotation}deg)`,
+              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            {/* Seta Norte (vermelha) */}
+            <polygon
+              points="24,6 20,24 28,24"
+              fill="#ef4444"
+              stroke="#dc2626"
+              strokeWidth="0.5"
+            />
+            {/* Seta Sul (cinza) */}
+            <polygon
+              points="24,42 20,24 28,24"
+              fill="#9ca3af"
+              stroke="#6b7280"
+              strokeWidth="0.5"
+            />
+            {/* Centro */}
+            <circle cx="24" cy="24" r="3" fill="white" stroke="#374151" strokeWidth="1" />
+          </svg>
+          {/* Letra N - sempre visualmente no topo */}
+          <span
+            className="absolute text-[9px] font-bold text-red-600 dark:text-red-400"
+            style={{ top: -2, left: '50%', transform: 'translateX(-50%)' }}
+          >
+            N
+          </span>
+        </div>
+
+        {/* Botão rotacionar para esquerda (anti-horário) */}
+        <button
+          onClick={handleRotateLeft}
+          className="w-9 h-9 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 
+                     flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 
+                     active:scale-95 transition-all shadow-md"
+          title="Rotacionar para esquerda (-15°)"
+          aria-label="Rotacionar mapa para esquerda"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2.5 2v6h6" />
+            <path d="M2.66 12.66A9 9 0 1 0 4.81 4.81L2.5 8" />
+          </svg>
+        </button>
+
+        {/* Indicador de graus - só aparece quando rotacionado */}
+        {displayAngle !== 0 && (
+          <div className="px-2 py-0.5 rounded bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 shadow-md">
+            <span className="text-[11px] font-mono font-semibold text-gray-700 dark:text-gray-300">
+              {displayAngle}°
+            </span>
+          </div>
+        )}
+
+        {/* Botão rotacionar para direita (horário) */}
+        <button
+          onClick={handleRotateRight}
+          className="w-9 h-9 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 
+                     flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 
+                     active:scale-95 transition-all shadow-md"
+          title="Rotacionar para direita (+15°)"
+          aria-label="Rotacionar mapa para direita"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.5 2v6h-6" />
+            <path d="M21.34 12.66A9 9 0 1 1 19.19 4.81L21.5 8" />
+          </svg>
+        </button>
+
+        {/* Botão reset (voltar ao Norte) - só aparece quando rotacionado */}
+        {displayAngle !== 0 && (
+          <button
+            onClick={handleRotateReset}
+            className="w-9 h-9 rounded-lg bg-blue-500 hover:bg-blue-600 text-white
+                       flex items-center justify-center 
+                       active:scale-95 transition-all shadow-md mt-1"
+            title="Voltar ao Norte (0°)"
+            aria-label="Resetar rotação do mapa"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="2" x2="12" y2="16" />
+              <polygon points="12,2 8,8 16,8" fill="currentColor" stroke="none" />
+              <line x1="5" y1="22" x2="19" y2="22" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
