@@ -435,6 +435,125 @@ function RotationDragHandler({ rotation }: { rotation: number }) {
   return null;
 }
 
+// ====================================================================
+// Componente que contra-rotaciona elementos de UI (controles, popups,
+// tooltips, clusters) para que permaneçam legíveis e proporcionais
+// quando o mapa está rotacionado. Também chama invalidateSize()
+// para forçar o Leaflet a carregar tiles na área expandida.
+// ====================================================================
+function MapRotationHelper({ rotation, oversizeFactor }: { rotation: number; oversizeFactor: number }) {
+  const map = useMap();
+  const styleRef = useRef<HTMLStyleElement | null>(null);
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    // Criar ou encontrar o style element
+    if (!styleRef.current) {
+      const el = document.createElement('style');
+      el.id = 'map-rotation-counter-styles';
+      container.appendChild(el);
+      styleRef.current = el;
+    }
+
+    const styleEl = styleRef.current;
+
+    if (rotation === 0 || oversizeFactor <= 1) {
+      styleEl.textContent = '';
+      requestAnimationFrame(() => map.invalidateSize());
+      return;
+    }
+
+    const counterDeg = -rotation;
+    const invScale = (1 / oversizeFactor).toFixed(6);
+    const fwdScale = oversizeFactor.toFixed(6);
+
+    styleEl.textContent = `
+      /* ========================================================
+         CONTRA-ROTAÇÃO DOS CONTROLES DO LEAFLET
+         O container de controles é filho do MapContainer expandido.
+         1) rotate(-θ) volta o container à orientação normal
+         2) scale(1/s) encolhe de volta ao tamanho da viewport
+         O resultado: controles ficam fixos nos cantos da viewport.
+         ======================================================== */
+      .leaflet-control-container {
+        transform: rotate(${counterDeg}deg) scale(${invScale}) !important;
+        transform-origin: center center !important;
+        pointer-events: none;
+      }
+      /* Reativar eventos nos controles individuais e cancelar a escala */
+      .leaflet-control-container .leaflet-control {
+        pointer-events: auto;
+        transform: scale(${fwdScale});
+      }
+      /* Ancorar cada controle no canto correto ao re-escalar */
+      .leaflet-top.leaflet-right .leaflet-control {
+        transform-origin: top right;
+      }
+      .leaflet-top.leaflet-left .leaflet-control {
+        transform-origin: top left;
+      }
+      .leaflet-bottom.leaflet-right .leaflet-control {
+        transform-origin: bottom right;
+      }
+      .leaflet-bottom.leaflet-left .leaflet-control {
+        transform-origin: bottom left;
+      }
+
+      /* ========================================================
+         CONTRA-ROTAÇÃO DOS POPUPS
+         ======================================================== */
+      .leaflet-popup-content-wrapper {
+        transform: rotate(${counterDeg}deg) !important;
+        transform-origin: bottom center;
+      }
+      .leaflet-popup-tip-container {
+        transform: rotate(${counterDeg}deg) !important;
+        transform-origin: top center;
+      }
+
+      /* ========================================================
+         CONTRA-ROTAÇÃO DOS TOOLTIPS (info das regiões no shapefile)
+         ======================================================== */
+      .leaflet-tooltip {
+        transform: rotate(${counterDeg}deg) !important;
+      }
+
+      /* ========================================================
+         CONTRA-ROTAÇÃO DO CONTEÚDO DOS CLUSTERS
+         Os ícones de cluster são divs redondos — o círculo
+         não muda ao rotacionar, mas o texto (números) precisa
+         ficar na horizontal para ser legível.
+         ======================================================== */
+      .custom-cluster-icon > div,
+      .custom-cluster-icon-mixed > div {
+        transform: rotate(${counterDeg}deg) !important;
+      }
+      /* O label "XD YM" abaixo do cluster misto */
+      .custom-cluster-icon-mixed > div:last-child {
+        transform: rotate(${counterDeg}deg) !important;
+      }
+    `;
+
+    // invalidateSize() após a transição CSS completar,
+    // para que o Leaflet recalcule bounds e carregue tiles extras
+    const timer = setTimeout(() => {
+      map.invalidateSize({ animate: false });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [map, rotation, oversizeFactor]);
+
+  // Invalidar tamanho na montagem para que o Leaflet reconheça
+  // o container expandido desde o início
+  useEffect(() => {
+    const timer = setTimeout(() => map.invalidateSize(), 100);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  return null;
+}
+
 
 interface ClusterMapProps {
   demandas: DemandaMapa[];
@@ -497,43 +616,48 @@ export function ClusterMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
 
-  // Medir o container com ResizeObserver para reagir a mudanças de tamanho
-  // (inclusive ao entrar/sair de tela cheia)
+  // Medir o container com ResizeObserver (reage a fullscreen, resize, etc.)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     const measure = () => {
       const { width, height } = el.getBoundingClientRect();
-      if (width > 0 && height > 0) {
-        setContainerSize({ w: width, h: height });
-      }
+      if (width > 0 && height > 0) setContainerSize({ w: width, h: height });
     };
-
-    measure(); // medição inicial
-
+    measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Fator de escala para preencher os cantos ao rotacionar.
-  // Para um retângulo W×H rotacionado por θ, a escala uniforme necessária
-  // para que o retângulo rotacionado cubra 100% da viewport é:
-  //   max( |cos θ| + (H/W)·|sin θ| ,  (W/H)·|sin θ| + |cos θ| )
-  // Isso garante cobertura completa para qualquer aspect ratio.
-  const rotationScale = useMemo(() => {
+  // ============================================================
+  // Cálculo do fator de expansão (oversize) para cobertura total.
+  //
+  // Para que um retângulo W'×H' rotacionado por θ cubra a viewport W×H,
+  // cada canto da viewport deve cair DENTRO do retângulo rotacionado.
+  // Isso requer:
+  //   W' ≥ W·|cosθ| + H·|sinθ|  (eixo X do retângulo rotacionado)
+  //   H' ≥ W·|sinθ| + H·|cosθ|  (eixo Y do retângulo rotacionado)
+  //
+  // Com escala uniforme (W' = s·W, H' = s·H):
+  //   s = max( |cosθ| + (H/W)·|sinθ| , (W/H)·|sinθ| + |cosθ| )
+  //
+  // Adicionamos 15% de buffer para cobrir zoom-out e arredondamentos.
+  // ============================================================
+  const oversizeFactor = useMemo(() => {
     if (rotation === 0) return 1;
     const rad = rotation * Math.PI / 180;
     const sinA = Math.abs(Math.sin(rad));
     const cosA = Math.abs(Math.cos(rad));
     const { w, h } = containerSize;
-    const r = w / h; // aspect ratio
-    return Math.max(
-      cosA + (1 / r) * sinA,  // cobertura no eixo X
-      r * sinA + cosA          // cobertura no eixo Y (dominante em viewports largas)
-    );
+    const r = w / h;
+    const s = Math.max(cosA + sinA / r, r * sinA + cosA);
+    return s * 1.15; // buffer de 15%
   }, [rotation, containerSize]);
+
+  // Percentuais CSS para posicionar o container expandido centralizado
+  const oversizePercent = oversizeFactor * 100;
+  const offsetPercent = -(oversizeFactor - 1) * 50;
 
   const handleRotateLeft = useCallback(() => {
     setRotation(prev => prev - 15);
@@ -617,25 +741,35 @@ export function ClusterMap({
       className="relative w-full h-full overflow-hidden"
       style={{ minHeight: '400px' }}
     >
-      {/* ============================================= */}
-      {/* Container rotacionado do mapa                 */}
-      {/* O scale compensa os cantos vazios ao girar    */}
-      {/* ============================================= */}
+      {/* ============================================================
+          Container expandido e rotacionado.
+          Em vez de CSS scale() (que distorce proporções e não faz o
+          Leaflet carregar tiles extras), usamos width/height reais
+          maiores que a viewport. O Leaflet "enxerga" o container
+          maior e carrega tiles para toda a área. O overflow:hidden
+          do pai recorta as bordas.
+          ============================================================ */}
       <div
         style={{
-          width: '100%',
-          height: '100%',
-          transform: `rotate(${rotation}deg) scale(${rotationScale})`,
+          position: 'absolute',
+          width: `${oversizePercent}%`,
+          height: `${oversizePercent}%`,
+          top: `${offsetPercent}%`,
+          left: `${offsetPercent}%`,
+          transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
           transformOrigin: 'center center',
-          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s ease, height 0.35s ease, top 0.35s ease, left 0.35s ease',
         }}
       >
         <MapContainer
           center={centroCalculado}
           zoom={zoom}
           style={{ height: '100%', width: '100%' }}
-          className="rounded-lg z-0"
+          className="z-0"
         >
+          {/* Helper que contra-rotaciona elementos de UI */}
+          <MapRotationHelper rotation={rotation} oversizeFactor={oversizeFactor} />
+
           {/* Handler de arraste corrigido para rotação */}
           <RotationDragHandler rotation={rotation} />
 
