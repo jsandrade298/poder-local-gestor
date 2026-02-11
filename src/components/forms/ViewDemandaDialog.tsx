@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DemandaAtividadesTab } from "./DemandaAtividadesTab";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ViewDemandaDialogProps {
   demanda: any;
@@ -21,6 +29,8 @@ interface ViewDemandaDialogProps {
 
 export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewDemandaDialogProps) {
   const navigate = useNavigate();
+  const [includeAtividades, setIncludeAtividades] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   
   // Buscar dados do munícipe se não vier na demanda
   const { data: municipeData } = useQuery({
@@ -67,6 +77,29 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       
       if (error) throw error;
       return data;
+    },
+    enabled: !!demanda?.id && open
+  });
+
+  // Buscar atividades da demanda para enviar ao Assessor IA
+  const { data: atividades = [] } = useQuery({
+    queryKey: ['demanda-atividades-assessor', demanda?.id],
+    queryFn: async () => {
+      if (!demanda?.id) return [];
+      const { data, error } = await supabase
+        .from('demanda_atividades')
+        .select(`
+          *,
+          created_by_profile:profiles!fk_demanda_atividades_created_by (
+            nome,
+            email
+          )
+        `)
+        .eq('demanda_id', demanda.id)
+        .order('data_atividade', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!demanda?.id && open
   });
@@ -143,6 +176,44 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     }
   };
 
+  const getTipoAtividadeLabel = (tipo: string) => {
+    const tipoMap: Record<string, string> = {
+      'comentario': 'Comentário',
+      'visita': 'Visita Técnica',
+      'atualizacao': 'Atualização',
+    };
+    return tipoMap[tipo] || tipo;
+  };
+
+  const getProposituraLabel = (prop: string) => {
+    const propMap: Record<string, string> = {
+      'projeto_decreto_legislativo': 'Projeto de Decreto Legislativo',
+      'projeto_lei': 'Projeto de Lei',
+      'req_informacao_art58': 'Req. Informação (art. 58 LOM)',
+      'voto_mocao': 'Voto ou Moção',
+      'requerimento': 'Requerimento',
+      'indicacao': 'Indicação',
+      'emenda': 'Emenda',
+      'projeto_resolucao': 'Projeto de Resolução',
+    };
+    return propMap[prop] || prop;
+  };
+
+  const getStatusProposituraLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'rejeitado': 'Rejeitado',
+      'aprovado': 'Aprovado',
+      'aguardando_resposta': 'Aguardando Resposta',
+      'atendido': 'Atendido',
+      'dilacao_prazo': 'Dilação de Prazo',
+      'tramitando': 'Tramitando',
+      'realizado': 'Realizado',
+      'retirado': 'Retirado',
+      'respondido': 'Respondido',
+    };
+    return statusMap[status] || status;
+  };
+
   const openAssessorIA = () => {
     // Construir endereço completo
     const enderecoCompleto = [
@@ -152,6 +223,21 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       demanda.complemento
     ].filter(Boolean).join(', ');
 
+    // Construir dados das atividades para o prompt
+    let atividadesData: any[] = [];
+    if (includeAtividades && atividades.length > 0) {
+      atividadesData = atividades.map((atv: any) => ({
+        tipo: getTipoAtividadeLabel(atv.tipo_atividade),
+        titulo: atv.titulo,
+        descricao: atv.descricao,
+        data: atv.data_atividade,
+        autor: atv.created_by_profile?.nome || 'Usuário',
+        propositura: atv.propositura ? getProposituraLabel(atv.propositura) : null,
+        status_propositura: atv.status_propositura ? getStatusProposituraLabel(atv.status_propositura) : null,
+        link_propositura: atv.link_propositura || null,
+      }));
+    }
+
     // Construir prompt pré-estruturado
     const promptData = {
       titulo: demanda.titulo,
@@ -160,12 +246,14 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       area: demanda.areas?.nome,
       municipe: municipeNome,
       protocolo: demanda.protocolo,
-      observacoes: demanda.observacoes
+      observacoes: demanda.observacoes,
+      atividades: atividadesData,
     };
 
     // Navegar para o Assessor IA com os dados
     navigate('/assessor-ia', { state: { promptData } });
     onOpenChange(false); // Fechar modal
+    setPopoverOpen(false);
   };
 
   return (
@@ -217,15 +305,65 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openAssessorIA}
-                      className="bg-primary/10 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                    >
-                      <Bot className="h-4 w-4 mr-2" />
-                      Assessor IA
-                    </Button>
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-primary/10 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        >
+                          <Bot className="h-4 w-4 mr-2" />
+                          Assessor IA
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="end">
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <h4 className="font-medium text-sm">Enviar para o Assessor IA</h4>
+                            <p className="text-xs text-muted-foreground">
+                              Escolha quais informações enviar junto com a demanda.
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox id="include-descricao" checked disabled />
+                              <Label htmlFor="include-descricao" className="text-sm text-muted-foreground">
+                                Descrição da demanda
+                              </Label>
+                            </div>
+                            
+                            <div className="flex items-start space-x-2">
+                              <Checkbox 
+                                id="include-atividades" 
+                                checked={includeAtividades}
+                                onCheckedChange={(checked) => setIncludeAtividades(checked === true)}
+                              />
+                              <div className="grid gap-0.5 leading-none">
+                                <Label htmlFor="include-atividades" className="text-sm cursor-pointer">
+                                  Histórico de atividades
+                                </Label>
+                                <span className="text-xs text-muted-foreground">
+                                  {atividades.length === 0 
+                                    ? "Nenhuma atividade registrada" 
+                                    : `${atividades.length} atividade${atividades.length > 1 ? 's' : ''} registrada${atividades.length > 1 ? 's' : ''}`
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button 
+                            onClick={openAssessorIA} 
+                            className="w-full"
+                            size="sm"
+                          >
+                            <Bot className="h-4 w-4 mr-2" />
+                            Enviar ao Assessor IA
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     {onEdit && (
                       <Button
                         variant="outline"
