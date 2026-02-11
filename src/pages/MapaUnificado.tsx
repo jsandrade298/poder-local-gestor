@@ -233,6 +233,9 @@ export default function MapaUnificado() {
   // Estado do modal de exportação do mapa
   const [exportarModalAberto, setExportarModalAberto] = useState(false);
 
+  // Estado de rotação do mapa (lifted para compartilhar com o modal de exportação)
+  const [mapaRotation, setMapaRotation] = useState(0);
+
   // Estados para dados eleitorais e novos modos de visualização
   const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'resolutividade' | 'votos' | 'comparativo' | 'predominancia'>('padrao');
   const [eleicaoSelecionada, setEleicaoSelecionada] = useState<string | null>(null);
@@ -1872,6 +1875,8 @@ export default function MapaUnificado() {
           modoVisualizacao={modoVisualizacao}
           tipoFiltro={tipoFiltro}
           colorirPorDensidade={colorirPorDensidade}
+          rotation={mapaRotation}
+          onRotationChange={setMapaRotation}
           onRegiaoClick={handleRegiaoClick}
           onDemandaClick={(d) => {
             setItemSelecionado(d);
@@ -2943,6 +2948,7 @@ export default function MapaUnificado() {
         totalEleitoresPorCamada={totalEleitoresPorCamada}
         modoVisualizacao={modoVisualizacao}
         statusList={statusList}
+        rotation={mapaRotation}
       />
     </div>
   );
