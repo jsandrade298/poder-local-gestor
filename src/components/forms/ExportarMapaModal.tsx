@@ -189,7 +189,7 @@ export function ExportarMapaModal({
 
   // Estado da legenda draggable
   const [legendPos, setLegendPos] = useState({ x: 12, y: 12 });
-  const [legendSize, setLegendSize] = useState({ width: 220, height: 300 });
+  const [legendSize, setLegendSize] = useState({ width: 280, height: 350 });
   const legendDragging = useRef(false);
   const legendResizing = useRef(false);
   const legendDragOffset = useRef({ x: 0, y: 0 });
@@ -666,7 +666,7 @@ export function ExportarMapaModal({
                   </div>
 
                   {/* Conteúdo scrollável */}
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 8px 12px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 8px 12px', wordBreak: 'break-word' }}>
                     {/* Modo de Análise */}
                     {modoVisualizacao !== 'padrao' && (
                       <div style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb' }}>
@@ -693,7 +693,7 @@ export function ExportarMapaModal({
                           {areas.map(area => (
                             <div key={area.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                               <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: area.cor || '#6b7280', flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{area.nome}</span>
+                              <span style={{ wordBreak: 'break-word' }}>{area.nome}</span>
                             </div>
                           ))}
                         </div>)}
@@ -712,7 +712,7 @@ export function ExportarMapaModal({
                         {statusVisiveis.map(s => (
                           <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.cor, flexShrink: 0 }} />
-                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nome}</span>
+                            <span style={{ flex: 1, wordBreak: 'break-word' }}>{s.nome}</span>
                             <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{demandas.filter(d => d.status === s.slug).length}</span>
                           </div>
                         ))}
@@ -726,7 +726,7 @@ export function ExportarMapaModal({
                         {categoriasVisiveis.map(c => (
                           <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.cor, flexShrink: 0 }} />
-                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                            <span style={{ flex: 1, wordBreak: 'break-word' }}>{c.nome}</span>
                             <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => m.categoria_id === c.id).length}</span>
                           </div>
                         ))}
@@ -759,7 +759,7 @@ export function ExportarMapaModal({
                         {areasVisiveis.map(a => (
                           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                             <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}`, flexShrink: 0 }} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome}</span>
+                            <span style={{ wordBreak: 'break-word' }}>{a.nome}</span>
                           </div>
                         ))}
                       </div>
@@ -772,7 +772,7 @@ export function ExportarMapaModal({
                         {camadasGeograficas.map(c => (
                           <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                             <div style={{ width: 14, height: 8, borderRadius: 2, backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}`, flexShrink: 0 }} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                            <span style={{ wordBreak: 'break-word' }}>{c.nome}</span>
                           </div>
                         ))}
                       </div>
