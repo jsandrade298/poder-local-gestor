@@ -269,12 +269,29 @@ table {
 }
 
 /* Leaflet - Controle de z-index para não sobrepor modais */
+/* O container cria um stacking context baixo */
 .leaflet-container {
   z-index: 1 !important;
 }
 
-.leaflet-pane {
+/* Panes individuais mantêm hierarquia correta entre si */
+.leaflet-tile-pane {
   z-index: 1 !important;
+}
+.leaflet-overlay-pane {
+  z-index: 2 !important;
+}
+.leaflet-shadow-pane {
+  z-index: 3 !important;
+}
+.leaflet-marker-pane {
+  z-index: 4 !important;
+}
+.leaflet-tooltip-pane {
+  z-index: 5 !important;
+}
+.leaflet-popup-pane {
+  z-index: 6 !important;
 }
 
 .leaflet-top,
@@ -286,9 +303,13 @@ table {
   z-index: 20 !important;
 }
 
-/* Garantir que modais ficam acima do mapa */
-[data-radix-portal],
-[role="dialog"],
+/* Garantir que modais ficam acima de TUDO, incluindo controles do mapa */
+[data-radix-portal] {
+  z-index: 9990 !important;
+}
+[data-radix-portal] [role="dialog"] {
+  z-index: 9999 !important;
+}
 .fixed[data-state="open"] {
-  z-index: 50 !important;
+  z-index: 9990 !important;
 }
