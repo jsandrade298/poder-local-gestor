@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
 import { logError } from '@/lib/errorUtils';
+import { registrarHistorico } from '@/lib/kanbanHistoricoUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
 import { AdicionarRotasKanbanDialog } from "@/components/forms/AdicionarRotasKanbanDialog";
@@ -20,6 +21,7 @@ import { ViewTarefaDialog } from "@/components/forms/ViewTarefaDialog";
 import { ViewRotaKanbanDialog } from "@/components/forms/ViewRotaKanbanDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { EditTarefaDialog } from "@/components/forms/EditTarefaDialog";
+import { HistoricoView } from "@/components/kanban/HistoricoView";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -57,6 +59,8 @@ interface KanbanItem {
   rota_pontos?: any[];
 }
 
+type ViewMode = 'board' | 'historico';
+
 const statusColumns = [
   { id: 'a_fazer', title: 'A Fazer', color: 'hsl(var(--chart-1))' },
   { id: 'em_progresso', title: 'Em Progresso', color: 'hsl(var(--chart-2))' },
@@ -75,6 +79,7 @@ export default function Kanban() {
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [isAdicionarRotasDialogOpen, setIsAdicionarRotasDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
+  const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isDraggingRef = useRef(false);
@@ -215,7 +220,6 @@ export default function Kanban() {
 
       if (kanbanRotasError) {
         logError('Erro ao buscar kanban_rotas:', kanbanRotasError);
-        // Não bloqueia — continua sem rotas
       }
 
       let rotasFormatadas: any[] = [];
@@ -234,7 +238,6 @@ export default function Kanban() {
         if (rotasError) {
           logError('Erro ao buscar rotas:', rotasError);
         } else if (rotasData) {
-          // Buscar nomes dos usuários das rotas
           const usuarioIds = [...new Set(rotasData.map(r => r.usuario_id))];
           let profilesMap = new Map<string, string>();
           if (usuarioIds.length > 0) {
@@ -311,6 +314,9 @@ export default function Kanban() {
       newSearchParams.delete('tarefa');
       setSearchParams(newSearchParams, { replace: true });
       
+      // Garantir que estamos no modo board
+      setViewMode('board');
+      
       const tarefaEncontrada = demandas.find(d => d.id === tarefaId && d.tipo === 'tarefa');
       
       if (tarefaEncontrada) {
@@ -380,10 +386,27 @@ export default function Kanban() {
   };
 
   // ══════════════════════════════════════════════
-  //  Mutations
+  //  Mutations (com registro de histórico)
   // ══════════════════════════════════════════════
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
+      // Registrar remoção de todos os itens no histórico
+      const itensParaRegistrar = demandas.map(item => ({
+        item_id: item.id,
+        item_tipo: (item.tipo || 'demanda') as 'demanda' | 'tarefa' | 'rota',
+        item_titulo: item.titulo,
+        kanban_type: selectedUser,
+        posicao_anterior: item.kanban_position,
+        posicao_nova: null as string | null,
+        acao: 'removido' as const,
+      }));
+
+      // Registrar em batch (não bloqueia)
+      if (itensParaRegistrar.length > 0) {
+        const { registrarHistoricoBatch } = await import('@/lib/kanbanHistoricoUtils');
+        registrarHistoricoBatch(itensParaRegistrar);
+      }
+
       // Limpar demandas do kanban
       const { data: kanbanEntries, error: fetchError } = await supabase
         .from('demanda_kanbans')
@@ -430,6 +453,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
@@ -440,6 +464,19 @@ export default function Kanban() {
 
   const removerDemandaMutation = useMutation({
     mutationFn: async (demandaId: string) => {
+      // Encontrar o item para registrar no histórico
+      const item = demandas.find(d => d.id === demandaId);
+      if (item) {
+        registrarHistorico({
+          item_id: demandaId,
+          item_tipo: 'demanda',
+          item_titulo: item.titulo,
+          kanban_type: selectedUser,
+          posicao_anterior: item.kanban_position,
+          acao: 'removido',
+        });
+      }
+
       const { error } = await supabase
         .from('demanda_kanbans').delete()
         .eq('demanda_id', demandaId).eq('kanban_type', selectedUser);
@@ -447,6 +484,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
@@ -457,11 +495,24 @@ export default function Kanban() {
 
   const removerTarefaMutation = useMutation({
     mutationFn: async (tarefaId: string) => {
+      const item = demandas.find(d => d.id === tarefaId);
+      if (item) {
+        registrarHistorico({
+          item_id: tarefaId,
+          item_tipo: 'tarefa',
+          item_titulo: item.titulo,
+          kanban_type: selectedUser,
+          posicao_anterior: item.kanban_position,
+          acao: 'removido',
+        });
+      }
+
       const { error } = await supabase.from('tarefas').delete().eq('id', tarefaId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success("Tarefa removida!");
     },
     onError: (error) => {
@@ -472,6 +523,18 @@ export default function Kanban() {
 
   const removerRotaMutation = useMutation({
     mutationFn: async (rotaId: string) => {
+      const item = demandas.find(d => d.id === rotaId);
+      if (item) {
+        registrarHistorico({
+          item_id: rotaId,
+          item_tipo: 'rota',
+          item_titulo: item.titulo,
+          kanban_type: selectedUser,
+          posicao_anterior: item.kanban_position,
+          acao: 'removido',
+        });
+      }
+
       const { error } = await supabase
         .from('kanban_rotas').delete()
         .eq('rota_id', rotaId).eq('kanban_type', selectedUser);
@@ -479,6 +542,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success("Rota removida do kanban!");
     },
     onError: (error) => {
@@ -534,9 +598,29 @@ export default function Kanban() {
     return responsavel?.nome || '';
   };
 
-  // Mutation para atualizar posição (demandas, tarefas e rotas)
+  const getCardBorderColor = (item: any) => {
+    if (item.tipo === 'rota') return '#10B981';
+    if (item.tipo === 'tarefa') return item.cor || '#3B82F6';
+    return 'hsl(var(--primary))';
+  };
+
+  // Mutation para atualizar posição (com histórico)
   const updatePositionMutation = useMutation({
     mutationFn: async ({ itemId, newPosition, tipo }: { itemId: string, newPosition: string, tipo: string }) => {
+      // Encontrar item para registrar histórico
+      const item = demandas.find(d => d.id === itemId);
+      if (item) {
+        registrarHistorico({
+          item_id: itemId,
+          item_tipo: (tipo || 'demanda') as 'demanda' | 'tarefa' | 'rota',
+          item_titulo: item.titulo,
+          kanban_type: selectedUser,
+          posicao_anterior: item.kanban_position,
+          posicao_nova: newPosition,
+          acao: 'movido',
+        });
+      }
+
       if (tipo === 'tarefa') {
         const { error } = await supabase
           .from('tarefas').update({ kanban_position: newPosition }).eq('id', itemId);
@@ -555,6 +639,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       setTimeout(() => { isDraggingRef.current = false; }, 100);
     },
     onError: (error) => {
@@ -600,15 +685,6 @@ export default function Kanban() {
   };
 
   // ══════════════════════════════════════════════
-  //  Helpers de estilo do card por tipo
-  // ══════════════════════════════════════════════
-  const getCardBorderColor = (item: any) => {
-    if (item.tipo === 'rota') return '#10B981'; // emerald
-    if (item.tipo === 'tarefa') return item.cor || '#3B82F6';
-    return 'hsl(var(--primary))';
-  };
-
-  // ══════════════════════════════════════════════
   //  Render
   // ══════════════════════════════════════════════
   if (isLoading) {
@@ -631,6 +707,7 @@ export default function Kanban() {
               <h1 className="text-3xl font-bold text-foreground">Kanban</h1>
               
               <div className="flex items-center gap-3">
+                {/* Dropdown de usuário */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="min-w-[200px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
@@ -659,304 +736,342 @@ export default function Kanban() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {/* ── Toggle Board | Histórico ── */}
+                <div className="flex rounded-lg border bg-muted/30 p-0.5">
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'board'
+                        ? 'bg-background shadow-sm font-medium'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setViewMode('board')}
+                  >
+                    Board
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'historico'
+                        ? 'bg-background shadow-sm font-medium'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setViewMode('historico')}
+                  >
+                    <History className="h-3.5 w-3.5" />
+                    Histórico
+                  </button>
+                </div>
               </div>
             </div>
             <p className="text-muted-foreground">
-              Visualize e gerencie as tarefas, demandas e rotas em formato kanban
+              {viewMode === 'board' 
+                ? 'Visualize e gerencie as tarefas, demandas e rotas em formato kanban'
+                : 'Consulte o histórico de movimentações por período'
+              }
             </p>
           </div>
 
-          {/* ── Botões de ação (Tarefa primeiro, depois Demanda, depois Rota) ── */}
-          <div className="flex items-center gap-3">
-            <AdicionarTarefaDialog kanbanType={selectedUser} />
-            
-            <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar Demanda
-            </Button>
+          {/* Botões de ação (só no modo board) */}
+          {viewMode === 'board' && (
+            <div className="flex items-center gap-3">
+              <AdicionarTarefaDialog kanbanType={selectedUser} />
+              
+              <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Demanda
+              </Button>
 
-            <Button 
-              onClick={() => setIsAdicionarRotasDialogOpen(true)} 
-              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Route className="h-4 w-4" />
-              Adicionar Rota
-            </Button>
-            
-            <AdicionarDemandasKanbanDialog 
-              open={isAdicionarDialogOpen}
-              onOpenChange={setIsAdicionarDialogOpen}
-              selectedUser={selectedUser}
-            />
+              <Button 
+                onClick={() => setIsAdicionarRotasDialogOpen(true)} 
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Route className="h-4 w-4" />
+                Adicionar Rota
+              </Button>
+              
+              <AdicionarDemandasKanbanDialog 
+                open={isAdicionarDialogOpen}
+                onOpenChange={setIsAdicionarDialogOpen}
+                selectedUser={selectedUser}
+              />
 
-            <AdicionarRotasKanbanDialog
-              open={isAdicionarRotasDialogOpen}
-              onOpenChange={setIsAdicionarRotasDialogOpen}
-              selectedUser={selectedUser}
-            />
+              <AdicionarRotasKanbanDialog
+                open={isAdicionarRotasDialogOpen}
+                onOpenChange={setIsAdicionarRotasDialogOpen}
+                selectedUser={selectedUser}
+              />
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Limpar Kanban
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => limparKanbanMutation.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Confirmar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Limpar Kanban
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => limparKanbanMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
 
-        {/* ══════════════ Board ══════════════ */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {statusColumns.map((column) => {
-              const columnItems = getDemandsByStatus(column.id);
-              
-              return (
-                <div key={column.id} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
-                      {column.title}
-                      <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
-                    </h2>
-                  </div>
+        {/* ══════════════ Conteúdo condicional ══════════════ */}
+        {viewMode === 'historico' ? (
+          <HistoricoView 
+            selectedUser={selectedUser} 
+            responsaveis={responsaveis} 
+          />
+        ) : (
+          /* ══════════════ Board ══════════════ */
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {statusColumns.map((column) => {
+                const columnItems = getDemandsByStatus(column.id);
+                
+                return (
+                  <div key={column.id} className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
+                        {column.title}
+                        <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
+                      </h2>
+                    </div>
 
-                  <Droppable droppableId={column.id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
-                          snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
-                        }`}
-                      >
-                        {columnItems.map((item, index) => (
-                          <Draggable key={item.id} draggableId={item.id} index={index}>
-                            {(provided, snapshot) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
-                                  snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
-                                }`}
-                                style={{
-                                  borderLeftColor: getCardBorderColor(item),
-                                  ...provided.draggableProps.style
-                                }}
-                                onClick={() => {
-                                  if (!snapshot.isDragging && !isDraggingRef.current) {
-                                    if (item.tipo === 'tarefa') {
-                                      setSelectedTarefa(item);
-                                      setIsViewTarefaDialogOpen(true);
-                                    } else if (item.tipo === 'rota') {
-                                      setSelectedRota(item);
-                                      setIsViewRotaDialogOpen(true);
-                                    } else {
-                                      setSelectedDemanda(item);
-                                      setIsViewDialogOpen(true);
-                                    }
-                                  }
-                                }}
-                              >
-                                {/* Botão remover */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (item.tipo === 'tarefa') {
-                                      removerTarefaMutation.mutate(item.id);
-                                    } else if (item.tipo === 'rota') {
-                                      removerRotaMutation.mutate(item.id);
-                                    } else {
-                                      removerDemandaMutation.mutate(item.id);
+                    <Droppable droppableId={column.id}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
+                            snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
+                          }`}
+                        >
+                          {columnItems.map((item, index) => (
+                            <Draggable key={item.id} draggableId={item.id} index={index}>
+                              {(provided, snapshot) => (
+                                <Card
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
+                                    snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
+                                  }`}
+                                  style={{
+                                    borderLeftColor: getCardBorderColor(item),
+                                    ...provided.draggableProps.style
+                                  }}
+                                  onClick={() => {
+                                    if (!snapshot.isDragging && !isDraggingRef.current) {
+                                      if (item.tipo === 'tarefa') {
+                                        setSelectedTarefa(item);
+                                        setIsViewTarefaDialogOpen(true);
+                                      } else if (item.tipo === 'rota') {
+                                        setSelectedRota(item);
+                                        setIsViewRotaDialogOpen(true);
+                                      } else {
+                                        setSelectedDemanda(item);
+                                        setIsViewDialogOpen(true);
+                                      }
                                     }
                                   }}
                                 >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                                
-                                <CardHeader className="pb-2">
-                                  <div className="flex items-start justify-between">
-                                    <div className="space-y-1 flex-1">
-                                      <CardTitle className="text-sm font-medium leading-tight">
-                                        {item.titulo}
-                                      </CardTitle>
-                                      <p className="text-xs text-muted-foreground">
-                                        {item.protocolo}
+                                  {/* Botão remover */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (item.tipo === 'tarefa') {
+                                        removerTarefaMutation.mutate(item.id);
+                                      } else if (item.tipo === 'rota') {
+                                        removerRotaMutation.mutate(item.id);
+                                      } else {
+                                        removerDemandaMutation.mutate(item.id);
+                                      }
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                  
+                                  <CardHeader className="pb-2">
+                                    <div className="flex items-start justify-between">
+                                      <div className="space-y-1 flex-1">
+                                        <CardTitle className="text-sm font-medium leading-tight">
+                                          {item.titulo}
+                                        </CardTitle>
+                                        <p className="text-xs text-muted-foreground">
+                                          {item.protocolo}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  
+                                  <CardContent className="pt-0 space-y-2">
+                                    {/* Descrição (demandas e tarefas) */}
+                                    {item.tipo !== 'rota' && item.descricao && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {item.descricao}
                                       </p>
-                                    </div>
-                                  </div>
-                                </CardHeader>
-                                
-                                <CardContent className="pt-0 space-y-2">
-                                  {/* Descrição (demandas e tarefas) */}
-                                  {item.tipo !== 'rota' && item.descricao && (
-                                    <p className="text-xs text-muted-foreground line-clamp-2">
-                                      {item.descricao}
-                                    </p>
-                                  )}
+                                    )}
 
-                                  {/* ── Card de ROTA: conteúdo específico ── */}
-                                  {item.tipo === 'rota' && (
-                                    <>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px]">
-                                          <Route className="h-3 w-3 mr-1" />
-                                          Rota
+                                    {/* ── Card de ROTA ── */}
+                                    {item.tipo === 'rota' && (
+                                      <>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px]">
+                                            <Route className="h-3 w-3 mr-1" />
+                                            Rota
+                                          </Badge>
+                                          <Badge variant="outline" className="text-[10px]">
+                                            {getRotaStatusLabel(item.rota_status || '')}
+                                          </Badge>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            <span>{(item as any).pontos_count || 0} pontos</span>
+                                            {(item as any).pontos_visitados > 0 && (
+                                              <span className="text-emerald-600">
+                                                ({(item as any).pontos_visitados} visitados)
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {item.data_programada && (
+                                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Calendar className="h-3 w-3" />
+                                            {formatDateOnly(item.data_programada)}
+                                          </div>
+                                        )}
+                                        {item.usuario_nome && (
+                                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <User className="h-3 w-3" />
+                                            {item.usuario_nome}
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+
+                                    {/* ── Card de TAREFA: checklist ── */}
+                                    {item.tipo === 'tarefa' && (item as any).checklist_total > 0 && (
+                                      <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                          <div className="flex items-center gap-1">
+                                            <CheckSquare className="h-3 w-3" />
+                                            <span>{(item as any).checklist_done}/{(item as any).checklist_total}</span>
+                                          </div>
+                                          <span>{Math.round(((item as any).checklist_done / (item as any).checklist_total) * 100)}%</span>
+                                        </div>
+                                        <Progress 
+                                          value={Math.round(((item as any).checklist_done / (item as any).checklist_total) * 100)} 
+                                          className="h-1.5" 
+                                        />
+                                      </div>
+                                    )}
+
+                                    {/* ── Prioridade + Prazo ── */}
+                                    {item.tipo !== 'rota' && (
+                                      <div className="flex items-center justify-between">
+                                        <Badge 
+                                          variant="outline" 
+                                          style={{ 
+                                            borderColor: getPrioridadeColor(item.prioridade),
+                                            color: getPrioridadeColor(item.prioridade)
+                                          }}
+                                          className="text-xs"
+                                        >
+                                          {getPrioridadeLabel(item.prioridade)}
                                         </Badge>
-                                        <Badge variant="outline" className="text-[10px]">
-                                          {getRotaStatusLabel(item.rota_status || '')}
-                                        </Badge>
+                                        
+                                        {item.data_prazo && (
+                                          <div className={`flex items-center gap-1 text-xs ${
+                                            isOverdue(item.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
+                                          }`}>
+                                            <Calendar className="h-3 w-3" />
+                                            {formatDateOnly(item.data_prazo)}
+                                            {isOverdue(item.data_prazo) && <AlertTriangle className="h-3 w-3 ml-1" />}
+                                          </div>
+                                        )}
                                       </div>
+                                    )}
+                                    
+                                    {/* ── Área e munícipe (demandas) ── */}
+                                    {item.tipo === 'demanda' && (
                                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                          <MapPin className="h-3 w-3" />
-                                          <span>{(item as any).pontos_count || 0} pontos</span>
-                                          {(item as any).pontos_visitados > 0 && (
-                                            <span className="text-emerald-600">
-                                              ({(item as any).pontos_visitados} visitados)
-                                            </span>
-                                          )}
-                                        </div>
+                                        {item.areas?.nome && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            {item.areas.nome}
+                                          </div>
+                                        )}
+                                        {item.municipes?.nome && (
+                                          <div className="flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            {item.municipes.nome}
+                                          </div>
+                                        )}
                                       </div>
-                                      {item.data_programada && (
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                          <Calendar className="h-3 w-3" />
-                                          {formatDateOnly(item.data_programada)}
-                                        </div>
-                                      )}
-                                      {item.usuario_nome && (
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                          <User className="h-3 w-3" />
-                                          {item.usuario_nome}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {/* ── Card de TAREFA: checklist ── */}
-                                  {item.tipo === 'tarefa' && (item as any).checklist_total > 0 && (
-                                    <div className="space-y-1">
-                                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                          <CheckSquare className="h-3 w-3" />
-                                          <span>{(item as any).checklist_done}/{(item as any).checklist_total}</span>
-                                        </div>
-                                        <span>{Math.round(((item as any).checklist_done / (item as any).checklist_total) * 100)}%</span>
+                                    )}
+                                    
+                                    {/* ── Responsável ── */}
+                                    {item.tipo !== 'rota' && getResponsavelNome(item.responsavel_id || item.tarefa_responsavel_id) && (
+                                      <div className="text-xs text-muted-foreground">
+                                        <strong>Responsável:</strong> {getResponsavelNome(item.responsavel_id || item.tarefa_responsavel_id)}
                                       </div>
-                                      <Progress 
-                                        value={Math.round(((item as any).checklist_done / (item as any).checklist_total) * 100)} 
-                                        className="h-1.5" 
-                                      />
-                                    </div>
-                                  )}
+                                    )}
+                                    
+                                    {/* ── Colaboradores (tarefas) ── */}
+                                    {item.tipo === 'tarefa' && (item as any).colaboradores?.length > 0 && (
+                                      <div className="text-xs text-muted-foreground">
+                                        <strong>Colaboradores:</strong> {(item as any).colaboradores.map((c: any) => c.nome).join(', ')}
+                                      </div>
+                                    )}
 
-                                  {/* ── Prioridade + Prazo (demandas e tarefas) ── */}
-                                  {item.tipo !== 'rota' && (
-                                    <div className="flex items-center justify-between">
-                                      <Badge 
-                                        variant="outline" 
-                                        style={{ 
-                                          borderColor: getPrioridadeColor(item.prioridade),
-                                          color: getPrioridadeColor(item.prioridade)
-                                        }}
-                                        className="text-xs"
-                                      >
-                                        {getPrioridadeLabel(item.prioridade)}
-                                      </Badge>
-                                      
-                                      {item.data_prazo && (
-                                        <div className={`flex items-center gap-1 text-xs ${
-                                          isOverdue(item.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
-                                        }`}>
-                                          <Calendar className="h-3 w-3" />
-                                          {formatDateOnly(item.data_prazo)}
-                                          {isOverdue(item.data_prazo) && <AlertTriangle className="h-3 w-3 ml-1" />}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* ── Área e munícipe (demandas) ── */}
-                                  {item.tipo === 'demanda' && (
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                      {item.areas?.nome && (
-                                        <div className="flex items-center gap-1">
-                                          <MapPin className="h-3 w-3" />
-                                          {item.areas.nome}
-                                        </div>
-                                      )}
-                                      {item.municipes?.nome && (
-                                        <div className="flex items-center gap-1">
-                                          <User className="h-3 w-3" />
-                                          {item.municipes.nome}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* ── Responsável (demandas e tarefas) ── */}
-                                  {item.tipo !== 'rota' && getResponsavelNome(item.responsavel_id || item.tarefa_responsavel_id) && (
-                                    <div className="text-xs text-muted-foreground">
-                                      <strong>Responsável:</strong> {getResponsavelNome(item.responsavel_id || item.tarefa_responsavel_id)}
-                                    </div>
-                                  )}
-                                  
-                                  {/* ── Colaboradores (tarefas) ── */}
-                                  {item.tipo === 'tarefa' && (item as any).colaboradores?.length > 0 && (
-                                    <div className="text-xs text-muted-foreground">
-                                      <strong>Colaboradores:</strong> {(item as any).colaboradores.map((c: any) => c.nome).join(', ')}
-                                    </div>
-                                  )}
-
-                                  {/* ── Comentários (tarefas) ── */}
-                                  {item.tipo === 'tarefa' && (item as any).comentarios_count > 0 && (
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <MessageSquare className="h-3 w-3" />
-                                      <span>{(item as any).comentarios_count} comentário{(item as any).comentarios_count !== 1 ? 's' : ''}</span>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                        
-                        {columnItems.length === 0 && (
-                          <div className="text-center text-muted-foreground py-8">
-                            Nenhum item nesta coluna
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-              );
-            })}
-          </div>
-        </DragDropContext>
+                                    {/* ── Comentários (tarefas) ── */}
+                                    {item.tipo === 'tarefa' && (item as any).comentarios_count > 0 && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <MessageSquare className="h-3 w-3" />
+                                        <span>{(item as any).comentarios_count} comentário{(item as any).comentarios_count !== 1 ? 's' : ''}</span>
+                                      </div>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                          
+                          {columnItems.length === 0 && (
+                            <div className="text-center text-muted-foreground py-8">
+                              Nenhum item nesta coluna
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                );
+              })}
+            </div>
+          </DragDropContext>
+        )}
 
         {/* ══════════════ Dialogs ══════════════ */}
         <ViewDemandaDialog
