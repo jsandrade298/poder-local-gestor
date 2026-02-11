@@ -30,11 +30,14 @@ import {
   User,
   Layers,
   Eye,
+  EyeOff,
   CheckCircle,
   Vote,
   PieChart,
   TrendingUp,
   RotateCcw,
+  GripVertical,
+  Move,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -172,9 +175,81 @@ export function ExportarMapaModal({
   const [exportando, setExportando] = useState(false);
   const [capturando, setCapturando] = useState(false);
 
+  // Visibilidade exclusiva para exportação (não altera filtros do mapa principal)
+  const [exibirDemandasExport, setExibirDemandasExport] = useState(true);
+  const [exibirMunicipesExport, setExibirMunicipesExport] = useState(true);
+
+  // Resetar quando modal abre
+  useEffect(() => {
+    if (open) {
+      setExibirDemandasExport(mostrarDemandas);
+      setExibirMunicipesExport(mostrarMunicipes);
+    }
+  }, [open, mostrarDemandas, mostrarMunicipes]);
+
+  // Estado da legenda draggable
+  const [legendPos, setLegendPos] = useState({ x: 12, y: 12 });
+  const [legendSize, setLegendSize] = useState({ width: 220, height: 300 });
+  const legendDragging = useRef(false);
+  const legendResizing = useRef(false);
+  const legendDragOffset = useRef({ x: 0, y: 0 });
+  const legendStartSize = useRef({ width: 0, height: 0 });
+  const legendStartPos = useRef({ x: 0, y: 0 });
+
   // Refs
   const captureRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
+
+  // Handlers para drag da legenda
+  const handleLegendDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    legendDragging.current = true;
+    const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+    legendDragOffset.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  }, []);
+
+  const handleLegendResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    legendResizing.current = true;
+    legendStartSize.current = { ...legendSize };
+    legendStartPos.current = { x: e.clientX, y: e.clientY };
+  }, [legendSize]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (legendDragging.current && captureRef.current) {
+        const container = captureRef.current.getBoundingClientRect();
+        let newX = e.clientX - container.left - legendDragOffset.current.x;
+        let newY = e.clientY - container.top - legendDragOffset.current.y;
+        newX = Math.max(0, Math.min(newX, container.width - legendSize.width));
+        newY = Math.max(0, Math.min(newY, container.height - legendSize.height));
+        setLegendPos({ x: newX, y: newY });
+      }
+      if (legendResizing.current) {
+        const dx = e.clientX - legendStartPos.current.x;
+        const dy = e.clientY - legendStartPos.current.y;
+        setLegendSize({
+          width: Math.max(160, Math.min(400, legendStartSize.current.width + dx)),
+          height: Math.max(150, Math.min(800, legendStartSize.current.height + dy)),
+        });
+      }
+    };
+    const handleMouseUp = () => {
+      legendDragging.current = false;
+      legendResizing.current = false;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [legendSize]);
 
   // Centro calculado
   const centroCalculado = useMemo((): [number, number] => {
@@ -195,26 +270,30 @@ export function ExportarMapaModal({
     return m;
   }, [categorias]);
 
+  // Visibilidade efetiva (filtro principal + toggle de exportação)
+  const mostrarDemandasEfetivo = mostrarDemandas && exibirDemandasExport;
+  const mostrarMunicipesEfetivo = mostrarMunicipes && exibirMunicipesExport;
+
   // Status visíveis no mapa
   const statusVisiveis = useMemo(() => {
-    if (!mostrarDemandas) return [];
+    if (!mostrarDemandasEfetivo) return [];
     const slugs = new Set(demandas.map(d => d.status).filter(Boolean));
     return statusList.filter(s => slugs.has(s.slug));
-  }, [demandas, mostrarDemandas, statusList]);
+  }, [demandas, mostrarDemandasEfetivo, statusList]);
 
   // Categorias visíveis
   const categoriasVisiveis = useMemo(() => {
-    if (!mostrarMunicipes) return [];
+    if (!mostrarMunicipesEfetivo) return [];
     const ids = new Set(municipes.map(m => m.categoria_id).filter(Boolean));
     return categorias.filter(c => ids.has(c.id));
-  }, [municipes, mostrarMunicipes, categorias]);
+  }, [municipes, mostrarMunicipesEfetivo, categorias]);
 
   // Áreas visíveis
   const areasVisiveis = useMemo(() => {
-    if (!mostrarDemandas) return [];
+    if (!mostrarDemandasEfetivo) return [];
     const ids = new Set(demandas.map(d => d.area_id).filter(Boolean));
     return areas.filter(a => ids.has(a.id));
-  }, [demandas, mostrarDemandas, areas]);
+  }, [demandas, mostrarDemandasEfetivo, areas]);
 
   // Display angle
   const displayAngle = useMemo(() => ((rotation % 360) + 360) % 360, [rotation]);
@@ -233,19 +312,14 @@ export function ExportarMapaModal({
     setExportando(true);
 
     try {
-      // Aguardar tiles carregarem
       if (previewMapRef.current) {
         previewMapRef.current.invalidateSize();
         await new Promise(r => setTimeout(r, 2000));
       }
 
-      // Mostrar legenda overlay dentro da área de captura
-      if (incluirLegenda) {
-        setCapturando(true);
-        await new Promise(r => setTimeout(r, 500)); // Aguardar render da legenda
-      }
+      setCapturando(true);
+      await new Promise(r => setTimeout(r, 300));
 
-      // Dynamic imports — tenta npm, fallback CDN
       let html2canvas: any;
       let jsPDF: any;
 
@@ -272,10 +346,7 @@ export function ExportarMapaModal({
       }
 
       if (!html2canvas || !jsPDF) {
-        toast.error(
-          'Bibliotecas não disponíveis. Execute no terminal: npm install html2canvas jspdf',
-          { duration: 8000 }
-        );
+        toast.error('Bibliotecas não disponíveis. Execute: npm install html2canvas jspdf', { duration: 8000 });
         return;
       }
 
@@ -291,35 +362,30 @@ export function ExportarMapaModal({
         logging: false,
         imageTimeout: 10000,
         onclone: (clonedDoc: Document) => {
-          // Garantir que canvas do Leaflet (GeoJSON renderizado como canvas) seja visível
           const canvasElements = clonedDoc.querySelectorAll('canvas');
-          canvasElements.forEach((c: HTMLCanvasElement) => {
-            c.style.display = 'block';
-          });
-          // Garantir que SVGs do overlay pane também sejam capturados
+          canvasElements.forEach((c: HTMLCanvasElement) => { c.style.display = 'block'; });
           const svgElements = clonedDoc.querySelectorAll('.leaflet-overlay-pane svg');
           svgElements.forEach((svg: Element) => {
             (svg as HTMLElement).style.display = 'block';
             (svg as HTMLElement).style.overflow = 'visible';
           });
+          // Esconder handles de drag/resize no clone do PDF
+          const dragHandles = clonedDoc.querySelectorAll('[data-export-hide]');
+          dragHandles.forEach((el: Element) => { (el as HTMLElement).style.display = 'none'; });
         },
       });
 
-      // Esconder legenda overlay após captura
       setCapturando(false);
 
       const pdf = new jsPDF({ orientation: orientacao, unit: 'mm', format: [pw, ph] });
-
       const margin = 8;
       const contentW = pw - margin * 2;
       const contentH = ph - margin * 2;
 
-      // Título
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
       pdf.text(titulo, pw / 2, margin + 5, { align: 'center' });
 
-      // Data
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
       const dataAtual = new Date().toLocaleDateString('pt-BR', {
@@ -328,7 +394,6 @@ export function ExportarMapaModal({
       });
       pdf.text(`Exportado em: ${dataAtual}`, pw - margin, margin + 5, { align: 'right' });
 
-      // Imagem
       const imgData = canvas.toDataURL('image/png');
       const topOffset = margin + 10;
       const availH = contentH - 10;
@@ -339,7 +404,6 @@ export function ExportarMapaModal({
       const imgX = margin + (contentW - imgW) / 2;
       pdf.addImage(imgData, 'PNG', imgX, topOffset, imgW, imgH);
 
-      // Rodapé
       pdf.setFontSize(7);
       pdf.setTextColor(150, 150, 150);
       pdf.text('Poder Local Gestor - Gestão Territorial', pw / 2, ph - 3, { align: 'center' });
@@ -363,7 +427,7 @@ export function ExportarMapaModal({
     try {
       const features: any[] = [];
 
-      if (mostrarDemandas) {
+      if (mostrarDemandasEfetivo) {
         demandas.forEach(d => {
           if (d.latitude && d.longitude) {
             features.push({
@@ -380,7 +444,7 @@ export function ExportarMapaModal({
         });
       }
 
-      if (mostrarMunicipes) {
+      if (mostrarMunicipesEfetivo) {
         municipes.forEach(m => {
           if (m.latitude && m.longitude) {
             features.push({
@@ -440,180 +504,6 @@ export function ExportarMapaModal({
   };
 
   // ============================================
-  // Legenda component
-  // ============================================
-  const LegendContent = () => (
-    <div className="space-y-3 text-xs">
-      {/* ---- Modo de Análise Ativo ---- */}
-      {modoVisualizacao !== 'padrao' && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            {modoVisualizacao === 'resolutividade' && <><CheckCircle className="h-3 w-3" /> Resolutividade</>}
-            {modoVisualizacao === 'votos' && <><Vote className="h-3 w-3" /> Votos</>}
-            {modoVisualizacao === 'predominancia' && <><PieChart className="h-3 w-3" /> DNA do Bairro</>}
-            {modoVisualizacao === 'comparativo' && <><TrendingUp className="h-3 w-3" /> Oportunidade</>}
-          </div>
-
-          {modoVisualizacao === 'resolutividade' && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#22c55e]" /><span>Excelente (&gt;80%)</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#eab308]" /><span>Atenção (50-80%)</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#ef4444]" /><span>Crítico (&lt;50%)</span></div>
-            </div>
-          )}
-
-          {modoVisualizacao === 'votos' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#7c3aed]" /><span>Alta concentração</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#c4b5fd]" /><span>Baixa concentração</span></div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-muted-foreground">Menos</span>
-                <div className="flex-1 h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #c4b5fd, #7c3aed)' }} />
-                <span className="text-[10px] text-muted-foreground">Mais</span>
-              </div>
-            </div>
-          )}
-
-          {modoVisualizacao === 'predominancia' && (
-            <div className="space-y-1">
-              {areas.map(area => (
-                <div key={area.id} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: area.cor || '#6b7280' }} />
-                  <span className="truncate">{area.nome}</span>
-                </div>
-              ))}
-              <p className="text-[10px] text-muted-foreground mt-1 italic">
-                Cor da área temática predominante na região
-              </p>
-            </div>
-          )}
-
-          {modoVisualizacao === 'comparativo' && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#ef4444]" /><span>Risco</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#3b82f6]" /><span>Equilíbrio</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#22c55e]" /><span>Potencial</span></div>
-            </div>
-          )}
-
-          <Separator />
-        </div>
-      )}
-
-      {/* ---- Status das demandas ---- */}
-      {statusVisiveis.length > 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Demandas por Status</span>
-          {statusVisiveis.map(s => (
-            <div key={s.slug} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.cor }} />
-              <span className="truncate flex-1">{s.nome}</span>
-              <span className="text-muted-foreground tabular-nums">{demandas.filter(d => d.status === s.slug).length}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ---- Categorias de munícipes ---- */}
-      {categoriasVisiveis.length > 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Munícipes por Categoria</span>
-          {categoriasVisiveis.map(c => (
-            <div key={c.id} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.cor }} />
-              <span className="truncate flex-1">{c.nome}</span>
-              <span className="text-muted-foreground tabular-nums">{municipes.filter(m => m.categoria_id === c.id).length}</span>
-            </div>
-          ))}
-          {municipes.some(m => !m.categoria_id) && (
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full flex-shrink-0 bg-[#8b5cf6]" />
-              <span className="truncate flex-1">Sem categoria</span>
-              <span className="text-muted-foreground tabular-nums">{municipes.filter(m => !m.categoria_id).length}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ---- Munícipes sem categoria (sem categorias visíveis) ---- */}
-      {mostrarMunicipes && categoriasVisiveis.length === 0 && municipes.length > 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Munícipes</span>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full flex-shrink-0 bg-[#8b5cf6]" />
-            <span className="flex-1">Munícipes</span>
-            <span className="text-muted-foreground tabular-nums">{municipes.length}</span>
-          </div>
-        </div>
-      )}
-
-      {/* ---- Áreas (no modo padrão) ---- */}
-      {areasVisiveis.length > 0 && modoVisualizacao === 'padrao' && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Áreas</span>
-          {areasVisiveis.map(a => (
-            <div key={a.id} className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}` }} />
-              <span className="truncate">{a.nome}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ---- Camadas geográficas ---- */}
-      {camadasGeograficas.length > 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Camadas Geográficas</span>
-          {camadasGeograficas.map(c => (
-            <div key={c.id} className="flex items-center gap-2">
-              <div className="w-4 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}` }} />
-              <span className="truncate">{c.nome}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ---- Heatmap ---- */}
-      {heatmapVisible && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Mapa de Calor</span>
-          <div className="flex items-center gap-2">
-            <div className="flex h-2.5 rounded-full overflow-hidden w-16 flex-shrink-0">
-              <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
-              <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
-              <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
-              <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
-              <div style={{ flex: 1, backgroundColor: '#67000d' }} />
-            </div>
-            <span className="text-muted-foreground">
-              {heatmapType === 'demandas' ? 'Demandas' : heatmapType === 'municipes' ? 'Munícipes' : 'Todos'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ---- Rotação ---- */}
-      {displayAngle !== 0 && (
-        <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Orientação</span>
-          <div className="flex items-center gap-2">
-            <RotateCcw className="h-3 w-3 text-muted-foreground" />
-            <span>Rotação: {displayAngle}°</span>
-          </div>
-        </div>
-      )}
-
-      {/* ---- Totais ---- */}
-      <Separator />
-      <div className="space-y-0.5 text-[10px] text-muted-foreground">
-        {mostrarDemandas && <div>{demandas.filter(d => d.latitude && d.longitude).length} demandas no mapa</div>}
-        {mostrarMunicipes && <div>{municipes.filter(m => m.latitude && m.longitude).length} munícipes no mapa</div>}
-        {camadasGeograficas.length > 0 && <div>{camadasGeograficas.length} camada(s) geográfica(s)</div>}
-      </div>
-    </div>
-  );
-
-  // ============================================
   // RENDER
   // ============================================
   return (
@@ -628,31 +518,11 @@ export function ExportarMapaModal({
             Exportar Mapa
           </DialogTitle>
           <DialogDescription>
-            Ajuste a visualização do mapa e configure o formato de exportação
+            Ajuste a visualização, posicione a legenda e configure o formato de exportação
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0">
-          {/* ================================================= */}
-          {/* ESQUERDA: Legenda (fora da captura, mas inclusa    */}
-          {/* no captureRef para PDF quando ativada)             */}
-          {/* ================================================= */}
-          {incluirLegenda && (
-            <div className="w-[220px] flex-shrink-0 border-r bg-muted/20 flex flex-col">
-              <div className="px-3 pt-3 pb-2 border-b">
-                <div className="flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Legenda</span>
-                </div>
-              </div>
-              <ScrollArea className="flex-1">
-                <div className="px-3 py-3">
-                  <LegendContent />
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-
           {/* ================================================= */}
           {/* CENTRO: Prévia do Mapa (área de captura)           */}
           {/* ================================================= */}
@@ -676,7 +546,6 @@ export function ExportarMapaModal({
                     preferCanvas={true}
                   >
                     <MapSyncReady onReady={handleMapReady} />
-
                     <TileLayer
                       attribution='&copy; OpenStreetMap'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -702,10 +571,10 @@ export function ExportarMapaModal({
                       />
                     ))}
 
-                    {/* Marcadores */}
+                    {/* Marcadores — controlados pelos toggles de exportação */}
                     {!heatmapVisible && (
                       <>
-                        {mostrarDemandas && demandas.map(d =>
+                        {mostrarDemandasEfetivo && demandas.map(d =>
                           d.latitude && d.longitude ? (
                             <Marker
                               key={`exp-d-${d.id}`}
@@ -714,7 +583,7 @@ export function ExportarMapaModal({
                             />
                           ) : null
                         )}
-                        {mostrarMunicipes && municipes.map(m =>
+                        {mostrarMunicipesEfetivo && municipes.map(m =>
                           m.latitude && m.longitude ? (
                             <Marker
                               key={`exp-m-${m.id}`}
@@ -732,8 +601,8 @@ export function ExportarMapaModal({
                 </div>
               )}
 
-              {/* Badge rotação */}
-              {displayAngle !== 0 && (
+              {/* Badge rotação — escondida durante captura */}
+              {displayAngle !== 0 && !capturando && (
                 <div className="absolute top-3 right-3 z-[500] bg-black/60 text-white text-xs px-2.5 py-1 rounded-full pointer-events-none flex items-center gap-1.5">
                   <RotateCcw className="h-3 w-3" />
                   {displayAngle}°
@@ -741,47 +610,77 @@ export function ExportarMapaModal({
               )}
 
               {/* ============================================= */}
-              {/* LEGENDA OVERLAY PARA CAPTURA DO PDF            */}
-              {/* Só aparece durante a captura do html2canvas    */}
+              {/* LEGENDA FLUTUANTE / ARRASTÁVEL                 */}
+              {/* Dentro do captureRef → capturada no PDF        */}
+              {/* Usa inline styles para compatibilidade         */}
+              {/* com html2canvas                                */}
               {/* ============================================= */}
-              {capturando && incluirLegenda && (
+              {incluirLegenda && (
                 <div
-                  className="absolute bottom-3 left-3 z-[600] pointer-events-none"
                   style={{
+                    position: 'absolute',
+                    left: legendPos.x,
+                    top: legendPos.y,
+                    width: legendSize.width,
+                    height: legendSize.height,
+                    zIndex: 600,
                     backgroundColor: 'rgba(255,255,255,0.95)',
                     border: '1px solid #d1d5db',
                     borderRadius: '8px',
-                    padding: '10px 14px',
-                    maxWidth: '240px',
-                    maxHeight: '60%',
-                    overflowY: 'auto',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
                     fontSize: '11px',
                     lineHeight: '1.4',
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
-                    Legenda
+                  {/* Header arrastável — escondido no PDF */}
+                  <div
+                    onMouseDown={handleLegendDragStart}
+                    data-export-hide="true"
+                    style={{
+                      padding: '5px 10px',
+                      borderBottom: '1px solid #e5e7eb',
+                      cursor: 'move',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: 'rgba(249,250,251,0.9)',
+                      flexShrink: 0,
+                      userSelect: 'none',
+                    }}
+                  >
+                    <Move style={{ width: 12, height: 12, color: '#9ca3af', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 600, fontSize: '10px', color: '#9ca3af', flex: 1 }}>
+                      Arraste para posicionar
+                    </span>
                   </div>
 
-                  {/* Modo de Análise Ativo */}
-                  {modoVisualizacao !== 'padrao' && (
-                    <div style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>
-                        {modoVisualizacao === 'resolutividade' ? 'Resolutividade' :
-                         modoVisualizacao === 'votos' ? 'Votos' :
-                         modoVisualizacao === 'predominancia' ? 'DNA do Bairro' : 'Oportunidade'}
-                      </div>
-                      {modoVisualizacao === 'resolutividade' && (
-                        <div>
+                  {/* Título "Legenda" — aparece no PDF */}
+                  <div style={{ padding: '8px 12px 4px 12px', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+                      Legenda
+                    </div>
+                  </div>
+
+                  {/* Conteúdo scrollável */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 8px 12px' }}>
+                    {/* Modo de Análise */}
+                    {modoVisualizacao !== 'padrao' && (
+                      <div style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>
+                          {modoVisualizacao === 'resolutividade' ? 'Resolutividade' :
+                           modoVisualizacao === 'votos' ? 'Votos' :
+                           modoVisualizacao === 'predominancia' ? 'DNA do Bairro' : 'Oportunidade'}
+                        </div>
+                        {modoVisualizacao === 'resolutividade' && (<div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', flexShrink: 0 }} /><span>Excelente (&gt;80%)</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#eab308', flexShrink: 0 }} /><span>Atenção (50-80%)</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} /><span>Crítico (&lt;50%)</span></div>
-                        </div>
-                      )}
-                      {modoVisualizacao === 'votos' && (
-                        <div>
+                        </div>)}
+                        {modoVisualizacao === 'votos' && (<div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#7c3aed', flexShrink: 0 }} /><span>Alta concentração</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#c4b5fd', flexShrink: 0 }} /><span>Baixa concentração</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -789,130 +688,145 @@ export function ExportarMapaModal({
                             <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'linear-gradient(to right, #c4b5fd, #7c3aed)' }} />
                             <span style={{ fontSize: '9px', color: '#9ca3af' }}>Mais</span>
                           </div>
-                        </div>
-                      )}
-                      {modoVisualizacao === 'predominancia' && (
-                        <div>
+                        </div>)}
+                        {modoVisualizacao === 'predominancia' && (<div>
                           {areas.map(area => (
                             <div key={area.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                               <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: area.cor || '#6b7280', flexShrink: 0 }} />
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{area.nome}</span>
                             </div>
                           ))}
-                        </div>
-                      )}
-                      {modoVisualizacao === 'comparativo' && (
-                        <div>
+                        </div>)}
+                        {modoVisualizacao === 'comparativo' && (<div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#ef4444', flexShrink: 0 }} /><span>Risco</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#3b82f6', flexShrink: 0 }} /><span>Equilíbrio</span></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#22c55e', flexShrink: 0 }} /><span>Potencial</span></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        </div>)}
+                      </div>
+                    )}
 
-                  {/* Status das demandas */}
-                  {statusVisiveis.length > 0 && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Demandas por Status</div>
-                      {statusVisiveis.map(s => (
-                        <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.cor, flexShrink: 0 }} />
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nome}</span>
-                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{demandas.filter(d => d.status === s.slug).length}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    {/* Status das demandas */}
+                    {statusVisiveis.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Demandas por Status</div>
+                        {statusVisiveis.map(s => (
+                          <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.cor, flexShrink: 0 }} />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nome}</span>
+                            <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{demandas.filter(d => d.status === s.slug).length}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Categorias de munícipes */}
-                  {categoriasVisiveis.length > 0 && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes por Categoria</div>
-                      {categoriasVisiveis.map(c => (
-                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.cor, flexShrink: 0 }} />
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
-                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => m.categoria_id === c.id).length}</span>
-                        </div>
-                      ))}
-                      {municipes.some(m => !m.categoria_id) && (
+                    {/* Categorias de munícipes */}
+                    {categoriasVisiveis.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes por Categoria</div>
+                        {categoriasVisiveis.map(c => (
+                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.cor, flexShrink: 0 }} />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                            <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => m.categoria_id === c.id).length}</span>
+                          </div>
+                        ))}
+                        {municipes.some(m => !m.categoria_id) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#8b5cf6', flexShrink: 0 }} />
+                            <span style={{ flex: 1 }}>Sem categoria</span>
+                            <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => !m.categoria_id).length}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Munícipes sem categorias visíveis */}
+                    {mostrarMunicipesEfetivo && categoriasVisiveis.length === 0 && municipes.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                           <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#8b5cf6', flexShrink: 0 }} />
-                          <span style={{ flex: 1 }}>Sem categoria</span>
-                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => !m.categoria_id).length}</span>
+                          <span style={{ flex: 1 }}>Munícipes</span>
+                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.length}</span>
                         </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Munícipes sem categorias visíveis */}
-                  {mostrarMunicipes && categoriasVisiveis.length === 0 && municipes.length > 0 && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#8b5cf6', flexShrink: 0 }} />
-                        <span style={{ flex: 1 }}>Munícipes</span>
-                        <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.length}</span>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Áreas (no modo padrão) */}
-                  {areasVisiveis.length > 0 && modoVisualizacao === 'padrao' && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Áreas</div>
-                      {areasVisiveis.map(a => (
-                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}`, flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Camadas geográficas */}
-                  {camadasGeograficas.length > 0 && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Camadas Geográficas</div>
-                      {camadasGeograficas.map(c => (
-                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <div style={{ width: 14, height: 8, borderRadius: 2, backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}`, flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Heatmap */}
-                  {heatmapVisible && (
-                    <div style={{ marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Mapa de Calor</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', width: 50, flexShrink: 0 }}>
-                          <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
-                          <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
-                          <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
-                          <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
-                          <div style={{ flex: 1, backgroundColor: '#67000d' }} />
-                        </div>
-                        <span style={{ color: '#9ca3af' }}>
-                          {heatmapType === 'demandas' ? 'Demandas' : heatmapType === 'municipes' ? 'Munícipes' : 'Todos'}
-                        </span>
+                    {/* Áreas (modo padrão) */}
+                    {areasVisiveis.length > 0 && modoVisualizacao === 'padrao' && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Áreas</div>
+                        {areasVisiveis.map(a => (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}`, flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome}</span>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Totais */}
-                  <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '4px', fontSize: '10px', color: '#9ca3af' }}>
-                    {mostrarDemandas && <div>{demandas.filter(d => d.latitude && d.longitude).length} demandas no mapa</div>}
-                    {mostrarMunicipes && <div>{municipes.filter(m => m.latitude && m.longitude).length} munícipes no mapa</div>}
-                    {camadasGeograficas.length > 0 && <div>{camadasGeograficas.length} camada(s) geográfica(s)</div>}
+                    {/* Camadas geográficas */}
+                    {camadasGeograficas.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Camadas Geográficas</div>
+                        {camadasGeograficas.map(c => (
+                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                            <div style={{ width: 14, height: 8, borderRadius: 2, backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}`, flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Heatmap */}
+                    {heatmapVisible && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Mapa de Calor</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', width: 50, flexShrink: 0 }}>
+                            <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
+                            <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
+                            <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
+                            <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
+                            <div style={{ flex: 1, backgroundColor: '#67000d' }} />
+                          </div>
+                          <span style={{ color: '#9ca3af' }}>
+                            {heatmapType === 'demandas' ? 'Demandas' : heatmapType === 'municipes' ? 'Munícipes' : 'Todos'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Totais */}
+                    <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '4px', fontSize: '10px', color: '#9ca3af' }}>
+                      {mostrarDemandasEfetivo && <div>{demandas.filter(d => d.latitude && d.longitude).length} demandas no mapa</div>}
+                      {mostrarMunicipesEfetivo && <div>{municipes.filter(m => m.latitude && m.longitude).length} munícipes no mapa</div>}
+                      {camadasGeograficas.length > 0 && <div>{camadasGeograficas.length} camada(s) geográfica(s)</div>}
+                    </div>
+                  </div>
+
+                  {/* Handle de redimensionamento — escondido no PDF */}
+                  <div
+                    onMouseDown={handleLegendResizeStart}
+                    data-export-hide="true"
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: 18,
+                      height: 18,
+                      cursor: 'nwse-resize',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <GripVertical style={{ width: 10, height: 10, color: '#9ca3af', transform: 'rotate(-45deg)' }} />
                   </div>
                 </div>
               )}
 
-              {/* Instrução - escondida durante captura do PDF */}
+              {/* Instrução — escondida durante captura */}
               {!capturando && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
                   Arraste e use o zoom para definir o recorte
@@ -969,6 +883,51 @@ export function ExportarMapaModal({
 
                 <Separator />
 
+                {/* Visibilidade na exportação */}
+                <div className="space-y-3">
+                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Elementos visíveis</Label>
+                  <p className="text-[10px] text-muted-foreground -mt-1">
+                    Oculte elementos apenas na exportação, sem alterar os filtros do mapa.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5 text-red-500" />
+                        <span className="text-xs">Demandas</span>
+                        <Badge variant="secondary" className="text-[10px] h-5">{demandas.filter(d => d.latitude && d.longitude).length}</Badge>
+                      </div>
+                      <Switch
+                        checked={exibirDemandasExport}
+                        onCheckedChange={setExibirDemandasExport}
+                        disabled={!mostrarDemandas}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-purple-500" />
+                        <span className="text-xs">Munícipes</span>
+                        <Badge variant="secondary" className="text-[10px] h-5">{municipes.filter(m => m.latitude && m.longitude).length}</Badge>
+                      </div>
+                      <Switch
+                        checked={exibirMunicipesExport}
+                        onCheckedChange={setExibirMunicipesExport}
+                        disabled={!mostrarMunicipes}
+                      />
+                    </div>
+                  </div>
+                  {(!mostrarDemandas || !mostrarMunicipes) && (
+                    <p className="text-[10px] text-amber-600 italic">
+                      {!mostrarDemandas && !mostrarMunicipes
+                        ? 'Demandas e munícipes estão ocultos nos filtros do mapa.'
+                        : !mostrarDemandas
+                        ? 'Demandas estão ocultas nos filtros do mapa.'
+                        : 'Munícipes estão ocultos nos filtros do mapa.'}
+                    </p>
+                  )}
+                </div>
+
+                <Separator />
+
                 {/* Config PDF */}
                 {formato === 'pdf' && (
                   <div className="space-y-4">
@@ -1011,9 +970,14 @@ export function ExportarMapaModal({
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">Incluir legenda</Label>
+                      <Label className="text-xs">Incluir legenda no mapa</Label>
                       <Switch checked={incluirLegenda} onCheckedChange={setIncluirLegenda} />
                     </div>
+                    {incluirLegenda && (
+                      <p className="text-[10px] text-muted-foreground italic -mt-2">
+                        Arraste a legenda sobre o mapa para posicioná-la. Use o canto inferior direito para redimensionar.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1024,11 +988,11 @@ export function ExportarMapaModal({
                     <div className="space-y-2 text-xs">
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
                         <div className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-red-500" /><span>Demandas</span></div>
-                        <Badge variant="secondary" className="text-xs">{mostrarDemandas ? demandas.filter(d => d.latitude && d.longitude).length : 0}</Badge>
+                        <Badge variant="secondary" className="text-xs">{mostrarDemandasEfetivo ? demandas.filter(d => d.latitude && d.longitude).length : 0}</Badge>
                       </div>
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
                         <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-purple-500" /><span>Munícipes</span></div>
-                        <Badge variant="secondary" className="text-xs">{mostrarMunicipes ? municipes.filter(m => m.latitude && m.longitude).length : 0}</Badge>
+                        <Badge variant="secondary" className="text-xs">{mostrarMunicipesEfetivo ? municipes.filter(m => m.latitude && m.longitude).length : 0}</Badge>
                       </div>
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
                         <div className="flex items-center gap-2"><Layers className="h-3.5 w-3.5 text-blue-500" /><span>Camadas</span></div>
@@ -1036,7 +1000,7 @@ export function ExportarMapaModal({
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      Arquivo GeoJSON com todos os pontos e polígonos visíveis. Compatível com QGIS, Google Earth e softwares de geoprocessamento.
+                      Arquivo GeoJSON compatível com QGIS, Google Earth e softwares de geoprocessamento.
                     </p>
                   </div>
                 )}
@@ -1047,8 +1011,18 @@ export function ExportarMapaModal({
                 <div className="space-y-2">
                   <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Resumo</Label>
                   <div className="space-y-1 text-xs text-muted-foreground">
-                    {mostrarDemandas && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{demandas.filter(d => d.latitude && d.longitude).length} demandas</span></div>}
-                    {mostrarMunicipes && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{municipes.filter(m => m.latitude && m.longitude).length} munícipes</span></div>}
+                    {mostrarDemandasEfetivo && (
+                      <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{demandas.filter(d => d.latitude && d.longitude).length} demandas</span></div>
+                    )}
+                    {mostrarDemandas && !exibirDemandasExport && (
+                      <div className="flex items-center gap-1.5 text-amber-600"><EyeOff className="h-3 w-3" /><span>Demandas ocultas na exportação</span></div>
+                    )}
+                    {mostrarMunicipesEfetivo && (
+                      <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{municipes.filter(m => m.latitude && m.longitude).length} munícipes</span></div>
+                    )}
+                    {mostrarMunicipes && !exibirMunicipesExport && (
+                      <div className="flex items-center gap-1.5 text-amber-600"><EyeOff className="h-3 w-3" /><span>Munícipes ocultos na exportação</span></div>
+                    )}
                     {camadasGeograficas.length > 0 && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{camadasGeograficas.length} camada(s)</span></div>}
                     {heatmapVisible && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>Mapa de calor ativo</span></div>}
                     {displayAngle !== 0 && <div className="flex items-center gap-1.5"><RotateCcw className="h-3 w-3" /><span>Rotação: {displayAngle}°</span></div>}
