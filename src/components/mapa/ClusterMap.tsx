@@ -582,6 +582,9 @@ interface ClusterMapProps {
   tipoFiltro?: 'todos' | 'demandas' | 'municipes' | 'nenhum';
   // Controle de clustering
   clusterEnabled?: boolean;
+  // Controle externo de rotação (controlled component pattern)
+  rotation?: number;
+  onRotationChange?: (rotation: number) => void;
 }
 
 export function ClusterMap({
@@ -606,13 +609,25 @@ export function ClusterMap({
   totalEleitoresPorCamada,
   modoVisualizacao = 'padrao',
   tipoFiltro = 'todos',
-  clusterEnabled = true
+  clusterEnabled = true,
+  rotation: externalRotation,
+  onRotationChange,
 }: ClusterMapProps) {
 
   // ============================
   // Estado de rotação do mapa
   // ============================
-  const [rotation, setRotation] = useState(0);
+  // Se rotation + onRotationChange foram passados, usar estado controlado
+  const [internalRotation, setInternalRotation] = useState(0);
+  const rotation = externalRotation ?? internalRotation;
+  const setRotation = useCallback((valOrFn: number | ((prev: number) => number)) => {
+    if (onRotationChange) {
+      const newVal = typeof valOrFn === 'function' ? valOrFn(externalRotation ?? 0) : valOrFn;
+      onRotationChange(newVal);
+    } else {
+      setInternalRotation(valOrFn as any);
+    }
+  }, [onRotationChange, externalRotation]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
 
@@ -660,16 +675,16 @@ export function ClusterMap({
   const offsetPercent = -(oversizeFactor - 1) * 50;
 
   const handleRotateLeft = useCallback(() => {
-    setRotation(prev => prev - 15);
-  }, []);
+    setRotation((prev: number) => prev - 15);
+  }, [setRotation]);
 
   const handleRotateRight = useCallback(() => {
-    setRotation(prev => prev + 15);
-  }, []);
+    setRotation((prev: number) => prev + 15);
+  }, [setRotation]);
 
   const handleRotateReset = useCallback(() => {
     setRotation(0);
-  }, []);
+  }, [setRotation]);
 
   // Normalizar ângulo para exibição (0-360)
   const displayAngle = useMemo(() => {
@@ -1306,7 +1321,7 @@ export function ClusterMap({
       {/* Funciona inclusive em tela cheia.              */}
       {/* ============================================= */}
       <div
-        className="absolute bottom-6 left-4 z-[1000] flex flex-col items-center gap-1 select-none"
+        className="absolute bottom-6 left-4 z-[400] flex flex-col items-center gap-1 select-none"
         style={{ pointerEvents: 'auto' }}
       >
         {/* Bússola / Indicador de direção */}
