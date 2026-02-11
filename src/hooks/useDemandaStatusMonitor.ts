@@ -61,6 +61,26 @@ export function useDemandaStatusMonitor() {
               return;
             }
 
+            // Buscar o status configurado na tabela demanda_status
+            // para verificar se deve notificar e obter o nome amigável
+            const { data: statusConfig } = await supabase
+              .from('demanda_status')
+              .select('nome, slug, notificar_municipe')
+              .eq('slug', newDemanda.status)
+              .eq('ativo', true)
+              .single();
+
+            if (!statusConfig) {
+              console.log('Status não encontrado na tabela demanda_status:', newDemanda.status);
+              return;
+            }
+
+            // Verificar se este status específico deve notificar o munícipe
+            if (!statusConfig.notificar_municipe) {
+              console.log(`Status "${statusConfig.nome}" não está configurado para notificar munícipe`);
+              return;
+            }
+
             // Buscar dados do munícipe
             const { data: municipe } = await supabase
               .from('municipes')
@@ -73,28 +93,8 @@ export function useDemandaStatusMonitor() {
               return;
             }
 
-            // Converter status para texto amigável
-            let statusTexto = newDemanda.status;
-            switch (newDemanda.status) {
-              case 'solicitada':
-                statusTexto = 'Solicitada';
-                break;
-              case 'em_producao':
-                statusTexto = 'Em Produção';
-                break;
-              case 'encaminhado':
-                statusTexto = 'Encaminhado';
-                break;
-              case 'devolvido':
-                statusTexto = 'Devolvido';
-                break;
-              case 'visitado':
-                statusTexto = 'Visitado';
-                break;
-              case 'atendido':
-                statusTexto = 'Atendido';
-                break;
-            }
+            // Usar o nome amigável do status configurado na tabela
+            const statusTexto = statusConfig.nome;
 
             // Adicionar notificação à fila
             addNotification({
