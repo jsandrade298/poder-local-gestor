@@ -278,7 +278,7 @@ serve(async (req) => {
                 phone, audio: mediaUrl 
               });
             } else {
-              resp = await callZApi(instanceId, zapiToken, clientToken, 'send-document/pdf', { 
+              resp = await callZApi(instanceId, zapiToken, clientToken, `send-document/${(media.filename || 'documento.pdf').split('.').pop()?.toLowerCase() || 'pdf'}`, { 
                 phone, document: mediaUrl, fileName: media.filename || 'documento' 
               });
             }
