@@ -10,6 +10,8 @@ interface DemandaNotificationProgress {
   error?: string;
   sentAt?: Date;
   demanda_titulo?: string;
+  demanda_protocolo?: string;
+  municipe_bairro?: string;
   novo_status?: string;
 }
 
@@ -29,7 +31,9 @@ interface DemandaNotificationContextType {
   addNotification: (data: {
     demanda_id: string;
     demanda_titulo: string;
+    demanda_protocolo?: string;
     municipe_nome: string;
+    municipe_bairro?: string;
     telefone: string;
     novo_status: string;
     instanceName: string;
@@ -60,7 +64,9 @@ export function DemandaNotificationProvider({ children }: { children: ReactNode 
   const addNotification = (data: {
     demanda_id: string;
     demanda_titulo: string;
+    demanda_protocolo?: string;
     municipe_nome: string;
+    municipe_bairro?: string;
     telefone: string;
     novo_status: string;
     instanceName: string;
@@ -72,6 +78,8 @@ export function DemandaNotificationProvider({ children }: { children: ReactNode 
       telefone: data.telefone,
       status: 'pending',
       demanda_titulo: data.demanda_titulo,
+      demanda_protocolo: data.demanda_protocolo,
+      municipe_bairro: data.municipe_bairro,
       novo_status: data.novo_status,
     };
 
