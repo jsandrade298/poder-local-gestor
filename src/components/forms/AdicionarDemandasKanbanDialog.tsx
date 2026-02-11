@@ -16,6 +16,7 @@ import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from '@/lib/dateUtils';
+import { registrarHistoricoBatch } from '@/lib/kanbanHistoricoUtils';
 import { cn } from "@/lib/utils";
 
 interface AdicionarDemandasKanbanDialogProps {
@@ -164,10 +165,25 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
         });
       
       if (error) throw error;
+
+      // Registrar no histórico
+      const demandasParaHistorico = demandaIds.map(demandaId => {
+        const demanda = demandas.find((d: any) => d.id === demandaId);
+        return {
+          item_id: demandaId,
+          item_tipo: 'demanda' as const,
+          item_titulo: demanda?.titulo || '',
+          kanban_type: selectedUser || 'producao-legislativa',
+          posicao_nova: 'a_fazer',
+          acao: 'adicionado' as const,
+        };
+      });
+      registrarHistoricoBatch(demandasParaHistorico);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       queryClient.invalidateQueries({ queryKey: ['demandas-disponiveis'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success(`${selectedDemandas.length} demanda(s) adicionada(s) ao kanban!`);
       setSelectedDemandas([]);
       onOpenChange(false);
