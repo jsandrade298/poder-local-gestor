@@ -753,7 +753,7 @@ export function ClusterMap({
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden"
+      className="relative z-0 w-full h-full overflow-hidden"
       style={{ minHeight: '400px' }}
     >
       {/* ============================================================
