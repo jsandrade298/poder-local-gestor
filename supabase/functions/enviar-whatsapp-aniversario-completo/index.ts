@@ -6,16 +6,72 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Credenciais Z-API padrão (fallback se não estiverem no banco)
+const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
+const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
+const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
+
+function normalizePhone(phone: string): string {
+  let digits = String(phone).replace(/\D/g, "");
+  if (digits.startsWith("55")) digits = digits.slice(2);
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const numero = digits.slice(2);
+    if (/^[987]/.test(numero)) digits = ddd + "9" + numero;
+  }
+  return "55" + digits;
+}
+
+function calcularDelayTyping(mensagem: string): number {
+  return Math.min(Math.max(Math.ceil(mensagem.length / 50), 2), 50);
+}
+
+async function callZApi(
+  instanceId: string, token: string, clientToken: string,
+  endpoint: string, payload: any
+): Promise<{ ok: boolean; body: any; error?: string }> {
+  const url = `https://api.z-api.io/instances/${instanceId}/token/${token}/${endpoint}`;
+  
+  try {
+    console.log(`🔄 Z-API: ${endpoint}`);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Client-Token": clientToken },
+      body: JSON.stringify(payload)
+    });
+    
+    const text = await response.text();
+    let body: any = text;
+    try { body = JSON.parse(text); } catch {}
+    
+    console.log(`📡 Z-API Response: ${response.status}`);
+    
+    if (!response.ok) {
+      return { ok: false, body, error: body?.error || body?.message || `HTTP ${response.status}` };
+    }
+    return { ok: true, body };
+  } catch (error: any) {
+    return { ok: false, body: null, error: error.message };
+  }
+}
+
+function detectMediaType(media: any): string {
+  const mimeType = media.mimetype || media.type || '';
+  const filename = (media.filename || media.fileName || '').toLowerCase();
+  if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/.test(filename)) return 'image';
+  if (mimeType.startsWith('video/') || /\.(mp4|avi|mov|webm)$/.test(filename)) return 'video';
+  if (mimeType.startsWith('audio/') || /\.(mp3|ogg|wav|m4a|opus)$/.test(filename)) return 'audio';
+  return 'document';
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('=== INICIANDO ENVIO ANIVERSÁRIOS ===');
+    console.log('=== INICIANDO ENVIO ANIVERSÁRIOS (Z-API) ===');
 
-    // Ler dados do corpo da requisição
     const requestData = await req.json();
     const {
       telefones = [],
@@ -34,7 +90,7 @@ serve(async (req) => {
       mediaFiles: mediaFiles.length 
     });
 
-    // Inicializar cliente Supabase
+    // Inicializar Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -42,17 +98,16 @@ serve(async (req) => {
     let aniversariantes: any[] = [];
     let messageTemplate = "";
     let finalInstanceName = instanceName;
+    let finalTempoMinimo = tempoMinimo;
+    let finalTempoMaximo = tempoMaximo;
 
     if (teste && telefones.length > 0) {
-      // Modo teste: usar dados enviados pelo frontend
       console.log('=== MODO TESTE ATIVADO ===');
       aniversariantes = telefones;
       messageTemplate = mensagem;
     } else {
-      // Modo automático: buscar configurações e aniversariantes do dia
       console.log('=== MODO AUTOMÁTICO ===');
       
-      // Buscar configurações
       const { data: configs } = await supabase
         .from('configuracoes')
         .select('chave, valor')
@@ -69,6 +124,8 @@ serve(async (req) => {
       finalInstanceName = configMap.get('whatsapp_instancia_aniversario') || '';
       messageTemplate = configMap.get('whatsapp_mensagem_aniversario') || '';
       const isActive = configMap.get('whatsapp_aniversario_ativo') === 'true';
+      finalTempoMinimo = parseInt(configMap.get('whatsapp_tempo_minimo_aniversario') || '1') || 1;
+      finalTempoMaximo = parseInt(configMap.get('whatsapp_tempo_maximo_aniversario') || '3') || 3;
 
       console.log('Configurações carregadas:', { instanceName: finalInstanceName, isActive });
 
@@ -110,7 +167,6 @@ serve(async (req) => {
     if (aniversariantes.length === 0) {
       console.log('Nenhum aniversariante encontrado');
       
-      // Log do envio vazio (apenas no modo automático)
       if (!teste) {
         await supabase.from('logs_aniversario').insert({
           quantidade: 0,
@@ -131,152 +187,129 @@ serve(async (req) => {
 
     console.log(`Encontrados ${aniversariantes.length} aniversariantes para processamento`);
 
-    // Buscar instância WhatsApp
+    // ========== BUSCAR CREDENCIAIS Z-API DA INSTÂNCIA ==========
+    let instanceId = ZAPI_INSTANCE_ID;
+    let zapiToken = ZAPI_TOKEN;
+    let clientToken = ZAPI_CLIENT_TOKEN;
+
     const { data: instance } = await supabase
       .from('whatsapp_instances')
       .select('*')
       .eq('instance_name', finalInstanceName)
       .eq('active', true)
-      .single();
+      .maybeSingle();
 
-    if (!instance) {
-      throw new Error(`Instância ${finalInstanceName} não encontrada`);
+    if (instance) {
+      instanceId = instance.instance_id || instanceId;
+      zapiToken = instance.instance_token || zapiToken;
+      clientToken = instance.client_token || clientToken;
+      console.log(`✅ Instância encontrada: ${instance.display_name}`);
+    } else {
+      console.log(`⚠️ Instância '${finalInstanceName}' não encontrada no banco, usando credenciais padrão Z-API`);
     }
 
-    // Headers da API
-    const apiHeaders = {
-      'Content-Type': 'application/json',
-      'apikey': instance.instance_token
-    };
-
-    console.log('Token configurado:', instance.instance_token ? 'Sim' : 'Não');
-
-    // Função para normalizar número brasileiro
-    const normalizePhone = (phone: string) => {
-      let digits = String(phone).replace(/\D/g, "");
-      
-      // Remove código do país se presente
-      if (digits.startsWith("55")) {
-        digits = digits.slice(2);
-      }
-      
-      // Adiciona 9 para celular se necessário
-      if (digits.length === 10) {
-        const ddd = digits.slice(0, 2);
-        const numero = digits.slice(2);
-        if (/^[987]/.test(numero)) {
-          digits = ddd + "9" + numero;
-        }
-      }
-      
-      // Adiciona código do país
-      return "55" + digits;
-    };
+    console.log(`🔗 Z-API Instance ID: ${instanceId.substring(0, 8)}...`);
 
     let successCount = 0;
     let errorCount = 0;
     const results: any[] = [];
 
-    // Processar aniversariantes
+    // ========== PROCESSAR ANIVERSARIANTES ==========
     for (let i = 0; i < aniversariantes.length; i++) {
       const aniversariante = aniversariantes[i];
       const telefoneContato = aniversariante.telefone;
-      const normalizedPhone = normalizePhone(telefoneContato);
+      const phone = normalizePhone(telefoneContato);
       
-      console.log(`\n🎂 [${i + 1}/${aniversariantes.length}] Processando: ${aniversariante.nome} (${normalizedPhone})`);
+      console.log(`\n🎂 [${i + 1}/${aniversariantes.length}] Processando: ${aniversariante.nome} (${phone})`);
       
-      // Aplicar delay entre envios (exceto no primeiro)
+      // Delay entre envios (exceto no primeiro)
       if (i > 0) {
-        const delaySeconds = Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo;
+        const delaySeconds = Math.random() * (finalTempoMaximo - finalTempoMinimo) + finalTempoMinimo;
         const delayMs = Math.round(delaySeconds * 1000);
-        
-        console.log(`⏳ Aguardando ${delayMs}ms (${delaySeconds.toFixed(1)}s) antes do próximo envio...`);
+        console.log(`⏳ Aguardando ${delayMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        console.log('✅ Delay concluído, enviando próxima mensagem...');
       }
 
       try {
         // Personalizar mensagem
         const mensagemPersonalizada = messageTemplate
-          .replace('{nome}', aniversariante.nome)
-          .replace('{NOME}', aniversariante.nome.toUpperCase());
+          .replace(/{nome}/gi, aniversariante.nome || '')
+          .replace(/{primeiro_nome}/gi, (aniversariante.nome || '').split(' ')[0])
+          .replace(/{NOME}/gi, (aniversariante.nome || '').toUpperCase());
 
-        console.log(`Mensagem: ${mensagemPersonalizada}`);
+        // Prefixar com [TESTE] se for teste
+        const mensagemFinal = teste ? `[TESTE] ${mensagemPersonalizada}` : mensagemPersonalizada;
 
-        // Primeiro, enviar mídias se houver
+        console.log(`💬 Mensagem: "${mensagemFinal.substring(0, 80)}${mensagemFinal.length > 80 ? '...' : ''}"`);
+
+        let sent = false;
+
+        // 1) Enviar mídias se houver
         if (mediaFiles && mediaFiles.length > 0) {
           console.log(`📎 Enviando ${mediaFiles.length} arquivo(s) de mídia`);
           
           for (let mediaIndex = 0; mediaIndex < mediaFiles.length; mediaIndex++) {
             const media = mediaFiles[mediaIndex];
             
-            // Delay entre mídias
             if (mediaIndex > 0) {
               await new Promise(r => setTimeout(r, 1000));
             }
             
-            // Detectar tipo de mídia
-            let mediaType = 'document';
-            if (media.mimetype) {
-              if (media.mimetype.startsWith('image/')) mediaType = 'image';
-              else if (media.mimetype.startsWith('video/')) mediaType = 'video';
-              else if (media.mimetype.startsWith('audio/')) mediaType = 'audio';
-            }
+            const mediaType = detectMediaType(media);
+            // Suporte a base64 (frontend envia como data) e URLs
+            const mediaUrl = media.data 
+              ? `data:${media.mimetype || 'application/octet-stream'};base64,${media.data}` 
+              : (media.url || '');
             
             console.log(`📎 Enviando mídia ${mediaType} (${mediaIndex + 1}/${mediaFiles.length})`);
             
-            const mediaUrl = `${instance.api_url}/message/sendMedia/${instance.instance_id}`;
-            const mediaPayload = {
-              number: normalizedPhone,
-              mediatype: mediaType,
-              media: media.data,
-              fileName: media.filename || `arquivo.${mediaType}`,
-              delay: 1200
-            };
+            let resp: any;
             
-            // Adicionar caption na primeira mídia
-            if (mediaIndex === 0) {
-              mediaPayload.caption = mensagemPersonalizada;
+            if (mediaType === 'image') {
+              resp = await callZApi(instanceId, zapiToken, clientToken, 'send-image', { 
+                phone, 
+                image: mediaUrl, 
+                caption: !sent ? mensagemFinal : '' 
+              });
+              if (resp.ok) sent = true;
+            } else if (mediaType === 'video') {
+              resp = await callZApi(instanceId, zapiToken, clientToken, 'send-video', { 
+                phone, 
+                video: mediaUrl, 
+                caption: !sent ? mensagemFinal : '' 
+              });
+              if (resp.ok) sent = true;
+            } else if (mediaType === 'audio') {
+              resp = await callZApi(instanceId, zapiToken, clientToken, 'send-audio', { 
+                phone, 
+                audio: mediaUrl 
+              });
+            } else {
+              resp = await callZApi(instanceId, zapiToken, clientToken, 'send-document/pdf', { 
+                phone, 
+                document: mediaUrl, 
+                fileName: media.filename || 'documento' 
+              });
             }
             
-            const mediaResponse = await fetch(mediaUrl, {
-              method: 'POST',
-              headers: apiHeaders,
-              body: JSON.stringify(mediaPayload)
-            });
-            
-            const mediaResponseText = await mediaResponse.text();
-            console.log(`Resposta mídia ${mediaIndex + 1}: ${mediaResponse.status} - ${mediaResponseText}`);
-            
-            if (!mediaResponse.ok) {
-              console.error(`❌ Erro ao enviar mídia ${mediaIndex + 1}`);
+            if (!resp.ok) {
+              console.error(`❌ Erro ao enviar mídia ${mediaIndex + 1}: ${resp.error}`);
+            } else {
+              console.log(`✅ Mídia ${mediaIndex + 1} enviada`);
             }
           }
-        } else {
-          // Enviar apenas texto se não há mídias
-          const url = `${instance.api_url}/message/sendText/${instance.instance_id}`;
-          const payload = {
-            number: normalizedPhone,
-            text: mensagemPersonalizada,
-            linkPreview: false,
-            delay: 1200
-          };
+        }
 
-          console.log(`URL da API: ${url}`);
-          console.log(`Payload:`, JSON.stringify(payload, null, 2));
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: apiHeaders,
-            body: JSON.stringify(payload)
+        // 2) Enviar texto se não foi enviado como caption de mídia
+        if (!sent && mensagemFinal) {
+          const resp = await callZApi(instanceId, zapiToken, clientToken, 'send-text', { 
+            phone, 
+            message: mensagemFinal, 
+            delayTyping: calcularDelayTyping(mensagemFinal) 
           });
-
-          const responseText = await response.text();
-          console.log(`Status da resposta: ${response.status}`);
-          console.log(`Resposta da API: ${responseText}`);
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status} - ${responseText}`);
+          
+          if (!resp.ok) {
+            throw new Error(resp.error || 'Erro ao enviar mensagem');
           }
         }
 
@@ -288,8 +321,8 @@ serve(async (req) => {
           status: 'sucesso'
         });
 
-      } catch (error) {
-        console.error(`❌ Erro geral ao enviar para ${aniversariante.nome}:`, error);
+      } catch (error: any) {
+        console.error(`❌ Erro ao enviar para ${aniversariante.nome}:`, error.message);
         errorCount++;
         results.push({
           nome: aniversariante.nome,
@@ -325,7 +358,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro no envio de aniversários:', error);
     
     return new Response(JSON.stringify({
