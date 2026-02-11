@@ -890,6 +890,9 @@ export function ClusterMap({
               modoVisualizacao={modoVisualizacao}
               tipoFiltro={tipoFiltro}
               colorirPorDensidade={colorirPorDensidade}
+              preenchimento={camada.propriedades?.preenchimento !== false}
+              estiloContorno={camada.propriedades?.estilo_contorno || 'solido'}
+              espessuraContorno={camada.propriedades?.espessura_contorno || 1}
               onFeatureClick={(feature, nomeRegiao) => {
                 if (onRegiaoClick) {
                   onRegiaoClick(camada.id, feature, nomeRegiao);
