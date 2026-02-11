@@ -152,36 +152,62 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
     staleTime: 5 * 60 * 1000,
   });
 
-  // Buscar instâncias conectadas
+  // Buscar instâncias do banco e verificar status da ativa
   const { data: instances, isLoading: loadingInstances } = useQuery({
     queryKey: ["whatsapp-instances-status"],
     queryFn: async () => {
-      const specificInstances = ["gabinete-whats-01", "gabinete-whats-02", "gabinete-whats-03"];
-      const connectedInstances = [];
+      // Buscar instâncias ativas do banco
+      const { data: dbInstances, error } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_name, display_name, status, phone_number')
+        .eq('active', true)
+        .order('display_name');
 
-      for (const instanceName of specificInstances) {
+      if (error || !dbInstances || dbInstances.length === 0) {
+        console.log('Nenhuma instância ativa encontrada no banco');
+        return [];
+      }
+
+      // Verificar status real via Z-API para cada instância
+      const connectedInstances = [];
+      for (const inst of dbInstances) {
         try {
-          const { data, error } = await supabase.functions.invoke("configurar-evolution", {
-            body: { action: "instance_status", instanceName }
+          const { data, error: statusError } = await supabase.functions.invoke("configurar-evolution", {
+            body: { action: "instance_status", instanceName: inst.instance_name }
           });
 
-          if (!error && data?.status === 'connected') {
+          if (!statusError && data?.status === 'connected') {
             connectedInstances.push({
-              instanceName,
-              displayName: instanceName.replace('gabinete-whats-', 'Gabinete WhatsApp '),
+              instanceName: inst.instance_name,
+              displayName: inst.display_name,
               status: 'connected',
-              number: data.phoneNumber
+              number: data.phoneNumber || inst.phone_number
+            });
+          } else {
+            // Incluir instância mesmo desconectada para o usuário ver
+            connectedInstances.push({
+              instanceName: inst.instance_name,
+              displayName: inst.display_name,
+              status: data?.status || inst.status || 'disconnected',
+              number: inst.phone_number
             });
           }
-        } catch (error) {
-          console.error(`Erro ao verificar instância ${instanceName}:`, error);
+        } catch (err) {
+          console.error(`Erro ao verificar instância ${inst.instance_name}:`, err);
+          // Usar status do banco como fallback
+          connectedInstances.push({
+            instanceName: inst.instance_name,
+            displayName: inst.display_name,
+            status: inst.status || 'disconnected',
+            number: inst.phone_number
+          });
         }
       }
 
       return connectedInstances;
     },
     enabled: open,
-    staleTime: 0,
+    staleTime: 30000, // Cache 30s para evitar chamadas repetidas
   });
 
   // ========== COMPUTED ==========
@@ -972,7 +998,7 @@ Estamos entrando em contato para..."
                         </div>
                       ) : instances && instances.length > 0 ? (
                         <div className="grid gap-3">
-                          {instances.map((inst) => (
+                          {instances.filter(inst => inst.status === 'connected').map((inst) => (
                             <button
                               key={inst.instanceName}
                               onClick={() => setSelectedInstance(inst.instanceName)}
@@ -996,6 +1022,18 @@ Estamos entrando em contato para..."
                               )}
                             </button>
                           ))}
+                          {instances.filter(inst => inst.status === 'connected').length === 0 && (
+                            <Alert>
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>Nenhuma instância conectada</AlertTitle>
+                              <AlertDescription>
+                                {instances.length > 0 
+                                  ? `${instances.length} instância(s) encontrada(s), mas nenhuma está conectada. Verifique em Configurações → WhatsApp.`
+                                  : 'Configure uma instância WhatsApp em Configurações → WhatsApp'
+                                }
+                              </AlertDescription>
+                            </Alert>
+                          )}
                         </div>
                       ) : (
                         <Alert>
