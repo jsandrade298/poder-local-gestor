@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { useDemandaNotification } from "@/contexts/DemandaNotificationContext";
 
 interface EditDemandaDialogProps {
   open: boolean;
@@ -45,6 +46,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
   const queryClient = useQueryClient();
   const { statusList, getStatusLabel, shouldNotify } = useDemandaStatus();
+  const { addNotification } = useDemandaNotification();
 
   // Buscar anexos existentes
   const { data: anexos = [] } = useQuery({
@@ -300,7 +302,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       const [demandaAnteriorResponse, editorResponse] = await Promise.all([
         supabase
           .from('demandas')
-          .select('status, responsavel_id, protocolo, titulo, municipes(nome, telefone)')
+          .select('status, responsavel_id, protocolo, titulo, municipes(nome, telefone, bairro)')
           .eq('id', demanda.id)
           .single(),
         supabase
@@ -374,11 +376,49 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       // Mapear status anterior para comparação correta
       const statusAnteriorMapeado = mapStatusAntigoParaNovo(statusAnterior || 'solicitada');
 
-      // Notificação WhatsApp é feita automaticamente pelo useDemandaStatusMonitor
-      // que escuta mudanças em realtime na tabela demandas
-      if (statusAnteriorMapeado !== statusMapeado && municipeData?.telefone) {
-        console.log('🔔 Status alterado - notificação WhatsApp será enviada pelo monitor realtime');
-        whatsappEnviado = true; // O monitor cuida do envio
+      // ========== NOTIFICAÇÃO WHATSAPP DIRETA ==========
+      // Dispara notificação diretamente, sem depender de Supabase Realtime
+      if (statusAnteriorMapeado !== statusMapeado && municipeData?.telefone && shouldNotify(statusMapeado)) {
+        try {
+          // Buscar configurações de WhatsApp para demandas
+          const { data: whatsConfigs } = await supabase
+            .from('configuracoes')
+            .select('chave, valor')
+            .in('chave', ['whatsapp_instancia_demandas', 'whatsapp_mensagem_demandas', 'whatsapp_demandas_ativo']);
+
+          const whatsConfigMap = (whatsConfigs || []).reduce((acc: any, item: any) => {
+            acc[item.chave] = item.valor;
+            return acc;
+          }, {});
+
+          const whatsAtivo = whatsConfigMap.whatsapp_demandas_ativo === 'true';
+          const whatsInstancia = whatsConfigMap.whatsapp_instancia_demandas;
+          const whatsMensagem = whatsConfigMap.whatsapp_mensagem_demandas;
+
+          if (whatsAtivo && whatsInstancia && whatsMensagem) {
+            // Obter nome amigável do status
+            const statusTexto = getStatusLabel(statusMapeado);
+
+            addNotification({
+              demanda_id: demanda.id,
+              demanda_titulo: data.titulo,
+              demanda_protocolo: demandaAnterior?.protocolo || '',
+              municipe_nome: municipeData.nome,
+              municipe_bairro: (municipeData as any)?.bairro || '',
+              telefone: municipeData.telefone,
+              novo_status: statusTexto,
+              instanceName: whatsInstancia
+            });
+
+            console.log('🔔 Notificação WhatsApp adicionada à fila para', municipeData.nome);
+            whatsappEnviado = true;
+          } else {
+            console.log('⚠️ Notificações WhatsApp de demandas não estão ativas ou configuradas');
+          }
+        } catch (whatsError) {
+          console.error('Erro ao verificar/enviar notificação WhatsApp:', whatsError);
+          // Não impede o salvamento da demanda
+        }
       }
 
       // ========== REGISTRAR MUDANÇA DE STATUS NO PRONTUÁRIO DO MUNÍCIPE ==========
