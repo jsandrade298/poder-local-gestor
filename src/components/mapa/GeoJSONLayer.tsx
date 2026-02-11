@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { DemandaMapa, AreaMapa } from '@/hooks/useMapaUnificado';
+import { EstiloContorno } from '@/hooks/useCamadasGeograficas';
 
 // =============================================
 // TIPOS E INTERFACES
@@ -13,6 +14,18 @@ export type ModoVisualizacao =
   | 'votos'            // Densidade de votos
   | 'comparativo'      // Votos vs Demandas
   | 'predominancia';   // Cor da área com mais demandas
+
+/**
+ * Converte o tipo de estilo de contorno para o dashArray do Leaflet
+ */
+function getDashArray(estilo?: EstiloContorno): string | undefined {
+  switch (estilo) {
+    case 'tracado':     return '10 6';
+    case 'pontilhado':  return '3 5';
+    case 'solido':
+    default:            return undefined;
+  }
+}
 
 interface GeoJSONLayerProps {
   data: any;
@@ -38,6 +51,11 @@ interface GeoJSONLayerProps {
   modoVisualizacao?: ModoVisualizacao;
   tipoFiltro?: 'todos' | 'demandas' | 'municipes' | 'nenhum';
   colorirPorDensidade?: boolean; // Legacy
+  
+  // Estilo visual da camada
+  preenchimento?: boolean;          // true (default) = preenche, false = só contorno
+  estiloContorno?: EstiloContorno;  // 'solido' (default) | 'tracado' | 'pontilhado'
+  espessuraContorno?: number;       // peso da linha da borda (default 1)
 }
 
 // =============================================
@@ -176,7 +194,10 @@ export function GeoJSONLayer({
   tipoFiltro = 'todos',
   colorirPorDensidade = false,
   demandas,
-  areas
+  areas,
+  preenchimento = true,
+  estiloContorno = 'solido',
+  espessuraContorno = 1
 }: GeoJSONLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GeoJSON | null>(null);
@@ -246,12 +267,18 @@ export function GeoJSONLayer({
             fillColor = cor;
         }
         
+        // Opacidade do preenchimento: 0 se preenchimento desativado
+        const baseFillOpacity = preenchimento
+          ? (modoEfetivo === 'padrao' ? opacidade : 0.6)
+          : 0;
+
         return {
-          color: '#334155', // Cor da borda (Slate-700)
-          weight: 1,        // Espessura da borda
+          color: preenchimento ? '#334155' : cor, // Sem preenchimento: contorno usa cor da camada
+          weight: espessuraContorno,
           fillColor: fillColor,
-          fillOpacity: modoEfetivo === 'padrao' ? opacidade : 0.6, // Mais opaco nos modos coloridos para melhor visibilidade
-          opacity: 1
+          fillOpacity: baseFillOpacity,
+          opacity: 1,
+          dashArray: getDashArray(estiloContorno),
         };
       },
       onEachFeature: (feature, featureLayer) => {
@@ -322,17 +349,20 @@ export function GeoJSONLayer({
         featureLayer.on('mouseover', () => {
           // Destacar ao passar o mouse
           (featureLayer as any).setStyle({ 
-            weight: 3, 
-            fillOpacity: 0.8 
+            weight: Math.max(espessuraContorno + 2, 3), 
+            fillOpacity: preenchimento ? 0.8 : 0 
           });
           if (onFeatureHover) onFeatureHover(feature, featureName);
         });
 
         featureLayer.on('mouseout', () => {
           // Restaurar estilo original
+          const baseFillOpacity = preenchimento
+            ? (modoEfetivo === 'padrao' ? opacidade : 0.6)
+            : 0;
           (featureLayer as any).setStyle({ 
-            weight: 1, 
-            fillOpacity: modoEfetivo === 'padrao' ? opacidade : 0.6 
+            weight: espessuraContorno, 
+            fillOpacity: baseFillOpacity 
           });
           if (onFeatureHover) onFeatureHover(null, null);
         });
@@ -362,7 +392,7 @@ export function GeoJSONLayer({
         layerRef.current = null;
       }
     };
-  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, totalEleitoresPorRegiao, modoEfetivo, tipoFiltro, demandas, areas]);
+  }, [data, cor, opacidade, map, mostrarLabels, onFeatureClick, onFeatureHover, estatisticas, votosPorRegiao, totalEleitoresPorRegiao, modoEfetivo, tipoFiltro, demandas, areas, preenchimento, estiloContorno, espessuraContorno]);
 
   return null;
 }
