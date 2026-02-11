@@ -31,6 +31,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { registrarHistoricoBatch } from "@/lib/kanbanHistoricoUtils";
 
 interface AdicionarRotasKanbanDialogProps {
   open: boolean;
@@ -125,11 +126,26 @@ export function AdicionarRotasKanbanDialog({
         });
 
       if (error) throw error;
+
+      // Registrar no histórico
+      const rotasParaHistorico = rotaIds.map((rotaId) => {
+        const rota = rotas.find((r: any) => r.id === rotaId);
+        return {
+          item_id: rotaId,
+          item_tipo: 'rota' as const,
+          item_titulo: rota?.titulo || '',
+          kanban_type: selectedUser || 'producao-legislativa',
+          posicao_nova: 'a_fazer',
+          acao: 'adicionado' as const,
+        };
+      });
+      registrarHistoricoBatch(rotasParaHistorico);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["demandas-kanban", selectedUser],
       });
+      queryClient.invalidateQueries({ queryKey: ["kanban-historico"] });
       toast.success(
         `${selectedRotas.length} rota(s) adicionada(s) ao kanban!`
       );
