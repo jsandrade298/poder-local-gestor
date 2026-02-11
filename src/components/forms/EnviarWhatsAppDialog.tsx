@@ -441,26 +441,44 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
       for (const media of mediaFiles) {
         const fileName = `whatsapp/${Date.now()}-${media.file.name}`;
         
+        let uploadSuccess = false;
+        
         const { error: uploadError } = await supabase.storage
           .from('whatsapp-media')
           .upload(fileName, media.file);
 
         if (uploadError) {
           if (uploadError.message.includes('not found')) {
+            // Bucket não existe, criar e tentar novamente
             await supabase.storage.createBucket('whatsapp-media', { public: true });
-            await supabase.storage.from('whatsapp-media').upload(fileName, media.file);
+            const { error: retryError } = await supabase.storage
+              .from('whatsapp-media')
+              .upload(fileName, media.file);
+            uploadSuccess = !retryError;
+            if (retryError) {
+              console.error('Erro no retry do upload:', retryError.message);
+            }
+          } else {
+            console.error('Erro no upload de mídia:', uploadError.message);
           }
+        } else {
+          uploadSuccess = true;
         }
 
-        const { data: urlData } = supabase.storage
-          .from('whatsapp-media')
-          .getPublicUrl(fileName);
+        if (uploadSuccess) {
+          const { data: urlData } = supabase.storage
+            .from('whatsapp-media')
+            .getPublicUrl(fileName);
 
-        uploadedMedia.push({
-          type: media.type,
-          url: urlData.publicUrl,
-          filename: media.file.name
-        });
+          uploadedMedia.push({
+            type: media.type,
+            mimetype: media.file.type,
+            url: urlData.publicUrl,
+            filename: media.file.name
+          });
+        } else {
+          console.warn(`⚠️ Mídia ${media.file.name} não foi enviada ao storage, será ignorada`);
+        }
       }
 
       // ========== CRIAR REGISTRO DE ENVIO NO BANCO ==========
