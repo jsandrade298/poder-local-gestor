@@ -11,11 +11,17 @@ export function useDemandaNotificationSender() {
   const processNotifications = useCallback(async () => {
     if (!state.isActive || state.notifications.length === 0) return;
 
-    // Buscar configurações
+    // Buscar configurações (incluindo tempos de intervalo)
     const { data: configs } = await supabase
       .from('configuracoes')
       .select('chave, valor')
-      .in('chave', ['whatsapp_instancia_demandas', 'whatsapp_mensagem_demandas', 'whatsapp_demandas_ativo']);
+      .in('chave', [
+        'whatsapp_instancia_demandas',
+        'whatsapp_mensagem_demandas',
+        'whatsapp_demandas_ativo',
+        'whatsapp_tempo_minimo_demandas',
+        'whatsapp_tempo_maximo_demandas',
+      ]);
 
     if (!configs) return;
 
@@ -27,6 +33,8 @@ export function useDemandaNotificationSender() {
     const isActive = configMap.whatsapp_demandas_ativo === 'true';
     const instanceName = configMap.whatsapp_instancia_demandas;
     const messageTemplate = configMap.whatsapp_mensagem_demandas;
+    const tempoMinimo = parseInt(configMap.whatsapp_tempo_minimo_demandas) || 1;
+    const tempoMaximo = parseInt(configMap.whatsapp_tempo_maximo_demandas) || 3;
 
     if (!isActive || !instanceName || !messageTemplate) {
       toast({
@@ -73,10 +81,11 @@ export function useDemandaNotificationSender() {
         // Sucesso
         updateNotificationStatus(notification.id, 'sent');
 
-        // Aguardar 1-2 segundos entre envios
+        // Aguardar intervalo configurado entre envios
         if (pendingNotifications.indexOf(notification) < pendingNotifications.length - 1) {
-          const delay = Math.random() * 1000 + 1000; // 1-2 segundos
-          let countdown = Math.ceil(delay / 1000);
+          // Usar tempos configurados na página WhatsApp (em segundos)
+          const delaySeconds = tempoMinimo + Math.random() * (tempoMaximo - tempoMinimo);
+          let countdown = Math.ceil(delaySeconds);
           
           while (countdown > 0 && !state.isCancelled) {
             updateCountdown(notification.id, countdown);
