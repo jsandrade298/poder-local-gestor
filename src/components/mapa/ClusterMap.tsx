@@ -494,14 +494,46 @@ export function ClusterMap({
   // Estado de rotação do mapa
   // ============================
   const [rotation, setRotation] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 1, h: 1 });
+
+  // Medir o container com ResizeObserver para reagir a mudanças de tamanho
+  // (inclusive ao entrar/sair de tela cheia)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        setContainerSize({ w: width, h: height });
+      }
+    };
+
+    measure(); // medição inicial
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Fator de escala para preencher os cantos ao rotacionar.
-  // A fórmula |sin(θ)| + |cos(θ)| garante que o retângulo rotacionado
-  // cubra 100% da viewport sem expor cantos vazios.
+  // Para um retângulo W×H rotacionado por θ, a escala uniforme necessária
+  // para que o retângulo rotacionado cubra 100% da viewport é:
+  //   max( |cos θ| + (H/W)·|sin θ| ,  (W/H)·|sin θ| + |cos θ| )
+  // Isso garante cobertura completa para qualquer aspect ratio.
   const rotationScale = useMemo(() => {
+    if (rotation === 0) return 1;
     const rad = rotation * Math.PI / 180;
-    return Math.abs(Math.sin(rad)) + Math.abs(Math.cos(rad));
-  }, [rotation]);
+    const sinA = Math.abs(Math.sin(rad));
+    const cosA = Math.abs(Math.cos(rad));
+    const { w, h } = containerSize;
+    const r = w / h; // aspect ratio
+    return Math.max(
+      cosA + (1 / r) * sinA,  // cobertura no eixo X
+      r * sinA + cosA          // cobertura no eixo Y (dominante em viewports largas)
+    );
+  }, [rotation, containerSize]);
 
   const handleRotateLeft = useCallback(() => {
     setRotation(prev => prev - 15);
@@ -581,6 +613,7 @@ export function ClusterMap({
 
   return (
     <div 
+      ref={containerRef}
       className="relative w-full h-full overflow-hidden"
       style={{ minHeight: '400px' }}
     >
