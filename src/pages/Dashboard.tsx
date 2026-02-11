@@ -5,6 +5,7 @@ import { ProjetosPlanilhasChart } from "@/components/dashboard/ProjetosPlanilhas
 import { HumorometroCard } from "@/components/dashboard/HumorometroCard";
 import { OverdueList } from "@/components/dashboard/OverdueList";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import {
   FileText,
   Users,
@@ -55,7 +56,10 @@ export default function Dashboard() {
               Métricas e demandas em tempo real
             </p>
           </div>
-          <NovaDemandaDialog />
+          <div className="flex gap-2">
+            <NovoMunicipeDialog />
+            <NovaDemandaDialog />
+          </div>
         </div>
 
         {/* ─── KPIs ─── */}
