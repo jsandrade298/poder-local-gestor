@@ -17,6 +17,7 @@ import { CriarRotaDialog } from '@/components/forms/CriarRotaDialog';
 import { ConcluirRotaDialog } from '@/components/forms/ConcluirRotaDialog';
 import { GerenciarRotasModal } from '@/components/forms/GerenciarRotasModal';
 import { BuscaEnderecoInput } from '@/components/forms/BuscaEnderecoInput';
+import { ExportarMapaModal } from '@/components/forms/ExportarMapaModal';
 import { 
   MapPin, 
   Filter, 
@@ -55,7 +56,8 @@ import {
   PieChart,
   TrendingUp,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Download
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -227,6 +229,9 @@ export default function MapaUnificado() {
 
   // Estado do modal de rankings
   const [modalRankingsAberto, setModalRankingsAberto] = useState(false);
+
+  // Estado do modal de exportação do mapa
+  const [exportarModalAberto, setExportarModalAberto] = useState(false);
 
   // Estados para dados eleitorais e novos modos de visualização
   const [modoVisualizacao, setModoVisualizacao] = useState<'padrao' | 'resolutividade' | 'votos' | 'comparativo' | 'predominancia'>('padrao');
@@ -871,6 +876,14 @@ export default function MapaUnificado() {
               >
                 <Link2 className="h-4 w-4" />
               </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => setExportarModalAberto(true)}
+                title="Exportar Mapa"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
             </div>
             <div className="flex-1" />
             <Button 
@@ -897,6 +910,21 @@ export default function MapaUnificado() {
                   <h1 className="font-semibold text-lg">Gestão Territorial</h1>
                 </div>
                 <div className="flex items-center gap-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setExportarModalAberto(true)}
+                          className="h-8 w-8"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Exportar mapa</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -2893,6 +2921,28 @@ export default function MapaUnificado() {
           setMunicipeDetalhesOpen(open);
           if (!open) setMunicipeParaDetalhes(null);
         }}
+      />
+
+      <ExportarMapaModal
+        open={exportarModalAberto}
+        onOpenChange={setExportarModalAberto}
+        demandas={tipoFiltro === 'municipes' || tipoFiltro === 'nenhum' ? [] : demandasFiltradas}
+        municipes={tipoFiltro === 'demandas' || tipoFiltro === 'nenhum' ? [] : municipesFiltrados}
+        areas={areas}
+        categorias={categorias}
+        mostrarDemandas={tipoFiltro !== 'municipes' && tipoFiltro !== 'nenhum'}
+        mostrarMunicipes={tipoFiltro !== 'demandas' && tipoFiltro !== 'nenhum'}
+        heatmapVisible={heatmapVisible && tipoFiltro !== 'nenhum'}
+        heatmapType={heatmapType}
+        clusterEnabled={clusterEnabled}
+        tipoFiltro={tipoFiltro}
+        camadasGeograficas={camadasVisiveis}
+        estatisticasPorRegiao={estatisticasPorRegiao}
+        colorirPorDensidade={colorirPorDensidade}
+        votosPorCamada={votosPorCamada}
+        totalEleitoresPorCamada={totalEleitoresPorCamada}
+        modoVisualizacao={modoVisualizacao}
+        statusList={statusList}
       />
     </div>
   );
