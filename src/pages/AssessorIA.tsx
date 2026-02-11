@@ -68,6 +68,22 @@ const AssessorIA = () => {
     }
   }, []);
 
+  // Função auxiliar para formatar data de atividade
+  const formatAtividadeData = (dataStr: string) => {
+    try {
+      const date = new Date(dataStr);
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dataStr;
+    }
+  };
+
   // Processar dados vindos de demanda
   useEffect(() => {
     const promptData = location.state?.promptData;
@@ -86,10 +102,36 @@ const AssessorIA = () => {
         prompt += `• Área: ${promptData.area}\n`;
       }
       
-      prompt += `• VEREADOR: Clóvis Girardi\n`;
-      
       if (promptData.observacoes) {
         prompt += `• OBSERVAÇÕES: ${promptData.observacoes}\n`;
+      }
+
+      // Incluir histórico de atividades se disponível
+      if (promptData.atividades && promptData.atividades.length > 0) {
+        prompt += `\nHISTÓRICO DE ATIVIDADES DA DEMANDA:\n`;
+        promptData.atividades.forEach((atv: any, index: number) => {
+          prompt += `\n--- Atividade ${index + 1} ---\n`;
+          prompt += `• Tipo: ${atv.tipo}\n`;
+          prompt += `• Título: ${atv.titulo}\n`;
+          if (atv.data) {
+            prompt += `• Data: ${formatAtividadeData(atv.data)}\n`;
+          }
+          if (atv.autor) {
+            prompt += `• Autor: ${atv.autor}\n`;
+          }
+          if (atv.descricao) {
+            prompt += `• Descrição: ${atv.descricao}\n`;
+          }
+          if (atv.propositura) {
+            prompt += `• Propositura: ${atv.propositura}\n`;
+          }
+          if (atv.status_propositura) {
+            prompt += `• Status da Propositura: ${atv.status_propositura}\n`;
+          }
+          if (atv.link_propositura) {
+            prompt += `• Link da Propositura: ${atv.link_propositura}\n`;
+          }
+        });
       }
       
       prompt += `\nPor favor, redija um [TIPO DE PROPOSITURA] oficial baseado nestes dados, seguindo os modelos de documentos enviados no contexto.`;
