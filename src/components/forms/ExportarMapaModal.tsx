@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DemandaMapa, MunicipeMapa, AreaMapa, CategoriaMapa } from '@/hooks/useMapaUnificado';
@@ -24,7 +23,6 @@ import { Input } from '@/components/ui/input';
 import {
   Download,
   FileText,
-  Map as MapIcon,
   Loader2,
   FileJson,
   FileDown,
@@ -32,37 +30,13 @@ import {
   User,
   Layers,
   Eye,
+  CheckCircle,
+  Vote,
+  PieChart,
+  TrendingUp,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// ============================================
-// Helpers para carregar bibliotecas via CDN
-// ============================================
-
-function loadScript(src: string, globalCheck: () => boolean): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (globalCheck()) { resolve(); return; }
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) { existing.addEventListener('load', () => resolve()); return; }
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error(`Falha ao carregar: ${src}`));
-    document.head.appendChild(s);
-  });
-}
-
-async function loadExportLibs() {
-  await loadScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-    () => !!(window as any).html2canvas
-  );
-  await loadScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
-    () => !!(window as any).jspdf
-  );
-}
 
 // ============================================
 // Tamanhos de papel em mm
@@ -76,13 +50,14 @@ const PAPER_SIZES: Record<string, { width: number; height: number; label: string
 };
 
 // ============================================
-// Ícones de marcador simplificados (para legenda)
+// Ícones de marcador simplificados
 // ============================================
+const STATUS_COLORS: Record<string, string> = {
+  'solicitada': '#3b82f6', 'em_producao': '#f59e0b', 'encaminhado': '#8b5cf6',
+  'atendido': '#22c55e', 'devolvido': '#ef4444', 'visitado': '#06b6d4',
+};
+
 function createSimpleDemandaIcon(status: string | null): L.DivIcon {
-  const STATUS_COLORS: Record<string, string> = {
-    'solicitada': '#3b82f6', 'em_producao': '#f59e0b', 'encaminhado': '#8b5cf6',
-    'atendido': '#22c55e', 'devolvido': '#ef4444', 'visitado': '#06b6d4',
-  };
   const color = STATUS_COLORS[status || 'solicitada'] || '#3b82f6';
   return L.divIcon({
     className: 'custom-marker',
@@ -114,7 +89,7 @@ function createSimpleMunicipeIcon(nome: string, cor: string): L.DivIcon {
 }
 
 // ============================================
-// Componente interno: sincroniza o mapa preview
+// Componente interno: sync do mapa preview
 // ============================================
 function MapSyncReady({ onReady }: { onReady: (map: L.Map) => void }) {
   const map = useMap();
@@ -123,32 +98,44 @@ function MapSyncReady({ onReady }: { onReady: (map: L.Map) => void }) {
 }
 
 // ============================================
+// Fallback: carregar script via CDN
+// ============================================
+function loadScriptFallback(src: string, check: () => boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (check()) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Falha ao carregar: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// ============================================
 // Props do modal
 // ============================================
 export interface ExportarMapaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // Dados filtrados (exatamente os mesmos que vão pro ClusterMap)
   demandas: DemandaMapa[];
   municipes: MunicipeMapa[];
   areas: AreaMapa[];
   categorias: CategoriaMapa[];
-  // Configurações do mapa
   mostrarDemandas: boolean;
   mostrarMunicipes: boolean;
   heatmapVisible: boolean;
   heatmapType: 'demandas' | 'municipes' | 'ambos';
   clusterEnabled: boolean;
   tipoFiltro: 'todos' | 'demandas' | 'municipes' | 'nenhum';
-  // Camadas geográficas
   camadasGeograficas: CamadaGeografica[];
   estatisticasPorRegiao?: Map<string, Map<string, { demandas: number; municipes: number }>>;
   colorirPorDensidade: boolean;
   votosPorCamada?: Map<string, Map<string, number>>;
   totalEleitoresPorCamada?: Map<string, Map<string, number>>;
   modoVisualizacao: ModoVisualizacao;
-  // Status para legenda
   statusList: { slug: string; nome: string; cor: string }[];
+  rotation: number;
 }
 
 // ============================================
@@ -174,30 +161,19 @@ export function ExportarMapaModal({
   totalEleitoresPorCamada,
   modoVisualizacao,
   statusList,
+  rotation,
 }: ExportarMapaModalProps) {
-  // Estados de configuração
+  // Config states
   const [formato, setFormato] = useState<'pdf' | 'geojson'>('pdf');
   const [tamanhoPapel, setTamanhoPapel] = useState('A4');
   const [orientacao, setOrientacao] = useState<'portrait' | 'landscape'>('landscape');
   const [incluirLegenda, setIncluirLegenda] = useState(true);
   const [titulo, setTitulo] = useState('Mapa - Gestão Territorial');
-
-  // Estado de exportação
   const [exportando, setExportando] = useState(false);
-  const [libsLoaded, setLibsLoaded] = useState(false);
 
   // Refs
   const captureRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
-
-  // Carregar bibliotecas ao abrir
-  useEffect(() => {
-    if (open && !libsLoaded) {
-      loadExportLibs()
-        .then(() => setLibsLoaded(true))
-        .catch(() => toast.error('Erro ao carregar bibliotecas de exportação'));
-    }
-  }, [open, libsLoaded]);
 
   // Centro calculado
   const centroCalculado = useMemo((): [number, number] => {
@@ -225,31 +201,26 @@ export function ExportarMapaModal({
     return statusList.filter(s => slugs.has(s.slug));
   }, [demandas, mostrarDemandas, statusList]);
 
-  // Categorias visíveis no mapa
+  // Categorias visíveis
   const categoriasVisiveis = useMemo(() => {
     if (!mostrarMunicipes) return [];
     const ids = new Set(municipes.map(m => m.categoria_id).filter(Boolean));
     return categorias.filter(c => ids.has(c.id));
   }, [municipes, mostrarMunicipes, categorias]);
 
-  // Áreas visíveis no mapa
+  // Áreas visíveis
   const areasVisiveis = useMemo(() => {
     if (!mostrarDemandas) return [];
     const ids = new Set(demandas.map(d => d.area_id).filter(Boolean));
     return areas.filter(a => ids.has(a.id));
   }, [demandas, mostrarDemandas, areas]);
 
-  // Proporção do papel para preview
-  const paperRatio = useMemo(() => {
-    const paper = PAPER_SIZES[tamanhoPapel];
-    if (orientacao === 'landscape') return paper.height / paper.width;
-    return paper.width / paper.height;
-  }, [tamanhoPapel, orientacao]);
+  // Display angle
+  const displayAngle = useMemo(() => ((rotation % 360) + 360) % 360, [rotation]);
 
-  // Callback para receber referência do mapa
+  // Map ready callback
   const handleMapReady = useCallback((map: L.Map) => {
     previewMapRef.current = map;
-    // Aguardar renderização e invalidar tamanho
     setTimeout(() => map.invalidateSize(), 300);
   }, []);
 
@@ -257,51 +228,64 @@ export function ExportarMapaModal({
   // Exportar PDF
   // ============================================
   const exportarPDF = async () => {
-    if (!captureRef.current || !libsLoaded) {
-      toast.error('Bibliotecas não carregadas. Tente novamente.');
-      return;
-    }
-
+    if (!captureRef.current) return;
     setExportando(true);
 
     try {
-      // Garantir que tiles estejam carregados
+      // Aguardar tiles carregarem
       if (previewMapRef.current) {
         previewMapRef.current.invalidateSize();
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 2000));
       }
 
-      const html2canvas = (window as any).html2canvas;
-      const { jsPDF } = (window as any).jspdf;
+      // Dynamic imports — tenta npm, fallback CDN
+      let html2canvas: any;
+      let jsPDF: any;
+
+      try {
+        const h2c = await import('html2canvas');
+        html2canvas = h2c.default || h2c;
+        const jpdf = await import('jspdf');
+        jsPDF = jpdf.jsPDF || jpdf.default;
+      } catch {
+        try {
+          await loadScriptFallback(
+            'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+            () => !!(window as any).html2canvas
+          );
+          await loadScriptFallback(
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
+            () => !!(window as any).jspdf
+          );
+          html2canvas = (window as any).html2canvas;
+          jsPDF = (window as any).jspdf?.jsPDF;
+        } catch (cdnErr) {
+          console.error('CDN fallback failed:', cdnErr);
+        }
+      }
+
+      if (!html2canvas || !jsPDF) {
+        toast.error(
+          'Bibliotecas não disponíveis. Execute no terminal: npm install html2canvas jspdf',
+          { duration: 8000 }
+        );
+        return;
+      }
 
       const paper = PAPER_SIZES[tamanhoPapel];
       const pw = orientacao === 'landscape' ? paper.height : paper.width;
       const ph = orientacao === 'landscape' ? paper.width : paper.height;
 
-      // Capturar o elemento
       const canvas = await html2canvas(captureRef.current, {
         useCORS: true,
         allowTaint: true,
         scale: 2,
         backgroundColor: '#ffffff',
         logging: false,
-        // Garantir que tiles sejam capturados
-        onclone: (doc: Document) => {
-          const tiles = doc.querySelectorAll('.leaflet-tile');
-          tiles.forEach((tile: any) => {
-            tile.crossOrigin = 'anonymous';
-          });
-        },
       });
 
-      // Criar PDF
-      const pdf = new jsPDF({
-        orientation: orientacao,
-        unit: 'mm',
-        format: [pw, ph],
-      });
+      const pdf = new jsPDF({ orientation: orientacao, unit: 'mm', format: [pw, ph] });
 
-      // Margens
       const margin = 8;
       const contentW = pw - margin * 2;
       const contentH = ph - margin * 2;
@@ -320,21 +304,14 @@ export function ExportarMapaModal({
       });
       pdf.text(`Exportado em: ${dataAtual}`, pw - margin, margin + 5, { align: 'right' });
 
-      // Adicionar imagem do mapa
+      // Imagem
       const imgData = canvas.toDataURL('image/png');
       const topOffset = margin + 10;
       const availH = contentH - 10;
-
-      // Calcular dimensões proporcionais
       const imgRatio = canvas.width / canvas.height;
       let imgW = contentW;
       let imgH = imgW / imgRatio;
-
-      if (imgH > availH) {
-        imgH = availH;
-        imgW = imgH * imgRatio;
-      }
-
+      if (imgH > availH) { imgH = availH; imgW = imgH * imgRatio; }
       const imgX = margin + (contentW - imgW) / 2;
       pdf.addImage(imgData, 'PNG', imgX, topOffset, imgW, imgH);
 
@@ -343,13 +320,11 @@ export function ExportarMapaModal({
       pdf.setTextColor(150, 150, 150);
       pdf.text('Poder Local Gestor - Gestão Territorial', pw / 2, ph - 3, { align: 'center' });
 
-      // Download
-      const nomeArquivo = `mapa_${tamanhoPapel}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      pdf.save(nomeArquivo);
+      pdf.save(`mapa_${tamanhoPapel}_${new Date().toISOString().slice(0, 10)}.pdf`);
       toast.success('PDF exportado com sucesso!');
     } catch (err) {
       console.error('Erro ao exportar PDF:', err);
-      toast.error('Erro ao gerar PDF. Tente novamente.');
+      toast.error('Erro ao gerar PDF. Verifique se html2canvas e jspdf estão instalados.');
     } finally {
       setExportando(false);
     }
@@ -360,11 +335,9 @@ export function ExportarMapaModal({
   // ============================================
   const exportarGeoJSON = () => {
     setExportando(true);
-
     try {
       const features: any[] = [];
 
-      // Demandas como Points
       if (mostrarDemandas) {
         demandas.forEach(d => {
           if (d.latitude && d.longitude) {
@@ -372,25 +345,16 @@ export function ExportarMapaModal({
               type: 'Feature',
               geometry: { type: 'Point', coordinates: [d.longitude, d.latitude] },
               properties: {
-                tipo: 'demanda',
-                id: d.id,
-                titulo: d.titulo,
-                protocolo: d.protocolo,
-                status: d.status,
-                prioridade: d.prioridade,
-                area: d.area_nome,
-                bairro: d.bairro,
-                cidade: d.cidade,
-                municipe: d.municipe_nome,
-                data_prazo: d.data_prazo,
-                created_at: d.created_at,
+                tipo: 'demanda', id: d.id, titulo: d.titulo, protocolo: d.protocolo,
+                status: d.status, prioridade: d.prioridade, area: d.area_nome,
+                bairro: d.bairro, cidade: d.cidade, municipe: d.municipe_nome,
+                data_prazo: d.data_prazo, created_at: d.created_at,
               },
             });
           }
         });
       }
 
-      // Munícipes como Points
       if (mostrarMunicipes) {
         municipes.forEach(m => {
           if (m.latitude && m.longitude) {
@@ -398,12 +362,8 @@ export function ExportarMapaModal({
               type: 'Feature',
               geometry: { type: 'Point', coordinates: [m.longitude, m.latitude] },
               properties: {
-                tipo: 'municipe',
-                id: m.id,
-                nome: m.nome,
-                bairro: m.bairro,
-                cidade: m.cidade,
-                tags: m.tags?.map(t => t.nome).join(', '),
+                tipo: 'municipe', id: m.id, nome: m.nome, bairro: m.bairro,
+                cidade: m.cidade, tags: m.tags?.map(t => t.nome).join(', '),
                 total_demandas: m.demandas_count,
               },
             });
@@ -411,20 +371,12 @@ export function ExportarMapaModal({
         });
       }
 
-      // Camadas geográficas (polígonos)
       camadasGeograficas.forEach(camada => {
         if (camada.geojson) {
           const geojson = typeof camada.geojson === 'string' ? JSON.parse(camada.geojson) : camada.geojson;
           if (geojson.features) {
             geojson.features.forEach((f: any) => {
-              features.push({
-                ...f,
-                properties: {
-                  ...f.properties,
-                  _camada: camada.nome,
-                  _tipo: 'camada_geografica',
-                },
-              });
+              features.push({ ...f, properties: { ...f.properties, _camada: camada.nome, _tipo: 'camada_geografica' } });
             });
           }
         }
@@ -433,8 +385,7 @@ export function ExportarMapaModal({
       const geojsonData = {
         type: 'FeatureCollection',
         metadata: {
-          exportado_em: new Date().toISOString(),
-          titulo: titulo,
+          exportado_em: new Date().toISOString(), titulo,
           total_demandas: demandas.filter(d => d.latitude && d.longitude).length,
           total_municipes: municipes.filter(m => m.latitude && m.longitude).length,
           total_camadas: camadasGeograficas.length,
@@ -458,37 +409,240 @@ export function ExportarMapaModal({
     }
   };
 
-  // ============================================
-  // Handler de exportação
-  // ============================================
   const handleExportar = () => {
     if (formato === 'pdf') exportarPDF();
     else exportarGeoJSON();
   };
 
+  // ============================================
+  // Legenda component
+  // ============================================
+  const LegendContent = () => (
+    <div className="space-y-3 text-xs">
+      {/* ---- Modo de Análise Ativo ---- */}
+      {modoVisualizacao !== 'padrao' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            {modoVisualizacao === 'resolutividade' && <><CheckCircle className="h-3 w-3" /> Resolutividade</>}
+            {modoVisualizacao === 'votos' && <><Vote className="h-3 w-3" /> Votos</>}
+            {modoVisualizacao === 'predominancia' && <><PieChart className="h-3 w-3" /> DNA do Bairro</>}
+            {modoVisualizacao === 'comparativo' && <><TrendingUp className="h-3 w-3" /> Oportunidade</>}
+          </div>
+
+          {modoVisualizacao === 'resolutividade' && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#22c55e]" /><span>Excelente (&gt;80%)</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#eab308]" /><span>Atenção (50-80%)</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#ef4444]" /><span>Crítico (&lt;50%)</span></div>
+            </div>
+          )}
+
+          {modoVisualizacao === 'votos' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#7c3aed]" /><span>Alta concentração</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#c4b5fd]" /><span>Baixa concentração</span></div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] text-muted-foreground">Menos</span>
+                <div className="flex-1 h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #c4b5fd, #7c3aed)' }} />
+                <span className="text-[10px] text-muted-foreground">Mais</span>
+              </div>
+            </div>
+          )}
+
+          {modoVisualizacao === 'predominancia' && (
+            <div className="space-y-1">
+              {areas.map(area => (
+                <div key={area.id} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: area.cor || '#6b7280' }} />
+                  <span className="truncate">{area.nome}</span>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted-foreground mt-1 italic">
+                Cor da área temática predominante na região
+              </p>
+            </div>
+          )}
+
+          {modoVisualizacao === 'comparativo' && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#ef4444]" /><span>Risco</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#3b82f6]" /><span>Equilíbrio</span></div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-sm bg-[#22c55e]" /><span>Potencial</span></div>
+            </div>
+          )}
+
+          <Separator />
+        </div>
+      )}
+
+      {/* ---- Status das demandas ---- */}
+      {statusVisiveis.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Demandas por Status</span>
+          {statusVisiveis.map(s => (
+            <div key={s.slug} className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.cor }} />
+              <span className="truncate flex-1">{s.nome}</span>
+              <span className="text-muted-foreground tabular-nums">{demandas.filter(d => d.status === s.slug).length}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ---- Categorias de munícipes ---- */}
+      {categoriasVisiveis.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Munícipes por Categoria</span>
+          {categoriasVisiveis.map(c => (
+            <div key={c.id} className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.cor }} />
+              <span className="truncate flex-1">{c.nome}</span>
+              <span className="text-muted-foreground tabular-nums">{municipes.filter(m => m.categoria_id === c.id).length}</span>
+            </div>
+          ))}
+          {municipes.some(m => !m.categoria_id) && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full flex-shrink-0 bg-[#8b5cf6]" />
+              <span className="truncate flex-1">Sem categoria</span>
+              <span className="text-muted-foreground tabular-nums">{municipes.filter(m => !m.categoria_id).length}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- Munícipes sem categoria (sem categorias visíveis) ---- */}
+      {mostrarMunicipes && categoriasVisiveis.length === 0 && municipes.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Munícipes</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full flex-shrink-0 bg-[#8b5cf6]" />
+            <span className="flex-1">Munícipes</span>
+            <span className="text-muted-foreground tabular-nums">{municipes.length}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Áreas (no modo padrão) ---- */}
+      {areasVisiveis.length > 0 && modoVisualizacao === 'padrao' && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Áreas</span>
+          {areasVisiveis.map(a => (
+            <div key={a.id} className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}` }} />
+              <span className="truncate">{a.nome}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ---- Camadas geográficas ---- */}
+      {camadasGeograficas.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Camadas Geográficas</span>
+          {camadasGeograficas.map(c => (
+            <div key={c.id} className="flex items-center gap-2">
+              <div className="w-4 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}` }} />
+              <span className="truncate">{c.nome}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ---- Heatmap ---- */}
+      {heatmapVisible && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Mapa de Calor</span>
+          <div className="flex items-center gap-2">
+            <div className="flex h-2.5 rounded-full overflow-hidden w-16 flex-shrink-0">
+              <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
+              <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
+              <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
+              <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
+              <div style={{ flex: 1, backgroundColor: '#67000d' }} />
+            </div>
+            <span className="text-muted-foreground">
+              {heatmapType === 'demandas' ? 'Demandas' : heatmapType === 'municipes' ? 'Munícipes' : 'Todos'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Rotação ---- */}
+      {displayAngle !== 0 && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Orientação</span>
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-3 w-3 text-muted-foreground" />
+            <span>Rotação: {displayAngle}°</span>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Totais ---- */}
+      <Separator />
+      <div className="space-y-0.5 text-[10px] text-muted-foreground">
+        {mostrarDemandas && <div>{demandas.filter(d => d.latitude && d.longitude).length} demandas no mapa</div>}
+        {mostrarMunicipes && <div>{municipes.filter(m => m.latitude && m.longitude).length} munícipes no mapa</div>}
+        {camadasGeograficas.length > 0 && <div>{camadasGeograficas.length} camada(s) geográfica(s)</div>}
+      </div>
+    </div>
+  );
+
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent
+        className="max-w-[96vw] w-[1550px] h-[92vh] max-h-[92vh] p-0 flex flex-col overflow-hidden"
+        style={{ zIndex: 9999 }}
+      >
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Download className="h-5 w-5 text-primary" />
             Exportar Mapa
           </DialogTitle>
           <DialogDescription>
-            Ajuste a visualização do mapa na prévia e configure o formato de exportação
+            Ajuste a visualização do mapa e configure o formato de exportação
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0">
-          {/* ============================================= */}
-          {/* LADO ESQUERDO: Prévia do Mapa + Legenda       */}
-          {/* ============================================= */}
-          <div className="flex-1 flex flex-col min-w-0 border-r">
-            {/* Área de captura (mapa + legenda) */}
-            <div ref={captureRef} className="flex-1 flex flex-col min-h-0 bg-white">
-              {/* Mapa Preview */}
-              <div className="flex-1 relative min-h-[300px]">
-                {open && (
+          {/* ================================================= */}
+          {/* ESQUERDA: Legenda (fora da captura, mas inclusa    */}
+          {/* no captureRef para PDF quando ativada)             */}
+          {/* ================================================= */}
+          {incluirLegenda && (
+            <div className="w-[220px] flex-shrink-0 border-r bg-muted/20 flex flex-col">
+              <div className="px-3 pt-3 pb-2 border-b">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Legenda</span>
+                </div>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="px-3 py-3">
+                  <LegendContent />
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* ================================================= */}
+          {/* CENTRO: Prévia do Mapa (área de captura)           */}
+          {/* ================================================= */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div ref={captureRef} className="flex-1 relative min-h-[300px] bg-white overflow-hidden">
+              {/* Container com rotação aplicada */}
+              {open && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: rotation !== 0 ? '-25%' : '0',
+                    transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
+                    transformOrigin: 'center center',
+                  }}
+                >
                   <MapContainer
                     center={centroCalculado}
                     zoom={13}
@@ -549,164 +703,31 @@ export function ExportarMapaModal({
                       </>
                     )}
                   </MapContainer>
-                )}
-
-                {/* Instrução sobreposta */}
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-                  Arraste e use o zoom para definir o recorte da exportação
-                </div>
-              </div>
-
-              {/* Legenda */}
-              {incluirLegenda && (
-                <div className="border-t bg-white px-4 py-3 flex-shrink-0" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Legenda</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-1.5 text-xs">
-                    {/* Status das demandas */}
-                    {statusVisiveis.length > 0 && (
-                      <div className="col-span-full mb-1">
-                        <span className="font-semibold text-[10px] text-gray-500">DEMANDAS POR STATUS</span>
-                      </div>
-                    )}
-                    {statusVisiveis.map(s => (
-                      <div key={s.slug} className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full border border-white flex-shrink-0"
-                          style={{ backgroundColor: s.cor, boxShadow: `0 0 0 1px ${s.cor}40` }}
-                        />
-                        <span className="truncate">{s.nome}</span>
-                        <span className="text-gray-400 ml-auto">
-                          {demandas.filter(d => d.status === s.slug).length}
-                        </span>
-                      </div>
-                    ))}
-
-                    {/* Categorias de munícipes */}
-                    {categoriasVisiveis.length > 0 && (
-                      <div className="col-span-full mb-1 mt-2">
-                        <span className="font-semibold text-[10px] text-gray-500">MUNÍCIPES POR CATEGORIA</span>
-                      </div>
-                    )}
-                    {categoriasVisiveis.map(c => (
-                      <div key={c.id} className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full border border-white flex-shrink-0"
-                          style={{ backgroundColor: c.cor, boxShadow: `0 0 0 1px ${c.cor}40` }}
-                        />
-                        <span className="truncate">{c.nome}</span>
-                        <span className="text-gray-400 ml-auto">
-                          {municipes.filter(m => m.categoria_id === c.id).length}
-                        </span>
-                      </div>
-                    ))}
-
-                    {/* Munícipes sem categoria */}
-                    {mostrarMunicipes && municipes.some(m => !m.categoria_id) && (
-                      <>
-                        {categoriasVisiveis.length === 0 && (
-                          <div className="col-span-full mb-1 mt-2">
-                            <span className="font-semibold text-[10px] text-gray-500">MUNÍCIPES</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full border border-white flex-shrink-0"
-                            style={{ backgroundColor: '#8b5cf6', boxShadow: '0 0 0 1px #8b5cf640' }}
-                          />
-                          <span className="truncate">Sem categoria</span>
-                          <span className="text-gray-400 ml-auto">
-                            {municipes.filter(m => !m.categoria_id).length}
-                          </span>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Áreas */}
-                    {areasVisiveis.length > 0 && (
-                      <div className="col-span-full mb-1 mt-2">
-                        <span className="font-semibold text-[10px] text-gray-500">ÁREAS</span>
-                      </div>
-                    )}
-                    {areasVisiveis.map(a => (
-                      <div key={a.id} className="flex items-center gap-2">
-                        <div
-                          className="w-2.5 h-2.5 rounded-sm border flex-shrink-0"
-                          style={{ backgroundColor: a.cor || '#6b7280', borderColor: a.cor || '#6b7280' }}
-                        />
-                        <span className="truncate">{a.nome}</span>
-                      </div>
-                    ))}
-
-                    {/* Camadas geográficas */}
-                    {camadasGeograficas.length > 0 && (
-                      <div className="col-span-full mb-1 mt-2">
-                        <span className="font-semibold text-[10px] text-gray-500">CAMADAS GEOGRÁFICAS</span>
-                      </div>
-                    )}
-                    {camadasGeograficas.map(c => (
-                      <div key={c.id} className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-2.5 rounded-sm border flex-shrink-0"
-                          style={{
-                            backgroundColor: `${c.cor_padrao}50`,
-                            borderColor: c.cor_padrao,
-                          }}
-                        />
-                        <span className="truncate">{c.nome}</span>
-                      </div>
-                    ))}
-
-                    {/* Heatmap */}
-                    {heatmapVisible && (
-                      <>
-                        <div className="col-span-full mb-1 mt-2">
-                          <span className="font-semibold text-[10px] text-gray-500">MAPA DE CALOR</span>
-                        </div>
-                        <div className="flex items-center gap-2 col-span-2">
-                          <div className="flex h-2.5 rounded-full overflow-hidden w-20 flex-shrink-0">
-                            <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
-                            <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
-                            <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
-                            <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
-                            <div style={{ flex: 1, backgroundColor: '#67000d' }} />
-                          </div>
-                          <span className="text-gray-500">
-                            {heatmapType === 'demandas' ? 'Demandas' :
-                             heatmapType === 'municipes' ? 'Munícipes' : 'Demandas + Munícipes'}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Totais */}
-                  <div className="flex items-center gap-4 mt-3 pt-2 border-t text-[10px] text-gray-400">
-                    {mostrarDemandas && (
-                      <span>{demandas.filter(d => d.latitude && d.longitude).length} demandas</span>
-                    )}
-                    {mostrarMunicipes && (
-                      <span>{municipes.filter(m => m.latitude && m.longitude).length} munícipes</span>
-                    )}
-                    {camadasGeograficas.length > 0 && (
-                      <span>{camadasGeograficas.length} camada(s)</span>
-                    )}
-                  </div>
                 </div>
               )}
+
+              {/* Badge rotação */}
+              {displayAngle !== 0 && (
+                <div className="absolute top-3 right-3 z-[500] bg-black/60 text-white text-xs px-2.5 py-1 rounded-full pointer-events-none flex items-center gap-1.5">
+                  <RotateCcw className="h-3 w-3" />
+                  {displayAngle}°
+                </div>
+              )}
+
+              {/* Instrução */}
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
+                Arraste e use o zoom para definir o recorte
+              </div>
             </div>
           </div>
 
-          {/* ============================================= */}
-          {/* LADO DIREITO: Configurações de exportação     */}
-          {/* ============================================= */}
-          <div className="w-[320px] flex flex-col flex-shrink-0 bg-muted/30">
+          {/* ================================================= */}
+          {/* DIREITA: Configurações de exportação               */}
+          {/* ================================================= */}
+          <div className="w-[310px] flex flex-col flex-shrink-0 bg-muted/30 border-l">
             <ScrollArea className="flex-1">
-              <div className="p-5 space-y-6">
-                {/* Título do mapa */}
+              <div className="p-5 space-y-5">
+                {/* Título */}
                 <div className="space-y-2">
                   <Label className="text-xs font-medium">Título do mapa</Label>
                   <Input
@@ -719,35 +740,27 @@ export function ExportarMapaModal({
 
                 <Separator />
 
-                {/* Formato de exportação */}
+                {/* Formato */}
                 <div className="space-y-3">
-                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">
-                    Formato
-                  </Label>
-
+                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Formato</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setFormato('pdf')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                        formato === 'pdf'
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-border hover:border-muted-foreground/30'
+                      className={`flex flex-col items-center gap-2 p-3.5 rounded-lg border-2 transition-all ${
+                        formato === 'pdf' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
                       }`}
                     >
-                      <FileDown className="h-8 w-8" />
+                      <FileDown className="h-7 w-7" />
                       <span className="text-sm font-medium">PDF</span>
                       <span className="text-[10px] text-muted-foreground">Imagem do mapa</span>
                     </button>
-
                     <button
                       onClick={() => setFormato('geojson')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                        formato === 'geojson'
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-border hover:border-muted-foreground/30'
+                      className={`flex flex-col items-center gap-2 p-3.5 rounded-lg border-2 transition-all ${
+                        formato === 'geojson' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
                       }`}
                     >
-                      <FileJson className="h-8 w-8" />
+                      <FileJson className="h-7 w-7" />
                       <span className="text-sm font-medium">GeoJSON</span>
                       <span className="text-[10px] text-muted-foreground">Dados geográficos</span>
                     </button>
@@ -756,64 +769,47 @@ export function ExportarMapaModal({
 
                 <Separator />
 
-                {/* Configurações de PDF */}
+                {/* Config PDF */}
                 {formato === 'pdf' && (
                   <div className="space-y-4">
-                    <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">
-                      Configurações do PDF
-                    </Label>
+                    <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Configurações do PDF</Label>
 
-                    {/* Tamanho do papel */}
                     <div className="space-y-2">
                       <Label className="text-xs">Tamanho do papel</Label>
                       <Select value={tamanhoPapel} onValueChange={setTamanhoPapel}>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {Object.entries(PAPER_SIZES).map(([key, val]) => (
-                            <SelectItem key={key} value={key}>
-                              {val.label}
-                            </SelectItem>
+                            <SelectItem key={key} value={key}>{val.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Orientação */}
                     <div className="space-y-2">
                       <Label className="text-xs">Orientação</Label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setOrientacao('landscape')}
                           className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm transition-all ${
-                            orientacao === 'landscape'
-                              ? 'border-primary bg-primary/5 text-primary font-medium'
-                              : 'border-border hover:bg-muted'
+                            orientacao === 'landscape' ? 'border-primary bg-primary/5 text-primary font-medium' : 'border-border hover:bg-muted'
                           }`}
                         >
-                          <div className="w-6 h-4 border-2 rounded-sm" style={{
-                            borderColor: orientacao === 'landscape' ? 'currentColor' : '#d1d5db'
-                          }} />
+                          <div className="w-6 h-4 border-2 rounded-sm" style={{ borderColor: orientacao === 'landscape' ? 'currentColor' : '#d1d5db' }} />
                           Paisagem
                         </button>
                         <button
                           onClick={() => setOrientacao('portrait')}
                           className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm transition-all ${
-                            orientacao === 'portrait'
-                              ? 'border-primary bg-primary/5 text-primary font-medium'
-                              : 'border-border hover:bg-muted'
+                            orientacao === 'portrait' ? 'border-primary bg-primary/5 text-primary font-medium' : 'border-border hover:bg-muted'
                           }`}
                         >
-                          <div className="w-4 h-6 border-2 rounded-sm" style={{
-                            borderColor: orientacao === 'portrait' ? 'currentColor' : '#d1d5db'
-                          }} />
+                          <div className="w-4 h-6 border-2 rounded-sm" style={{ borderColor: orientacao === 'portrait' ? 'currentColor' : '#d1d5db' }} />
                           Retrato
                         </button>
                       </div>
                     </div>
 
-                    {/* Incluir legenda */}
                     <div className="flex items-center justify-between">
                       <Label className="text-xs">Incluir legenda</Label>
                       <Switch checked={incluirLegenda} onCheckedChange={setIncluirLegenda} />
@@ -821,83 +817,49 @@ export function ExportarMapaModal({
                   </div>
                 )}
 
-                {/* Configurações de GeoJSON */}
+                {/* Config GeoJSON */}
                 {formato === 'geojson' && (
                   <div className="space-y-4">
-                    <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">
-                      Conteúdo do GeoJSON
-                    </Label>
-
+                    <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Conteúdo do GeoJSON</Label>
                     <div className="space-y-2 text-xs">
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5 text-red-500" />
-                          <span>Demandas</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {mostrarDemandas ? demandas.filter(d => d.latitude && d.longitude).length : 0}
-                        </Badge>
+                        <div className="flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-red-500" /><span>Demandas</span></div>
+                        <Badge variant="secondary" className="text-xs">{mostrarDemandas ? demandas.filter(d => d.latitude && d.longitude).length : 0}</Badge>
                       </div>
-
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-purple-500" />
-                          <span>Munícipes</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {mostrarMunicipes ? municipes.filter(m => m.latitude && m.longitude).length : 0}
-                        </Badge>
+                        <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-purple-500" /><span>Munícipes</span></div>
+                        <Badge variant="secondary" className="text-xs">{mostrarMunicipes ? municipes.filter(m => m.latitude && m.longitude).length : 0}</Badge>
                       </div>
-
                       <div className="flex items-center justify-between py-2 px-3 bg-background rounded-md">
-                        <div className="flex items-center gap-2">
-                          <Layers className="h-3.5 w-3.5 text-blue-500" />
-                          <span>Camadas geográficas</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {camadasGeograficas.length}
-                        </Badge>
+                        <div className="flex items-center gap-2"><Layers className="h-3.5 w-3.5 text-blue-500" /><span>Camadas</span></div>
+                        <Badge variant="secondary" className="text-xs">{camadasGeograficas.length}</Badge>
                       </div>
                     </div>
-
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      O arquivo GeoJSON incluirá todos os pontos e polígonos visíveis no mapa com suas 
-                      propriedades (status, área, tags, etc.). Compatível com QGIS, Google Earth e outros
-                      softwares de geoprocessamento.
+                      Arquivo GeoJSON com todos os pontos e polígonos visíveis. Compatível com QGIS, Google Earth e softwares de geoprocessamento.
                     </p>
                   </div>
                 )}
 
                 <Separator />
 
-                {/* Resumo do que será exportado */}
+                {/* Resumo */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">
-                    Resumo da exportação
-                  </Label>
+                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Resumo</Label>
                   <div className="space-y-1 text-xs text-muted-foreground">
-                    {mostrarDemandas && (
+                    {mostrarDemandas && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{demandas.filter(d => d.latitude && d.longitude).length} demandas</span></div>}
+                    {mostrarMunicipes && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{municipes.filter(m => m.latitude && m.longitude).length} munícipes</span></div>}
+                    {camadasGeograficas.length > 0 && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{camadasGeograficas.length} camada(s)</span></div>}
+                    {heatmapVisible && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>Mapa de calor ativo</span></div>}
+                    {displayAngle !== 0 && <div className="flex items-center gap-1.5"><RotateCcw className="h-3 w-3" /><span>Rotação: {displayAngle}°</span></div>}
+                    {modoVisualizacao !== 'padrao' && (
                       <div className="flex items-center gap-1.5">
                         <Eye className="h-3 w-3" />
-                        <span>{demandas.filter(d => d.latitude && d.longitude).length} demandas visíveis</span>
-                      </div>
-                    )}
-                    {mostrarMunicipes && (
-                      <div className="flex items-center gap-1.5">
-                        <Eye className="h-3 w-3" />
-                        <span>{municipes.filter(m => m.latitude && m.longitude).length} munícipes visíveis</span>
-                      </div>
-                    )}
-                    {camadasGeograficas.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <Eye className="h-3 w-3" />
-                        <span>{camadasGeograficas.length} camada(s) geográfica(s)</span>
-                      </div>
-                    )}
-                    {heatmapVisible && (
-                      <div className="flex items-center gap-1.5">
-                        <Eye className="h-3 w-3" />
-                        <span>Mapa de calor ativo</span>
+                        <span>Análise: {
+                          modoVisualizacao === 'resolutividade' ? 'Resolutividade' :
+                          modoVisualizacao === 'votos' ? 'Votos' :
+                          modoVisualizacao === 'predominancia' ? 'DNA do Bairro' : 'Oportunidade'
+                        }</span>
                       </div>
                     )}
                   </div>
@@ -905,38 +867,22 @@ export function ExportarMapaModal({
               </div>
             </ScrollArea>
 
-            {/* Botão de exportar */}
+            {/* Botão exportar */}
             <div className="p-4 border-t bg-background">
               <Button
                 onClick={handleExportar}
-                disabled={exportando || (formato === 'pdf' && !libsLoaded)}
+                disabled={exportando}
                 className="w-full h-11 text-sm font-medium"
                 size="lg"
               >
                 {exportando ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Exportando...
-                  </>
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
                 ) : formato === 'pdf' ? (
-                  <>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Exportar PDF ({tamanhoPapel})
-                  </>
+                  <><Printer className="h-4 w-4 mr-2" />Exportar PDF ({tamanhoPapel})</>
                 ) : (
-                  <>
-                    <FileJson className="h-4 w-4 mr-2" />
-                    Exportar GeoJSON
-                  </>
+                  <><FileJson className="h-4 w-4 mr-2" />Exportar GeoJSON</>
                 )}
               </Button>
-
-              {formato === 'pdf' && !libsLoaded && (
-                <p className="text-[10px] text-muted-foreground text-center mt-2 flex items-center justify-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Carregando bibliotecas...
-                </p>
-              )}
             </div>
           </div>
         </div>
