@@ -54,8 +54,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Preparar mensagem personalizada - substituir TODAS as variáveis
     const primeiroNome = (notificacao.municipe_nome || '').split(' ')[0];
     const agora = new Date();
-    const dataAtual = agora.toLocaleDateString('pt-BR');
-    const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dataAtual = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
     const mensagemPersonalizada = notificacao.mensagem
       .replace(/\{nome\}/gi, notificacao.municipe_nome || '')
