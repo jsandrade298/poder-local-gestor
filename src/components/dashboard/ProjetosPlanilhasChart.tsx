@@ -54,23 +54,25 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              layout="vertical"
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              barCategoryGap="25%"
-              barGap={3}
+              barCategoryGap="20%"
+              barGap={4}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                horizontal={false}
+                vertical={false}
                 className="opacity-30"
               />
-              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-              <YAxis
+              <XAxis
                 dataKey="name"
                 type="category"
-                width={110}
                 tick={{ fontSize: 11 }}
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={60}
               />
+              <YAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
               <Tooltip
                 contentStyle={{
                   borderRadius: "8px",
@@ -95,13 +97,15 @@ export function ProjetosPlanilhasChart({ data }: ProjetosPlanilhasChartProps) {
                 dataKey="projetos"
                 fill="#8b5cf6"
                 name="projetos"
-                radius={[0, 4, 4, 0]}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={40}
               />
               <Bar
                 dataKey="planilhas"
                 fill="#06b6d4"
                 name="planilhas"
-                radius={[0, 4, 4, 0]}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={40}
               />
             </BarChart>
           </ResponsiveContainer>
