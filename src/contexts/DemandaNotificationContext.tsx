@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, ReactNode } from 'react';
 
 interface DemandaNotificationProgress {
   id: string;
@@ -58,8 +58,14 @@ const initialState: DemandaNotificationState = {
   instanceName: '',
 };
 
+// Tempo em ms para considerar uma notificação como duplicada (30 segundos)
+const DEDUP_WINDOW_MS = 30000;
+
 export function DemandaNotificationProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DemandaNotificationState>(initialState);
+  
+  // Mapa de deduplicação: demanda_id+status -> timestamp
+  const recentNotificationsRef = useRef<Map<string, number>>(new Map());
 
   const addNotification = (data: {
     demanda_id: string;
@@ -71,6 +77,26 @@ export function DemandaNotificationProvider({ children }: { children: ReactNode 
     novo_status: string;
     instanceName: string;
   }) => {
+    // Deduplicação: verificar se já foi adicionada recentemente
+    const dedupKey = `${data.demanda_id}:${data.novo_status}`;
+    const now = Date.now();
+    const lastAdded = recentNotificationsRef.current.get(dedupKey);
+    
+    if (lastAdded && (now - lastAdded) < DEDUP_WINDOW_MS) {
+      console.log(`⚠️ Notificação duplicada ignorada para demanda ${data.demanda_id} (status: ${data.novo_status})`);
+      return;
+    }
+    
+    // Registrar no mapa de deduplicação
+    recentNotificationsRef.current.set(dedupKey, now);
+    
+    // Limpar entradas antigas do mapa de deduplicação
+    for (const [key, timestamp] of recentNotificationsRef.current.entries()) {
+      if (now - timestamp > DEDUP_WINDOW_MS * 2) {
+        recentNotificationsRef.current.delete(key);
+      }
+    }
+
     const notification: DemandaNotificationProgress = {
       id: `${data.demanda_id}-${Date.now()}`,
       demanda_id: data.demanda_id,
