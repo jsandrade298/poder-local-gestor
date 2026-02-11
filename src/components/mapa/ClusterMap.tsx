@@ -335,6 +335,56 @@ function RotationDragHandler({ rotation }: { rotation: number }) {
   const isDragging = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const lastTouchPos = useRef<{ x: number; y: number } | null>(null);
+  const originalMouseEventToContainerPoint = useRef<any>(null);
+
+  // ====================================================================
+  // Corrigir coordenadas do mouse para tooltips/popups quando rotacionado
+  // Leaflet usa getBoundingClientRect() que retorna o bounding-box do
+  // elemento rotacionado, causando offset nos tooltips.
+  // ====================================================================
+  useEffect(() => {
+    // Salvar referência ao método original na primeira vez
+    if (!originalMouseEventToContainerPoint.current) {
+      originalMouseEventToContainerPoint.current = map.mouseEventToContainerPoint.bind(map);
+    }
+
+    if (rotation === 0) {
+      // Restaurar método original
+      map.mouseEventToContainerPoint = originalMouseEventToContainerPoint.current;
+      return;
+    }
+
+    const container = map.getContainer();
+    const rad = -rotation * Math.PI / 180;
+    const cosR = Math.cos(rad);
+    const sinR = Math.sin(rad);
+
+    // Override que corrige as coordenadas considerando a rotação CSS
+    map.mouseEventToContainerPoint = function(e: MouseEvent) {
+      const rect = container.getBoundingClientRect();
+      // Centro do bounding-box rotacionado
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      // Posição do mouse relativa ao centro
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      // Aplicar rotação inversa para obter coordenadas no espaço do container
+      const rx = dx * cosR - dy * sinR;
+      const ry = dx * sinR + dy * cosR;
+      // Converter para coordenadas do container (origem no canto superior esquerdo)
+      return new L.Point(
+        rx + container.offsetWidth / 2,
+        ry + container.offsetHeight / 2
+      );
+    };
+
+    return () => {
+      // Restaurar método original ao desmontar
+      if (originalMouseEventToContainerPoint.current) {
+        map.mouseEventToContainerPoint = originalMouseEventToContainerPoint.current;
+      }
+    };
+  }, [map, rotation]);
 
   useEffect(() => {
     // Se não há rotação, usar arraste nativo do Leaflet
