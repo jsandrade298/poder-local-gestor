@@ -31,13 +31,13 @@ export function DemandaNotificationProgress() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'sent':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
       case 'error':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-3.5 w-3.5 text-red-500" />;
       case 'sending':
-        return <Send className="h-4 w-4 text-blue-500 animate-pulse" />;
+        return <Send className="h-3.5 w-3.5 text-blue-500 animate-pulse" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
+        return <Clock className="h-3.5 w-3.5 text-gray-500" />;
     }
   };
 
@@ -70,27 +70,27 @@ export function DemandaNotificationProgress() {
   return (
     <div 
       className={cn(
-        "fixed z-40 bg-background border border-border shadow-lg transition-all duration-300",
+        "fixed z-40 bg-background border border-border shadow-lg transition-all duration-300 rounded-lg",
         state.isMinimized 
-          ? "bottom-20 right-4 w-80 h-16 rounded-lg"
-          : "bottom-20 right-4 w-96 h-[500px] rounded-lg"
+          ? "bottom-20 right-4 w-72"
+          : "bottom-20 right-4 w-80 sm:w-96"
       )}
       data-demanda-notification-state
       data-cancelled={state.isCancelled}
     >
-      <Card className="h-full">
-        <CardHeader className="pb-2 space-y-1">
+      <Card className="border-0 shadow-none">
+        <CardHeader className="px-4 py-3 pb-2 space-y-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              <CardTitle className="text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bell className="h-4 w-4 flex-shrink-0 text-primary" />
+              <CardTitle className="text-xs font-semibold truncate">
                 {state.isMinimized 
-                  ? `Notificações Demandas (${state.processedNotifications}/${state.totalNotifications})`
-                  : 'Progresso Notificações de Demandas'
+                  ? `Notificações (${state.processedNotifications}/${state.totalNotifications})`
+                  : 'Notificações de Demandas'
                 }
               </CardTitle>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
@@ -128,94 +128,94 @@ export function DemandaNotificationProgress() {
             </div>
           </div>
           
+          {/* Barra de progresso - sempre visível quando não minimizado */}
           {!state.isMinimized && (
-            <>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Progresso: {state.processedNotifications} de {state.totalNotifications}</span>
-                  <span>{Math.round(progressPercentage)}%</span>
-                </div>
-                <Progress value={progressPercentage} className="h-2" />
+            <div className="space-y-1.5 pt-2">
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>{state.processedNotifications} de {state.totalNotifications}</span>
+                <span>{Math.round(progressPercentage)}%</span>
               </div>
-              
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div>Instância: {state.instanceName}</div>
-                <div>Tipo: Notificações automáticas</div>
-              </div>
-            </>
+              <Progress value={progressPercentage} className="h-1.5" />
+            </div>
+          )}
+
+          {/* Barra de progresso compacta quando minimizado */}
+          {state.isMinimized && (
+            <Progress value={progressPercentage} className="h-1 mt-2" />
           )}
         </CardHeader>
 
         {!state.isMinimized && (
-          <CardContent className="pt-0 flex flex-col" style={{ height: 'calc(100% - 120px)' }}>
-            <div className="flex-1 space-y-3 overflow-hidden min-h-0">
-              {/* Lista de Notificações */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="font-medium text-xs mb-2">Notificações:</div>
-                <ScrollArea className="flex-1 border rounded">
-                  <div className="p-2 space-y-2">
-                    {state.notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={cn(
-                          "flex items-center justify-between p-2 rounded border text-xs",
-                          notification.status === 'sending' && "bg-blue-50 border-blue-200",
-                          notification.status === 'sent' && "bg-green-50 border-green-200",
-                          notification.status === 'error' && "bg-red-50 border-red-200"
-                        )}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{notification.municipe_nome}</div>
-                          <div className="text-muted-foreground truncate text-xs">
-                            {notification.demanda_titulo} - {notification.novo_status}
-                          </div>
-                          <div className="text-muted-foreground truncate text-xs">{notification.telefone}</div>
-                          {notification.error && (
-                            <div className="text-red-600 text-xs truncate" title={notification.error}>
-                              {notification.error}
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 ml-2">
-                          {notification.countdown !== undefined && notification.countdown > 0 && (
-                            <div className="text-xs text-blue-600 font-mono">
-                              {notification.countdown}s
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center gap-1">
-                            {getStatusIcon(notification.status)}
-                            <Badge 
-                              variant={getStatusBadgeVariant(notification.status)}
-                              className="text-xs px-1 py-0"
-                            >
-                              {getStatusText(notification.status)}
-                            </Badge>
-                          </div>
-                        </div>
+          <CardContent className="px-4 pt-0 pb-3">
+            {/* Lista de Notificações */}
+            <ScrollArea className={cn(
+              "border rounded-md mt-2",
+              state.notifications.length <= 2 ? "" : "max-h-[200px]"
+            )}>
+              <div className="p-1.5 space-y-1.5">
+                {state.notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded border text-xs",
+                      notification.status === 'sending' && "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+                      notification.status === 'sent' && "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
+                      notification.status === 'error' && "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                    )}
+                  >
+                    {/* Ícone de status */}
+                    <div className="flex-shrink-0">
+                      {getStatusIcon(notification.status)}
+                    </div>
+                    
+                    {/* Conteúdo */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate text-xs">{notification.municipe_nome}</div>
+                      <div className="text-muted-foreground truncate text-[10px]">
+                        {notification.demanda_titulo} → {notification.novo_status}
                       </div>
-                    ))}
+                      {notification.error && (
+                        <div className="text-red-600 dark:text-red-400 truncate text-[10px]" title={notification.error}>
+                          {notification.error}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Badge / Countdown */}
+                    <div className="flex-shrink-0">
+                      {notification.countdown !== undefined && notification.countdown > 0 ? (
+                        <span className="text-[10px] text-blue-600 font-mono">{notification.countdown}s</span>
+                      ) : (
+                        <Badge 
+                          variant={getStatusBadgeVariant(notification.status)}
+                          className="text-[10px] px-1.5 py-0 h-4"
+                        >
+                          {getStatusText(notification.status)}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </ScrollArea>
+                ))}
               </div>
-            </div>
+            </ScrollArea>
 
-            {/* Status Summary - fixo no final */}
-            <div className="mt-3 flex justify-between items-center text-xs bg-muted p-2 rounded flex-shrink-0">
-              <span className="flex items-center gap-1 text-green-600">
-                <CheckCircle className="h-3 w-3" />
-                {state.notifications.filter(n => n.status === 'sent').length} enviadas
-              </span>
-              <span className="flex items-center gap-1 text-red-600">
-                <XCircle className="h-3 w-3" />
-                {state.notifications.filter(n => n.status === 'error').length} erros
-              </span>
-              <span className="flex items-center gap-1 text-gray-600">
-                <Clock className="h-3 w-3" />
-                {state.notifications.filter(n => n.status === 'pending').length} pendentes
-              </span>
-            </div>
+            {/* Resumo - só mostra quando há mais de 1 notificação */}
+            {state.totalNotifications > 1 && (
+              <div className="mt-2 flex justify-between items-center text-[10px] bg-muted/60 px-2 py-1.5 rounded">
+                <span className="flex items-center gap-1 text-green-600">
+                  <CheckCircle className="h-3 w-3" />
+                  {state.notifications.filter(n => n.status === 'sent').length}
+                </span>
+                <span className="flex items-center gap-1 text-red-600">
+                  <XCircle className="h-3 w-3" />
+                  {state.notifications.filter(n => n.status === 'error').length}
+                </span>
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {state.notifications.filter(n => n.status === 'pending').length}
+                </span>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>
