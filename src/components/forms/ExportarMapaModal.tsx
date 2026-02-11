@@ -170,6 +170,7 @@ export function ExportarMapaModal({
   const [incluirLegenda, setIncluirLegenda] = useState(true);
   const [titulo, setTitulo] = useState('Mapa - Gestão Territorial');
   const [exportando, setExportando] = useState(false);
+  const [capturando, setCapturando] = useState(false);
 
   // Refs
   const captureRef = useRef<HTMLDivElement>(null);
@@ -238,6 +239,12 @@ export function ExportarMapaModal({
         await new Promise(r => setTimeout(r, 2000));
       }
 
+      // Mostrar legenda overlay dentro da área de captura
+      if (incluirLegenda) {
+        setCapturando(true);
+        await new Promise(r => setTimeout(r, 500)); // Aguardar render da legenda
+      }
+
       // Dynamic imports — tenta npm, fallback CDN
       let html2canvas: any;
       let jsPDF: any;
@@ -282,7 +289,24 @@ export function ExportarMapaModal({
         scale: 2,
         backgroundColor: '#ffffff',
         logging: false,
+        imageTimeout: 10000,
+        onclone: (clonedDoc: Document) => {
+          // Garantir que canvas do Leaflet (GeoJSON renderizado como canvas) seja visível
+          const canvasElements = clonedDoc.querySelectorAll('canvas');
+          canvasElements.forEach((c: HTMLCanvasElement) => {
+            c.style.display = 'block';
+          });
+          // Garantir que SVGs do overlay pane também sejam capturados
+          const svgElements = clonedDoc.querySelectorAll('.leaflet-overlay-pane svg');
+          svgElements.forEach((svg: Element) => {
+            (svg as HTMLElement).style.display = 'block';
+            (svg as HTMLElement).style.overflow = 'visible';
+          });
+        },
       });
+
+      // Esconder legenda overlay após captura
+      setCapturando(false);
 
       const pdf = new jsPDF({ orientation: orientacao, unit: 'mm', format: [pw, ph] });
 
@@ -326,6 +350,7 @@ export function ExportarMapaModal({
       console.error('Erro ao exportar PDF:', err);
       toast.error('Erro ao gerar PDF. Verifique se html2canvas e jspdf estão instalados.');
     } finally {
+      setCapturando(false);
       setExportando(false);
     }
   };
@@ -648,6 +673,7 @@ export function ExportarMapaModal({
                     zoom={13}
                     style={{ height: '100%', width: '100%' }}
                     className="z-0"
+                    preferCanvas={true}
                   >
                     <MapSyncReady onReady={handleMapReady} />
 
@@ -714,10 +740,184 @@ export function ExportarMapaModal({
                 </div>
               )}
 
-              {/* Instrução */}
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-                Arraste e use o zoom para definir o recorte
-              </div>
+              {/* ============================================= */}
+              {/* LEGENDA OVERLAY PARA CAPTURA DO PDF            */}
+              {/* Só aparece durante a captura do html2canvas    */}
+              {/* ============================================= */}
+              {capturando && incluirLegenda && (
+                <div
+                  className="absolute bottom-3 left-3 z-[600] pointer-events-none"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.95)',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    maxWidth: '240px',
+                    maxHeight: '60%',
+                    overflowY: 'auto',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    fontSize: '11px',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+                    Legenda
+                  </div>
+
+                  {/* Modo de Análise Ativo */}
+                  {modoVisualizacao !== 'padrao' && (
+                    <div style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        {modoVisualizacao === 'resolutividade' ? 'Resolutividade' :
+                         modoVisualizacao === 'votos' ? 'Votos' :
+                         modoVisualizacao === 'predominancia' ? 'DNA do Bairro' : 'Oportunidade'}
+                      </div>
+                      {modoVisualizacao === 'resolutividade' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', flexShrink: 0 }} /><span>Excelente (&gt;80%)</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#eab308', flexShrink: 0 }} /><span>Atenção (50-80%)</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#ef4444', flexShrink: 0 }} /><span>Crítico (&lt;50%)</span></div>
+                        </div>
+                      )}
+                      {modoVisualizacao === 'votos' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#7c3aed', flexShrink: 0 }} /><span>Alta concentração</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#c4b5fd', flexShrink: 0 }} /><span>Baixa concentração</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>Menos</span>
+                            <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'linear-gradient(to right, #c4b5fd, #7c3aed)' }} />
+                            <span style={{ fontSize: '9px', color: '#9ca3af' }}>Mais</span>
+                          </div>
+                        </div>
+                      )}
+                      {modoVisualizacao === 'predominancia' && (
+                        <div>
+                          {areas.map(area => (
+                            <div key={area.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                              <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: area.cor || '#6b7280', flexShrink: 0 }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{area.nome}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {modoVisualizacao === 'comparativo' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#ef4444', flexShrink: 0 }} /><span>Risco</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#3b82f6', flexShrink: 0 }} /><span>Equilíbrio</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#22c55e', flexShrink: 0 }} /><span>Potencial</span></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Status das demandas */}
+                  {statusVisiveis.length > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Demandas por Status</div>
+                      {statusVisiveis.map(s => (
+                        <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.cor, flexShrink: 0 }} />
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nome}</span>
+                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{demandas.filter(d => d.status === s.slug).length}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Categorias de munícipes */}
+                  {categoriasVisiveis.length > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes por Categoria</div>
+                      {categoriasVisiveis.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: c.cor, flexShrink: 0 }} />
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => m.categoria_id === c.id).length}</span>
+                        </div>
+                      ))}
+                      {municipes.some(m => !m.categoria_id) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#8b5cf6', flexShrink: 0 }} />
+                          <span style={{ flex: 1 }}>Sem categoria</span>
+                          <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.filter(m => !m.categoria_id).length}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Munícipes sem categorias visíveis */}
+                  {mostrarMunicipes && categoriasVisiveis.length === 0 && municipes.length > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Munícipes</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#8b5cf6', flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>Munícipes</span>
+                        <span style={{ color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{municipes.length}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Áreas (no modo padrão) */}
+                  {areasVisiveis.length > 0 && modoVisualizacao === 'padrao' && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Áreas</div>
+                      {areasVisiveis.map(a => (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: a.cor || '#6b7280', border: `1px solid ${a.cor || '#6b7280'}`, flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nome}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Camadas geográficas */}
+                  {camadasGeograficas.length > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Camadas Geográficas</div>
+                      {camadasGeograficas.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <div style={{ width: 14, height: 8, borderRadius: 2, backgroundColor: `${c.cor_padrao}50`, border: `1px solid ${c.cor_padrao}`, flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Heatmap */}
+                  {heatmapVisible && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Mapa de Calor</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', width: 50, flexShrink: 0 }}>
+                          <div style={{ flex: 1, backgroundColor: '#fee5d9' }} />
+                          <div style={{ flex: 1, backgroundColor: '#fcae91' }} />
+                          <div style={{ flex: 1, backgroundColor: '#fb6a4a' }} />
+                          <div style={{ flex: 1, backgroundColor: '#de2d26' }} />
+                          <div style={{ flex: 1, backgroundColor: '#67000d' }} />
+                        </div>
+                        <span style={{ color: '#9ca3af' }}>
+                          {heatmapType === 'demandas' ? 'Demandas' : heatmapType === 'municipes' ? 'Munícipes' : 'Todos'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Totais */}
+                  <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '4px', fontSize: '10px', color: '#9ca3af' }}>
+                    {mostrarDemandas && <div>{demandas.filter(d => d.latitude && d.longitude).length} demandas no mapa</div>}
+                    {mostrarMunicipes && <div>{municipes.filter(m => m.latitude && m.longitude).length} munícipes no mapa</div>}
+                    {camadasGeograficas.length > 0 && <div>{camadasGeograficas.length} camada(s) geográfica(s)</div>}
+                  </div>
+                </div>
+              )}
+
+              {/* Instrução - escondida durante captura do PDF */}
+              {!capturando && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-black/60 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
+                  Arraste e use o zoom para definir o recorte
+                </div>
+              )}
             </div>
           </div>
 
