@@ -378,7 +378,7 @@ export function useBalancoData(filters: BalancoFilters, granularity: TemporalGra
   const funilData = useMemo(() => {
     const map: Record<string, number> = {};
     demandas.forEach((d: any) => { map[d.status || "solicitada"] = (map[d.status || "solicitada"] || 0) + 1; });
-    return statusList.map((s) => ({ name: s.nome, slug: s.slug, value: map[s.slug] || 0, color: s.cor })).filter((s) => s.value > 0);
+    return statusList.map((s) => ({ name: s.nome, slug: s.slug, value: map[s.slug] || 0, color: s.cor }));
   }, [demandas, statusList]);
 
   // ===== Top Munícipes =====
