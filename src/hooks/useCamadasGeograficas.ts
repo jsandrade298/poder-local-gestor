@@ -2,6 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export type EstiloContorno = 'solido' | 'tracado' | 'pontilhado';
+
+export interface CamadaEstiloVisual {
+  preenchimento?: boolean;       // true = preenche, false = só contorno
+  estilo_contorno?: EstiloContorno; // tipo de traçado da borda
+  espessura_contorno?: number;   // peso da linha (default 1)
+}
+
 export interface CamadaGeografica {
   id: string;
   nome: string;
@@ -11,7 +19,7 @@ export interface CamadaGeografica {
   opacidade: number;
   visivel: boolean;
   geojson: any;
-  propriedades?: any;
+  propriedades?: CamadaEstiloVisual & Record<string, any>;
   created_at: string;
   created_by?: string;
 }
@@ -146,6 +154,30 @@ export function useCamadasGeograficas() {
     }
   });
 
+  // Atualizar propriedades visuais (preenchimento, estilo de contorno, etc.)
+  const atualizarPropriedades = useMutation({
+    mutationFn: async ({ id, propriedades }: { id: string; propriedades: Partial<CamadaEstiloVisual> }) => {
+      // Buscar propriedades atuais para fazer merge
+      const camadaAtual = camadas.find(c => c.id === id);
+      const propsAtuais = camadaAtual?.propriedades || {};
+      const novasProps = { ...propsAtuais, ...propriedades };
+
+      const { error } = await supabase
+        .from('camadas_geograficas')
+        .update({ propriedades: novasProps })
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['camadas-geograficas'] });
+    },
+    onError: (error: any) => {
+      console.error('Erro ao atualizar propriedades:', error);
+      toast.error('Erro ao atualizar propriedades da camada');
+    }
+  });
+
   // Remover camada
   const removerCamada = useMutation({
     mutationFn: async (id: string) => {
@@ -178,6 +210,7 @@ export function useCamadasGeograficas() {
     toggleVisibilidade,
     atualizarCor,
     atualizarOpacidade,
+    atualizarPropriedades,
     removerCamada
   };
 }
