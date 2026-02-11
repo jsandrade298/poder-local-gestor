@@ -374,30 +374,11 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       // Mapear status anterior para comparação correta
       const statusAnteriorMapeado = mapStatusAntigoParaNovo(statusAnterior || 'solicitada');
 
-      // Notificar se status mudou
+      // Notificação WhatsApp é feita automaticamente pelo useDemandaStatusMonitor
+      // que escuta mudanças em realtime na tabela demandas
       if (statusAnteriorMapeado !== statusMapeado && municipeData?.telefone) {
-        try {
-          console.log('🔔 Enviando notificação WhatsApp...');
-          const response = await supabase.functions.invoke('whatsapp-notificar-demanda', {
-            body: {
-              demanda_id: demanda.id,
-              municipe_nome: municipeData.nome,
-              municipe_telefone: municipeData.telefone,
-              status: getStatusLabel(statusMapeado),
-              status_anterior: getStatusLabel(statusAnteriorMapeado),
-              titulo_demanda: data.titulo,
-              protocolo: demanda.protocolo
-            }
-          });
-          
-          console.log('📱 Resposta da notificação:', response);
-          
-          if (response.data?.success) {
-            whatsappEnviado = true;
-          }
-        } catch (notifError) {
-          console.error('Erro ao enviar notificação:', notifError);
-        }
+        console.log('🔔 Status alterado - notificação WhatsApp será enviada pelo monitor realtime');
+        whatsappEnviado = true; // O monitor cuida do envio
       }
 
       // ========== REGISTRAR MUDANÇA DE STATUS NO PRONTUÁRIO DO MUNÍCIPE ==========
