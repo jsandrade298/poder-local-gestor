@@ -73,11 +73,23 @@ async function callZApi(
 }
 
 function detectMediaType(media: any): string {
-  const mimeType = media.mimetype || media.type || '';
+  const mimeType = media.mimetype || '';
+  const shortType = media.type || '';
   const filename = (media.filename || media.fileName || '').toLowerCase();
-  if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/.test(filename)) return 'image';
-  if (mimeType.startsWith('video/') || /\.(mp4|avi|mov|webm)$/.test(filename)) return 'video';
-  if (mimeType.startsWith('audio/') || /\.(mp3|ogg|wav|m4a|opus)$/.test(filename)) return 'audio';
+  
+  // Prioridade 1: mimetype completo (ex: 'image/jpeg')
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (mimeType.startsWith('application/')) return 'document';
+  
+  // Prioridade 2: type shorthand do frontend (ex: 'image', 'video')
+  if (['image', 'video', 'audio', 'document'].includes(shortType)) return shortType;
+  
+  // Prioridade 3: extensão do arquivo
+  if (/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|svg)$/.test(filename)) return 'image';
+  if (/\.(mp4|avi|mov|webm|mkv|3gp)$/.test(filename)) return 'video';
+  if (/\.(mp3|ogg|wav|m4a|opus|aac|wma)$/.test(filename)) return 'audio';
   return 'document';
 }
 
@@ -126,6 +138,7 @@ serve(async (req) => {
     console.log("📋 Incluir todos:", incluirTodos);
     console.log("📋 EnvioId externo:", envioIdExterno);
     console.log("📋 Tipo:", tipo);
+    console.log("📎 MediaFiles:", mediaFiles.length, mediaFiles.map((m: any) => ({ type: m.type, mimetype: m.mimetype, filename: m.filename, hasUrl: !!m.url, hasData: !!m.data })));
 
     // Buscar credenciais da instância
     let instanceId = ZAPI_INSTANCE_ID;
