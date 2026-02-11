@@ -294,13 +294,19 @@ table {
   z-index: 6 !important;
 }
 
+/* Controles do Leaflet (LayersControl, zoom, etc.)
+   Precisam ficar acima dos panes mas abaixo dos modais */
 .leaflet-top,
 .leaflet-bottom {
-  z-index: 10 !important;
+  z-index: 800 !important;
+}
+
+.leaflet-control-layers {
+  z-index: 810 !important;
 }
 
 .leaflet-popup {
-  z-index: 20 !important;
+  z-index: 820 !important;
 }
 
 /* Garantir que modais ficam acima de TUDO, incluindo controles do mapa */
@@ -312,4 +318,9 @@ table {
 }
 .fixed[data-state="open"] {
   z-index: 9990 !important;
+}
+
+/* Garantir que dropdowns/selects dentro de modais ficam acima do dialog */
+[data-radix-popper-content-wrapper] {
+  z-index: 99999 !important;
 }
