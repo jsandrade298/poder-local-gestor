@@ -12,63 +12,52 @@ interface NotificacaoDemanda {
   municipe_telefone: string;
   municipe_bairro?: string;
   status: string;
-  status_anterior?: string;
-  titulo_demanda: string;
-  protocolo: string;
+  instancia: string;
+  mensagem: string;
+  titulo_demanda?: string;
+  protocolo?: string;
 }
 
-serve(async (req: Request) => {
+const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Iniciando notificação de atualização de demanda');
+
+    // Inicializar cliente Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Receber dados da notificação
     const notificacao: NotificacaoDemanda = await req.json();
     
-    console.log('Notificação de mudança de status:', notificacao);
+    console.log('Dados recebidos:', {
+      demanda_id: notificacao.demanda_id,
+      municipe_nome: notificacao.municipe_nome,
+      status: notificacao.status,
+      titulo_demanda: notificacao.titulo_demanda,
+      protocolo: notificacao.protocolo,
+      bairro: notificacao.municipe_bairro,
+      instancia: notificacao.instancia
+    });
 
-    // Buscar configurações
-    const { data: configs } = await supabase
-      .from('configuracoes')
-      .select('chave, valor')
-      .in('chave', ['whatsapp_instancia_demandas', 'whatsapp_mensagem_demandas', 'whatsapp_demandas_ativo']);
-
-    if (!configs) {
-      throw new Error('Configurações não encontradas');
+    // Validar dados obrigatórios
+    if (!notificacao.demanda_id || !notificacao.municipe_nome || !notificacao.municipe_telefone || 
+        !notificacao.status || !notificacao.instancia || !notificacao.mensagem) {
+      throw new Error('Dados obrigatórios missing para notificação');
     }
 
-    const configMap = configs.reduce((acc: any, item: any) => {
-      acc[item.chave] = item.valor;
-      return acc;
-    }, {});
-
-    // Verificar se está ativo
-    if (configMap.whatsapp_demandas_ativo !== 'true') {
-      console.log('Notificações de demanda desativadas');
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Notificações desativadas' 
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const instancia = configMap.whatsapp_instancia_demandas;
-    const mensagemTemplate = configMap.whatsapp_mensagem_demandas;
-
-    if (!instancia || !mensagemTemplate) {
-      throw new Error('Configurações incompletas');
-    }
-
-    // Personalizar mensagem - substituir TODAS as variáveis
+    // Preparar mensagem personalizada - substituir TODAS as variáveis
     const primeiroNome = (notificacao.municipe_nome || '').split(' ')[0];
     const agora = new Date();
     const dataAtual = agora.toLocaleDateString('pt-BR');
     const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    const mensagemPersonalizada = mensagemTemplate
+    const mensagemPersonalizada = notificacao.mensagem
       .replace(/\{nome\}/gi, notificacao.municipe_nome || '')
       .replace(/\{primeiro_nome\}/gi, primeiroNome)
       .replace(/\{status\}/gi, notificacao.status || '')
@@ -78,35 +67,61 @@ serve(async (req: Request) => {
       .replace(/\{data\}/gi, dataAtual)
       .replace(/\{hora\}/gi, horaAtual);
 
-    // Enviar via WhatsApp
-    const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
+    console.log('Mensagem personalizada:', mensagemPersonalizada);
+
+    // Preparar dados para envio via WhatsApp
+    const telefones = [{
+      id: notificacao.demanda_id,
+      nome: notificacao.municipe_nome,
+      telefone: notificacao.municipe_telefone
+    }];
+
+    const customMessages: Record<string, string> = {};
+    customMessages[notificacao.municipe_telefone] = mensagemPersonalizada;
+
+    // Enviar mensagem via WhatsApp
+    const { data: resultadoEnvio, error: envioError } = await supabase.functions.invoke('enviar-whatsapp', {
       body: {
-        telefones: [notificacao.municipe_telefone],
-        mensagem: mensagemPersonalizada,
-        instanceName: instancia,
+        telefones,
+        mensagem: 'Será personalizada', // Será substituída pelo customMessages
+        instanceName: notificacao.instancia,
         tempoMinimo: 1,
-        tempoMaximo: 2
+        tempoMaximo: 2,
+        customMessages
       }
     });
 
-    if (error) throw error;
+    if (envioError) {
+      throw new Error(`Erro ao enviar mensagem: ${envioError.message}`);
+    }
+
+    console.log('Notificação enviada com sucesso:', resultadoEnvio);
 
     return new Response(JSON.stringify({
+      message: 'Notificação de demanda enviada com sucesso',
       success: true,
-      message: 'Notificação enviada',
-      resultado: data
+      demanda_id: notificacao.demanda_id,
+      municipe_nome: notificacao.municipe_nome,
+      status: notificacao.status,
+      resultado: resultadoEnvio
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
 
   } catch (error: any) {
-    console.error('Erro:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error('Erro no envio de notificação de demanda:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      }
+    );
   }
-});
+};
+
+serve(handler);
