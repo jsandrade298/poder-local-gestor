@@ -1264,19 +1264,19 @@ export default function Demandas() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setIsConfigStatusOpen(true)}
+                  title="Configurar Status"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => navigate("/balanco-demandas")}
                   title="Balanço de Demandas"
                 >
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Balanço
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsConfigStatusOpen(true)}
-                  title="Configurar Status"
-                >
-                  <Settings className="h-4 w-4" />
                 </Button>
                 <ImportCSVDialogDemandas 
                   onFileSelect={handleFileImport}
