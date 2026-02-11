@@ -293,29 +293,39 @@ export default function BalancoDemandas() {
               </CardHeader>
               <CardContent>
                 {funilData.length === 0 ? <EmptyState msg="Sem dados de status" /> : (
-                  <div className="space-y-3">
+                  <div className="flex flex-col items-center py-4 gap-[2px]" style={{ maxWidth: '600px', margin: '0 auto' }}>
                     {(() => {
-                      const maxVal = Math.max(...funilData.map((f: any) => f.value), 1);
-                      return funilData.map((item: any) => (
-                        <div key={item.slug} className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }} />
-                              <span className="font-semibold text-base">{item.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-2xl font-bold">{item.value}</span>
-                              <span className="text-sm text-muted-foreground w-14 text-right">
-                                {kpis.total > 0 ? Math.round((item.value / kpis.total) * 100) : 0}%
-                              </span>
+                      const totalSteps = funilData.length;
+                      return funilData.map((item: any, index: number) => {
+                        // Largura diminui linearmente: 100% no topo → 30% na base
+                        const widthPercent = totalSteps === 1 ? 100 : 100 - ((index / (totalSteps - 1)) * 70);
+                        const pct = kpis.total > 0 ? Math.round((item.value / kpis.total) * 100) : 0;
+                        const isFirst = index === 0;
+                        const isLast = index === totalSteps - 1;
+                        
+                        return (
+                          <div key={item.slug} className="w-full flex justify-center">
+                            <div
+                              className="relative flex items-center justify-center transition-all duration-500"
+                              style={{
+                                width: `${widthPercent}%`,
+                                minHeight: '48px',
+                                backgroundColor: item.color,
+                                opacity: item.value > 0 ? 0.9 : 0.3,
+                                borderRadius: isFirst && isLast ? '12px' :
+                                  isFirst ? '12px 12px 0 0' :
+                                  isLast ? '0 0 12px 12px' : '0',
+                              }}
+                            >
+                              <div className="flex items-center gap-2.5 text-white z-10 px-4 py-1">
+                                <span className="font-bold text-xl drop-shadow-sm">{item.value}</span>
+                                <span className="font-semibold text-sm drop-shadow-sm whitespace-nowrap">{item.name}</span>
+                                <span className="text-xs opacity-80 drop-shadow-sm">({pct}%)</span>
+                              </div>
                             </div>
                           </div>
-                          <div className="h-8 bg-muted/40 rounded-lg overflow-hidden">
-                            <div className="h-full rounded-lg transition-all duration-500"
-                              style={{ width: `${Math.max((item.value / maxVal) * 100, 1)}%`, backgroundColor: item.color, opacity: 0.85 }} />
-                          </div>
-                        </div>
-                      ));
+                        );
+                      });
                     })()}
                   </div>
                 )}
