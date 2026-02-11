@@ -676,9 +676,8 @@ export default function Kanban() {
             </Button>
 
             <Button 
-              variant="outline" 
               onClick={() => setIsAdicionarRotasDialogOpen(true)} 
-              className="gap-2"
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Route className="h-4 w-4" />
               Adicionar Rota
