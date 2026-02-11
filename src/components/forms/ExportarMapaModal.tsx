@@ -38,6 +38,7 @@ import {
   RotateCcw,
   GripVertical,
   Move,
+  Map as MapIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +51,33 @@ const PAPER_SIZES: Record<string, { width: number; height: number; label: string
   A2: { width: 420, height: 594, label: 'A2 (420×594 mm)' },
   A1: { width: 594, height: 841, label: 'A1 (594×841 mm)' },
   A0: { width: 841, height: 1189, label: 'A0 (841×1189 mm)' },
+};
+
+// ============================================
+// Opções de camada base (tile layers)
+// ============================================
+const TILE_LAYERS: Record<string, { url: string; attribution: string; label: string; opacity?: number }> = {
+  ruas: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap',
+    label: '🗺️ Mapa de Ruas',
+  },
+  satelite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri',
+    label: '🛰️ Satélite',
+  },
+  satelite_rotulos: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri',
+    label: '🏙️ Satélite com Rótulos',
+  },
+  branco: {
+    url: '',
+    attribution: '',
+    label: '⬜ Em Branco',
+    opacity: 0,
+  },
 };
 
 // ============================================
@@ -97,6 +125,132 @@ function createSimpleMunicipeIcon(nome: string, cor: string): L.DivIcon {
 function MapSyncReady({ onReady }: { onReady: (map: L.Map) => void }) {
   const map = useMap();
   useEffect(() => { onReady(map); }, [map, onReady]);
+  return null;
+}
+
+// ============================================
+// Corrige coordenadas do mouse quando o mapa
+// do modal de exportação está rotacionado,
+// para que tooltips/popups fiquem junto ao cursor.
+// ============================================
+function ExportRotationDragHandler({ rotation }: { rotation: number }) {
+  const map = useMap();
+  const originalRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!originalRef.current) {
+      originalRef.current = map.mouseEventToContainerPoint.bind(map);
+    }
+
+    if (rotation === 0) {
+      map.mouseEventToContainerPoint = originalRef.current;
+      return;
+    }
+
+    const container = map.getContainer();
+    const rad = -rotation * Math.PI / 180;
+    const cosR = Math.cos(rad);
+    const sinR = Math.sin(rad);
+
+    map.mouseEventToContainerPoint = function (e: MouseEvent) {
+      const rect = container.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const rx = dx * cosR - dy * sinR;
+      const ry = dx * sinR + dy * cosR;
+      return new L.Point(
+        rx + container.offsetWidth / 2,
+        ry + container.offsetHeight / 2
+      );
+    };
+
+    return () => {
+      if (originalRef.current) {
+        map.mouseEventToContainerPoint = originalRef.current;
+      }
+    };
+  }, [map, rotation]);
+
+  return null;
+}
+
+// ============================================
+// Contra-rotaciona controles, tooltips e popups
+// dentro do mapa do modal de exportação.
+// Usa a propriedade CSS "rotate" para tooltips
+// (não "transform: rotate") para preservar o
+// translate3d que o Leaflet aplica inline.
+// ============================================
+function ExportRotationHelper({ rotation, oversizeFactor }: { rotation: number; oversizeFactor: number }) {
+  const map = useMap();
+  const styleRef = useRef<HTMLStyleElement | null>(null);
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    if (!styleRef.current) {
+      const el = document.createElement('style');
+      el.id = 'export-map-rotation-styles';
+      container.appendChild(el);
+      styleRef.current = el;
+    }
+
+    const styleEl = styleRef.current;
+
+    if (rotation === 0 || oversizeFactor <= 1) {
+      styleEl.textContent = '';
+      requestAnimationFrame(() => map.invalidateSize());
+      return;
+    }
+
+    const counterDeg = -rotation;
+    const invScale = (1 / oversizeFactor).toFixed(6);
+    const fwdScale = oversizeFactor.toFixed(6);
+
+    styleEl.textContent = `
+      .leaflet-control-container {
+        transform: rotate(${counterDeg}deg) scale(${invScale}) !important;
+        transform-origin: center center !important;
+        pointer-events: none;
+      }
+      .leaflet-control-container .leaflet-control {
+        pointer-events: auto;
+        transform: scale(${fwdScale});
+      }
+      .leaflet-top.leaflet-right .leaflet-control { transform-origin: top right; }
+      .leaflet-top.leaflet-left .leaflet-control { transform-origin: top left; }
+      .leaflet-bottom.leaflet-right .leaflet-control { transform-origin: bottom right; }
+      .leaflet-bottom.leaflet-left .leaflet-control { transform-origin: bottom left; }
+      .leaflet-popup-content-wrapper {
+        transform: rotate(${counterDeg}deg) !important;
+        transform-origin: bottom center;
+      }
+      .leaflet-popup-tip-container {
+        transform: rotate(${counterDeg}deg) !important;
+        transform-origin: top center;
+      }
+      /* Usa 'rotate' (não 'transform: rotate') para NÃO sobrescrever
+         o 'transform: translate3d(x,y,0)' que o Leaflet define inline
+         para posicionar o tooltip. Ambas as propriedades se compõem. */
+      .leaflet-tooltip {
+        rotate: ${counterDeg}deg !important;
+      }
+    `;
+
+    const timer = setTimeout(() => {
+      map.invalidateSize({ animate: false });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [map, rotation, oversizeFactor]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => map.invalidateSize(), 100);
+    return () => clearTimeout(timer);
+  }, [map]);
+
   return null;
 }
 
@@ -175,6 +329,9 @@ export function ExportarMapaModal({
   const [exportando, setExportando] = useState(false);
   const [capturando, setCapturando] = useState(false);
 
+  // Tile layer selecionada para exportação
+  const [tileLayerKey, setTileLayerKey] = useState<string>('ruas');
+
   // Visibilidade exclusiva para exportação (não altera filtros do mapa principal)
   const [exibirDemandasExport, setExibirDemandasExport] = useState(true);
   const [exibirMunicipesExport, setExibirMunicipesExport] = useState(true);
@@ -199,6 +356,38 @@ export function ExportarMapaModal({
   // Refs
   const captureRef = useRef<HTMLDivElement>(null);
   const previewMapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ w: 1, h: 1 });
+
+  // Medir container para calcular oversize factor
+  useEffect(() => {
+    if (!open) return;
+    const el = mapContainerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) setContainerSize({ w: width, h: height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
+  // Calcular oversize factor para cobertura completa quando rotacionado
+  const oversizeFactor = useMemo(() => {
+    if (rotation === 0) return 1;
+    const rad = rotation * Math.PI / 180;
+    const sinA = Math.abs(Math.sin(rad));
+    const cosA = Math.abs(Math.cos(rad));
+    const { w, h } = containerSize;
+    const r = w / h;
+    const s = Math.max(cosA + sinA / r, r * sinA + cosA);
+    return s * 1.15;
+  }, [rotation, containerSize]);
+
+  const oversizePercent = oversizeFactor * 100;
+  const offsetPercent = -(oversizeFactor - 1) * 50;
 
   // Handlers para drag da legenda
   const handleLegendDragStart = useCallback((e: React.MouseEvent) => {
@@ -297,6 +486,9 @@ export function ExportarMapaModal({
 
   // Display angle
   const displayAngle = useMemo(() => ((rotation % 360) + 360) % 360, [rotation]);
+
+  // Tile layer atual
+  const currentTile = TILE_LAYERS[tileLayerKey] || TILE_LAYERS.ruas;
 
   // Map ready callback
   const handleMapReady = useCallback((map: L.Map) => {
@@ -528,14 +720,21 @@ export function ExportarMapaModal({
           {/* ================================================= */}
           <div className="flex-1 flex flex-col min-w-0">
             <div ref={captureRef} className="flex-1 relative min-h-[300px] bg-white overflow-hidden">
-              {/* Container com rotação aplicada */}
+              {/* Div invisível para medir o tamanho real do container */}
+              <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+
+              {/* Container com rotação e oversize calculados */}
               {open && (
                 <div
                   style={{
                     position: 'absolute',
-                    inset: rotation !== 0 ? '-25%' : '0',
+                    width: rotation !== 0 ? `${oversizePercent}%` : '100%',
+                    height: rotation !== 0 ? `${oversizePercent}%` : '100%',
+                    top: rotation !== 0 ? `${offsetPercent}%` : '0',
+                    left: rotation !== 0 ? `${offsetPercent}%` : '0',
                     transform: rotation !== 0 ? `rotate(${rotation}deg)` : 'none',
                     transformOrigin: 'center center',
+                    transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s ease, height 0.35s ease, top 0.35s ease, left 0.35s ease',
                   }}
                 >
                   <MapContainer
@@ -546,10 +745,18 @@ export function ExportarMapaModal({
                     preferCanvas={true}
                   >
                     <MapSyncReady onReady={handleMapReady} />
+
+                    {/* Helpers de rotação — corrigem tooltips, controles e popups */}
+                    <ExportRotationHelper rotation={rotation} oversizeFactor={oversizeFactor} />
+                    <ExportRotationDragHandler rotation={rotation} />
+
+                    {/* Tile layer selecionada pelo usuário */}
                     <TileLayer
-                      attribution='&copy; OpenStreetMap'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      key={tileLayerKey}
+                      attribution={currentTile.attribution}
+                      url={currentTile.url}
                       crossOrigin="anonymous"
+                      {...(currentTile.opacity !== undefined ? { opacity: currentTile.opacity } : {})}
                     />
 
                     {/* Camadas Geográficas */}
@@ -611,9 +818,6 @@ export function ExportarMapaModal({
 
               {/* ============================================= */}
               {/* LEGENDA FLUTUANTE / ARRASTÁVEL                 */}
-              {/* Dentro do captureRef → capturada no PDF        */}
-              {/* Usa inline styles para compatibilidade         */}
-              {/* com html2canvas                                */}
               {/* ============================================= */}
               {incluirLegenda && (
                 <div
@@ -883,6 +1087,26 @@ export function ExportarMapaModal({
 
                 <Separator />
 
+                {/* Tipo de Visualização do Mapa (camada base) */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide flex items-center gap-1.5">
+                    <MapIcon className="h-3.5 w-3.5" />
+                    Camada base
+                  </Label>
+                  <Select value={tileLayerKey} onValueChange={setTileLayerKey}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(TILE_LAYERS).map(([key, val]) => (
+                        <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
                 {/* Visibilidade na exportação */}
                 <div className="space-y-3">
                   <Label className="text-xs font-medium uppercase text-muted-foreground tracking-wide">Elementos visíveis</Label>
@@ -1026,6 +1250,9 @@ export function ExportarMapaModal({
                     {camadasGeograficas.length > 0 && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>{camadasGeograficas.length} camada(s)</span></div>}
                     {heatmapVisible && <div className="flex items-center gap-1.5"><Eye className="h-3 w-3" /><span>Mapa de calor ativo</span></div>}
                     {displayAngle !== 0 && <div className="flex items-center gap-1.5"><RotateCcw className="h-3 w-3" /><span>Rotação: {displayAngle}°</span></div>}
+                    {tileLayerKey !== 'ruas' && (
+                      <div className="flex items-center gap-1.5"><MapIcon className="h-3 w-3" /><span>Base: {TILE_LAYERS[tileLayerKey]?.label}</span></div>
+                    )}
                     {modoVisualizacao !== 'padrao' && (
                       <div className="flex items-center gap-1.5">
                         <Eye className="h-3 w-3" />
