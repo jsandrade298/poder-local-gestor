@@ -404,7 +404,8 @@ serve(async (req) => {
                 conteudo?.nomeArquivo || mediaFiles[0]?.filename || 'documento.pdf', 
                 dest.variaveis
               );
-              resp = await callZApi(instanceId, token, clientToken, 'send-document/pdf', { 
+              const ext = fn.split('.').pop()?.toLowerCase() || 'pdf';
+              resp = await callZApi(instanceId, token, clientToken, `send-document/${ext}`, { 
                 phone, document: docUrl, fileName: fn 
               });
             }
@@ -434,7 +435,8 @@ serve(async (req) => {
                   phone, audio: mUrl 
                 });
               } else {
-                resp = await callZApi(instanceId, token, clientToken, 'send-document/pdf', { 
+                const ext = (media.filename || 'documento.pdf').split('.').pop()?.toLowerCase() || 'pdf';
+                resp = await callZApi(instanceId, token, clientToken, `send-document/${ext}`, { 
                   phone, document: mUrl, fileName: media.filename || 'documento' 
                 });
               }
