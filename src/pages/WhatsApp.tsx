@@ -195,7 +195,7 @@ const WhatsApp = () => {
           id,
           titulo,
           protocolo,
-          municipes (nome, telefone)
+          municipes (nome, telefone, bairro)
         `)
         .not('municipes.telefone', 'is', null)
         .order('created_at', { ascending: false })
@@ -1166,6 +1166,7 @@ const WhatsApp = () => {
                           demanda_id: demandaEscolhida.id,
                           municipe_nome: municipeData.nome,
                           municipe_telefone: municipeData.telefone,
+                          municipe_bairro: municipeData.bairro || '',
                           status: 'Em Andamento (TESTE)',
                           titulo_demanda: demandaEscolhida.titulo,
                           protocolo: demandaEscolhida.protocolo
