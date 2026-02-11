@@ -10,9 +10,12 @@ interface NotificacaoDemanda {
   demanda_id: string;
   municipe_nome: string;
   municipe_telefone: string;
+  municipe_bairro?: string;
   status: string;
   instancia: string;
   mensagem: string;
+  titulo_demanda?: string;
+  protocolo?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -36,6 +39,9 @@ const handler = async (req: Request): Promise<Response> => {
       demanda_id: notificacao.demanda_id,
       municipe_nome: notificacao.municipe_nome,
       status: notificacao.status,
+      titulo_demanda: notificacao.titulo_demanda,
+      protocolo: notificacao.protocolo,
+      bairro: notificacao.municipe_bairro,
       instancia: notificacao.instancia
     });
 
@@ -45,10 +51,21 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Dados obrigatórios missing para notificação');
     }
 
-    // Preparar mensagem personalizada
+    // Preparar mensagem personalizada - substituir TODAS as variáveis
+    const primeiroNome = (notificacao.municipe_nome || '').split(' ')[0];
+    const agora = new Date();
+    const dataAtual = agora.toLocaleDateString('pt-BR');
+    const horaAtual = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     const mensagemPersonalizada = notificacao.mensagem
-      .replace('{nome}', notificacao.municipe_nome)
-      .replace('{status}', notificacao.status);
+      .replace(/\{nome\}/gi, notificacao.municipe_nome || '')
+      .replace(/\{primeiro_nome\}/gi, primeiroNome)
+      .replace(/\{status\}/gi, notificacao.status || '')
+      .replace(/\{protocolo\}/gi, notificacao.protocolo || '')
+      .replace(/\{titulo\}/gi, notificacao.titulo_demanda || '')
+      .replace(/\{bairro\}/gi, notificacao.municipe_bairro || '')
+      .replace(/\{data\}/gi, dataAtual)
+      .replace(/\{hora\}/gi, horaAtual);
 
     console.log('Mensagem personalizada:', mensagemPersonalizada);
 
