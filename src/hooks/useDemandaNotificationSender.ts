@@ -57,7 +57,10 @@ export function useDemandaNotificationSender() {
             demanda_id: notification.demanda_id,
             municipe_nome: notification.municipe_nome,
             municipe_telefone: notification.telefone,
+            municipe_bairro: notification.municipe_bairro || '',
             status: notification.novo_status,
+            titulo_demanda: notification.demanda_titulo || '',
+            protocolo: notification.demanda_protocolo || '',
             instancia: instanceName,
             mensagem: messageTemplate
           }
