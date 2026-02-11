@@ -64,7 +64,7 @@ export function useDemandaStatusMonitor() {
             // Buscar dados do munícipe
             const { data: municipe } = await supabase
               .from('municipes')
-              .select('nome, telefone')
+              .select('nome, telefone, bairro')
               .eq('id', newDemanda.municipe_id)
               .single();
 
@@ -100,7 +100,9 @@ export function useDemandaStatusMonitor() {
             addNotification({
               demanda_id: newDemanda.id,
               demanda_titulo: newDemanda.titulo,
+              demanda_protocolo: newDemanda.protocolo || '',
               municipe_nome: municipe.nome,
+              municipe_bairro: municipe.bairro || '',
               telefone: municipe.telefone,
               novo_status: statusTexto,
               instanceName: instanceName
