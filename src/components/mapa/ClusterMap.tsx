@@ -564,9 +564,13 @@ function MapRotationHelper({ rotation, oversizeFactor }: { rotation: number; ove
 
       /* ========================================================
          CONTRA-ROTAÇÃO DOS TOOLTIPS (info das regiões no shapefile)
+         Usamos a propriedade CSS 'rotate' (não 'transform: rotate')
+         para NÃO sobrescrever o 'transform: translate3d(x,y,0)'
+         que o Leaflet aplica inline para posicionar o tooltip.
+         Ambas as propriedades se compõem automaticamente.
          ======================================================== */
       .leaflet-tooltip {
-        transform: rotate(${counterDeg}deg) !important;
+        rotate: ${counterDeg}deg !important;
       }
 
       /* ========================================================
