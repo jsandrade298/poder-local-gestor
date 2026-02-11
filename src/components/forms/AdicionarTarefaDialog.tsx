@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Palette, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { registrarHistorico } from "@/lib/kanbanHistoricoUtils";
 
 interface AdicionarTarefaDialogProps {
   kanbanType: string;
@@ -123,10 +124,21 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         }
       }
 
+      // Registrar no histórico
+      registrarHistorico({
+        item_id: novaTarefa.id,
+        item_tipo: 'tarefa',
+        item_titulo: tarefa.titulo,
+        kanban_type: kanbanType,
+        posicao_nova: tarefa.posicao,
+        acao: 'adicionado',
+      });
+
       return novaTarefa;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
       toast.success("Tarefa criada com sucesso!");
       setFormData({
         titulo: "",
