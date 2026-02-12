@@ -40,6 +40,10 @@ import {
   Loader2,
   ArrowLeft,
   UserPlus,
+  MessageCircle,
+  Wifi,
+  WifiOff,
+  Trash2,
 } from "lucide-react";
 
 // ============================================================
@@ -387,11 +391,185 @@ function CriarUsuarioDialog({ tenantId, tenantNome, onSuccess }: { tenantId: str
 }
 
 // ============================================================
+// Dialog: Criar instância WhatsApp
+// ============================================================
+
+function CriarWhatsAppDialog({ tenantId, onSuccess }: { tenantId: string; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [instanceName, setInstanceName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [zapiInstanceId, setZapiInstanceId] = useState("");
+  const [zapiToken, setZapiToken] = useState("");
+  const [zapiClientToken, setZapiClientToken] = useState("");
+  const { toast } = useToast();
+
+  const criarMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("admin_create_whatsapp_instance", {
+        p_tenant_id: tenantId,
+        p_instance_name: instanceName,
+        p_display_name: displayName,
+        p_instance_id: zapiInstanceId,
+        p_instance_token: zapiToken,
+        p_client_token: zapiClientToken || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Instância criada!", description: `"${displayName}" configurada.` });
+      setOpen(false);
+      setInstanceName(""); setDisplayName(""); setZapiInstanceId(""); setZapiToken(""); setZapiClientToken("");
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <MessageCircle className="h-4 w-4 mr-2" />
+          Nova Instância
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Nova Instância WhatsApp (Z-API)</DialogTitle>
+          <DialogDescription>
+            Configure as credenciais da Z-API para este gabinete.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Nome interno</Label>
+              <Input placeholder="gabinete-silva-01" value={instanceName} onChange={(e) => setInstanceName(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground">Identificador único, sem espaços</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nome de exibição</Label>
+              <Input placeholder="WhatsApp Principal" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+          </div>
+          <Separator />
+          <p className="text-xs font-medium text-muted-foreground">Credenciais Z-API</p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Instance ID</Label>
+              <Input placeholder="Ex: 3C5A7E8B4F2D1A9..." value={zapiInstanceId} onChange={(e) => setZapiInstanceId(e.target.value)} className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>Instance Token</Label>
+              <Input placeholder="Ex: a1b2c3d4e5f6..." value={zapiToken} onChange={(e) => setZapiToken(e.target.value)} className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Token</Label>
+              <Input placeholder="Ex: F1c345cff720..." value={zapiClientToken} onChange={(e) => setZapiClientToken(e.target.value)} className="font-mono text-xs" />
+              <p className="text-[10px] text-muted-foreground">Encontrado em Segurança → Token da conta na Z-API</p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            onClick={() => criarMutation.mutate()}
+            disabled={!instanceName || !displayName || !zapiInstanceId || !zapiToken || criarMutation.isPending}
+          >
+            {criarMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+            Criar Instância
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// Dialog: Editar instância WhatsApp
+// ============================================================
+
+function EditarWhatsAppDialog({ instance, onSuccess }: { instance: any; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(instance.display_name);
+  const [zapiInstanceId, setZapiInstanceId] = useState(instance.instance_id || "");
+  const [zapiToken, setZapiToken] = useState(instance.instance_token || "");
+  const [zapiClientToken, setZapiClientToken] = useState(instance.client_token || "");
+  const { toast } = useToast();
+
+  const editarMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("admin_update_whatsapp_instance", {
+        p_instance_id: instance.id,
+        p_display_name: displayName,
+        p_zapi_instance_id: zapiInstanceId,
+        p_instance_token: zapiToken,
+        p_client_token: zapiClientToken || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Instância atualizada!" });
+      setOpen(false);
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar: {instance.display_name}</DialogTitle>
+          <DialogDescription>Atualizar credenciais Z-API</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Nome de exibição</Label>
+            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </div>
+          <Separator />
+          <p className="text-xs font-medium text-muted-foreground">Credenciais Z-API</p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Instance ID</Label>
+              <Input value={zapiInstanceId} onChange={(e) => setZapiInstanceId(e.target.value)} className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>Instance Token</Label>
+              <Input value={zapiToken} onChange={(e) => setZapiToken(e.target.value)} className="font-mono text-xs" />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Token</Label>
+              <Input value={zapiClientToken} onChange={(e) => setZapiClientToken(e.target.value)} className="font-mono text-xs" />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button onClick={() => editarMutation.mutate()} disabled={editarMutation.isPending}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
 // Detalhe do Tenant
 // ============================================================
 
 function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => void }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
     queryFn: async () => {
@@ -401,12 +579,43 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
     },
   });
 
+  const { data: whatsappInstances, refetch: refetchInstances } = useQuery({
+    queryKey: ["admin-whatsapp-instances", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_whatsapp_instances", { p_tenant_id: tenantId });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const toggleInstanceMutation = useMutation({
+    mutationFn: async ({ instanceId, active }: { instanceId: string; active: boolean }) => {
+      const { data, error } = await supabase.rpc("admin_toggle_whatsapp_instance", { p_instance_id: instanceId, p_active: active });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { refetchInstances(); toast({ title: "Status atualizado!" }); },
+    onError: (err: any) => { toast({ title: "Erro", description: err.message, variant: "destructive" }); },
+  });
+
+  const deleteInstanceMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      const { data, error } = await supabase.rpc("admin_delete_whatsapp_instance", { p_instance_id: instanceId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { refetchInstances(); toast({ title: "Instância removida!" }); },
+    onError: (err: any) => { toast({ title: "Erro", description: err.message, variant: "destructive" }); },
+  });
+
   if (isLoading) return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
 
   const refreshDetail = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
   };
+
+  const hasCredentials = (inst: any) => inst.instance_id && inst.instance_token && inst.client_token;
 
   return (
     <div className="space-y-6">
@@ -417,15 +626,12 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
         <Badge variant="outline">{data.tenant?.plano}</Badge>
       </div>
 
+      {/* Usuários */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Usuários ({data.usuarios?.length || 0})</CardTitle>
-            <CriarUsuarioDialog
-              tenantId={tenantId}
-              tenantNome={data.tenant?.nome || ""}
-              onSuccess={refreshDetail}
-            />
+            <CriarUsuarioDialog tenantId={tenantId} tenantNome={data.tenant?.nome || ""} onSuccess={refreshDetail} />
           </div>
         </CardHeader>
         <CardContent>
@@ -442,22 +648,89 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
         </CardContent>
       </Card>
 
+      {/* Instâncias WhatsApp (Z-API) */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Instâncias WhatsApp</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Instâncias WhatsApp ({whatsappInstances?.length || 0})
+            </CardTitle>
+            <CriarWhatsAppDialog tenantId={tenantId} onSuccess={refetchInstances} />
+          </div>
+        </CardHeader>
         <CardContent>
-          {data.whatsapp_instances && data.whatsapp_instances.length > 0 ? (
-            <div className="space-y-2">
-              {data.whatsapp_instances.map((w: any) => (
-                <div key={w.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div><p className="text-sm font-medium">{w.display_name}</p><p className="text-xs text-muted-foreground">{w.instance_name}</p></div>
-                  <Badge variant={w.active ? "default" : "secondary"}>{w.active ? "Ativa" : "Inativa"}</Badge>
+          {whatsappInstances && whatsappInstances.length > 0 ? (
+            <div className="space-y-3">
+              {whatsappInstances.map((inst: any) => (
+                <div key={inst.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${inst.active ? "bg-green-100" : "bg-slate-100"}`}>
+                        <MessageCircle className={`h-4 w-4 ${inst.active ? "text-green-600" : "text-slate-400"}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{inst.display_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{inst.instance_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={inst.active ? "default" : "secondary"} className="text-[10px]">
+                        {inst.active ? "Ativa" : "Inativa"}
+                      </Badge>
+                      {!hasCredentials(inst) && (
+                        <Badge variant="destructive" className="text-[10px]">Sem credenciais</Badge>
+                      )}
+                      <EditarWhatsAppDialog instance={inst} onSuccess={refetchInstances} />
+                      <Button variant="ghost" size="icon"
+                        onClick={() => toggleInstanceMutation.mutate({ instanceId: inst.id, active: !inst.active })}
+                        title={inst.active ? "Desativar" : "Ativar"}
+                      >
+                        {inst.active ? <WifiOff className="h-4 w-4 text-destructive" /> : <Wifi className="h-4 w-4 text-green-600" />}
+                      </Button>
+                      <Button variant="ghost" size="icon"
+                        onClick={() => { if (confirm(`Remover instância "${inst.display_name}"?`)) deleteInstanceMutation.mutate(inst.id); }}
+                        title="Remover"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">Instance ID</p>
+                      <p className="font-mono bg-muted px-2 py-1 rounded truncate">
+                        {inst.instance_id ? `${inst.instance_id.slice(0, 8)}...${inst.instance_id.slice(-4)}` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">Instance Token</p>
+                      <p className="font-mono bg-muted px-2 py-1 rounded truncate">
+                        {inst.instance_token ? `${inst.instance_token.slice(0, 8)}...${inst.instance_token.slice(-4)}` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-0.5">Client Token</p>
+                      <p className="font-mono bg-muted px-2 py-1 rounded truncate">
+                        {inst.client_token ? `${inst.client_token.slice(0, 8)}...${inst.client_token.slice(-4)}` : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {inst.phone_number && <p className="text-xs text-muted-foreground">📱 {inst.phone_number}</p>}
                 </div>
               ))}
             </div>
-          ) : <p className="text-sm text-muted-foreground">Nenhuma instância configurada</p>}
+          ) : (
+            <div className="text-center py-6">
+              <MessageCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground mb-1">Nenhuma instância WhatsApp configurada</p>
+              <p className="text-xs text-muted-foreground">Clique em "Nova Instância" para configurar o Z-API deste gabinete.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Histórico de Uso */}
       <Card>
         <CardHeader><CardTitle className="text-base">Histórico de Uso</CardTitle></CardHeader>
         <CardContent>
