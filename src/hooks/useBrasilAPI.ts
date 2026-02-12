@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
-// Token do Mapbox
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoianNhbmRyYWRlMjk4IiwiYSI6ImNta3drZXJ4NDAwMnQzZG9oOXFlY2RwNnEifQ.bTCMd8ALMou7GbqApG_ipg';
+// Token do Mapbox via variável de ambiente (configurar no Netlify)
+const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 interface BrasilAPICoordinates {
   longitude: string;
@@ -52,12 +52,6 @@ interface UseBrasilAPIReturn {
 
 /**
  * Geocodifica um endereço usando Mapbox (PRINCIPAL)
- * Muito mais preciso que Nominatim para endereços brasileiros
- * 
- * Estratégias de busca (em ordem):
- * 1. Endereço completo com número
- * 2. Endereço completo sem número
- * 3. Bairro + Cidade
  */
 async function geocodificarComMapbox(
   logradouro: string,
@@ -66,8 +60,13 @@ async function geocodificarComMapbox(
   cidade: string,
   estado: string
 ): Promise<{ latitude: number; longitude: number } | null> {
+  if (!MAPBOX_ACCESS_TOKEN) {
+    console.warn('⚠️ VITE_MAPBOX_TOKEN não configurado');
+    return null;
+  }
+
   try {
-    // ESTRATÉGIA 1: Endereço completo COM número (mais preciso)
+    // ESTRATÉGIA 1: Endereço completo COM número
     if (numero && numero.trim()) {
       const partesComNumero = [
         `${logradouro}, ${numero}`,
@@ -121,7 +120,7 @@ async function geocodificarComMapbox(
       }
     }
 
-    // ESTRATÉGIA 3: Apenas Bairro + Cidade (fallback)
+    // ESTRATÉGIA 3: Apenas Bairro + Cidade
     console.log('Mapbox tentativa 3 (bairro + cidade)...');
     const buscaSimples = `${bairro}, ${cidade}, ${estado}, Brasil`;
     const encodedSimples = encodeURIComponent(buscaSimples);
@@ -146,7 +145,6 @@ async function geocodificarComMapbox(
 
 /**
  * Geocodifica um endereço usando Nominatim (FALLBACK)
- * Agora inclui o número para maior precisão
  */
 async function geocodificarComNominatim(
   logradouro: string,
@@ -156,7 +154,6 @@ async function geocodificarComNominatim(
   estado: string
 ): Promise<{ latitude: number; longitude: number } | null> {
   try {
-    // Primeira tentativa: endereço completo com número
     const partesCompletas = [
       numero ? `${logradouro}, ${numero}` : logradouro,
       bairro,
@@ -190,9 +187,9 @@ async function geocodificarComNominatim(
       }
     }
 
-    // Segunda tentativa: busca estruturada (mais precisa para endereços)
+    // Segunda tentativa: busca estruturada
     console.log('Nominatim tentativa 2 (estruturada)...');
-    await new Promise(resolve => setTimeout(resolve, 300)); // Rate limit
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     const urlEstruturada = `https://nominatim.openstreetmap.org/search?format=json&street=${encodeURIComponent(numero ? `${numero} ${logradouro}` : logradouro)}&city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}&country=Brazil&limit=1`;
 
@@ -215,7 +212,7 @@ async function geocodificarComNominatim(
       }
     }
 
-    // Terceira tentativa: só logradouro + cidade (fallback)
+    // Terceira tentativa: simplificada
     console.log('Nominatim tentativa 3 (simplificada)...');
     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -251,14 +248,6 @@ async function geocodificarComNominatim(
 
 /**
  * Hook para consultar CEP e obter dados do endereço
- * 
- * IMPORTANTE: Este hook NÃO faz geocodificação automática!
- * A geocodificação deve ser feita no momento de SALVAR o registro,
- * quando o número já estiver preenchido, usando a função geocodificarEndereco()
- * 
- * Fluxo:
- * 1. BrasilAPI → retorna dados do endereço (logradouro, bairro, cidade, estado)
- * 2. Geocodificação → deve ser chamada separadamente com geocodificarEndereco()
  */
 export function useBrasilAPI(): UseBrasilAPIReturn {
   const [isLoading, setIsLoading] = useState(false);
@@ -276,7 +265,6 @@ export function useBrasilAPI(): UseBrasilAPIReturn {
     setError(null);
 
     try {
-      // Buscar na BrasilAPI - apenas dados do endereço
       const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cepLimpo}`);
 
       if (!response.ok) {
@@ -289,21 +277,18 @@ export function useBrasilAPI(): UseBrasilAPIReturn {
 
       const data: BrasilAPICepResponse = await response.json();
 
-      // Retornar apenas dados do endereço, SEM coordenadas
-      // A geocodificação será feita no momento de salvar, com o número preenchido
       const endereco: EnderecoCompleto = {
         cep: data.cep,
         logradouro: data.street || '',
         bairro: data.neighborhood || '',
         cidade: data.city || '',
         estado: data.state || '',
-        latitude: null,  // Sempre null - geocodificação feita ao salvar
-        longitude: null, // Sempre null - geocodificação feita ao salvar
+        latitude: null,
+        longitude: null,
         fonteGeo: null
       };
 
       console.log('✅ CEP encontrado:', endereco.logradouro, '-', endereco.bairro, '-', endereco.cidade);
-      console.log('ℹ️ Geocodificação será feita ao salvar o registro (com número)');
 
       return endereco;
     } catch (err) {
@@ -341,19 +326,9 @@ export function validarCep(cep: string): boolean {
 }
 
 /**
- * Geocodifica um endereço completo (sem precisar de CEP)
- * Útil para regeocoding de registros existentes
+ * Geocodifica um endereço completo
  * 
- * Fluxo:
- * 1. Mapbox (PRINCIPAL) - mais preciso
- * 2. Nominatim (FALLBACK)
- * 
- * @param logradouro - Nome da rua/avenida
- * @param numero - Número do endereço (importante para precisão!)
- * @param bairro - Nome do bairro
- * @param cidade - Nome da cidade
- * @param estado - Sigla do estado (SP, RJ, etc)
- * @returns Coordenadas { latitude, longitude, fonte } ou null
+ * Fluxo: Mapbox (principal) → Nominatim (fallback)
  */
 export async function geocodificarEndereco(
   logradouro: string,
@@ -362,13 +337,11 @@ export async function geocodificarEndereco(
   cidade: string,
   estado: string
 ): Promise<{ latitude: number; longitude: number; fonte: 'mapbox' | 'nominatim' } | null> {
-  // Validar entrada
   if (!cidade && !bairro && !logradouro) {
     console.log('❌ Endereço muito incompleto para geocodificar');
     return null;
   }
 
-  // Tentar Mapbox primeiro (mais preciso)
   const coordMapbox = await geocodificarComMapbox(
     logradouro || '',
     numero || '',
@@ -385,8 +358,7 @@ export async function geocodificarEndereco(
     };
   }
 
-  // Fallback para Nominatim
-  await new Promise(resolve => setTimeout(resolve, 300)); // Rate limit
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   const coordNominatim = await geocodificarComNominatim(
     logradouro || '',
