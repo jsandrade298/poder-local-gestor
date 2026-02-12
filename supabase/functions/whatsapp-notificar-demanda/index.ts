@@ -15,6 +15,8 @@ interface NotificacaoDemanda {
   status_anterior?: string;
   titulo_demanda: string;
   protocolo: string;
+  // MULTI-TENANT
+  tenant_id?: string;
 }
 
 serve(async (req: Request) => {
@@ -31,11 +33,41 @@ serve(async (req: Request) => {
     
     console.log('Notificação de mudança de status:', notificacao);
 
-    // Buscar configurações
-    const { data: configs } = await supabase
+    // ============================================================
+    // MULTI-TENANT: Identificar tenant
+    // ============================================================
+    let tenantId = notificacao.tenant_id || null;
+
+    // Se não veio no body, tentar extrair do usuário autenticado
+    if (!tenantId) {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        const { data: { user } } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tenant_id')
+            .eq('id', user.id)
+            .single();
+          tenantId = profile?.tenant_id || null;
+        }
+      }
+    }
+
+    console.log('🏢 Tenant ID:', tenantId);
+    // ============================================================
+
+    // MULTI-TENANT: filtrar configurações por tenant_id
+    const configQuery = supabase
       .from('configuracoes')
       .select('chave, valor')
       .in('chave', ['whatsapp_instancia_demandas', 'whatsapp_mensagem_demandas', 'whatsapp_demandas_ativo']);
+
+    if (tenantId) configQuery.eq('tenant_id', tenantId);
+
+    const { data: configs } = await configQuery;
 
     if (!configs) {
       throw new Error('Configurações não encontradas');
@@ -46,7 +78,6 @@ serve(async (req: Request) => {
       return acc;
     }, {});
 
-    // Verificar se está ativo
     if (configMap.whatsapp_demandas_ativo !== 'true') {
       console.log('Notificações de demanda desativadas');
       return new Response(JSON.stringify({ 
@@ -62,7 +93,6 @@ serve(async (req: Request) => {
       throw new Error('Configurações incompletas');
     }
 
-    // Personalizar mensagem - substituir TODAS as variáveis
     const primeiroNome = (notificacao.municipe_nome || '').split(' ')[0];
     const agora = new Date();
     const dataAtual = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -78,14 +108,14 @@ serve(async (req: Request) => {
       .replace(/\{data\}/gi, dataAtual)
       .replace(/\{hora\}/gi, horaAtual);
 
-    // Enviar via WhatsApp
     const { data, error } = await supabase.functions.invoke('enviar-whatsapp', {
       body: {
         telefones: [notificacao.municipe_telefone],
         mensagem: mensagemPersonalizada,
         instanceName: instancia,
         tempoMinimo: 1,
-        tempoMaximo: 2
+        tempoMaximo: 2,
+        tenant_id: tenantId  // MULTI-TENANT: passar tenant_id
       }
     });
 
