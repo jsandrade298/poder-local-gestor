@@ -6,46 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Credenciais Z-API padrão (fallback)
-const ZAPI_DEFAULT_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
-const ZAPI_DEFAULT_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
-const ZAPI_DEFAULT_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
-
-/**
- * Normaliza número de telefone brasileiro para formato Z-API
- */
 function normalizePhone(phone: string): string {
   let digits = String(phone).replace(/\D/g, "");
   if (digits.startsWith("55")) digits = digits.slice(2);
-  
   if (digits.length === 10) {
     const ddd = digits.slice(0, 2);
     const numero = digits.slice(2);
-    if (/^[987]/.test(numero)) {
-      digits = ddd + "9" + numero;
-    }
+    if (/^[987]/.test(numero)) digits = ddd + "9" + numero;
   }
-  
   return "55" + digits;
 }
 
-/**
- * Calcula delay de digitação proporcional ao tamanho da mensagem
- */
 function calcularDelayTyping(mensagem: string): number {
   return Math.min(Math.max(Math.ceil(mensagem.length / 50), 2), 50);
 }
 
-/**
- * Chama Z-API com credenciais corretas
- * IMPORTANTE: token vai na URL, clientToken vai no header Client-Token
- */
 async function callZApi(
-  instanceId: string, 
-  token: string,
-  clientToken: string,
-  endpoint: string, 
-  payload: any
+  instanceId: string, token: string, clientToken: string,
+  endpoint: string, payload: any
 ): Promise<{ ok: boolean; body: any; error?: string }> {
   const url = `https://api.z-api.io/instances/${instanceId}/token/${token}/${endpoint}`;
   
@@ -53,10 +31,7 @@ async function callZApi(
     console.log(`🔄 Z-API: ${endpoint}`);
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Client-Token": clientToken
-      },
+      headers: { "Content-Type": "application/json", "Client-Token": clientToken },
       body: JSON.stringify(payload)
     });
     
@@ -64,21 +39,15 @@ async function callZApi(
     let body: any = text;
     try { body = JSON.parse(text); } catch {}
     
-    console.log(`📡 Z-API Response: ${response.status}`);
-    
     if (!response.ok) {
       return { ok: false, body, error: body?.error || body?.message || `HTTP ${response.status}` };
     }
-    
     return { ok: true, body };
   } catch (error: any) {
     return { ok: false, body: null, error: error.message };
   }
 }
 
-/**
- * Detecta tipo de mídia pelo mimetype/filename
- */
 function detectMediaType(media: any): string {
   const mimeType = media.mimetype || media.type || '';
   const filename = (media.filename || media.fileName || '').toLowerCase();
@@ -94,7 +63,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== ENVIO ANIVERSÁRIOS Z-API (CRON/TESTE) ===');
+    console.log('=== ENVIO ANIVERSÁRIOS Z-API (MULTI-TENANT) ===');
 
     const requestData = await req.json();
     const {
@@ -104,13 +73,58 @@ serve(async (req) => {
       tempoMinimo = 1,
       tempoMaximo = 3,
       mediaFiles = [],
-      teste = false
+      teste = false,
+      // MULTI-TENANT: tenant_id obrigatório para cron
+      tenant_id: tenantIdParam = null,
     } = requestData;
 
-    // Inicializar Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // ============================================================
+    // MULTI-TENANT: Se não veio tenant_id, processar TODOS os tenants
+    // ============================================================
+    if (!tenantIdParam && !teste) {
+      console.log('🏢 Modo CRON: processando todos os tenants ativos...');
+      
+      const { data: tenants } = await supabase
+        .from('tenants')
+        .select('id, nome')
+        .eq('ativo', true);
+
+      if (!tenants || tenants.length === 0) {
+        return new Response(JSON.stringify({ 
+          success: true, message: 'Nenhum tenant ativo' 
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const resultadosPorTenant: any[] = [];
+
+      for (const tenant of tenants) {
+        console.log(`\n🏢 Processando tenant: ${tenant.nome} (${tenant.id})`);
+        
+        // Chamar a própria função recursivamente com tenant_id
+        const { data, error } = await supabase.functions.invoke('enviar-whatsapp-aniversario', {
+          body: { ...requestData, tenant_id: tenant.id }
+        });
+
+        resultadosPorTenant.push({
+          tenant: tenant.nome,
+          resultado: data || { error: error?.message }
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Processamento multi-tenant concluído',
+        tenants: resultadosPorTenant
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    // ============================================================
+
+    const tenantId = tenantIdParam;
+    console.log('🏢 Tenant ID:', tenantId || 'teste sem tenant');
 
     let aniversariantes: any[] = [];
     let messageTemplate = "";
@@ -123,10 +137,10 @@ serve(async (req) => {
       aniversariantes = telefones;
       messageTemplate = mensagem;
     } else {
-      console.log('=== MODO AUTOMÁTICO (CRON) ===');
+      console.log('=== MODO AUTOMÁTICO ===');
       
-      // Buscar configurações
-      const { data: configs } = await supabase
+      // MULTI-TENANT: filtrar configurações por tenant_id
+      const configQuery = supabase
         .from('configuracoes')
         .select('chave, valor')
         .in('chave', [
@@ -137,6 +151,9 @@ serve(async (req) => {
           'whatsapp_tempo_maximo_aniversario'
         ]);
 
+      if (tenantId) configQuery.eq('tenant_id', tenantId);
+
+      const { data: configs } = await configQuery;
       const configMap = new Map(configs?.map(c => [c.chave, c.valor]) || []);
       
       finalInstanceName = configMap.get('whatsapp_instancia_aniversario') || '';
@@ -144,8 +161,6 @@ serve(async (req) => {
       const isActive = configMap.get('whatsapp_aniversario_ativo') === 'true';
       finalTempoMinimo = parseInt(configMap.get('whatsapp_tempo_minimo_aniversario') || '1') || 1;
       finalTempoMaximo = parseInt(configMap.get('whatsapp_tempo_maximo_aniversario') || '3') || 3;
-
-      console.log('Configurações:', { instanceName: finalInstanceName, isActive, messageTemplate: messageTemplate.substring(0, 50) });
 
       if (!isActive) {
         console.log('❌ Envio de aniversários DESATIVADO');
@@ -158,17 +173,20 @@ serve(async (req) => {
         throw new Error('Configurações incompletas: instância ou mensagem não definidas');
       }
 
-      // Buscar aniversariantes de hoje
-      const today = new Date().toISOString().slice(5, 10); // MM-DD
+      // MULTI-TENANT: filtrar munícipes por tenant_id
+      const today = new Date().toISOString().slice(5, 10);
       console.log(`📅 Buscando aniversariantes para: ${today}`);
       
-      const { data: aniversariantesHoje } = await supabase
+      const municipeQuery = supabase
         .from('municipes')
         .select('id, nome, telefone, data_nascimento')
         .not('telefone', 'is', null)
         .neq('telefone', '')
         .like('data_nascimento', `%-${today}`);
 
+      if (tenantId) municipeQuery.eq('tenant_id', tenantId);
+
+      const { data: aniversariantesHoje } = await municipeQuery;
       aniversariantes = aniversariantesHoje || [];
     }
 
@@ -184,7 +202,8 @@ serve(async (req) => {
           quantidade: 0,
           success: true,
           aniversariantes: [],
-          data_envio: new Date().toISOString()
+          data_envio: new Date().toISOString(),
+          tenant_id: tenantId  // MULTI-TENANT
         });
       }
 
@@ -195,50 +214,45 @@ serve(async (req) => {
 
     console.log(`🎂 ${aniversariantes.length} aniversariantes para processar`);
 
-    // ========== BUSCAR CREDENCIAIS Z-API DA INSTÂNCIA CONFIGURADA ==========
-    let instanceId = ZAPI_DEFAULT_INSTANCE_ID;
-    let zapiToken = ZAPI_DEFAULT_TOKEN;
-    let clientToken = ZAPI_DEFAULT_CLIENT_TOKEN;
+    // ============================================================
+    // Buscar credenciais Z-API da instância no banco (SEM FALLBACK HARDCODED)
+    // ============================================================
+    const instanceQuery = supabase
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('instance_name', finalInstanceName)
+      .eq('active', true);
 
-    if (finalInstanceName) {
-      const { data: instance } = await supabase
-        .from('whatsapp_instances')
-        .select('*')
-        .eq('instance_name', finalInstanceName)
-        .eq('active', true)
-        .maybeSingle();
+    if (tenantId) instanceQuery.eq('tenant_id', tenantId);
 
-      if (instance) {
-        instanceId = instance.instance_id || instanceId;
-        zapiToken = instance.instance_token || zapiToken;
-        clientToken = instance.client_token || clientToken;
-        console.log(`✅ Instância: ${instance.display_name} (${instanceId.substring(0, 8)}...)`);
-      } else {
-        console.log(`⚠️ Instância '${finalInstanceName}' não encontrada, usando credenciais padrão`);
-      }
+    const { data: instance } = await instanceQuery.maybeSingle();
+
+    if (!instance || !instance.instance_id || !instance.instance_token || !instance.client_token) {
+      throw new Error(`Instância '${finalInstanceName}' não encontrada ou credenciais incompletas. Configure instance_id, instance_token e client_token na tabela whatsapp_instances.`);
     }
+
+    const instanceId = instance.instance_id;
+    const zapiToken = instance.instance_token;
+    const clientToken = instance.client_token;
+    console.log(`✅ Instância: ${instance.display_name}`);
+    // ============================================================
 
     let successCount = 0;
     let errorCount = 0;
     const results: any[] = [];
 
-    // ========== PROCESSAR ANIVERSARIANTES ==========
     for (let i = 0; i < aniversariantes.length; i++) {
       const aniversariante = aniversariantes[i];
       const phone = normalizePhone(aniversariante.telefone);
       
       console.log(`\n🎂 [${i + 1}/${aniversariantes.length}] ${aniversariante.nome} (${phone})`);
       
-      // Delay entre envios (exceto no primeiro)
       if (i > 0) {
-        const delaySeconds = Math.random() * (finalTempoMaximo - finalTempoMinimo) + finalTempoMinimo;
-        const delayMs = Math.round(delaySeconds * 1000);
-        console.log(`⏳ Aguardando ${(delayMs/1000).toFixed(1)}s...`);
+        const delayMs = Math.round((Math.random() * (finalTempoMaximo - finalTempoMinimo) + finalTempoMinimo) * 1000);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
 
       try {
-        // Personalizar mensagem
         const mensagemPersonalizada = messageTemplate
           .replace(/{nome}/gi, aniversariante.nome || '')
           .replace(/{primeiro_nome}/gi, (aniversariante.nome || '').split(' ')[0])
@@ -246,11 +260,8 @@ serve(async (req) => {
 
         const mensagemFinal = teste ? `[TESTE] ${mensagemPersonalizada}` : mensagemPersonalizada;
 
-        console.log(`💬 "${mensagemFinal.substring(0, 60)}${mensagemFinal.length > 60 ? '...' : ''}"`);
-
         let sent = false;
 
-        // Enviar mídias se houver
         if (mediaFiles && mediaFiles.length > 0) {
           for (let mi = 0; mi < mediaFiles.length; mi++) {
             const media = mediaFiles[mi];
@@ -283,48 +294,30 @@ serve(async (req) => {
               });
             }
 
-            if (!resp.ok) {
-              console.error(`❌ Mídia ${mi + 1}: ${resp.error}`);
-            }
+            if (!resp.ok) console.error(`❌ Mídia ${mi + 1}: ${resp.error}`);
           }
         }
 
-        // Enviar texto se não foi enviado como caption
         if (!sent && mensagemFinal) {
           const resp = await callZApi(instanceId, zapiToken, clientToken, 'send-text', {
-            phone,
-            message: mensagemFinal,
-            delayTyping: calcularDelayTyping(mensagemFinal)
+            phone, message: mensagemFinal, delayTyping: calcularDelayTyping(mensagemFinal)
           });
-
-          if (!resp.ok) {
-            throw new Error(resp.error || 'Erro no envio');
-          }
+          if (!resp.ok) throw new Error(resp.error || 'Erro no envio');
         }
 
         console.log('✅ Enviado com sucesso');
         successCount++;
-        results.push({
-          nome: aniversariante.nome,
-          telefone: aniversariante.telefone,
-          status: 'sucesso'
-        });
+        results.push({ nome: aniversariante.nome, telefone: aniversariante.telefone, status: 'sucesso' });
 
       } catch (error: any) {
         console.error(`❌ Erro: ${error.message}`);
         errorCount++;
-        results.push({
-          nome: aniversariante.nome,
-          telefone: aniversariante.telefone,
-          status: 'erro',
-          erro: error.message
-        });
+        results.push({ nome: aniversariante.nome, telefone: aniversariante.telefone, status: 'erro', erro: error.message });
       }
     }
 
     console.log(`\n🎉 Concluído: ${successCount} sucessos, ${errorCount} erros`);
 
-    // Log do envio (apenas no modo automático)
     if (!teste) {
       await supabase.from('logs_aniversario').insert({
         quantidade: aniversariantes.length,
@@ -332,27 +325,31 @@ serve(async (req) => {
         aniversariantes: results,
         data_envio: new Date().toISOString(),
         error_message: errorCount > 0 ? `${errorCount} erros` : null,
-        teste: false
+        teste: false,
+        tenant_id: tenantId  // MULTI-TENANT
+      });
+    }
+
+    // MULTI-TENANT: Registrar uso WhatsApp
+    if (tenantId && successCount > 0) {
+      const mesAtual = new Date().toISOString().substring(0, 7) + '-01';
+      await supabase.rpc('increment_whatsapp_usage', {
+        p_tenant_id: tenantId,
+        p_mes: mesAtual,
+        p_envios: successCount
       });
     }
 
     return new Response(JSON.stringify({
-      success: true,
-      message: 'Envio concluído',
-      total: aniversariantes.length,
-      sucessos: successCount,
-      erros: errorCount,
+      success: true, message: 'Envio concluído',
+      total: aniversariantes.length, sucessos: successCount, erros: errorCount,
       resultados: results
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
     console.error('💥 Erro crítico:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
