@@ -7,10 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
-const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
-const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
-
 function normalizePhone(phone: string): string {
   let digits = String(phone).replace(/\D/g, "");
   if (digits.startsWith("55")) digits = digits.slice(2);
@@ -77,16 +73,13 @@ function detectMediaType(media: any): string {
   const shortType = media.type || '';
   const filename = (media.filename || media.fileName || '').toLowerCase();
   
-  // Prioridade 1: mimetype completo (ex: 'image/jpeg')
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType.startsWith('audio/')) return 'audio';
   if (mimeType.startsWith('application/')) return 'document';
   
-  // Prioridade 2: type shorthand do frontend (ex: 'image', 'video')
   if (['image', 'video', 'audio', 'document'].includes(shortType)) return shortType;
   
-  // Prioridade 3: extensão do arquivo
   if (/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|svg)$/.test(filename)) return 'image';
   if (/\.(mp4|avi|mov|webm|mkv|3gp)$/.test(filename)) return 'video';
   if (/\.(mp3|ogg|wav|m4a|opus|aac|wma)$/.test(filename)) return 'audio';
@@ -106,9 +99,7 @@ serve(async (req) => {
     const requestData = await req.json();
     
     const {
-      // Formato novo: array de objetos com dados completos
       destinatarios = [],
-      // Formato antigo: array de telefones simples
       telefones = [],
       mensagem = "",
       incluirTodos = false,
@@ -124,44 +115,128 @@ serve(async (req) => {
       enquete,
       ordemAleatoria = false,
       reacaoAutomatica = null,
-      // Se true E não tiver envioId externo, cria novo registro
       salvarHistorico = true,
       tituloEnvio = '',
-      // NOVO: envioId externo (criado pelo frontend antes do loop)
-      // Se fornecido, vincula destinatários a este envio sem criar novo
       envioId: envioIdExterno = null,
+      // MULTI-TENANT: tenant_id pode vir do body (chamadas internas)
+      tenant_id: tenantIdParam = null,
     } = requestData;
 
-    console.log("=== ENVIO WHATSAPP Z-API v3 ===");
+    console.log("=== ENVIO WHATSAPP Z-API (MULTI-TENANT) ===");
     console.log("📋 Destinatários (novo):", destinatarios.length);
     console.log("📋 Telefones (antigo):", telefones.length);
     console.log("📋 Incluir todos:", incluirTodos);
     console.log("📋 EnvioId externo:", envioIdExterno);
     console.log("📋 Tipo:", tipo);
-    console.log("📎 MediaFiles:", mediaFiles.length, mediaFiles.map((m: any) => ({ type: m.type, mimetype: m.mimetype, filename: m.filename, hasUrl: !!m.url, hasData: !!m.data })));
+    console.log("📎 MediaFiles:", mediaFiles.length);
 
-    // Buscar credenciais da instância
-    let instanceId = ZAPI_INSTANCE_ID;
-    let token = ZAPI_TOKEN;
-    let clientToken = ZAPI_CLIENT_TOKEN;
-    let instanciaDbId: string | null = null;
-
-    if (instanceName) {
-      const { data: instance } = await supabase
-        .from("whatsapp_instances")
-        .select("*")
-        .eq("instance_name", instanceName)
-        .eq("active", true)
-        .maybeSingle();
-
-      if (instance) {
-        instanceId = instance.instance_id || instanceId;
-        token = instance.instance_token || token;
-        clientToken = instance.client_token || clientToken;
-        instanciaDbId = instance.id;
-        console.log("✅ Instância:", instance.display_name);
+    // ============================================================
+    // MULTI-TENANT: Identificar tenant
+    // ============================================================
+    let tenantId: string | null = tenantIdParam;
+    
+    // Se não veio no body, tentar extrair do usuário autenticado
+    if (!tenantId) {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        const { data: { user } } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tenant_id')
+            .eq('id', user.id)
+            .single();
+          tenantId = profile?.tenant_id || null;
+        }
       }
     }
+
+    console.log("🏢 Tenant ID:", tenantId || 'não identificado');
+    // ============================================================
+
+    // Validação da instância
+    if (!instanceName) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Nome da instância é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ============================================================
+    // Buscar credenciais Z-API da instância no banco
+    // Sem fallback para hardcoded — cada tenant TEM que ter
+    // sua instância configurada.
+    // ============================================================
+    let instanceId: string | null = null;
+    let token: string | null = null;
+    let clientToken: string | null = null;
+    let instanciaDbId: string | null = null;
+
+    const instanceQuery = supabase
+      .from("whatsapp_instances")
+      .select("*")
+      .eq("instance_name", instanceName)
+      .eq("active", true);
+
+    // Se temos tenant_id, filtrar por ele (segurança multi-tenant)
+    if (tenantId) {
+      instanceQuery.eq("tenant_id", tenantId);
+    }
+
+    const { data: instance, error: instErr } = await instanceQuery.maybeSingle();
+
+    if (!instance) {
+      // Tentar por display_name
+      const displayQuery = supabase
+        .from("whatsapp_instances")
+        .select("*")
+        .eq("display_name", instanceName)
+        .eq("active", true);
+      
+      if (tenantId) {
+        displayQuery.eq("tenant_id", tenantId);
+      }
+
+      const { data: instanceByDisplay } = await displayQuery.maybeSingle();
+
+      if (!instanceByDisplay) {
+        console.error("❌ Instância não encontrada:", instanceName);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Instância WhatsApp '${instanceName}' não encontrada ou inativa` 
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      instanceId = instanceByDisplay.instance_id;
+      token = instanceByDisplay.instance_token;
+      clientToken = instanceByDisplay.client_token;
+      instanciaDbId = instanceByDisplay.id;
+      tenantId = tenantId || instanceByDisplay.tenant_id;
+    } else {
+      instanceId = instance.instance_id;
+      token = instance.instance_token;
+      clientToken = instance.client_token;
+      instanciaDbId = instance.id;
+      tenantId = tenantId || instance.tenant_id;
+    }
+
+    // Validar que temos credenciais
+    if (!instanceId || !token || !clientToken) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Instância encontrada mas credenciais Z-API incompletas. Configure instance_id, instance_token e client_token." 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("✅ Instância:", instanceName, "| Tenant:", tenantId);
 
     // Interface para destinatários processados
     interface Dest {
@@ -173,7 +248,6 @@ serve(async (req) => {
     
     let lista: Dest[] = [];
     
-    // PRIORIDADE: destinatarios > telefones > incluirTodos
     if (destinatarios.length > 0) {
       console.log("📋 Usando formato NOVO (destinatarios com variáveis)");
       lista = destinatarios.map((d: any) => ({
@@ -219,10 +293,17 @@ serve(async (req) => {
       });
     } else if (incluirTodos) {
       console.log("📋 Buscando TODOS os munícipes");
-      const { data: municipes } = await supabase
+      // MULTI-TENANT: filtrar por tenant_id
+      const municipeQuery = supabase
         .from("municipes")
         .select("id, nome, telefone, email, bairro")
         .not("telefone", "is", null);
+      
+      if (tenantId) {
+        municipeQuery.eq("tenant_id", tenantId);
+      }
+
+      const { data: municipes } = await municipeQuery;
       
       if (municipes) {
         lista = municipes.map(m => ({
@@ -263,15 +344,11 @@ serve(async (req) => {
       );
     }
 
-    // Aplicar ordem aleatória se configurado
     if (ordemAleatoria) {
       lista = embaralharArray(lista);
       console.log("🔀 Ordem aleatória aplicada");
     }
 
-    // Determinar envioId a usar
-    // Se temos envioId externo, usar ele (frontend já criou o registro)
-    // Se não, e salvarHistorico é true, criar novo registro
     let envioId: string | null = envioIdExterno;
     
     if (!envioId && salvarHistorico) {
@@ -279,7 +356,6 @@ serve(async (req) => {
       const { data: envio, error: envioError } = await supabase.from('whatsapp_envios').insert({
         titulo: tituloEnvio || mensagem.substring(0, 100) || `Envio ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}`,
         tipo,
-        mensagem: mensagem,
         conteudo: { mensagem, ...conteudo },
         total_destinatarios: lista.length,
         ordem_aleatoria: ordemAleatoria,
@@ -289,7 +365,8 @@ serve(async (req) => {
         instancia_id: instanciaDbId,
         instancia_nome: instanceName,
         status: 'enviando',
-        iniciado_em: new Date().toISOString()
+        iniciado_em: new Date().toISOString(),
+        tenant_id: tenantId  // MULTI-TENANT
       }).select().single();
       
       if (envio) {
@@ -298,40 +375,30 @@ serve(async (req) => {
       } else if (envioError) {
         console.warn("⚠️ Erro ao criar envio:", envioError.message);
       }
-    } else if (envioId) {
-      console.log("📎 Usando envioId externo:", envioId);
     }
 
     const results: any[] = [];
     let ok = 0, erros = 0;
 
-    // Loop de envio
     for (let i = 0; i < lista.length; i++) {
       const dest = lista[i];
       const phone = normalizePhone(dest.telefone);
       
       console.log(`\n📱 [${i + 1}/${lista.length}] ${dest.nome || phone}`);
       
-      // Delay entre envios (se não for o primeiro)
-      // NOTA: Se o frontend está controlando o delay com countdown,
-      // ele deve passar tempoMinimo=0 e tempoMaximo=0
       if (i > 0 && (tempoMinimo > 0 || tempoMaximo > 0)) {
         const ms = Math.round((Math.random() * (tempoMaximo - tempoMinimo) + tempoMinimo) * 1000);
         console.log(`⏳ Aguardando ${ms}ms...`);
         await new Promise(r => setTimeout(r, ms));
       }
       
-      // Substituir variáveis na mensagem
       const msgFinal = customMessages[dest.telefone] 
         ? substituirVariaveis(customMessages[dest.telefone], dest.variaveis)
         : substituirVariaveis(mensagem, dest.variaveis);
       
-      console.log(`💬 Mensagem: "${msgFinal.substring(0, 60)}${msgFinal.length > 60 ? '...' : ''}"`);
-      
       let resp: any = null;
       
       try {
-        // Enviar baseado no tipo
         switch (tipo) {
           case 'localizacao':
             if (localizacao) {
@@ -415,10 +482,8 @@ serve(async (req) => {
             break;
             
           default:
-            // Tipo padrão: texto ou mídia detectada automaticamente
             let sent = false;
             
-            // Enviar mídias primeiro
             for (const media of mediaFiles) {
               const mt = detectMediaType(media);
               const mUrl = media.url || media.data;
@@ -448,7 +513,6 @@ serve(async (req) => {
               await new Promise(r => setTimeout(r, 1000));
             }
             
-            // Enviar texto se não enviou nada ainda
             if (!sent && msgFinal) {
               resp = await callZApi(instanceId, token, clientToken, 'send-text', { 
                 phone, 
@@ -458,7 +522,6 @@ serve(async (req) => {
             }
         }
         
-        // Processar resultado
         if (resp?.ok) {
           console.log('✅ Enviado com sucesso');
           ok++;
@@ -471,7 +534,6 @@ serve(async (req) => {
             zapiId 
           });
           
-          // Salvar destinatário no banco se temos envioId
           if (envioId) {
             await supabase.from('whatsapp_envios_destinatarios').insert({
               envio_id: envioId, 
@@ -484,7 +546,8 @@ serve(async (req) => {
               mensagem_enviada: msgFinal, 
               zapi_message_id: zapiId,
               enviado_em: new Date().toISOString(), 
-              ordem: i
+              ordem: i,
+              tenant_id: tenantId  // MULTI-TENANT
             });
           }
         } else {
@@ -502,7 +565,6 @@ serve(async (req) => {
           erro: e.message 
         });
         
-        // Salvar erro no banco se temos envioId
         if (envioId) {
           await supabase.from('whatsapp_envios_destinatarios').insert({
             envio_id: envioId, 
@@ -512,14 +574,14 @@ serve(async (req) => {
             municipe_id: dest.id || null, 
             status: 'erro',
             erro_mensagem: e.message, 
-            ordem: i
+            ordem: i,
+            tenant_id: tenantId  // MULTI-TENANT
           });
         }
       }
     }
 
-    // Atualizar estatísticas do envio (se não foi passado envioId externo)
-    // Se foi passado envioId externo, o frontend é responsável por atualizar
+    // Atualizar estatísticas do envio
     if (envioId && !envioIdExterno) {
       await supabase.from('whatsapp_envios').update({
         status: erros === lista.length ? 'erro' : 'concluido',
@@ -527,8 +589,23 @@ serve(async (req) => {
         total_erros: erros,
         concluido_em: new Date().toISOString()
       }).eq('id', envioId);
-      console.log('📊 Estatísticas atualizadas');
     }
+
+    // ============================================================
+    // MULTI-TENANT: Registrar uso de WhatsApp
+    // ============================================================
+    if (tenantId && ok > 0) {
+      const mesAtual = new Date().toISOString().substring(0, 7) + '-01';
+      await supabase.rpc('increment_whatsapp_usage', {
+        p_tenant_id: tenantId,
+        p_mes: mesAtual,
+        p_envios: ok
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Erro ao registrar uso WhatsApp:', error.message);
+        else console.log(`📊 Uso registrado: ${ok} envios`);
+      });
+    }
+    // ============================================================
 
     console.log(`\n📊 RESULTADO FINAL: ✅ ${ok} sucessos | ❌ ${erros} erros`);
 
@@ -536,11 +613,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         envioId, 
-        resumo: { 
-          total: lista.length, 
-          sucessos: ok, 
-          erros 
-        }, 
+        resumo: { total: lista.length, sucessos: ok, erros }, 
         resultados: results 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
