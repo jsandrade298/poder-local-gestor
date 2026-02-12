@@ -17,7 +17,6 @@ interface ProfileInfo {
   email: string;
   tenant_id: string | null;
   role_no_tenant: string;
-  avatar_url?: string;
 }
 
 interface AuthContextType {
@@ -53,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Buscar profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, nome, email, tenant_id, role_no_tenant, avatar_url')
+        .select('id, nome, email, tenant_id, role_no_tenant')
         .eq('id', userId)
         .single();
 
