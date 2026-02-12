@@ -39,6 +39,7 @@ import {
   BarChart3,
   Loader2,
   ArrowLeft,
+  UserPlus,
 } from "lucide-react";
 
 // ============================================================
@@ -277,10 +278,120 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
 }
 
 // ============================================================
+// Dialog: Criar usuário para um tenant
+// ============================================================
+
+function CriarUsuarioDialog({ tenantId, tenantNome, onSuccess }: { tenantId: string; tenantNome: string; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [nome, setNome] = useState("");
+  const [senha, setSenha] = useState("");
+  const [role, setRole] = useState("membro");
+  const { toast } = useToast();
+
+  const criarMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Não autenticado");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email,
+            password: senha,
+            nome,
+            tenant_id: tenantId,
+            role_no_tenant: role,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Erro ao criar usuário");
+      return result;
+    },
+    onSuccess: () => {
+      toast({ title: "Usuário criado!", description: `${email} adicionado ao gabinete.` });
+      setOpen(false);
+      setEmail("");
+      setNome("");
+      setSenha("");
+      setRole("membro");
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao criar usuário", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <UserPlus className="h-4 w-4 mr-2" />
+          Adicionar Usuário
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Novo Usuário</DialogTitle>
+          <DialogDescription>
+            Criar usuário para o gabinete "{tenantNome}"
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Nome completo</Label>
+            <Input placeholder="João da Silva" value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>E-mail</Label>
+            <Input type="email" placeholder="joao@gabinete.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Senha inicial</Label>
+            <Input type="text" placeholder="Mínimo 6 caracteres" value={senha} onChange={(e) => setSenha(e.target.value)} />
+            <p className="text-xs text-muted-foreground">O usuário poderá alterar depois.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Papel no gabinete</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="membro">Membro</SelectItem>
+                <SelectItem value="visualizador">Visualizador</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            onClick={() => criarMutation.mutate()}
+            disabled={!email || !senha || senha.length < 6 || criarMutation.isPending}
+          >
+            {criarMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
+            Criar Usuário
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
 // Detalhe do Tenant
 // ============================================================
 
 function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => void }) {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["admin-tenant-detail", tenantId],
     queryFn: async () => {
@@ -293,6 +404,10 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
   if (isLoading) return <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!data) return null;
 
+  const refreshDetail = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-tenant-detail", tenantId] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -303,7 +418,16 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Usuários ({data.usuarios?.length || 0})</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Usuários ({data.usuarios?.length || 0})</CardTitle>
+            <CriarUsuarioDialog
+              tenantId={tenantId}
+              tenantNome={data.tenant?.nome || ""}
+              onSuccess={refreshDetail}
+            />
+          </div>
+        </CardHeader>
         <CardContent>
           {data.usuarios && data.usuarios.length > 0 ? (
             <div className="space-y-2">
