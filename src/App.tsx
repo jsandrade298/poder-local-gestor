@@ -1,4 +1,3 @@
-import AdminSaaS from "./pages/AdminSaaS";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,6 +29,8 @@ import Configuracoes from "./pages/Configuracoes";
 import MapaUnificado from "./pages/MapaUnificado";
 import BalancoDemandas from "./pages/BalancoDemandas";
 import Login from "./pages/Login";
+import EscolherDestino from "./pages/EscolherDestino";
+import AdminSaaS from "./pages/AdminSaaS";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,8 @@ const App = () => (
           <AuthLayout>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/escolher" element={<EscolherDestino />} />
+              <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />
@@ -64,7 +67,6 @@ const App = () => (
               <Route path="/config" element={<Configuracoes />} />
               <Route path="/mapa" element={<MapaUnificado />} />
               <Route path="/balanco-demandas" element={<BalancoDemandas />} />
-              <Route path="/admin" element={<AdminSaaS />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
