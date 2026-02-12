@@ -31,6 +31,7 @@ import BalancoDemandas from "./pages/BalancoDemandas";
 import Login from "./pages/Login";
 import EscolherDestino from "./pages/EscolherDestino";
 import AdminSaaS from "./pages/AdminSaaS";
+import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
           <AuthLayout>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/site" element={<LandingPage />} />
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/" element={<Dashboard />} />
