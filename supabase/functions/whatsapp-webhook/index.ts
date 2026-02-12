@@ -7,14 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Credenciais Z-API para enviar reação
-const ZAPI_INSTANCE_ID = "3E6B64573148D1AB699D4A0A02232B3D";
-const ZAPI_TOKEN = "8FBCD627DCF04CA3F24CD5EC";
-const ZAPI_CLIENT_TOKEN = "F1c345cff72034ecbbcbe4e942ade925bS";
-
-/**
- * Mapeia status da Z-API para status do banco
- */
 function mapearStatus(zapiStatus: string): string {
   const mapa: Record<string, string> = {
     'SENT': 'enviado',
@@ -27,9 +19,6 @@ function mapearStatus(zapiStatus: string): string {
   return mapa[zapiStatus?.toUpperCase()] || 'enviado';
 }
 
-/**
- * Campo de timestamp baseado no status
- */
 function campoTimestamp(status: string): string | null {
   const mapa: Record<string, string> = {
     'enviado': 'enviado_em',
@@ -40,19 +29,11 @@ function campoTimestamp(status: string): string | null {
   return mapa[status] || null;
 }
 
-/**
- * Ordem de status para evitar retrocesso
- */
 function ordemStatus(status: string): number {
   const ordem: Record<string, number> = {
-    'pendente': 0,
-    'enviando': 1,
-    'enviado': 2,
-    'entregue': 3,
-    'lido': 4,
-    'reproduzido': 5,
-    'erro': 0,
-    'cancelado': 0
+    'pendente': 0, 'enviando': 1, 'enviado': 2,
+    'entregue': 3, 'lido': 4, 'reproduzido': 5,
+    'erro': 0, 'cancelado': 0
   };
   return ordem[status] ?? 0;
 }
@@ -75,7 +56,6 @@ serve(async (req) => {
 
     console.log("📥 Webhook recebido:", JSON.stringify(payload).substring(0, 500));
 
-    // Identificar tipo de webhook
     const webhookType = payload.type || payload.event || 'unknown';
     
     // ==================== MESSAGE STATUS CALLBACK ====================
@@ -93,7 +73,6 @@ serve(async (req) => {
       console.log(`📊 Status: ${status} → ${novoStatus} | IDs: ${ids.length}`);
 
       for (const messageId of ids) {
-        // Buscar destinatário
         const { data: dest, error } = await supabase
           .from('whatsapp_envios_destinatarios')
           .select('id, status, envio_id')
@@ -105,13 +84,11 @@ serve(async (req) => {
           continue;
         }
 
-        // Verificar se é um avanço de status
         if (ordemStatus(novoStatus) <= ordemStatus(dest.status)) {
           console.log(`⏭️ Status ${novoStatus} não é avanço de ${dest.status}`);
           continue;
         }
 
-        // Atualizar
         const updateData: any = { status: novoStatus, updated_at: new Date().toISOString() };
         if (campoTs) updateData[campoTs] = momment || new Date().toISOString();
 
@@ -127,9 +104,9 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ==================== RECEIVED CALLBACK (Mensagem recebida) ====================
+    // ==================== RECEIVED CALLBACK ====================
     if (webhookType === 'ReceivedCallback' || payload.isNewMsg !== undefined) {
-      const { phone, body, messageId, fromMe, instanceId } = payload;
+      const { phone, body, messageId, fromMe, instanceId: zapiInstanceId } = payload;
       
       if (fromMe) {
         console.log("⏭️ Mensagem própria, ignorando");
@@ -138,7 +115,6 @@ serve(async (req) => {
 
       console.log(`📨 Mensagem recebida de ${phone}: ${body?.substring(0, 50)}`);
 
-      // Buscar se há envio recente para esse telefone com reação automática
       const telefoneFormatado = phone?.replace(/\D/g, '');
       
       const { data: destRecente } = await supabase
@@ -146,6 +122,7 @@ serve(async (req) => {
         .select(`
           id, 
           zapi_message_id,
+          tenant_id,
           envio:whatsapp_envios!inner(id, reacao_automatica, instancia_id)
         `)
         .or(`telefone.eq.${telefoneFormatado},telefone_formatado.eq.${telefoneFormatado}`)
@@ -157,10 +134,13 @@ serve(async (req) => {
       if (destRecente?.envio?.reacao_automatica && destRecente.zapi_message_id) {
         console.log(`👍 Enviando reação: ${destRecente.envio.reacao_automatica}`);
         
-        // Buscar credenciais da instância
-        let iId = ZAPI_INSTANCE_ID;
-        let tok = ZAPI_TOKEN;
-        let cTok = ZAPI_CLIENT_TOKEN;
+        // ============================================================
+        // MULTI-TENANT: Buscar credenciais da instância do banco
+        // Sem fallback para hardcoded
+        // ============================================================
+        let iId: string | null = null;
+        let tok: string | null = null;
+        let cTok: string | null = null;
 
         if (destRecente.envio.instancia_id) {
           const { data: inst } = await supabase
@@ -170,43 +150,47 @@ serve(async (req) => {
             .single();
           
           if (inst) {
-            iId = inst.instance_id || iId;
-            tok = inst.instance_token || tok;
-            cTok = inst.client_token || cTok;
+            iId = inst.instance_id;
+            tok = inst.instance_token;
+            cTok = inst.client_token;
           }
         }
 
-        // Enviar reação à mensagem RECEBIDA
-        try {
-          const reacaoResp = await fetch(
-            `https://api.z-api.io/instances/${iId}/token/${tok}/send-reaction`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Client-Token': cTok },
-              body: JSON.stringify({
-                phone: telefoneFormatado,
-                messageId: messageId,
-                emoji: destRecente.envio.reacao_automatica
-              })
-            }
-          );
-          
-          if (reacaoResp.ok) {
-            console.log("✅ Reação enviada!");
+        if (iId && tok && cTok) {
+          try {
+            const reacaoResp = await fetch(
+              `https://api.z-api.io/instances/${iId}/token/${tok}/send-reaction`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Client-Token': cTok },
+                body: JSON.stringify({
+                  phone: telefoneFormatado,
+                  messageId: messageId,
+                  emoji: destRecente.envio.reacao_automatica
+                })
+              }
+            );
             
-            // Registrar reação
-            await supabase.from('whatsapp_reacoes').insert({
-              telefone: telefoneFormatado,
-              message_id: messageId,
-              emoji: destRecente.envio.reacao_automatica,
-              tipo: 'enviada',
-              envio_destinatario_id: destRecente.id,
-              instancia_id: destRecente.envio.instancia_id
-            });
+            if (reacaoResp.ok) {
+              console.log("✅ Reação enviada!");
+              
+              await supabase.from('whatsapp_reacoes').insert({
+                telefone: telefoneFormatado,
+                message_id: messageId,
+                emoji: destRecente.envio.reacao_automatica,
+                tipo: 'enviada',
+                envio_destinatario_id: destRecente.id,
+                instancia_id: destRecente.envio.instancia_id,
+                tenant_id: destRecente.tenant_id  // MULTI-TENANT
+              });
+            }
+          } catch (e) {
+            console.error("❌ Erro ao enviar reação:", e);
           }
-        } catch (e) {
-          console.error("❌ Erro ao enviar reação:", e);
+        } else {
+          console.warn("⚠️ Credenciais Z-API não encontradas para a instância");
         }
+        // ============================================================
       }
 
       return new Response(JSON.stringify({ received: true }), 
@@ -219,14 +203,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ received: true }), { headers: corsHeaders });
     }
 
-    // Webhook desconhecido
     console.log(`⚠️ Webhook tipo desconhecido: ${webhookType}`);
     return new Response(JSON.stringify({ received: true, type: webhookType }), 
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error: any) {
     console.error("💥 Erro no webhook:", error);
-    // Retornar 200 mesmo com erro para evitar retries infinitos da Z-API
     return new Response(JSON.stringify({ error: error.message }), 
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
