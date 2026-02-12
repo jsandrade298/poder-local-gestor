@@ -19,8 +19,8 @@ interface BuscaEnderecoInputProps {
   proximity?: { lat: number; lng: number } | null;
 }
 
-// Token do Mapbox (mesmo usado em useBrasilAPI.ts)
-const MAPBOX_TOKEN = 'pk.eyJ1IjoianNhbmRyYWRlMjk4IiwiYSI6ImNta3drZXJ4NDAwMnQzZG9oOXFlY2RwNnEifQ.bTCMd8ALMou7GbqApG_ipg';
+// Token do Mapbox via variável de ambiente (configurar no Netlify)
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 export function BuscaEnderecoInput({
   value,
@@ -30,7 +30,6 @@ export function BuscaEnderecoInput({
   label,
   proximity
 }: BuscaEnderecoInputProps) {
-  // Estados locais para controle do input
   const [inputValue, setInputValue] = useState('');
   const [results, setResults] = useState<EnderecoResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -41,10 +40,14 @@ export function BuscaEnderecoInput({
   const debounceRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Buscar endereços usando Mapbox Geocoding API
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setResults([]);
+      return;
+    }
+
+    if (!MAPBOX_TOKEN) {
+      console.warn('⚠️ VITE_MAPBOX_TOKEN não configurado');
       return;
     }
 
@@ -58,7 +61,6 @@ export function BuscaEnderecoInput({
         types: 'poi,address,place,locality,neighborhood'
       };
       
-      // Adicionar proximidade se fornecida (prioriza resultados próximos)
       if (proximity) {
         params.proximity = `${proximity.lng},${proximity.lat}`;
       }
@@ -81,18 +83,15 @@ export function BuscaEnderecoInput({
     }
   }, [proximity]);
 
-  // Handler de mudança do input com debounce
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
     setSelectedAddress('');
     
-    // Limpar timeout anterior
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     
-    // Se limpar o campo, limpar o valor
     if (!newValue.trim()) {
       setResults([]);
       setShowResults(false);
@@ -100,13 +99,11 @@ export function BuscaEnderecoInput({
       return;
     }
     
-    // Debounce de 400ms para buscar
     debounceRef.current = setTimeout(() => {
       searchAddress(newValue);
     }, 400);
   }, [searchAddress, onChange]);
 
-  // Selecionar endereço
   const handleSelectAddress = useCallback((result: EnderecoResult) => {
     const coords = {
       lat: result.center[1],
@@ -119,7 +116,6 @@ export function BuscaEnderecoInput({
     setShowResults(false);
   }, [onChange]);
 
-  // Obter geolocalização
   const handleGeolocation = useCallback(() => {
     if (!navigator.geolocation) {
       alert('Geolocalização não suportada pelo navegador');
@@ -149,7 +145,6 @@ export function BuscaEnderecoInput({
     );
   }, [onChange]);
 
-  // Limpar
   const handleClear = useCallback(() => {
     onChange(null);
     setSelectedAddress('');
@@ -159,9 +154,7 @@ export function BuscaEnderecoInput({
     inputRef.current?.focus();
   }, [onChange]);
 
-  // Fechar dropdown ao clicar fora
   const handleBlur = useCallback(() => {
-    // Delay para permitir clique nos resultados
     setTimeout(() => {
       setShowResults(false);
     }, 200);
@@ -200,7 +193,6 @@ export function BuscaEnderecoInput({
             </Button>
           )}
           
-          {/* Dropdown de resultados */}
           {showResults && (inputValue.length >= 3 || results.length > 0) && (
             <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg overflow-hidden">
               {isSearching ? (
@@ -224,7 +216,7 @@ export function BuscaEnderecoInput({
                         type="button"
                         className="w-full flex items-start gap-2 p-2 hover:bg-muted rounded text-left transition-colors"
                         onMouseDown={(e) => {
-                          e.preventDefault(); // Previne blur
+                          e.preventDefault();
                           handleSelectAddress(result);
                         }}
                       >
