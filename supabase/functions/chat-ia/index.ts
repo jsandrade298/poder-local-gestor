@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,21 +9,16 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 200 });
   }
 
-  // Handle healthcheck
   if (req.method === 'GET') {
     const url = new URL(req.url);
     if (url.searchParams.get('healthz') === '1') {
       return new Response(
         JSON.stringify({ ok: true }), 
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   }
@@ -34,18 +30,44 @@ serve(async (req) => {
       console.error('OPENAI_API_KEY não configurado');
       return new Response(
         JSON.stringify({ error: 'Chave da API OpenAI não configurada' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // ============================================================
+    // MULTI-TENANT: Identificar o tenant do usuário autenticado
+    // ============================================================
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Extrair token do header Authorization
+    const authHeader = req.headers.get('Authorization');
+    let tenantId: string | null = null;
+
+    if (authHeader) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
+      );
+      
+      if (user && !userError) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tenant_id')
+          .eq('id', user.id)
+          .single();
+        
+        tenantId = profile?.tenant_id || null;
+      }
+    }
+
+    console.log('🏢 Tenant ID:', tenantId || 'não identificado');
+    // ============================================================
+
     const { message, conversationHistory = [], documentosContexto = [], model = 'gpt-5-mini' } = await req.json();
     
-    // Validar modelo
     const validModels = ['gpt-5', 'gpt-5-mini'];
-    const modelMap = {
+    const modelMap: Record<string, string> = {
       'gpt-5': 'gpt-5-2025-08-07',
       'gpt-5-mini': 'gpt-5-mini-2025-08-07'
     };
@@ -53,20 +75,14 @@ serve(async (req) => {
     if (!validModels.includes(model)) {
       return new Response(
         JSON.stringify({ error: `Modelo inválido. Use: ${validModels.join(', ')}` }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     if (!message) {
       return new Response(
         JSON.stringify({ error: 'Mensagem é obrigatória' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -75,13 +91,11 @@ serve(async (req) => {
     console.log('Histórico de conversa:', conversationHistory.length, 'mensagens');
     console.log('Documentos no contexto:', documentosContexto.length);
 
-    // Função para truncar texto preservando estrutura
     const truncarTexto = (texto: string, maxChars: number = 10000): string => {
       if (!texto || texto.length <= maxChars) return texto;
       return texto.substring(0, maxChars) + '\n[... texto truncado ...]';
     };
 
-    // Construir contexto dos documentos
     let contextosDocumentos = '';
     if (documentosContexto.length > 0) {
       contextosDocumentos = '\n\n=== DOCUMENTOS DE REFERÊNCIA ===\n';
@@ -94,7 +108,6 @@ serve(async (req) => {
       contextosDocumentos += '\n=== FIM DOS DOCUMENTOS DE REFERÊNCIA ===\n\n';
     }
 
-    // Preparar mensagens para a OpenAI
     const systemPrompt = `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Sua função é redigir:
 
 - Requerimentos de informação
@@ -119,15 +132,9 @@ ${documentosContexto.length > 0 ?
 ${contextosDocumentos}`;
 
     const messages = [
-      {
-        role: 'system',
-        content: systemPrompt
-      },
+      { role: 'system', content: systemPrompt },
       ...conversationHistory,
-      {
-        role: 'user',
-        content: message
-      }
+      { role: 'user', content: message }
     ];
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -151,18 +158,12 @@ ${contextosDocumentos}`;
         const errorJson = JSON.parse(errorData);
         return new Response(
           JSON.stringify({ error: errorJson.error?.message || 'Erro na API OpenAI' }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch {
         return new Response(
           JSON.stringify({ error: `Erro OpenAI: ${errorData}` }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
@@ -172,24 +173,75 @@ ${contextosDocumentos}`;
 
     const assistantMessage = data.choices[0].message.content;
 
+    // ============================================================
+    // MULTI-TENANT: Registrar uso de tokens no tenant_usage
+    // ============================================================
+    if (tenantId && data.usage) {
+      const tokensInput = data.usage.prompt_tokens || 0;
+      const tokensOutput = data.usage.completion_tokens || 0;
+      
+      const mesAtual = new Date().toISOString().substring(0, 7) + '-01'; // '2026-02-01'
+      
+      // Upsert: incrementar contadores do mês
+      const { error: usageError } = await supabase.rpc('increment_openai_usage', {
+        p_tenant_id: tenantId,
+        p_mes: mesAtual,
+        p_chamadas: 1,
+        p_tokens_input: tokensInput,
+        p_tokens_output: tokensOutput
+      });
+
+      if (usageError) {
+        // Fallback: tentar insert/update manual
+        console.warn('⚠️ Erro no RPC, tentando upsert direto:', usageError.message);
+        
+        const { data: existing } = await supabase
+          .from('tenant_usage')
+          .select('id, openai_chamadas, openai_tokens_input, openai_tokens_output')
+          .eq('tenant_id', tenantId)
+          .eq('mes', mesAtual)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('tenant_usage')
+            .update({
+              openai_chamadas: (existing.openai_chamadas || 0) + 1,
+              openai_tokens_input: (existing.openai_tokens_input || 0) + tokensInput,
+              openai_tokens_output: (existing.openai_tokens_output || 0) + tokensOutput,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+        } else {
+          await supabase
+            .from('tenant_usage')
+            .insert({
+              tenant_id: tenantId,
+              mes: mesAtual,
+              openai_chamadas: 1,
+              openai_tokens_input: tokensInput,
+              openai_tokens_output: tokensOutput
+            });
+        }
+      }
+
+      console.log(`📊 Uso registrado: ${tokensInput} in + ${tokensOutput} out tokens`);
+    }
+    // ============================================================
+
     return new Response(
       JSON.stringify({ 
         message: assistantMessage,
-        conversationId: Date.now().toString() // ID simples para a conversa
+        conversationId: Date.now().toString()
       }), 
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Erro na função chat-ia:', error);
     return new Response(
       JSON.stringify({ error: 'Erro interno do servidor' }), 
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
