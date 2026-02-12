@@ -6,6 +6,7 @@ import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemandaStatusMonitor } from "@/hooks/useDemandaStatusMonitor";
 import { useDemandaNotificationSender } from "@/hooks/useDemandaNotificationSender";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import { LogOut, User } from "lucide-react";
 
 interface AuthLayoutProps {
@@ -15,15 +16,15 @@ interface AuthLayoutProps {
 export function AuthLayout({ children }: AuthLayoutProps) {
   const location = useLocation();
   const isLoginPage = location.pathname === "/login";
-  const { user, loading, signOut } = useAuth();
+  const isChooserPage = location.pathname === "/escolher";
+  const isAdminArea = location.pathname.startsWith("/admin");
+  const { user, loading, profileLoading, isSuperAdmin, signOut } = useAuth();
   
-  // Ativar monitor de status de demandas apenas se autenticado
+  // Ativar monitor de status de demandas apenas se autenticado e no gabinete
   useDemandaStatusMonitor();
-  
-  // Ativar sender para processar notificações automaticamente
   useDemandaNotificationSender();
 
-  // Mostrar loading enquanto verifica autenticação
+  // Loading de autenticação
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
@@ -35,21 +36,65 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     );
   }
 
-  // Se não está na página de login e não está autenticado, redirecionar
-  if (!isLoginPage && !user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Se está na página de login e já está autenticado, redirecionar  
-  if (isLoginPage && user) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Se está na página de login, mostrar apenas o children (página de login)
+  // ========== PÁGINA DE LOGIN ==========
   if (isLoginPage) {
+    if (user) {
+      // Logado → aguardar profile carregar para decidir destino
+      if (profileLoading) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Carregando perfil...</p>
+            </div>
+          </div>
+        );
+      }
+      // Superadmin → tela de escolha
+      if (isSuperAdmin) {
+        return <Navigate to="/escolher" replace />;
+      }
+      // Usuário normal → gabinete
+      return <Navigate to="/" replace />;
+    }
+    // Não logado → mostrar formulário de login
     return <>{children}</>;
   }
 
+  // ========== PÁGINAS PROTEGIDAS (requer autenticação) ==========
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // ========== TELA DE ESCOLHA (superadmin) ==========
+  if (isChooserPage) {
+    // Só superadmin pode acessar
+    if (!profileLoading && !isSuperAdmin) {
+      return <Navigate to="/" replace />;
+    }
+    return <>{children}</>;
+  }
+
+  // ========== ÁREA ADMIN (layout próprio) ==========
+  if (isAdminArea) {
+    // Só superadmin pode acessar
+    if (profileLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Verificando permissões...</p>
+          </div>
+        </div>
+      );
+    }
+    if (!isSuperAdmin) {
+      return <Navigate to="/" replace />;
+    }
+    return <AdminLayout>{children}</AdminLayout>;
+  }
+
+  // ========== GABINETE (layout padrão com sidebar) ==========
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -77,7 +122,6 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                 size="sm" 
                 onClick={async () => {
                   await signOut();
-                  // Garantir redirecionamento mesmo em caso de erro
                   window.location.href = '/login';
                 }}
               >
