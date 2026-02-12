@@ -23,12 +23,14 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  // MULTI-TENANT: novos campos
+  profileLoading: boolean;
+  // MULTI-TENANT
   profile: ProfileInfo | null;
   tenant: TenantInfo | null;
   tenantId: string | null;
   roleNoTenant: string | null;
   isTenantAdmin: boolean;
+  isSuperAdmin: boolean;
   // Métodos
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
@@ -42,12 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileInfo | null>(null);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const queryClient = useQueryClient();
 
-  // Função para carregar profile e tenant do usuário
   const loadProfileAndTenant = async (userId: string) => {
+    setProfileLoading(true);
     try {
       // Buscar profile
       const { data: profileData, error: profileError } = await supabase
@@ -60,12 +64,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('⚠️ Profile não encontrado:', profileError?.message);
         setProfile(null);
         setTenant(null);
+        setIsSuperAdmin(false);
         return;
       }
 
       setProfile(profileData as ProfileInfo);
 
-      // Buscar tenant se existir
+      // Buscar tenant
       if (profileData.tenant_id) {
         const { data: tenantData, error: tenantError } = await supabase
           .from('tenants')
@@ -77,20 +82,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTenant(tenantData as TenantInfo);
           console.log('🏢 Tenant carregado:', tenantData.nome);
         } else {
-          console.warn('⚠️ Tenant não encontrado:', tenantError?.message);
           setTenant(null);
         }
       } else {
         setTenant(null);
       }
+
+      // Verificar superadmin
+      const { data: superAdminCheck } = await supabase.rpc('is_superadmin');
+      setIsSuperAdmin(superAdminCheck === true);
+      if (superAdminCheck === true) {
+        console.log('🛡️ Superadmin detectado');
+      }
     } catch (err) {
       console.error('Erro ao carregar profile/tenant:', err);
       setProfile(null);
       setTenant(null);
+      setIsSuperAdmin(false);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
-  // Refresh manual do profile (ex: após alterar dados)
   const refreshProfile = async () => {
     if (user) {
       await loadProfileAndTenant(user.id);
@@ -105,7 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
-          // Carregar profile e tenant (usar setTimeout para evitar deadlock com Supabase)
           setTimeout(() => {
             loadProfileAndTenant(session.user.id);
           }, 0);
@@ -122,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('🧹 Logout detectado - limpando cache');
           setProfile(null);
           setTenant(null);
+          setIsSuperAdmin(false);
+          setProfileLoading(true);
           queryClient.clear();
         }
 
@@ -129,13 +143,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Verificar sessão existente
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
         loadProfileAndTenant(session.user.id);
+      } else {
+        setProfileLoading(false);
       }
       
       setLoading(false);
@@ -145,25 +160,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        }
-      }
+      email, password,
+      options: { emailRedirectTo: redirectUrl, data: { full_name: fullName } }
     });
     return { error };
   };
@@ -178,26 +183,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setTenant(null);
+      setIsSuperAdmin(false);
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
     }
   };
 
   const value: AuthContextType = {
-    user,
-    session,
-    loading,
-    // MULTI-TENANT
-    profile,
-    tenant,
+    user, session, loading, profileLoading,
+    profile, tenant,
     tenantId: profile?.tenant_id || null,
     roleNoTenant: profile?.role_no_tenant || null,
     isTenantAdmin: profile?.role_no_tenant === 'admin',
-    // Métodos
-    signIn,
-    signUp,
-    signOut,
-    refreshProfile,
+    isSuperAdmin,
+    signIn, signUp, signOut, refreshProfile,
   };
 
   return (
