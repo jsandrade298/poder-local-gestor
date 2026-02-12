@@ -15,11 +15,8 @@ import {
   Target,
   MapPin,
   Layers,
-  Shield,
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -55,15 +52,6 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const { data: config } = useConfiguracoes();
-
-  // Verificar se é superadmin para mostrar link do painel admin
-  const { data: isSuperAdmin } = useQuery({
-    queryKey: ['check-superadmin-sidebar'],
-    queryFn: async () => {
-      const { data } = await supabase.rpc('is_superadmin');
-      return data === true;
-    },
-  });
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -124,22 +112,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-
-            {isSuperAdmin && (
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to="/admin"
-                      className={getNavCls(isActive("/admin"))}
-                    >
-                      <Shield className="h-4 w-4" />
-                      {!collapsed && <span>Admin SaaS</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
