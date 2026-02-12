@@ -18,6 +18,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const isLoginPage = location.pathname === "/login";
   const isChooserPage = location.pathname === "/escolher";
   const isAdminArea = location.pathname.startsWith("/admin");
+  const isPublicPage = location.pathname === "/site";
   const { user, loading, profileLoading, isSuperAdmin, signOut } = useAuth();
   
   // Ativar monitor de status de demandas apenas se autenticado e no gabinete
@@ -34,6 +35,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
       </div>
     );
+  }
+
+  // ========== PÁGINA PÚBLICA (landing page) ==========
+  if (isPublicPage) {
+    return <>{children}</>;
   }
 
   // ========== PÁGINA DE LOGIN ==========
