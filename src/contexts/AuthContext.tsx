@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (event === 'SIGNED_IN' && session?.user) {
+          setProfileLoading(true);
           setTimeout(() => {
             loadProfileAndTenant(session.user.id);
           }, 0);
