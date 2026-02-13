@@ -68,7 +68,7 @@ const EMPTY_CONFIG: NotificationConfig = {
   usar_ia: true,
   tom_mensagem: "profissional_leve",
   mensagem_fallback:
-    "🔔 Olá {primeiro_nome}!\n\n{mensagem}\n\nAcesse o sistema para mais detalhes.\n\nPor favor, confirme o recebimento desta notificação.",
+    "🔔 Olá {primeiro_nome}!\n\n📋 {tipo}: {mensagem}\n\n💡 Acesse o Poder Local Gestor para ver todos os detalhes e próximas ações.\n\n✅ Confirme o recebimento respondendo OK.",
   tipos_ativos: [
     "atribuicao",
     "mencao",
