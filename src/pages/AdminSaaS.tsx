@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ import {
   Loader2,
   ArrowLeft,
   UserPlus,
-  MessageCircle,
+  Bell,
   Wifi,
   WifiOff,
   Trash2,
@@ -773,6 +774,7 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
 export default function AdminSaaS() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
   const { data: summary, isLoading: loadingSummary } = useQuery({
@@ -830,7 +832,13 @@ export default function AdminSaaS() {
           <h1 className="text-2xl font-bold tracking-tight">Visão Geral</h1>
           <p className="text-sm text-muted-foreground">Gestão de gabinetes e uso da plataforma</p>
         </div>
-        <CriarTenantDialog onSuccess={invalidateAll} />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate("/admin/notificacoes")}>
+            <Bell className="h-4 w-4 mr-2" />
+            Notificações WhatsApp
+          </Button>
+          <CriarTenantDialog onSuccess={invalidateAll} />
+        </div>
       </div>
 
       {/* KPIs */}
