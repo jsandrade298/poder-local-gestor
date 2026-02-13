@@ -31,6 +31,7 @@ import BalancoDemandas from "./pages/BalancoDemandas";
 import Login from "./pages/Login";
 import EscolherDestino from "./pages/EscolherDestino";
 import AdminSaaS from "./pages/AdminSaaS";
+import AdminNotificacoesWhatsApp from "./pages/AdminNotificacoesWhatsApp";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/site" element={<LandingPage />} />
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
+              <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
               <Route path="/" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />
