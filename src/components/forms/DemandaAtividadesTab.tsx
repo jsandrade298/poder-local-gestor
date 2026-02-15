@@ -6,6 +6,78 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MentionTextarea, extractMentionsFromText, renderMentionText } from "@/components/ui/MentionTextarea";
+
+// Helper: transforma URLs em texto em links clicáveis
+function linkifyText(text: string): (string | JSX.Element)[] {
+  const urlRegex = /(https?:\/\/[^\s<]+)/g;
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const url = match[1];
+    // Extrair domínio para exibição amigável
+    let displayText: string;
+    try {
+      const domain = new URL(url).hostname.replace('www.', '');
+      displayText = domain;
+    } catch {
+      displayText = url.length > 40 ? url.substring(0, 37) + '...' : url;
+    }
+    parts.push(
+      <a
+        key={`link-${match.index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+      >
+        {displayText}
+        <ExternalLink className="h-3 w-3 inline" />
+      </a>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+// Combina renderização de menções + links clicáveis
+function renderMentionAndLinks(text: string): JSX.Element {
+  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = mentionRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      // Texto entre menções — pode conter URLs
+      parts.push(...linkifyText(text.slice(lastIndex, match.index)));
+    }
+    parts.push(
+      <span 
+        key={`mention-${match.index}`}
+        className="bg-primary text-primary-foreground px-1 rounded font-medium"
+      >
+        @{match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(...linkifyText(text.slice(lastIndex)));
+  }
+
+  return <>{parts}</>;
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -25,7 +97,8 @@ import {
   Calendar,
   Clock,
   Trash2,
-  Edit
+  Edit,
+  ExternalLink
 } from "lucide-react";
 import { formatDateTime } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -628,7 +701,7 @@ export function DemandaAtividadesTab({
                         
                         {atividade.descricao && (
                           <div className="text-sm text-foreground mb-3 whitespace-pre-wrap">
-                            {renderMentionText(atividade.descricao)}
+                            {renderMentionAndLinks(atividade.descricao)}
                           </div>
                         )}
                         
@@ -652,9 +725,15 @@ export function DemandaAtividadesTab({
                             
                             {atividade.link_propositura && (
                               <div>
-                                <span className="text-xs text-foreground break-all">
-                                  {atividade.link_propositura}
-                                </span>
+                                <a
+                                  href={atividade.link_propositura}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Acessar propositura
+                                </a>
                               </div>
                             )}
                           </div>
