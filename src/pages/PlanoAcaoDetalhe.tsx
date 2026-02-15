@@ -23,7 +23,8 @@ import {
   Calendar as CalendarIcon, CheckCircle, PlayCircle, PauseCircle,
   CircleDot, MessageSquarePlus, Clock, MoreHorizontal,
   Columns, Settings, AlertTriangle, Send, ChevronLeft, ChevronRight,
-  Pencil, Expand, X, ChevronDown, ChevronUp
+  Pencil, Expand, X, ChevronDown, ChevronUp, Maximize2, Minimize2,
+  Filter, Upload, Download
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, differenceInDays, parseISO, isValid, isBefore, startOfDay } from "date-fns";
@@ -107,6 +108,19 @@ export default function PlanoAcaoDetalhe() {
   // Expandable updates in table
   const [expandedLinhas, setExpandedLinhas] = useState<Set<string>>(new Set());
   const [inlineUpdateText, setInlineUpdateText] = useState<Record<string, string>>({});
+
+  // Fullscreen mode
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Column filters (planilha)
+  const [showFilters, setShowFilters] = useState(false);
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
+  // Import dialog (planilha)
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Column resizing
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -215,6 +229,15 @@ export default function PlanoAcaoDetalhe() {
     colunas.forEach((c: any) => { w[c.id] = colWidths[c.id] || c.largura || 150; });
     setColWidths(w);
   }, [colunas]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // ===== MUTATIONS =====
   const updateProjeto = useMutation({
@@ -366,6 +389,103 @@ export default function PlanoAcaoDetalhe() {
   // ===== HELPERS: PLANILHA =====
   const resetColunaForm = () => { setColunaNome(""); setColunaTipo("texto"); setColunaOpcoes([{ valor: "A fazer", cor: "#6b7280" }, { valor: "Em progresso", cor: "#3b82f6" }, { valor: "Concluído", cor: "#10b981" }]); };
   const parseOpcoes = (col: any): { valor: string; cor: string }[] => { try { return typeof col.opcoes === "string" ? JSON.parse(col.opcoes) : (col.opcoes || []); } catch { return []; } };
+
+  // Filtered linhas
+  const filteredLinhas = useMemo(() => {
+    if (!showFilters || Object.values(columnFilters).every(v => !v)) return linhas;
+    return linhas.filter((linha: any) => {
+      return Object.entries(columnFilters).every(([colId, filterVal]) => {
+        if (!filterVal) return true;
+        const cellVal = (linha.dados?.[colId] || "").toString().toLowerCase();
+        return cellVal.includes(filterVal.toLowerCase());
+      });
+    });
+  }, [linhas, columnFilters, showFilters]);
+
+  const activeFilterCount = useMemo(() => Object.values(columnFilters).filter(v => !!v).length, [columnFilters]);
+
+  // Download planilha template as CSV
+  const downloadTemplate = () => {
+    if (colunas.length === 0) return;
+    const headers = colunas.map((c: any) => c.nome);
+    const exampleRow = colunas.map((c: any) => {
+      if (c.tipo === "data") return "2026-01-15";
+      if (c.tipo === "numero") return "100";
+      if (c.tipo === "checkbox") return "sim";
+      if (c.tipo === "status" || c.tipo === "select") {
+        const opts = parseOpcoes(c);
+        return opts.length > 0 ? opts[0].valor : "";
+      }
+      if (c.tipo === "responsavel") return "Nome do responsável";
+      return "Exemplo de texto";
+    });
+    const bom = "\uFEFF";
+    const csv = bom + [headers.join(";"), exampleRow.join(";")].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `modelo_${projeto?.titulo?.replace(/\s+/g, "_") || "planilha"}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // Handle import file selection
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { toast.error("Arquivo deve ter cabeçalho + dados"); return; }
+      const sep = lines[0].includes(";") ? ";" : ",";
+      const headers = lines[0].split(sep).map(h => h.replace(/^\uFEFF/, "").replace(/^"|"$/g, "").trim());
+      const rows = lines.slice(1).map(line => {
+        const vals = line.split(sep).map(v => v.replace(/^"|"$/g, "").trim());
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+        return obj;
+      }).filter(row => Object.values(row).some(v => v));
+      setImportPreview(rows);
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
+  // Execute import
+  const executeImport = async () => {
+    if (importPreview.length === 0 || colunas.length === 0) return;
+    setIsImporting(true);
+    try {
+      const colMap: Record<string, any> = {};
+      colunas.forEach((c: any) => { colMap[c.nome.toLowerCase().trim()] = c; });
+
+      const linhasToInsert = importPreview.map((row, idx) => {
+        const dados: Record<string, any> = {};
+        Object.entries(row).forEach(([header, value]) => {
+          const col = colMap[header.toLowerCase().trim()];
+          if (!col) return;
+          if (col.tipo === "checkbox") {
+            dados[col.id] = ["sim", "true", "1", "yes", "x"].includes(value.toLowerCase());
+          } else if (col.tipo === "numero") {
+            dados[col.id] = value ? parseFloat(value.replace(",", ".")) || 0 : "";
+          } else {
+            dados[col.id] = value;
+          }
+        });
+        return { projeto_id: id, dados, ordem: linhas.length + idx };
+      });
+
+      const { error } = await supabase.from("planilha_linhas").insert(linhasToInsert);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["planilha-linhas", id] });
+      toast.success(`${linhasToInsert.length} linha(s) importada(s) com sucesso!`);
+      setShowImportDialog(false); setImportFile(null); setImportPreview([]);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao importar");
+    } finally { setIsImporting(false); }
+  };
 
   // Inline cell editing
   const startEditCell = (linhaId: string, colunaId: string, val: any) => { setEditingCell({ linhaId, colunaId }); setEditCellValue(val?.toString() || ""); };
@@ -527,8 +647,12 @@ export default function PlanoAcaoDetalhe() {
 
   // =============== JSX ===============
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className={cn(
+      isFullscreen
+        ? "fixed inset-0 z-50 bg-background overflow-auto"
+        : "min-h-screen bg-gradient-to-br from-background via-muted/30 to-background"
+    )}>
+      <div className={cn("mx-auto px-4 py-6 space-y-6", !isFullscreen && "container")}>
 
         {/* ====== HEADER ====== */}
         <div className="space-y-4">
@@ -547,6 +671,9 @@ export default function PlanoAcaoDetalhe() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="gap-1" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}>
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setShowAddUpdate(true)} className="gap-1"><MessageSquarePlus className="h-4 w-4" /> Atualização</Button>
               <Button variant="outline" size="sm" onClick={openEditHeader} className="gap-1"><Edit className="h-4 w-4" /> Editar</Button>
             </div>
@@ -601,11 +728,25 @@ export default function PlanoAcaoDetalhe() {
 
         {/* ====== PLANILHA (REDESIGNED) ====== */}
         {projeto.tipo === "planilha" && (
-          <Card>
+          <Card className={isFullscreen ? "border-0 shadow-none" : ""}>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2"><Columns className="h-4 w-4" /> Dados ({linhas.length} registro{linhas.length !== 1 ? "s" : ""})</CardTitle>
-                <div className="flex gap-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Columns className="h-4 w-4" /> Dados
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    {showFilters && activeFilterCount > 0
+                      ? `${filteredLinhas.length} de ${linhas.length}`
+                      : `${linhas.length} registro${linhas.length !== 1 ? "s" : ""}`
+                    }
+                  </Badge>
+                </CardTitle>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant={showFilters ? "default" : "outline"} onClick={() => { setShowFilters(!showFilters); if (showFilters) setColumnFilters({}); }} className="gap-1">
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    {activeFilterCount > 0 && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 bg-white/20">{activeFilterCount}</Badge>}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setShowImportDialog(true); setImportFile(null); setImportPreview([]); }} className="gap-1"><Upload className="h-4 w-4" /> Importar</Button>
                   <Button size="sm" variant="outline" onClick={() => { resetColunaForm(); setShowAddColuna(true); }} className="gap-1"><Settings className="h-4 w-4" /> Coluna</Button>
                   <Button size="sm" onClick={() => addLinha.mutate()} className="gap-1"><Plus className="h-4 w-4" /> Linha</Button>
                 </div>
@@ -613,10 +754,10 @@ export default function PlanoAcaoDetalhe() {
             </CardHeader>
             <CardContent className="p-0">
               {colunas.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8 px-6">Nenhuma coluna configurada.</p> : (
-                <div className="overflow-x-auto border-t">
+                <div className={cn("overflow-x-auto border-t", isFullscreen && "overflow-y-auto max-h-[calc(100vh-220px)]")}>
                   <table className="w-max min-w-full border-collapse" style={{ tableLayout: "fixed" }}>
-                    <thead>
-                      <tr className="bg-muted/30">
+                    <thead className={cn(isFullscreen && "sticky top-0 z-40")}>
+                      <tr className={cn("bg-muted/30", isFullscreen && "bg-muted")}>
                         {/* Sticky: # + first column + expand */}
                         <th className="sticky left-0 z-30 bg-muted border-b border-r w-10 text-center text-xs font-medium text-muted-foreground p-0" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
                           <div className="px-2 py-2.5">#</div>
@@ -647,9 +788,56 @@ export default function PlanoAcaoDetalhe() {
                         {/* Actions */}
                         <th className="border-b w-10 p-0" />
                       </tr>
+                      {/* Filter row */}
+                      {showFilters && (
+                        <tr className={cn("bg-muted/10", isFullscreen && "bg-background")}>
+                          <th className={cn("sticky left-0 z-30 border-b border-r w-10 p-0", isFullscreen ? "bg-background" : "bg-muted/10")} style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }} />
+                          {colunas[0] && (
+                            <th className={cn("sticky z-30 border-b border-r p-0", isFullscreen ? "bg-background" : "bg-muted/10")} style={{ left: 40, width: getColWidth(colunas[0].id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
+                              <Input
+                                value={columnFilters[colunas[0].id] || ""}
+                                onChange={(e) => setColumnFilters(prev => ({ ...prev, [colunas[0].id]: e.target.value }))}
+                                placeholder="Filtrar..."
+                                className="h-7 text-xs border-0 rounded-none bg-transparent focus-visible:ring-1 focus-visible:ring-inset"
+                              />
+                            </th>
+                          )}
+                          {colunas.slice(1).map((col: any) => (
+                            <th key={col.id} className="border-b border-r p-0" style={{ width: getColWidth(col.id) }}>
+                              {(col.tipo === "status" || col.tipo === "select") ? (
+                                <Select value={columnFilters[col.id] || ""} onValueChange={(v) => setColumnFilters(prev => ({ ...prev, [col.id]: v === "__all__" ? "" : v }))}>
+                                  <SelectTrigger className="h-7 text-xs border-0 bg-transparent rounded-none"><SelectValue placeholder="Todos" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__all__">Todos</SelectItem>
+                                    {parseOpcoes(col).map((o: any, i: number) => <SelectItem key={i} value={o.valor}>{o.valor}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              ) : col.tipo === "checkbox" ? (
+                                <Select value={columnFilters[col.id] || ""} onValueChange={(v) => setColumnFilters(prev => ({ ...prev, [col.id]: v === "__all__" ? "" : v }))}>
+                                  <SelectTrigger className="h-7 text-xs border-0 bg-transparent rounded-none"><SelectValue placeholder="Todos" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__all__">Todos</SelectItem>
+                                    <SelectItem value="true">Marcado</SelectItem>
+                                    <SelectItem value="false">Desmarcado</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  value={columnFilters[col.id] || ""}
+                                  onChange={(e) => setColumnFilters(prev => ({ ...prev, [col.id]: e.target.value }))}
+                                  placeholder="Filtrar..."
+                                  className="h-7 text-xs border-0 rounded-none bg-transparent focus-visible:ring-1 focus-visible:ring-inset"
+                                />
+                              )}
+                            </th>
+                          ))}
+                          <th className="border-b border-r p-0" style={{ width: 280 }} />
+                          <th className="border-b w-10 p-0" />
+                        </tr>
+                      )}
                     </thead>
                     <tbody>
-                      {linhas.map((linha: any, idx: number) => {
+                      {filteredLinhas.map((linha: any, idx: number) => {
                         const updates = atualizacoesByLinha[linha.id] || [];
                         const isExpanded = expandedLinhas.has(linha.id);
                         const firstCol = colunas[0];
@@ -858,6 +1046,85 @@ export default function PlanoAcaoDetalhe() {
           <DialogHeader><DialogTitle>Registrar Atualização</DialogTitle></DialogHeader>
           <div className="space-y-2"><Label>O que mudou?</Label><Textarea value={updateTexto} onChange={(e) => setUpdateTexto(e.target.value)} placeholder="Ex: Licitação publicada..." rows={4} /></div>
           <DialogFooter><Button variant="outline" onClick={() => setShowAddUpdate(false)}>Cancelar</Button><Button onClick={() => addAtualizacao.mutate({ texto: updateTexto })} disabled={!updateTexto.trim()}>Registrar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Import Planilha --- */}
+      <Dialog open={showImportDialog} onOpenChange={(o) => { setShowImportDialog(o); if (!o) { setImportFile(null); setImportPreview([]); } }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> Importar Dados</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            {/* Step 1: Download template */}
+            <Card className="border-dashed">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">1. Baixar modelo</p>
+                    <p className="text-xs text-muted-foreground">Planilha CSV com as colunas configuradas</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={downloadTemplate} className="gap-1" disabled={colunas.length === 0}>
+                    <Download className="h-4 w-4" /> Baixar modelo
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                  Colunas: {colunas.map((c: any) => c.nome).join(" · ")}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Step 2: Upload file */}
+            <Card className="border-dashed">
+              <CardContent className="p-4 space-y-2">
+                <p className="text-sm font-medium">2. Enviar arquivo preenchido</p>
+                <p className="text-xs text-muted-foreground">CSV com separador vírgula ou ponto e vírgula. Primeira linha = cabeçalho.</p>
+                <div className="flex gap-2">
+                  <Input type="file" accept=".csv,.txt" onChange={handleImportFile} className="text-sm" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Step 3: Preview */}
+            {importPreview.length > 0 && (
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-sm font-medium">3. Pré-visualização ({importPreview.length} linha{importPreview.length !== 1 ? "s" : ""})</p>
+                  <div className="overflow-x-auto max-h-[200px] overflow-y-auto border rounded">
+                    <table className="w-max min-w-full text-xs">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium">#</th>
+                          {Object.keys(importPreview[0]).map(h => (
+                            <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.slice(0, 10).map((row, i) => (
+                          <tr key={i} className="border-t hover:bg-muted/20">
+                            <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
+                            {Object.values(row).map((v: any, j) => (
+                              <td key={j} className="px-2 py-1 max-w-[200px] truncate">{v}</td>
+                            ))}
+                          </tr>
+                        ))}
+                        {importPreview.length > 10 && (
+                          <tr className="border-t"><td colSpan={Object.keys(importPreview[0]).length + 1} className="px-2 py-1 text-center text-muted-foreground">... e mais {importPreview.length - 10} linha(s)</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          <DialogFooter className="flex-shrink-0 pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>Cancelar</Button>
+            <Button onClick={executeImport} disabled={importPreview.length === 0 || isImporting} className="gap-1">
+              {isImporting ? "Importando..." : `Importar ${importPreview.length} linha(s)`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
