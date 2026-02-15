@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Palette, Calendar } from "lucide-react";
+import { Plus, Palette, Calendar, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { registrarHistorico } from "@/lib/kanbanHistoricoUtils";
 
@@ -27,6 +27,13 @@ const cores = [
   { nome: "Cinza", valor: "#6B7280" }
 ];
 
+const opcoesLembrete = [
+  { dias: 1, label: "1 dia antes" },
+  { dias: 3, label: "3 dias antes" },
+  { dias: 5, label: "5 dias antes" },
+  { dias: 7, label: "7 dias antes" },
+];
+
 export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
   const [open, setOpen] = useState(false);
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
@@ -36,7 +43,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
     prioridade: "media",
     posicao: "a_fazer",
     cor: "#3B82F6",
-    data_prazo: ""
+    data_prazo: "",
+    lembretes_prazo: [] as number[]
   });
 
   const queryClient = useQueryClient();
@@ -84,6 +92,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           kanban_type: kanbanType,
           cor: tarefa.cor,
           data_prazo: tarefa.data_prazo || null,
+          lembretes_prazo: tarefa.data_prazo && tarefa.lembretes_prazo.length > 0 ? tarefa.lembretes_prazo : [],
           created_by: userId
         })
         .select()
@@ -146,7 +155,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         prioridade: "media",
         posicao: "a_fazer",
         cor: "#3B82F6",
-        data_prazo: ""
+        data_prazo: "",
+        lembretes_prazo: []
       });
       setColaboradoresSelecionados([]);
       setOpen(false);
@@ -283,9 +293,43 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
               id="data_prazo"
               type="date"
               value={formData.data_prazo}
-              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value, lembretes_prazo: e.target.value ? formData.lembretes_prazo : [] })}
             />
           </div>
+
+          {/* Lembretes de prazo */}
+          {formData.data_prazo && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                <Bell className="h-4 w-4" />
+                Lembretes antes do prazo
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {opcoesLembrete.map((opcao) => (
+                  <div key={opcao.dias} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`lembrete-${opcao.dias}`}
+                      checked={formData.lembretes_prazo.includes(opcao.dias)}
+                      onCheckedChange={(checked) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          lembretes_prazo: checked
+                            ? [...prev.lembretes_prazo, opcao.dias].sort((a, b) => b - a)
+                            : prev.lembretes_prazo.filter(d => d !== opcao.dias)
+                        }));
+                      }}
+                    />
+                    <Label htmlFor={`lembrete-${opcao.dias}`} className="text-sm cursor-pointer">
+                      {opcao.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tarefas em atraso enviam lembrete diário automaticamente.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
