@@ -37,6 +37,7 @@ export function NovoMunicipeDialog() {
     nome: "",
     telefone: "",
     email: "",
+    instagram: "",
     logradouro: "",
     numero: "",
     bairro: "",
@@ -207,6 +208,7 @@ export function NovoMunicipeDialog() {
           nome: data.nome,
           telefone: data.telefone,
           email: data.email || null,
+          instagram: data.instagram || null,
           endereco: `${data.logradouro}${data.numero ? ', ' + data.numero : ''}${data.complemento ? ' - ' + data.complemento : ''}`,
           bairro: data.bairro,
           cidade: data.cidade,
@@ -252,6 +254,7 @@ export function NovoMunicipeDialog() {
         nome: "",
         telefone: "",
         email: "",
+        instagram: "",
         logradouro: "",
         numero: "",
         bairro: "",
@@ -357,6 +360,16 @@ export function NovoMunicipeDialog() {
                     placeholder="email@exemplo.com"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="instagram">Instagram</Label>
+                <Input
+                  id="instagram"
+                  value={formData.instagram}
+                  onChange={(e) => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
+                  placeholder="@usuario"
+                />
               </div>
 
               <div className="space-y-2">
