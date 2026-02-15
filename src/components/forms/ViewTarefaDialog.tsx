@@ -240,7 +240,7 @@ export function ViewTarefaDialog({
     if (!dataPrazo) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const prazo = new Date(dataPrazo + "T12:00:00");
+    const prazo = new Date(dataPrazo + "T00:00:00");
     return today > prazo;
   };
 
@@ -248,7 +248,7 @@ export function ViewTarefaDialog({
     if (!dataPrazo) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const prazo = new Date(dataPrazo + "T12:00:00");
+    const prazo = new Date(dataPrazo + "T00:00:00");
     return Math.floor(
       (today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24)
     );
