@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot } from "lucide-react";
+import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot, Link2, Check } from "lucide-react";
 import { HumorBadge, getHumorLabel } from "./HumorSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
@@ -14,6 +14,7 @@ import { DemandaAtividadesTab } from "./DemandaAtividadesTab";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
   Popover,
   PopoverContent,
@@ -29,8 +30,19 @@ interface ViewDemandaDialogProps {
 
 export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewDemandaDialogProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [includeAtividades, setIncludeAtividades] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyLink = () => {
+    const url = `${window.location.origin}/demandas?protocolo=${demanda.protocolo}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      toast({ title: "Link copiado!", description: `Link da demanda #${demanda.protocolo} copiado para a área de transferência.` });
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
   
   // Buscar dados do munícipe se não vier na demanda
   const { data: municipeData } = useQuery({
@@ -322,6 +334,15 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyLink}
+                      className="gap-2"
+                    >
+                      {linkCopied ? <Check className="h-4 w-4 text-green-600" /> : <Link2 className="h-4 w-4" />}
+                      {linkCopied ? "Copiado!" : "Copiar link"}
+                    </Button>
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button
