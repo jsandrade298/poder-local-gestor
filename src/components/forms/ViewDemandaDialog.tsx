@@ -66,6 +66,23 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     enabled: open
   });
 
+  // Buscar quem cadastrou a demanda
+  const { data: criadorData } = useQuery({
+    queryKey: ['criador-demanda', demanda?.criado_por],
+    queryFn: async () => {
+      if (!demanda?.criado_por) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .eq('id', demanda.criado_por)
+        .single();
+      
+      if (error) return null;
+      return data;
+    },
+    enabled: !!demanda?.criado_por && open
+  });
+
   const { data: anexos = [] } = useQuery({
     queryKey: ['anexos', demanda?.id],
     queryFn: async () => {
@@ -424,6 +441,15 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                         <strong>Responsável:</strong> {getResponsavelNome(demanda.responsavel_id)}
                       </span>
                     </div>
+
+                    {criadorData?.nome && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          <strong>Cadastrada por:</strong> {criadorData.nome}
+                        </span>
+                      </div>
+                    )}
 
                     {demanda.origem && (
                       <div className="flex items-center gap-2">
