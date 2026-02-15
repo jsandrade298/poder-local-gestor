@@ -90,7 +90,7 @@ export function useDashboardData() {
   // ── Demandas em atraso ──
   const demandasComAtraso = demandas.filter((d) => {
     if (!d.data_prazo || closedSlugs.includes(d.status || "")) return false;
-    return today > new Date(d.data_prazo);
+    return today > new Date(d.data_prazo + 'T00:00:00');
   });
   const demandasEmAtraso = demandasComAtraso.length;
 
@@ -213,7 +213,7 @@ export function useDashboardData() {
   // ── Demandas em atraso detalhadas ──
   const demandasAtrasoDetalhadas = demandasComAtraso
     .map((demanda) => {
-      const prazo = new Date(demanda.data_prazo);
+      const prazo = new Date(demanda.data_prazo + 'T00:00:00');
       const diasAtraso = Math.floor(
         (today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24)
       );
