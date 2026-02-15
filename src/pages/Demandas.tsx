@@ -175,13 +175,27 @@ export default function Demandas() {
         if (atividadeId) {
           setHighlightedActivityId(atividadeId);
         }
+      } else if (protocolo || demandaId) {
+        // Demanda não encontrada na lista local — buscar diretamente no banco
+        (async () => {
+          const { data, error } = await supabase
+            .from('demandas')
+            .select('*, areas(nome), municipes(nome)')
+            .eq(protocolo ? 'protocolo' : 'id', protocolo || demandaId)
+            .single();
+          if (data && !error) {
+            setSelectedDemanda(data);
+            setIsViewDialogOpen(true);
+            if (atividadeId) setHighlightedActivityId(atividadeId);
+          }
+        })();
       }
     }
 
-    // Limpar parâmetros da URL via React Router (garante que o state seja atualizado)
-    // Só limpa quando não precisa esperar demandas carregarem
+    // Limpar apenas filtros da URL (area, atraso, responsavel)
+    // NÃO limpa protocolo/id — o link fica compartilhável e é limpo ao fechar o modal
     const needsDemandas = protocolo || demandaId;
-    if (!needsDemandas || demandas.length > 0) {
+    if (!needsDemandas) {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, demandas, setSearchParams]);
@@ -402,6 +416,10 @@ export default function Demandas() {
   const handleViewDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
     setIsViewDialogOpen(true);
+    // Atualizar URL com protocolo para link compartilhável
+    if (demanda.protocolo) {
+      setSearchParams({ protocolo: demanda.protocolo }, { replace: true });
+    }
   };
 
   const handleEditDemanda = (demanda: any) => {
@@ -1759,7 +1777,13 @@ export default function Demandas() {
           <ViewDemandaDialog
             demanda={selectedDemanda}
             open={isViewDialogOpen}
-            onOpenChange={setIsViewDialogOpen}
+            onOpenChange={(open) => {
+              setIsViewDialogOpen(open);
+              if (!open) {
+                // Limpar protocolo da URL ao fechar o modal
+                setSearchParams({}, { replace: true });
+              }
+            }}
             onEdit={handleEditFromView}
           />
         )}
