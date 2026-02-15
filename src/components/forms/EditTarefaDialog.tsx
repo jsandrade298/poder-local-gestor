@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Palette, Calendar } from "lucide-react";
+import { Palette, Calendar, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { logError } from "@/lib/errorUtils";
 
@@ -29,6 +29,13 @@ const cores = [
   { nome: "Cinza", valor: "#6B7280" }
 ];
 
+const opcoesLembrete = [
+  { dias: 1, label: "1 dia antes" },
+  { dias: 3, label: "3 dias antes" },
+  { dias: 5, label: "5 dias antes" },
+  { dias: 7, label: "7 dias antes" },
+];
+
 export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialogProps) {
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -37,7 +44,8 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
     prioridade: "media",
     posicao: "a_fazer",
     cor: "#3B82F6",
-    data_prazo: ""
+    data_prazo: "",
+    lembretes_prazo: [] as number[]
   });
 
   const queryClient = useQueryClient();
@@ -65,7 +73,8 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
         prioridade: tarefa.prioridade || "media",
         posicao: tarefa.kanban_position || "a_fazer",
         cor: tarefa.cor || "#3B82F6",
-        data_prazo: tarefa.data_prazo || ""
+        data_prazo: tarefa.data_prazo || "",
+        lembretes_prazo: Array.isArray(tarefa.lembretes_prazo) ? tarefa.lembretes_prazo : []
       });
 
       // Carregar colaboradores da tarefa
@@ -108,6 +117,7 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
           kanban_position: tarefaData.posicao,
           cor: tarefaData.cor,
           data_prazo: tarefaData.data_prazo || null,
+          lembretes_prazo: tarefaData.data_prazo && tarefaData.lembretes_prazo.length > 0 ? tarefaData.lembretes_prazo : [],
           completed: tarefaData.posicao === 'feito',
           completed_at: tarefaData.posicao === 'feito' ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
@@ -296,9 +306,43 @@ export function EditTarefaDialog({ tarefa, open, onOpenChange }: EditTarefaDialo
               id="data_prazo"
               type="date"
               value={formData.data_prazo}
-              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, data_prazo: e.target.value, lembretes_prazo: e.target.value ? formData.lembretes_prazo : [] })}
             />
           </div>
+
+          {/* Lembretes de prazo */}
+          {formData.data_prazo && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                <Bell className="h-4 w-4" />
+                Lembretes antes do prazo
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {opcoesLembrete.map((opcao) => (
+                  <div key={opcao.dias} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`lembrete-edit-${opcao.dias}`}
+                      checked={formData.lembretes_prazo.includes(opcao.dias)}
+                      onCheckedChange={(checked) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          lembretes_prazo: checked
+                            ? [...prev.lembretes_prazo, opcao.dias].sort((a, b) => b - a)
+                            : prev.lembretes_prazo.filter(d => d !== opcao.dias)
+                        }));
+                      }}
+                    />
+                    <Label htmlFor={`lembrete-edit-${opcao.dias}`} className="text-sm cursor-pointer">
+                      {opcao.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tarefas em atraso enviam lembrete diário automaticamente.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
