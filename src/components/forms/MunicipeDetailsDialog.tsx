@@ -14,7 +14,9 @@ import {
   Edit,
   Clock,
   ClipboardList,
-  ChevronRight
+  ChevronRight,
+  Instagram,
+  ExternalLink
 } from "lucide-react";
 import { formatDateOnly, formatDateTime } from "@/lib/dateUtils";
 import { MunicipeProntuarioTab } from "./MunicipeProntuarioTab";
@@ -174,7 +176,24 @@ export function MunicipeDetailsDialog({ municipe, open, onOpenChange }: Municipe
                               </span>
                             </div>
                           )}
-                          {!municipe.telefone && !municipe.email && (
+                          {municipe.instagram && (
+                            <div className="flex items-center gap-2">
+                              <Instagram className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">
+                                <strong>Instagram:</strong>{" "}
+                                <a
+                                  href={`https://instagram.com/${municipe.instagram.replace(/^@/, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline inline-flex items-center gap-1"
+                                >
+                                  {municipe.instagram.startsWith('@') ? municipe.instagram : `@${municipe.instagram}`}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </span>
+                            </div>
+                          )}
+                          {!municipe.telefone && !municipe.email && !municipe.instagram && (
                             <p className="text-sm text-muted-foreground">Nenhum contato cadastrado</p>
                           )}
                         </div>
