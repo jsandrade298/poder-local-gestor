@@ -1659,16 +1659,14 @@ export default function Municipes() {
                               <Eye className="h-4 w-4 mr-2" />
                               Ver detalhes
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.preventDefault();
+                            <DropdownMenuItem onClick={() => {
                               setMunicipeParaDemandas(municipe);
                               setShowDemandasDialog(true);
                             }}>
                               <FileText className="h-4 w-4 mr-2" />
                               Ver demandas
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.preventDefault();
+                            <DropdownMenuItem onClick={() => {
                               console.log('Editar clicado para:', municipe.nome);
                               setMunicipeToEdit(municipe);
                               setShowEditDialog(true);
@@ -1676,11 +1674,8 @@ export default function Municipes() {
                               <Edit className="h-4 w-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
+                            <DropdownMenuItem onClick={() => {
                               console.log('🗑️ Excluir clicado para:', municipe.nome);
-                              console.log('🔧 Definindo munícipe para exclusão e abrindo modal');
                               setMunicipeToDelete(municipe);
                               setShowDeleteDialog(true);
                             }}>
