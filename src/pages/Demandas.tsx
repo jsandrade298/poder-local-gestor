@@ -317,7 +317,7 @@ export default function Demandas() {
       } else {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const prazo = new Date(demanda.data_prazo);
+        const prazo = new Date(demanda.data_prazo + 'T00:00:00');
         const isOverdue = today > prazo;
         
         if (atrasoFilter === "overdue") {
