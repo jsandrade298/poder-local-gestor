@@ -44,6 +44,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     nome: "",
     telefone: "",
     email: "",
+    instagram: "",
     logradouro: "",
     numero: "",
     bairro: "",
@@ -63,6 +64,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         nome: municipe.nome || "",
         telefone: municipe.telefone || "",
         email: municipe.email || "",
+        instagram: municipe.instagram || "",
         logradouro: "",
         numero: "",
         bairro: municipe.bairro || "",
@@ -325,6 +327,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           nome: data.nome,
           telefone: data.telefone || null,
           email: data.email || null,
+          instagram: data.instagram || null,
           endereco: endereco || null,
           bairro: data.bairro || null,
           cidade: data.cidade,
@@ -477,6 +480,16 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                   placeholder="email@exemplo.com"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="instagram">Instagram</Label>
+              <Input
+                id="instagram"
+                value={formData.instagram}
+                onChange={(e) => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
+                placeholder="@usuario"
+              />
             </div>
 
             <div className="space-y-2">
