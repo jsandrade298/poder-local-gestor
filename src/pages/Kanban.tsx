@@ -588,7 +588,7 @@ export default function Kanban() {
     if (!dataPrazo) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const prazo = new Date(dataPrazo.includes('T') ? dataPrazo : dataPrazo + 'T12:00:00');
+    const prazo = new Date(dataPrazo.includes('T') ? dataPrazo : dataPrazo + 'T00:00:00');
     return today > prazo;
   };
 
