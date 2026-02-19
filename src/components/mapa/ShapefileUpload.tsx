@@ -266,6 +266,128 @@ function fixGeoJSONEncoding(geoData: any): any {
 }
 
 // ============================================
+// FIX ENCODING DE SHAPEFILES BRASILEIROS
+// ============================================
+
+/**
+ * CRC32 para ZIP
+ */
+function crc32(data: Uint8Array): number {
+  let crc = ~0;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+  }
+  return (~crc) >>> 0;
+}
+
+/**
+ * Injeta um arquivo .cpg com "ISO-8859-1" dentro do zip se não existir.
+ * Shapefiles brasileiros (IBGE, prefeituras) usam Latin-1 no .dbf,
+ * mas shpjs lê como UTF-8 por padrão, gerando caracteres como "V rzea".
+ * A presença do .cpg instrui o shpjs a usar o encoding correto.
+ */
+function ensureEncodingInZip(zipBuffer: ArrayBuffer): ArrayBuffer {
+  const bytes = new Uint8Array(zipBuffer);
+  const view = new DataView(zipBuffer);
+  
+  // Encontrar End of Central Directory (busca do final)
+  let eocdPos = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdPos = i;
+      break;
+    }
+  }
+  if (eocdPos === -1) return zipBuffer;
+  
+  const cdEntries = view.getUint16(eocdPos + 10, true);
+  const cdSize = view.getUint32(eocdPos + 12, true);
+  const cdOffset = view.getUint32(eocdPos + 16, true);
+  
+  // Varrer central directory para achar .cpg e nome base do .shp
+  let hasCpg = false;
+  let shpBaseName = '';
+  let pos = cdOffset;
+  const dec = new TextDecoder('ascii');
+  
+  for (let i = 0; i < cdEntries && pos < bytes.length; i++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break;
+    const nameLen = view.getUint16(pos + 28, true);
+    const extraLen = view.getUint16(pos + 30, true);
+    const commentLen = view.getUint16(pos + 32, true);
+    const name = dec.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+    
+    if (name.toLowerCase().endsWith('.cpg')) hasCpg = true;
+    if (name.toLowerCase().endsWith('.shp')) {
+      shpBaseName = name.replace(/\.shp$/i, '');
+    }
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+  
+  // Se já tem .cpg ou não encontrou .shp, retornar sem modificar
+  if (hasCpg || !shpBaseName) return zipBuffer;
+  
+  console.log('Injetando .cpg (ISO-8859-1) no zip para encoding correto...');
+  
+  // Montar novo arquivo .cpg
+  const enc = new TextEncoder();
+  const cpgFileName = enc.encode(shpBaseName + '.cpg');
+  const cpgData = enc.encode('ISO-8859-1');
+  const cpgCrc = crc32(cpgData);
+  
+  // Local file header para .cpg (30 + nome)
+  const localHeader = new Uint8Array(30 + cpgFileName.length);
+  const lhv = new DataView(localHeader.buffer);
+  lhv.setUint32(0, 0x04034b50, true);
+  lhv.setUint16(4, 20, true);
+  lhv.setUint32(14, cpgCrc, true);
+  lhv.setUint32(18, cpgData.length, true);
+  lhv.setUint32(22, cpgData.length, true);
+  lhv.setUint16(26, cpgFileName.length, true);
+  localHeader.set(cpgFileName, 30);
+  
+  const newLocalOffset = cdOffset; // inserir antes do CD original
+  
+  // Central directory entry para .cpg (46 + nome)
+  const cdEntry = new Uint8Array(46 + cpgFileName.length);
+  const cev = new DataView(cdEntry.buffer);
+  cev.setUint32(0, 0x02014b50, true);
+  cev.setUint16(4, 20, true);
+  cev.setUint16(6, 20, true);
+  cev.setUint32(16, cpgCrc, true);
+  cev.setUint32(20, cpgData.length, true);
+  cev.setUint32(24, cpgData.length, true);
+  cev.setUint16(28, cpgFileName.length, true);
+  cev.setUint32(42, newLocalOffset, true);
+  cdEntry.set(cpgFileName, 46);
+  
+  // Montar resultado: [local files originais][.cpg local+data][CD original][CD entry .cpg][novo EOCD]
+  const insertSize = localHeader.length + cpgData.length;
+  const newCdOffset = cdOffset + insertSize;
+  const newCdSize = cdSize + cdEntry.length;
+  
+  const newEocd = new Uint8Array(22);
+  const nev = new DataView(newEocd.buffer);
+  nev.setUint32(0, 0x06054b50, true);
+  nev.setUint16(8, cdEntries + 1, true);
+  nev.setUint16(10, cdEntries + 1, true);
+  nev.setUint32(12, newCdSize, true);
+  nev.setUint32(16, newCdOffset, true);
+  
+  const totalSize = cdOffset + insertSize + cdSize + cdEntry.length + 22;
+  const result = new Uint8Array(totalSize);
+  result.set(bytes.slice(0, cdOffset), 0);                           // local files originais
+  result.set(localHeader, cdOffset);                                  // .cpg local header
+  result.set(cpgData, cdOffset + localHeader.length);                 // .cpg conteúdo
+  result.set(bytes.slice(cdOffset, cdOffset + cdSize), newCdOffset);  // CD original
+  result.set(cdEntry, newCdOffset + cdSize);                          // CD entry do .cpg
+  result.set(newEocd, totalSize - 22);                                // novo EOCD
+  
+  return result.buffer;
+}
+
+// ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
 
@@ -343,7 +465,10 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
 
           const shp = (await import('shpjs')).default;
           const arrayBuffer = await file.arrayBuffer();
-          const geojson = await shp(arrayBuffer);
+          
+          // Injetar .cpg no zip se não existir (fix encoding Latin-1)
+          const processedBuffer = ensureEncodingInZip(arrayBuffer);
+          const geojson = await shp(processedBuffer);
           
           // Se retornou múltiplas camadas, pegar a primeira
           geoData = Array.isArray(geojson) ? geojson[0] : geojson;
@@ -486,8 +611,8 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           Importar Shapefile
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <MapIcon className="h-5 w-5" />
             Importar Camada Geográfica
@@ -497,7 +622,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-y-auto flex-1 min-h-0">
           {/* Upload de Arquivo */}
           <div className="space-y-2">
             <Label>Arquivo (.zip ou .geojson)</Label>
@@ -650,7 +775,7 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancelar
           </Button>
