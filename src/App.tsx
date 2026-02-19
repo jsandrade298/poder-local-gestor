@@ -35,7 +35,23 @@ import AdminNotificacoesWhatsApp from "./pages/AdminNotificacoesWhatsApp";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // ═══════════════════════════════════════════════════════════
+      // CRÍTICO: Desabilita refetch automático ao voltar para a aba.
+      // Sem isso, toda vez que o usuário troca de aba e volta,
+      // TODAS as queries refazem fetch, causando loading spinners
+      // e perda de estado nos formulários/dialogs abertos.
+      // ═══════════════════════════════════════════════════════════
+      refetchOnWindowFocus: false,
+      // Mantém dados em cache por 5 minutos
+      staleTime: 5 * 60 * 1000,
+      // Retry apenas 1 vez em caso de erro
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
