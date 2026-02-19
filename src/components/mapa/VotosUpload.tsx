@@ -385,7 +385,7 @@ export function VotosUpload({
 
         {/* ETAPA 1: Seleção de Camada */}
         {etapa === 'selecao' && (
-          <div className="flex-1 space-y-4 py-4">
+          <div className="flex-1 space-y-4 py-4 overflow-y-auto min-h-0">
             {/* Seletor de Camada */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export function VotosUpload({
 
         {/* ETAPA 2: Upload */}
         {etapa === 'upload' && (
-          <div className="flex-1 space-y-4 py-4 flex flex-col min-h-0">
+          <div className="flex-1 space-y-4 py-4 flex flex-col min-h-0 overflow-y-auto">
             {/* Info resumida */}
             <div className="flex items-center gap-4 text-sm">
               <Badge variant="outline" className="gap-1">
@@ -687,7 +687,7 @@ export function VotosUpload({
           </div>
         )}
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           {etapa === 'selecao' ? (
             <>
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
