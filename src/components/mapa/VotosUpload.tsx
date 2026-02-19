@@ -27,7 +27,6 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Vote, 
@@ -506,7 +505,7 @@ export function VotosUpload({
 
         {/* ETAPA 2: Upload */}
         {etapa === 'upload' && (
-          <div className="flex-1 space-y-4 py-4 px-1 flex flex-col min-h-0 overflow-y-auto">
+          <div className="flex-1 space-y-4 py-4 px-1 flex flex-col min-h-0">
             {/* Info resumida */}
             <div className="flex items-center gap-4 text-sm">
               <Badge variant="outline" className="gap-1">
@@ -596,9 +595,9 @@ export function VotosUpload({
 
             {/* Tabela de Preview */}
             {dadosPreview.length > 0 && (
-              <ScrollArea className="flex-1 border rounded-lg max-h-[40vh]">
+              <div className="flex-1 border rounded-lg min-h-0 overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="w-[35%]">Região (Planilha)</TableHead>
                       <TableHead className="w-[25%]">Match</TableHead>
@@ -671,7 +670,7 @@ export function VotosUpload({
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             )}
 
             {/* Dica */}
