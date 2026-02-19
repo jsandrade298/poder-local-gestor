@@ -45,10 +45,6 @@ const queryClient = new QueryClient({
       // e perda de estado nos formulários/dialogs abertos.
       // ═══════════════════════════════════════════════════════════
       refetchOnWindowFocus: false,
-      // Mantém dados em cache por 5 minutos
-      staleTime: 5 * 60 * 1000,
-      // Retry apenas 1 vez em caso de erro
-      retry: 1,
     },
   },
 });
