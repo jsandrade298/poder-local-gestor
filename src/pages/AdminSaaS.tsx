@@ -26,6 +26,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Building2,
   Users,
   FileText,
@@ -45,6 +56,8 @@ import {
   Wifi,
   WifiOff,
   Trash2,
+  KeyRound,
+  UserCog,
 } from "lucide-react";
 
 // ============================================================
@@ -91,6 +104,33 @@ interface TenantDetail {
   usuarios: any[];
   whatsapp_instances: any[];
   uso_mensal: any[];
+}
+
+// ============================================================
+// Helper: chamada autenticada a Edge Function
+// ============================================================
+
+async function callEdgeFunction(fnName: string, body: Record<string, any>) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Não autenticado");
+
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  const result = await response.json();
+  if (!response.ok || result.success === false) {
+    throw new Error(result.error || `Erro ao chamar ${fnName}`);
+  }
+  return result;
 }
 
 // ============================================================
@@ -181,7 +221,7 @@ function CriarTenantDialog({ onSuccess }: { onSuccess: () => void }) {
         <DialogHeader>
           <DialogTitle>Criar Novo Gabinete</DialogTitle>
           <DialogDescription>
-            Crie um novo tenant. Depois, crie o usuário admin no Supabase Auth e vincule ao tenant.
+            Crie um novo tenant. Depois, adicione usuários ao gabinete.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -296,30 +336,13 @@ function CriarUsuarioDialog({ tenantId, tenantNome, onSuccess }: { tenantId: str
 
   const criarMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Não autenticado");
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            email,
-            password: senha,
-            nome,
-            tenant_id: tenantId,
-            role_no_tenant: role,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Erro ao criar usuário");
-      return result;
+      return await callEdgeFunction("admin-create-user", {
+        email,
+        password: senha,
+        nome,
+        tenant_id: tenantId,
+        role_no_tenant: role,
+      });
     },
     onSuccess: () => {
       toast({ title: "Usuário criado!", description: `${email} adicionado ao gabinete.` });
@@ -380,7 +403,7 @@ function CriarUsuarioDialog({ tenantId, tenantNome, onSuccess }: { tenantId: str
           <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button
             onClick={() => criarMutation.mutate()}
-            disabled={!email || !senha || senha.length < 6 || criarMutation.isPending}
+            disabled={!email || !nome || !senha || senha.length < 6 || criarMutation.isPending}
           >
             {criarMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
             Criar Usuário
@@ -388,6 +411,224 @@ function CriarUsuarioDialog({ tenantId, tenantNome, onSuccess }: { tenantId: str
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================
+// Dialog: Editar usuário
+// ============================================================
+
+function EditarUsuarioDialog({ usuario, onSuccess }: { usuario: any; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [nome, setNome] = useState(usuario.nome || "");
+  const [email, setEmail] = useState(usuario.email || "");
+  const [cargo, setCargo] = useState(usuario.cargo || "");
+  const [role, setRole] = useState(usuario.role_no_tenant || "membro");
+  const { toast } = useToast();
+
+  const editarMutation = useMutation({
+    mutationFn: async () => {
+      return await callEdgeFunction("admin-update-user", {
+        user_id: usuario.id,
+        nome,
+        email,
+        cargo,
+        role_no_tenant: role,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Usuário atualizado!" });
+      setOpen(false);
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao atualizar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Reset form quando dialog abre
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setNome(usuario.nome || "");
+      setEmail(usuario.email || "");
+      setCargo(usuario.cargo || "");
+      setRole(usuario.role_no_tenant || "membro");
+    }
+    setOpen(isOpen);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Editar usuário">
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Usuário</DialogTitle>
+          <DialogDescription>Alterar dados de {usuario.nome || usuario.email}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Nome completo</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>E-mail</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Cargo</Label>
+            <Input placeholder="Ex: Assessor parlamentar" value={cargo} onChange={(e) => setCargo(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Papel no gabinete</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="membro">Membro</SelectItem>
+                <SelectItem value="visualizador">Visualizador</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button onClick={() => editarMutation.mutate()} disabled={!nome || !email || editarMutation.isPending}>
+            {editarMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// Dialog: Alterar senha do usuário
+// ============================================================
+
+function AlterarSenhaDialog({ usuario, onSuccess }: { usuario: any; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const { toast } = useToast();
+
+  const alterarMutation = useMutation({
+    mutationFn: async () => {
+      if (novaSenha !== confirmarSenha) throw new Error("As senhas não coincidem");
+      return await callEdgeFunction("admin-reset-password", {
+        user_id: usuario.id,
+        new_password: novaSenha,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Senha alterada!", description: `Nova senha definida para ${usuario.email}.` });
+      setOpen(false);
+      setNovaSenha("");
+      setConfirmarSenha("");
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao alterar senha", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) { setNovaSenha(""); setConfirmarSenha(""); } }}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Alterar senha">
+          <KeyRound className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Alterar Senha</DialogTitle>
+          <DialogDescription>
+            Definir nova senha para {usuario.nome || usuario.email}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Nova senha</Label>
+            <Input type="text" placeholder="Mínimo 6 caracteres" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Confirmar senha</Label>
+            <Input type="text" placeholder="Repita a senha" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
+          </div>
+          {novaSenha && confirmarSenha && novaSenha !== confirmarSenha && (
+            <p className="text-xs text-destructive">As senhas não coincidem.</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            onClick={() => alterarMutation.mutate()}
+            disabled={!novaSenha || novaSenha.length < 6 || novaSenha !== confirmarSenha || alterarMutation.isPending}
+          >
+            {alterarMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
+            Alterar Senha
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// Botão: Excluir usuário (com confirmação)
+// ============================================================
+
+function ExcluirUsuarioButton({ usuario, onSuccess }: { usuario: any; onSuccess: () => void }) {
+  const { toast } = useToast();
+
+  const excluirMutation = useMutation({
+    mutationFn: async () => {
+      return await callEdgeFunction("admin-delete-user", {
+        user_id: usuario.id,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Usuário excluído!", description: `${usuario.email} foi removido.` });
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Excluir usuário">
+          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir <strong>{usuario.nome || usuario.email}</strong>?
+            <br />
+            Esta ação é irreversível. O usuário será removido do sistema de autenticação e não poderá mais acessar a plataforma.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => excluirMutation.mutate()}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={excluirMutation.isPending}
+          >
+            {excluirMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -631,7 +872,10 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Usuários ({data.usuarios?.length || 0})</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Usuários ({data.usuarios?.length || 0})
+            </CardTitle>
             <CriarUsuarioDialog tenantId={tenantId} tenantNome={data.tenant?.nome || ""} onSuccess={refreshDetail} />
           </div>
         </CardHeader>
@@ -639,13 +883,30 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
           {data.usuarios && data.usuarios.length > 0 ? (
             <div className="space-y-2">
               {data.usuarios.map((u: any) => (
-                <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div><p className="text-sm font-medium">{u.nome || "—"}</p><p className="text-xs text-muted-foreground">{u.email}</p></div>
-                  <Badge variant="outline" className="text-xs">{u.role_no_tenant}</Badge>
+                <div key={u.id} className="flex items-center justify-between py-3 px-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{u.nome || "—"}</p>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{u.role_no_tenant}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{u.email}</p>
+                    {u.cargo && <p className="text-xs text-muted-foreground mt-0.5">{u.cargo}</p>}
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0 ml-2">
+                    <EditarUsuarioDialog usuario={u} onSuccess={refreshDetail} />
+                    <AlterarSenhaDialog usuario={u} onSuccess={refreshDetail} />
+                    <ExcluirUsuarioButton usuario={u} onSuccess={refreshDetail} />
+                  </div>
                 </div>
               ))}
             </div>
-          ) : <p className="text-sm text-muted-foreground">Nenhum usuário vinculado</p>}
+          ) : (
+            <div className="text-center py-6">
+              <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground mb-1">Nenhum usuário vinculado</p>
+              <p className="text-xs text-muted-foreground">Clique em "Adicionar Usuário" para criar o primeiro.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
