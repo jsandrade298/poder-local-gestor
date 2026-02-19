@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -50,8 +50,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const queryClient = useQueryClient();
 
-  const loadProfileAndTenant = async (userId: string) => {
-    setProfileLoading(true);
+  // ═══════════════════════════════════════════════════════════════════
+  // FIX: Controle para evitar que TOKEN_REFRESHED (ao voltar à aba)
+  // cause reload completo da página. Só mostramos loading na primeira
+  // vez que o perfil é carregado.
+  // ═══════════════════════════════════════════════════════════════════
+  const profileLoadedOnce = useRef(false);
+  const currentUserId = useRef<string | null>(null);
+
+  const loadProfileAndTenant = async (userId: string, showLoading = true) => {
+    // Só mostra loading se for a primeira vez ou se foi pedido explicitamente
+    if (showLoading && !profileLoadedOnce.current) {
+      setProfileLoading(true);
+    }
     try {
       // Buscar profile
       const { data: profileData, error: profileError } = await supabase
@@ -101,12 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsSuperAdmin(false);
     } finally {
       setProfileLoading(false);
+      profileLoadedOnce.current = true;
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
-      await loadProfileAndTenant(user.id);
+      await loadProfileAndTenant(user.id, false);
     }
   };
 
@@ -114,25 +126,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔐 Auth state change:', event, session?.user?.email);
+
+        // Atualizar session e user sempre
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (event === 'SIGNED_IN' && session?.user) {
-          setProfileLoading(true);
-          setTimeout(() => {
-            loadProfileAndTenant(session.user.id);
-          }, 0);
-          
-          console.log('🔄 Login detectado - invalidando cache de dados');
-          queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
-          queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
-          queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
-          queryClient.invalidateQueries({ queryKey: ['demandas'] });
-          queryClient.invalidateQueries({ queryKey: ['tags'] });
+          const isNewUser = currentUserId.current !== session.user.id;
+          currentUserId.current = session.user.id;
+
+          if (isNewUser) {
+            // ═══════════════════════════════════════════════════════
+            // Novo login real (user diferente): mostrar loading e
+            // invalidar cache
+            // ═══════════════════════════════════════════════════════
+            profileLoadedOnce.current = false;
+            setProfileLoading(true);
+            setTimeout(() => {
+              loadProfileAndTenant(session.user.id, true);
+            }, 0);
+
+            console.log('🔄 Login detectado - invalidando cache de dados');
+            queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+            queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
+            queryClient.invalidateQueries({ queryKey: ['demandas'] });
+            queryClient.invalidateQueries({ queryKey: ['tags'] });
+          } else if (!profileLoadedOnce.current) {
+            // Mesmo user, mas perfil ainda não carregou (primeira vez)
+            setTimeout(() => {
+              loadProfileAndTenant(session.user.id, true);
+            }, 0);
+          }
+          // Se mesmo user e perfil já carregou → NÃO FAZER NADA
+          // Isso evita o reload ao voltar para a aba
         }
-        
+
+        if (event === 'TOKEN_REFRESHED') {
+          // ═══════════════════════════════════════════════════════
+          // FIX: Token refreshed (típico ao voltar para a aba).
+          // NÃO resetar profileLoading. Apenas atualizar silenciosamente
+          // se necessário, sem causar re-render visual.
+          // ═══════════════════════════════════════════════════════
+          console.log('🔄 Token refreshed - mantendo estado atual');
+          // Opcionalmente, refresh silencioso do perfil (sem loading)
+          if (session?.user && profileLoadedOnce.current) {
+            // Não faz nada - mantém o estado como está
+          }
+        }
+
         if (event === 'SIGNED_OUT') {
           console.log('🧹 Logout detectado - limpando cache');
+          currentUserId.current = null;
+          profileLoadedOnce.current = false;
           setProfile(null);
           setTenant(null);
           setIsSuperAdmin(false);
@@ -147,13 +193,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        loadProfileAndTenant(session.user.id);
+        currentUserId.current = session.user.id;
+        loadProfileAndTenant(session.user.id, true);
       } else {
         setProfileLoading(false);
       }
-      
+
       setLoading(false);
     });
 
@@ -161,6 +208,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   const signIn = async (email: string, password: string) => {
+    // Reset para garantir loading correto no novo login
+    profileLoadedOnce.current = false;
+    currentUserId.current = null;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
@@ -180,6 +230,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.log('Erro no logout, limpando estado local:', error);
     } finally {
+      currentUserId.current = null;
+      profileLoadedOnce.current = false;
       setSession(null);
       setUser(null);
       setProfile(null);
