@@ -595,7 +595,7 @@ export function VotosUpload({
 
             {/* Tabela de Preview */}
             {dadosPreview.length > 0 && (
-              <div className="flex-1 border rounded-lg min-h-0 overflow-y-auto">
+              <div className="border rounded-lg overflow-y-auto max-h-[calc(85vh-380px)]">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
