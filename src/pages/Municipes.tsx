@@ -442,6 +442,8 @@ export default function Municipes() {
             if (municipe.cep) updateData.cep = municipe.cep;
             if (municipe.data_nascimento) updateData.data_nascimento = municipe.data_nascimento;
             if (municipe.observacoes) updateData.observacoes = municipe.observacoes;
+            if (municipe.instagram) updateData.instagram = municipe.instagram;
+            if (municipe.categoria_id) updateData.categoria_id = municipe.categoria_id;
             // Reset geocoding se endereço mudou
             if (endereco || municipe.bairro || municipe.cidade) {
               updateData.geocodificado = false;
@@ -490,12 +492,14 @@ export default function Municipes() {
                 nome: municipe.nome,
                 telefone: municipe.telefone || null,
                 email: municipe.email || null,
+                instagram: municipe.instagram || null,
                 endereco: endereco || null,
                 bairro: municipe.bairro || null,
                 cidade: municipe.cidade || 'São Paulo',
                 cep: municipe.cep || null,
                 data_nascimento: municipe.data_nascimento || null,
                 observacoes: municipe.observacoes || null,
+                categoria_id: municipe.categoria_id || null,
                 geocodificado: false
               })
               .select('id')
@@ -786,6 +790,7 @@ export default function Municipes() {
           nome: ['nome', 'nome completo', 'name'],
           telefone: ['telefone', 'phone', 'celular'],
           email: ['email', 'e-mail', 'mail'],
+          instagram: ['instagram', 'insta', '@'],
           logradouro: ['logradouro', 'endereco', 'endereço', 'address', 'rua'],
           numero: ['numero', 'número', 'number'],
           bairro: ['bairro', 'neighborhood'],
@@ -794,6 +799,7 @@ export default function Municipes() {
           complemento: ['complemento', 'complement'],
           data_nascimento: ['data_nascimento', 'data de nascimento', 'nascimento', 'birth_date'],
           observacoes: ['observacoes', 'observações', 'notes', 'obs'],
+          categoria: ['categoria', 'category', 'tipo'],
           tag: ['tag', 'tags', 'etiqueta', 'etiquetas']
         };
 
@@ -803,6 +809,13 @@ export default function Municipes() {
           .select('id, nome');
         
         const tagMap = new Map(existingTags?.map(tag => [tag.nome.toLowerCase(), tag.id]) || []);
+
+        // Buscar todas as categorias existentes para mapeamento
+        const { data: existingCategorias } = await supabase
+          .from('municipe_categorias')
+          .select('id, nome');
+        
+        const categoriaMap = new Map(existingCategorias?.map(cat => [cat.nome.toLowerCase(), cat.id]) || []);
         
         // Coletar todas as tags novas (não existem no sistema)
         const allNewTagNames = new Set<string>(); // nomes originais
@@ -876,6 +889,22 @@ export default function Municipes() {
                   if (tagIds.length > 0) {
                     municipe.tagIds = tagIds;
                   }
+                }
+              } else if (key === 'categoria') {
+                const catName = values[headerIndex]?.trim();
+                if (catName) {
+                  const catId = categoriaMap.get(catName.toLowerCase());
+                  if (catId) {
+                    municipe.categoria_id = catId;
+                  } else {
+                    console.warn(`⚠️ Categoria "${catName}" não encontrada no sistema`);
+                  }
+                }
+              } else if (key === 'instagram') {
+                const insta = values[headerIndex]?.trim();
+                if (insta) {
+                  // Normalizar: garantir que começa com @
+                  municipe.instagram = insta.startsWith('@') ? insta : `@${insta}`;
                 }
               } else {
                 municipe[key] = values[headerIndex];
