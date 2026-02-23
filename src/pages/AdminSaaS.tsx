@@ -587,7 +587,7 @@ function ExcluirUsuarioButton({ usuario, onSuccess }: { usuario: any; onSuccess:
 
   const excluirMutation = useMutation({
     mutationFn: async () => {
-      return await callEdgeFunction("admin-delete-user", {
+      return await callEdgeFunction("delete-user", {
         user_id: usuario.id,
       });
     },
