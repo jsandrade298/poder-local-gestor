@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Palette, Calendar, Bell } from "lucide-react";
+import { Plus, Palette, Calendar, Bell, User } from "lucide-react";
 import { toast } from "sonner";
 import { registrarHistorico } from "@/lib/kanbanHistoricoUtils";
 
@@ -37,6 +37,7 @@ const opcoesLembrete = [
 export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
   const [open, setOpen] = useState(false);
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
+  const [responsavelId, setResponsavelId] = useState<string>("");
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -93,7 +94,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           cor: tarefa.cor,
           data_prazo: tarefa.data_prazo || null,
           lembretes_prazo: tarefa.data_prazo && tarefa.lembretes_prazo.length > 0 ? tarefa.lembretes_prazo : [],
-          created_by: userId
+          created_by: userId,
+          responsavel_id: responsavelId || userId
         })
         .select()
         .single();
@@ -159,6 +161,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         lembretes_prazo: []
       });
       setColaboradoresSelecionados([]);
+      setResponsavelId("");
       setOpen(false);
     },
     onError: (error) => {
@@ -192,7 +195,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           Adicionar Tarefa
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
         </DialogHeader>
@@ -217,6 +220,28 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
               placeholder="Descreva a tarefa..."
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Responsável
+            </Label>
+            <Select
+              value={responsavelId}
+              onValueChange={(value) => setResponsavelId(value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o responsável..." />
+              </SelectTrigger>
+              <SelectContent>
+                {colaboradores.map((colaborador) => (
+                  <SelectItem key={colaborador.id} value={colaborador.id}>
+                    {colaborador.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
