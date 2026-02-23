@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
@@ -924,6 +924,20 @@ export default function Kanban() {
                                   </CardHeader>
                                   
                                   <CardContent className="pt-0 space-y-2">
+                                    {/* ── Badge de tipo ── */}
+                                    {item.tipo === 'tarefa' && (
+                                      <Badge variant="secondary" className="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 text-[10px]">
+                                        <ListTodo className="h-3 w-3 mr-1" />
+                                        Tarefa
+                                      </Badge>
+                                    )}
+                                    {item.tipo === 'demanda' && (
+                                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-[10px]">
+                                        <FileText className="h-3 w-3 mr-1" />
+                                        Demanda
+                                      </Badge>
+                                    )}
+
                                     {/* Descrição (demandas e tarefas) */}
                                     {item.tipo !== 'rota' && item.descricao && (
                                       <p className="text-xs text-muted-foreground line-clamp-2">
@@ -1002,11 +1016,11 @@ export default function Kanban() {
                                         
                                         {item.data_prazo && (
                                           <div className={`flex items-center gap-1 text-xs ${
-                                            isOverdue(item.data_prazo) ? 'text-destructive' : 'text-muted-foreground'
+                                            isOverdue(item.data_prazo) && item.kanban_position !== 'feito' ? 'text-destructive' : 'text-muted-foreground'
                                           }`}>
                                             <Calendar className="h-3 w-3" />
                                             {formatDateOnly(item.data_prazo)}
-                                            {isOverdue(item.data_prazo) && <AlertTriangle className="h-3 w-3 ml-1" />}
+                                            {isOverdue(item.data_prazo) && item.kanban_position !== 'feito' && <AlertTriangle className="h-3 w-3 ml-1" />}
                                           </div>
                                         )}
                                       </div>
