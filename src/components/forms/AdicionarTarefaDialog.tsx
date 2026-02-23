@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Palette, Calendar, Bell, User } from "lucide-react";
+import { Plus, Palette, Calendar, Bell, Trash2, CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 import { registrarHistorico } from "@/lib/kanbanHistoricoUtils";
 
@@ -34,10 +34,16 @@ const opcoesLembrete = [
   { dias: 7, label: "7 dias antes" },
 ];
 
+interface ChecklistItem {
+  id: string;
+  texto: string;
+}
+
 export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
   const [open, setOpen] = useState(false);
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
-  const [responsavelId, setResponsavelId] = useState<string>("");
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [novoItemTexto, setNovoItemTexto] = useState("");
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -64,10 +70,30 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
     }
   });
 
+  // ── Checklist local ──
+  const handleAddChecklistItem = () => {
+    const texto = novoItemTexto.trim();
+    if (!texto) return;
+    setChecklistItems(prev => [...prev, { id: crypto.randomUUID(), texto }]);
+    setNovoItemTexto("");
+  };
+
+  const handleRemoveChecklistItem = (id: string) => {
+    setChecklistItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleChecklistKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddChecklistItem();
+    }
+  };
+
   const createTarefaMutation = useMutation({
     mutationFn: async (tarefa: typeof formData) => {
       console.log("🔄 Criando tarefa - dados:", tarefa);
       console.log("🔄 Colaboradores selecionados:", colaboradoresSelecionados);
+      console.log("🔄 Checklist items:", checklistItems);
       
       // Obter usuário atual
       const { data: user } = await supabase.auth.getUser();
@@ -82,7 +108,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         .eq('id', userId)
         .single();
       
-      // Criar uma tarefa na nova tabela
+      // Criar tarefa
       const { data: novaTarefa, error: tarefaError } = await supabase
         .from('tarefas')
         .insert({
@@ -94,13 +120,30 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           cor: tarefa.cor,
           data_prazo: tarefa.data_prazo || null,
           lembretes_prazo: tarefa.data_prazo && tarefa.lembretes_prazo.length > 0 ? tarefa.lembretes_prazo : [],
-          created_by: userId,
-          responsavel_id: responsavelId || userId
+          created_by: userId
         })
         .select()
         .single();
 
       if (tarefaError) throw tarefaError;
+
+      // Inserir checklist items no banco
+      if (checklistItems.length > 0) {
+        const checklistData = checklistItems.map((item, index) => ({
+          tarefa_id: novaTarefa.id,
+          texto: item.texto,
+          ordem: index,
+          concluido: false
+        }));
+
+        const { error: checklistError } = await supabase
+          .from('tarefa_checklist_items')
+          .insert(checklistData);
+
+        if (checklistError) {
+          console.error('Erro ao criar checklist:', checklistError);
+        }
+      }
 
       // Adicionar colaboradores se houver algum selecionado
       if (colaboradoresSelecionados.length > 0) {
@@ -161,7 +204,8 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
         lembretes_prazo: []
       });
       setColaboradoresSelecionados([]);
-      setResponsavelId("");
+      setChecklistItems([]);
+      setNovoItemTexto("");
       setOpen(false);
     },
     onError: (error) => {
@@ -195,7 +239,7 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
           Adicionar Tarefa
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
         </DialogHeader>
@@ -220,28 +264,6 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
               placeholder="Descreva a tarefa..."
               rows={3}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Responsável
-            </Label>
-            <Select
-              value={responsavelId}
-              onValueChange={(value) => setResponsavelId(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o responsável..." />
-              </SelectTrigger>
-              <SelectContent>
-                {colaboradores.map((colaborador) => (
-                  <SelectItem key={colaborador.id} value={colaborador.id}>
-                    {colaborador.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -356,6 +378,64 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
             </div>
           )}
 
+          {/* ══════════════ Checklist ══════════════ */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Checklist
+              {checklistItems.length > 0 && (
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({checklistItems.length} {checklistItems.length === 1 ? 'item' : 'itens'})
+                </span>
+              )}
+            </Label>
+
+            {/* Lista de itens */}
+            {checklistItems.length > 0 && (
+              <div className="border rounded-md divide-y">
+                {checklistItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 px-3 py-2 group hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-xs text-muted-foreground w-5 text-center">{index + 1}</span>
+                    <span className="flex-1 text-sm">{item.texto}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100 h-7 w-7 p-0 text-muted-foreground hover:text-destructive transition-opacity"
+                      onClick={() => handleRemoveChecklistItem(item.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Adicionar novo item */}
+            <div className="flex items-center gap-2">
+              <Input
+                value={novoItemTexto}
+                onChange={(e) => setNovoItemTexto(e.target.value)}
+                onKeyDown={handleChecklistKeyDown}
+                placeholder="Adicionar item ao checklist..."
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddChecklistItem}
+                disabled={!novoItemTexto.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Cor do Card */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
