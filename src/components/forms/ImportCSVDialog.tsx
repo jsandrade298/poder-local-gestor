@@ -45,6 +45,7 @@ export function ImportCSVDialog({
       'nome',
       'telefone', 
       'email',
+      'instagram',
       'logradouro',
       'numero',
       'bairro',
@@ -53,6 +54,7 @@ export function ImportCSVDialog({
       'complemento',
       'data_nascimento',
       'observacoes',
+      'categoria',
       'tag'
     ];
 
@@ -61,6 +63,7 @@ export function ImportCSVDialog({
         'Maria da Silva Santos',
         '(11) 99999-1111',
         'maria.silva@email.com',
+        '@maria.silva',
         'Rua das Flores',
         '123',
         'Centro',
@@ -69,12 +72,14 @@ export function ImportCSVDialog({
         'Apt 45',
         '1985-05-15',
         'Munícipe cadastrada em 2024',
+        'Líder Comunitário',
         'Família, Idoso'
       ],
       [
         'José Santos Oliveira',
         '(11) 98888-2222',
         'jose.santos@email.com',
+        '@jose.oliveira',
         'Avenida Principal',
         '456',
         'Vila Nova',
@@ -83,12 +88,14 @@ export function ImportCSVDialog({
         '',
         '1978-12-03',
         'Comerciante local',
-         'Comerciante, Empresário'
+        'Empresário',
+        'Comerciante, Empresário'
        ],
        [
          'Ana Costa Silva',
          '(11) 97777-3333',
          'ana.costa@email.com',
+         '',
          'Rua São Paulo',
          '789',
          'Jardim Paulista',
@@ -97,6 +104,7 @@ export function ImportCSVDialog({
          'Casa',
          '1990-08-20',
          'Professora',
+         '',
          'Educação, Cultura'
       ]
     ];
@@ -449,6 +457,10 @@ export function ImportCSVDialog({
                         <span>email</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>instagram (ex: @usuario)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-blue-500" />
                         <span>logradouro</span>
                       </div>
@@ -480,6 +492,10 @@ export function ImportCSVDialog({
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span>observacoes</span>
                       </div>
+                      <div className="flex items-center gap-2 md:col-span-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>categoria (nome exato de uma categoria já cadastrada)</span>
+                      </div>
                        <div className="flex items-center gap-2 md:col-span-2">
                          <FileText className="h-4 w-4 text-muted-foreground" />
                          <span>tag (use vírgula para múltiplas tags: "Tag1, Tag2")</span>
@@ -500,6 +516,8 @@ export function ImportCSVDialog({
                   <p>• O campo <strong>nome</strong> é obrigatório - munícipes sem nome não serão importados</p>
                   <p>• Datas devem estar no formato DD/MM/AAAA (ex: 15/05/1985) ou DD/MM/AA (ex: 15/05/85)</p>
                   <p>• Se um campo estiver vazio, deixe a célula em branco</p>
+                  <p>• O campo <strong>instagram</strong> pode conter ou não o @ (ex: "@usuario" ou "usuario")</p>
+                  <p>• O campo <strong>categoria</strong> deve conter o nome exato de uma categoria já cadastrada no sistema</p>
                    <p>• O campo <strong>tag</strong> deve conter o nome exato de uma tag já cadastrada no sistema</p>
                    <p>• Para múltiplas tags, separe-as com vírgula: "Tag1, Tag2, Tag3"</p>
                    <p>• Exemplo de múltiplas tags: "Família, Idoso" ou "Empresário, Comércio"</p>
