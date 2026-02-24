@@ -51,7 +51,7 @@ export default function Demandas() {
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   
   // Estados para paginação
-  const [pageSize, setPageSize] = useState<number | "all">("all");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,26 +73,64 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter],
+    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo],
     queryFn: async () => {
-      // Se "Todas", buscar todas as demandas em lotes
+      // Construir query com filtros server-side
+      const buildQuery = () => {
+        let query = supabase
+          .from('demandas')
+          .select(`
+            *,
+            areas(nome),
+            municipes(nome)
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false });
+
+        // Filtros simples: delegar ao PostgreSQL
+        if (statusFilter !== "all") query = query.eq('status', statusFilter);
+        if (areaFilter !== "all") query = query.eq('area_id', areaFilter);
+        if (municipeFilter !== "all") query = query.eq('municipe_id', municipeFilter);
+        if (responsavelFilter !== "all") query = query.eq('responsavel_id', responsavelFilter);
+        if (cidadeFilter !== "all") query = query.eq('cidade', cidadeFilter);
+        if (bairroFilter !== "all") query = query.eq('bairro', bairroFilter);
+
+        // Filtro de atraso
+        if (atrasoFilter !== "all") {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const closedSlugs = ['atendido', 'devolvido', 'concluido', 'arquivado'];
+          query = query
+            .not('status', 'in', `(${closedSlugs.join(',')})`)
+            .not('data_prazo', 'is', null);
+          
+          if (atrasoFilter === "overdue") {
+            query = query.lt('data_prazo', todayStr);
+          } else if (["30", "60", "90"].includes(atrasoFilter)) {
+            const minDays = parseInt(atrasoFilter);
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - minDays);
+            query = query.lt('data_prazo', cutoffDate.toISOString().split('T')[0]);
+          }
+        }
+
+        // Filtro de período (data de criação)
+        if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
+        if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
+
+        // Busca por texto fica client-side (envolve join com municipes.nome)
+        // Os filtros estruturais acima já reduzem drasticamente o volume
+
+        return query;
+      };
+
       if (pageSize === "all") {
-        console.log('🔄 Demandas: Carregando todas as demandas em lotes...');
-        
+        // Buscar todas com filtros server-side (em lotes eficientes)
         const BATCH_SIZE = 1000;
         let allDemandas: any[] = [];
         let hasMore = true;
         let offset = 0;
         
         while (hasMore) {
-          const { data, error } = await supabase
-            .from('demandas')
-            .select(`
-              *,
-              areas(nome),
-              municipes(nome)
-            `)
-            .order('created_at', { ascending: false })
+          const { data, error } = await buildQuery()
             .range(offset, offset + BATCH_SIZE - 1);
           
           if (error) {
@@ -101,38 +139,23 @@ export default function Demandas() {
           }
           
           if (data && data.length > 0) {
-            allDemandas = [...allDemandas, ...data];
+            allDemandas.push(...data);
             offset += BATCH_SIZE;
-            
-            // Se retornou menos que o tamanho do lote, não há mais dados
             hasMore = data.length === BATCH_SIZE;
-            
-            console.log(`📦 Demandas: Lote carregado - ${data.length} demandas (total: ${allDemandas.length})`);
           } else {
             hasMore = false;
           }
         }
         
-        console.log(`✅ Demandas: ${allDemandas.length} demandas carregadas em lotes`);
         return { demandas: allDemandas, total: allDemandas.length };
       }
 
-      // Busca paginada normal
+      // Busca paginada normal com filtros
       const itemsPerPage = pageSize as number;
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
-      console.log(`🔄 Demandas: Carregando página ${currentPage} (${itemsPerPage} por página)`);
-
-      // Buscar com paginação
-      const { data, error, count } = await supabase
-        .from('demandas')
-        .select(`
-          *,
-          areas(nome),
-          municipes(nome)
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false })
+      const { data, error, count } = await buildQuery()
         .range(from, to);
       
       if (error) {
@@ -140,7 +163,6 @@ export default function Demandas() {
         throw error;
       }
       
-      console.log(`✅ Demandas: Página ${currentPage} carregada - ${data?.length || 0} demandas`);
       return { demandas: data || [], total: count || 0 };
     }
   });
@@ -295,68 +317,18 @@ export default function Demandas() {
     }
   };
 
+  // Busca por texto fica client-side (envolve titulo, protocolo e municipes.nome que é join)
+  // Os demais filtros já são server-side, então o volume aqui é pequeno
   const filteredDemandas = useMemo(() => {
-    return demandas.filter(demanda => {
-      const matchesSearch = debouncedSearchTerm === "" || 
-                           demanda.titulo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                           demanda.protocolo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                           demanda.municipes?.nome?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+    if (!debouncedSearchTerm) return demandas;
     
-    const matchesStatus = statusFilter === "all" || demanda.status === statusFilter;
-    const matchesArea = areaFilter === "all" || demanda.area_id === areaFilter;
-    const matchesMunicipe = municipeFilter === "all" || demanda.municipe_id === municipeFilter;
-    const matchesResponsavel = responsavelFilter === "all" || demanda.responsavel_id === responsavelFilter;
-    const matchesCidade = cidadeFilter === "all" || demanda.cidade === cidadeFilter;
-    const matchesBairro = bairroFilter === "all" || demanda.bairro === bairroFilter;
-
-    // Filtro de atraso
-    let matchesAtraso = true;
-    if (atrasoFilter !== "all") {
-      if (!demanda.data_prazo || ['atendido', 'devolvido', 'concluido', 'arquivado'].includes(demanda.status || '')) {
-        matchesAtraso = false;
-      } else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const prazo = new Date(demanda.data_prazo + 'T00:00:00');
-        const isOverdue = today > prazo;
-        
-        if (atrasoFilter === "overdue") {
-          matchesAtraso = isOverdue;
-        } else if (atrasoFilter === "30" || atrasoFilter === "60" || atrasoFilter === "90") {
-          if (!isOverdue) {
-            matchesAtraso = false;
-          } else {
-            const diasAtraso = Math.floor((today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24));
-            const minDays = parseInt(atrasoFilter);
-            matchesAtraso = diasAtraso >= minDays;
-          }
-        }
-      }
-    }
-
-    // Filtro de período (data de criação)
-    let matchesDateRange = true;
-    if (dateFrom || dateTo) {
-      const createdAt = demanda.created_at ? new Date(demanda.created_at) : null;
-      if (!createdAt) {
-        matchesDateRange = false;
-      } else {
-        if (dateFrom) {
-          const from = new Date(dateFrom);
-          from.setHours(0, 0, 0, 0);
-          if (createdAt < from) matchesDateRange = false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo);
-          to.setHours(23, 59, 59, 999);
-          if (createdAt > to) matchesDateRange = false;
-        }
-      }
-    }
-
-      return matchesSearch && matchesStatus && matchesArea && matchesMunicipe && matchesResponsavel && matchesCidade && matchesBairro && matchesAtraso && matchesDateRange;
+    const term = debouncedSearchTerm.toLowerCase();
+    return demandas.filter(demanda => {
+      return demanda.titulo?.toLowerCase().includes(term) ||
+             demanda.protocolo?.toLowerCase().includes(term) ||
+             demanda.municipes?.nome?.toLowerCase().includes(term);
     });
-  }, [demandas, debouncedSearchTerm, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo]);
+  }, [demandas, debouncedSearchTerm]);
 
   // Paginação para dados filtrados (quando pageSize !== "all")
   const paginatedDemandas = pageSize === "all" 
@@ -366,10 +338,10 @@ export default function Demandas() {
   // Calcular total de páginas
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
 
-  // Resetar página quando mudar filtros (exceto search)
+  // Resetar página quando mudar filtros ou pageSize
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo]);
+  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo, pageSize]);
 
 
   // Mutação para excluir demanda
