@@ -67,7 +67,7 @@ export default function Municipes() {
   const [pendingRawTagNames, setPendingRawTagNames] = useState<Map<string, string>>(new Map()); // lowercase -> original
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [itemsPerPage, setItemsPerPage] = useState(-1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
