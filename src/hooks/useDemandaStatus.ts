@@ -11,6 +11,7 @@ export interface DemandaStatus {
   ordem: number;
   ativo: boolean;
   notificar_municipe: boolean;
+  is_final: boolean;  // ← novo: indica que este status representa conclusão
   created_at: string;
   updated_at: string;
 }
@@ -18,7 +19,6 @@ export interface DemandaStatus {
 export function useDemandaStatus() {
   const queryClient = useQueryClient();
 
-  // Buscar todos os status ativos
   const { data: statusList = [], isLoading, error } = useQuery({
     queryKey: ['demanda-status'],
     queryFn: async () => {
@@ -27,14 +27,12 @@ export function useDemandaStatus() {
         .select('*')
         .eq('ativo', true)
         .order('ordem', { ascending: true });
-      
       if (error) throw error;
       return data as DemandaStatus[];
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos de cache
+    staleTime: 1000 * 60 * 5,
   });
 
-  // Buscar todos os status (incluindo inativos) - para configuração
   const { data: allStatusList = [], isLoading: isLoadingAll } = useQuery({
     queryKey: ['demanda-status-all'],
     queryFn: async () => {
@@ -42,19 +40,18 @@ export function useDemandaStatus() {
         .from('demanda_status')
         .select('*')
         .order('ordem', { ascending: true });
-      
       if (error) throw error;
       return data as DemandaStatus[];
     },
     staleTime: 1000 * 60 * 5,
   });
 
-  // Criar novo status
+  // Slugs que representam conclusão (derivados dos dados reais — sem hard-code)
+  const finalSlugs = statusList.filter(s => s.is_final).map(s => s.slug);
+
   const createStatus = useMutation({
     mutationFn: async (newStatus: Partial<DemandaStatus>) => {
-      // Obter a maior ordem atual
       const maxOrdem = Math.max(...allStatusList.map(s => s.ordem), 0);
-      
       const { data, error } = await supabase
         .from('demanda_status')
         .insert({
@@ -65,10 +62,10 @@ export function useDemandaStatus() {
           ordem: newStatus.ordem ?? maxOrdem + 1,
           ativo: newStatus.ativo ?? true,
           notificar_municipe: newStatus.notificar_municipe ?? false,
+          is_final: newStatus.is_final ?? false,
         })
         .select()
         .single();
-      
       if (error) throw error;
       return data;
     },
@@ -78,27 +75,19 @@ export function useDemandaStatus() {
       queryClient.invalidateQueries({ queryKey: ['demanda-status-all'] });
     },
     onError: (error: any) => {
-      if (error.code === '23505') {
-        toast.error('Já existe um status com este identificador');
-      } else {
-        toast.error('Erro ao criar status: ' + error.message);
-      }
+      if (error.code === '23505') toast.error('Já existe um status com este identificador');
+      else toast.error('Erro ao criar status: ' + error.message);
     },
   });
 
-  // Atualizar status
   const updateStatus = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<DemandaStatus> & { id: string }) => {
       const { data, error } = await supabase
         .from('demanda_status')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
-      
       if (error) throw error;
       return data;
     },
@@ -107,32 +96,22 @@ export function useDemandaStatus() {
       queryClient.invalidateQueries({ queryKey: ['demanda-status'] });
       queryClient.invalidateQueries({ queryKey: ['demanda-status-all'] });
     },
-    onError: (error: any) => {
-      toast.error('Erro ao atualizar status: ' + error.message);
-    },
+    onError: (error: any) => toast.error('Erro ao atualizar status: ' + error.message),
   });
 
-  // Deletar status
   const deleteStatus = useMutation({
     mutationFn: async (id: string) => {
-      // Verificar se existem demandas com este status
       const status = allStatusList.find(s => s.id === id);
       if (status) {
         const { count } = await supabase
           .from('demandas')
           .select('*', { count: 'exact', head: true })
           .eq('status', status.slug);
-        
         if (count && count > 0) {
           throw new Error(`Existem ${count} demanda(s) com este status. Altere o status dessas demandas antes de excluir.`);
         }
       }
-
-      const { error } = await supabase
-        .from('demanda_status')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from('demanda_status').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -140,25 +119,16 @@ export function useDemandaStatus() {
       queryClient.invalidateQueries({ queryKey: ['demanda-status'] });
       queryClient.invalidateQueries({ queryKey: ['demanda-status-all'] });
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Erro ao excluir status');
-    },
+    onError: (error: any) => toast.error(error.message || 'Erro ao excluir status'),
   });
 
-  // Reordenar status
   const reorderStatus = useMutation({
     mutationFn: async (orderedIds: string[]) => {
-      const updates = orderedIds.map((id, index) => ({
-        id,
-        ordem: index + 1,
-      }));
-
-      for (const update of updates) {
+      for (const [index, id] of orderedIds.entries()) {
         const { error } = await supabase
           .from('demanda_status')
-          .update({ ordem: update.ordem })
-          .eq('id', update.id);
-        
+          .update({ ordem: index + 1 })
+          .eq('id', id);
         if (error) throw error;
       }
     },
@@ -167,59 +137,21 @@ export function useDemandaStatus() {
       queryClient.invalidateQueries({ queryKey: ['demanda-status'] });
       queryClient.invalidateQueries({ queryKey: ['demanda-status-all'] });
     },
-    onError: (error: any) => {
-      toast.error('Erro ao reordenar status: ' + error.message);
-    },
+    onError: (error: any) => toast.error('Erro ao reordenar status: ' + error.message),
   });
 
-  // Funções auxiliares
-  const getStatusBySlug = (slug: string): DemandaStatus | undefined => {
-    return statusList.find(s => s.slug === slug);
-  };
+  const getStatusBySlug = (slug: string) => statusList.find(s => s.slug === slug);
+  const getStatusLabel = (slug: string) => getStatusBySlug(slug)?.nome || slug;
+  const getStatusColor = (slug: string) => getStatusBySlug(slug)?.cor || '#6b7280';
+  const shouldNotify = (slug: string) => getStatusBySlug(slug)?.notificar_municipe ?? false;
+  const isFinal = (slug: string) => getStatusBySlug(slug)?.is_final ?? false;
 
-  const getStatusLabel = (slug: string): string => {
-    const status = getStatusBySlug(slug);
-    return status?.nome || slug;
-  };
-
-  const getStatusColor = (slug: string): string => {
-    const status = getStatusBySlug(slug);
-    return status?.cor || '#6b7280';
-  };
-
-  const shouldNotify = (slug: string): boolean => {
-    const status = getStatusBySlug(slug);
-    return status?.notificar_municipe ?? false;
-  };
-
-  // Opções para Select components
-  const statusOptions = statusList.map(s => ({
-    value: s.slug,
-    label: s.nome,
-    cor: s.cor,
-  }));
+  const statusOptions = statusList.map(s => ({ value: s.slug, label: s.nome, cor: s.cor }));
 
   return {
-    // Data
-    statusList,
-    allStatusList,
-    statusOptions,
-    
-    // Loading states
-    isLoading,
-    isLoadingAll,
-    error,
-    
-    // Mutations
-    createStatus,
-    updateStatus,
-    deleteStatus,
-    reorderStatus,
-    
-    // Helpers
-    getStatusBySlug,
-    getStatusLabel,
-    getStatusColor,
-    shouldNotify,
+    statusList, allStatusList, statusOptions, finalSlugs,
+    isLoading, isLoadingAll, error,
+    createStatus, updateStatus, deleteStatus, reorderStatus,
+    getStatusBySlug, getStatusLabel, getStatusColor, shouldNotify, isFinal,
   };
 }
