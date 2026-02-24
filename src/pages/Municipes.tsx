@@ -67,27 +67,19 @@ export default function Municipes() {
   const [pendingRawTagNames, setPendingRawTagNames] = useState<Map<string, string>>(new Map()); // lowercase -> original
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
 
-  // Buscar munícipes com suas tags - SEM LIMITE
-  const { data: municipes = [], isLoading } = useQuery({
-    queryKey: ['municipes-complete'], // Chave única para esta query complexa
+  // Buscar munícipes com filtros server-side e paginação
+  const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
+    queryKey: ['municipes-complete', bairroFilter, cidadeFilter, itemsPerPage, currentPage],
     queryFn: async () => {
-      console.log('🔄 Iniciando busca de munícipes...');
-      
-      // Usar o mesmo sistema de lotes que funcionou no dashboard
-      let allMunicipes: any[] = [];
-      let from = 0;
-      const size = 1000; // Buscar em lotes de 1000
-      let hasMore = true;
-      let totalExpected = 0;
-      
-      while (hasMore) {
-        const { data, error, count } = await supabase
+      // Construir query base com filtros server-side
+      const buildQuery = () => {
+        let query = supabase
           .from('municipes')
           .select(`
             *,
@@ -99,60 +91,97 @@ export default function Municipes() {
               )
             )
           `, { count: 'exact' })
-          .order('nome')
-          .range(from, from + size - 1);
-        
-        if (error) {
-          console.error('❌ Erro ao buscar munícipes:', error);
-          throw error;
-        }
-        
-        // Armazenar total esperado na primeira iteração
-        if (from === 0 && count !== null) {
-          totalExpected = count;
-          console.log(`📈 Munícipes: Total esperado no banco: ${totalExpected}`);
-        }
-        
-        if (data && data.length > 0) {
-          allMunicipes = [...allMunicipes, ...data];
-          console.log(`📊 Munícipes: Lote ${Math.floor(from/size) + 1}: ${data.length} munícipes (${from + 1} a ${from + data.length})`);
-          
-          // Se retornou menos que o tamanho do lote, chegamos ao fim
-          if (data.length < size) {
-            hasMore = false;
-          } else {
-            from += size;
+          .order('nome');
+
+        // Filtros server-side
+        if (bairroFilter !== "all") query = query.ilike('bairro', bairroFilter);
+        if (cidadeFilter !== "all") query = query.ilike('cidade', cidadeFilter);
+
+        return query;
+      };
+
+      if (itemsPerPage === -1) {
+        // "Mostrar todos" — buscar em lotes com filtros server-side
+        const BATCH_SIZE = 1000;
+        let allMunicipes: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        let totalExpected = 0;
+
+        while (hasMore) {
+          const { data, error, count } = await buildQuery()
+            .range(from, from + BATCH_SIZE - 1);
+
+          if (error) {
+            console.error('❌ Erro ao buscar munícipes:', error);
+            throw error;
           }
-        } else {
-          hasMore = false;
+
+          if (from === 0 && count !== null) totalExpected = count;
+
+          if (data && data.length > 0) {
+            allMunicipes.push(...data);
+            if (data.length < BATCH_SIZE) {
+              hasMore = false;
+            } else {
+              from += BATCH_SIZE;
+            }
+          } else {
+            hasMore = false;
+          }
+
+          if (totalExpected > 0 && allMunicipes.length >= totalExpected) hasMore = false;
+          if (from > 50000) hasMore = false;
         }
-        
-        // Verificação de segurança: se já temos o total esperado, parar
-        if (totalExpected > 0 && allMunicipes.length >= totalExpected) {
-          hasMore = false;
-        }
-        
-        // Verificação de segurança: evitar loop infinito
-        if (from > 50000) {
-          console.warn('⚠️ Limite de segurança atingido');
-          hasMore = false;
-        }
+
+        return { municipes: allMunicipes, total: allMunicipes.length };
       }
-      
-      console.log(`✅ Munícipes: Total final carregado: ${allMunicipes.length} munícipes (esperado: ${totalExpected})`);
-      
-      // Verificar se carregamos todos os registros esperados
-      if (totalExpected > 0 && allMunicipes.length < totalExpected) {
-        console.warn(`⚠️ ATENÇÃO: Carregados ${allMunicipes.length} de ${totalExpected} munícipes`);
+
+      // Busca paginada
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+
+      const { data, error, count } = await buildQuery()
+        .range(from, to);
+
+      if (error) {
+        console.error('❌ Erro ao buscar munícipes:', error);
+        throw error;
       }
-      
-      return allMunicipes;
+
+      return { municipes: data || [], total: count || 0 };
     },
-    staleTime: 5 * 60 * 1000, // Cache válido por 5 minutos
-    refetchOnMount: false, // Não refetch automático no mount
-    refetchOnWindowFocus: false, // Não refetch no foco
-    refetchOnReconnect: true // Apenas refetch na reconexão
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true
   });
+
+  const municipes = municipesPaginado.municipes;
+
+  // Helper: buscar todos os munícipes (para operações que precisam do conjunto completo)
+  const fetchAllMunicipesForComparison = async () => {
+    const BATCH = 1000;
+    let all: any[] = [];
+    let from = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('id, nome, telefone, email, bairro, cidade')
+        .order('nome')
+        .range(from, from + BATCH - 1);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        all.push(...data);
+        from += BATCH;
+        hasMore = data.length === BATCH;
+      } else {
+        hasMore = false;
+      }
+    }
+    return all;
+  };
 
   // Buscar contagem de demandas por munícipe e status (leve: só IDs e status)
   const { data: demandasData = { countMap: new Map(), statusMap: new Map() } } = useQuery({
@@ -228,6 +257,8 @@ export default function Municipes() {
     }
   });
 
+  // Client-side filters (search, tag, demanda — estes envolvem joins ou dados cruzados)
+  // Bairro e cidade já são filtrados server-side
   const filteredMunicipes = municipes.filter(municipe => {
     const matchesSearch = !searchTerm || 
       municipe.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,12 +267,6 @@ export default function Municipes() {
     
     const matchesTag = tagFilter === "all" || 
       (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => mt.tags?.id === tagFilter));
-    
-    const matchesBairro = bairroFilter === "all" || 
-      municipe.bairro?.toLowerCase() === bairroFilter.toLowerCase();
-
-    const matchesCidade = cidadeFilter === "all" ||
-      municipe.cidade?.toLowerCase() === cidadeFilter.toLowerCase();
 
     // Filtro de demandas
     const demandaCount = demandasCountMap.get(municipe.id) || 0;
@@ -259,15 +284,20 @@ export default function Municipes() {
       matchesDemandaStatus = !!municipeStatuses && municipeStatuses.has(demandaStatusFilter);
     }
     
-    return matchesSearch && matchesTag && matchesBairro && matchesCidade && matchesDemanda && matchesDemandaStatus;
+    return matchesSearch && matchesTag && matchesDemanda && matchesDemandaStatus;
   });
 
-  // Calcular paginação
-  const totalItems = filteredMunicipes.length;
+  // Paginação — quando server-side (sem filtros client-side ativos), usar total do server
+  // Quando há filtros client-side, usar o total filtrado
+  const hasClientFilters = searchTerm || tagFilter !== "all" || demandaFilter !== "all" || demandaStatusFilter !== "all";
+  const totalItems = hasClientFilters ? filteredMunicipes.length : municipesPaginado.total;
   const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
-  const startIndex = itemsPerPage === -1 ? 0 : (currentPage - 1) * itemsPerPage;
-  const endIndex = itemsPerPage === -1 ? totalItems : startIndex + itemsPerPage;
-  const paginatedMunicipes = itemsPerPage === -1 ? filteredMunicipes : filteredMunicipes.slice(startIndex, endIndex);
+  // Quando paginação é server-side e sem filtros client-side, não precisa fatiar
+  const paginatedMunicipes = itemsPerPage === -1 
+    ? filteredMunicipes 
+    : hasClientFilters 
+      ? filteredMunicipes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+      : filteredMunicipes; // Já veio paginado do servidor
 
   // Reset da página quando filtros mudam
   const resetPage = () => {
@@ -647,16 +677,19 @@ export default function Municipes() {
   };
 
   // Checar duplicados e decidir próximo passo
-  const checkDuplicatesAndProceed = (municipesToCheck: any[], tagMap: Map<string, string>) => {
+  const checkDuplicatesAndProceed = async (municipesToCheck: any[], tagMap: Map<string, string>) => {
     // Buscar duplicados por telefone
     const duplicates: DuplicateMatch[] = [];
+    
+    // Buscar todos os munícipes para comparação completa
+    const allExisting = await fetchAllMunicipesForComparison();
     
     municipesToCheck.forEach((csvMunicipe, index) => {
       if (csvMunicipe.telefone && csvMunicipe.telefone.trim() !== '') {
         const csvPhone = cleanPhoneNumber(csvMunicipe.telefone);
         if (csvPhone.length >= 10) {
           // Procurar nos munícipes existentes do banco
-          const existing = municipes.find(m => {
+          const existing = allExisting.find(m => {
             if (!m.telefone) return false;
             return cleanPhoneNumber(m.telefone) === csvPhone;
           });
@@ -958,11 +991,15 @@ export default function Municipes() {
   };
 
   // Função para detectar duplicados por telefone
-  const findDuplicates = () => {
+  const findDuplicates = async () => {
     const phoneGroups: { [key: string]: any[] } = {};
     
+    // Buscar todos os munícipes para comparação completa
+    toast({ title: "Buscando munícipes...", description: "Analisando dados para encontrar duplicados." });
+    const allMunicipes = await fetchAllMunicipesForComparison();
+    
     // Agrupar munícipes por telefone (ignorar null/empty)
-    municipes.forEach(municipe => {
+    allMunicipes.forEach(municipe => {
       if (municipe.telefone && municipe.telefone.trim() !== '') {
         const cleanPhone = municipe.telefone.replace(/\D/g, ''); // Remove caracteres não numéricos
         if (cleanPhone.length >= 10) { // Apenas telefones válidos
@@ -1094,7 +1131,7 @@ export default function Municipes() {
         }
         
         if (batchData) {
-          allMunicipesList = [...allMunicipesList, ...batchData];
+          allMunicipesList.push(...batchData);
         }
       }
 
@@ -1497,7 +1534,7 @@ export default function Municipes() {
               <div className="flex items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Total de Munícipes</p>
-                  <p className="text-2xl font-bold text-foreground">{municipes.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{municipesPaginado.total}</p>
                 </div>
               </div>
             </CardContent>
@@ -1545,7 +1582,7 @@ export default function Municipes() {
                   {isLoading ? 'Carregando...' : 
                     itemsPerPage === -1 ? 
                       `${filteredMunicipes.length} munícipes` :
-                      `${startIndex + 1}-${Math.min(endIndex, totalItems)} de ${totalItems} munícipes`
+                      `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} de ${totalItems} munícipes`
                   }
                 </span>
               </div>
