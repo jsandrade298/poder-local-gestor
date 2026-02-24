@@ -229,7 +229,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+        <div className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 flex-shrink-0">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <div className="p-2 bg-blue-500 rounded-lg">
@@ -266,7 +266,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
         </div>
 
         {/* Toolbar */}
-        <div className="px-6 py-3 border-b flex items-center gap-3 bg-muted/30">
+        <div className="px-6 py-3 border-b flex items-center gap-3 bg-muted/30 flex-shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -283,7 +283,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
         </div>
 
         {/* Content */}
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
@@ -567,7 +567,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
               })}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
