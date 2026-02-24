@@ -108,7 +108,7 @@ export function ConfiguracoesAvancadasDialog({ children }: ConfiguracoesAvancada
         const { error } = await supabase
           .from('configuracoes')
           .upsert(entry, { 
-            onConflict: 'chave',
+            onConflict: 'tenant_id,chave',
             ignoreDuplicates: false 
           });
         
