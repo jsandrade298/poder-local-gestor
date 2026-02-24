@@ -4,56 +4,99 @@ import { logError } from "@/lib/errorUtils";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
+const CLOSED_SLUGS = ["atendido", "devolvido", "concluido", "arquivado"];
+
 export function useDashboardData() {
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
-  // ── Demandas (batch load) ──
-  const { data: demandas = [], isLoading: isLoadingDemandas } = useQuery({
-    queryKey: ["demandas-dashboard"],
+  const todayStr = new Date().toISOString().split("T")[0]; // "2026-02-24"
+
+  // ── KPIs via count (head: true = sem dados, só contagem) ──
+  const { data: kpiData, isLoading: isLoadingKpis } = useQuery({
+    queryKey: ["dashboard-kpis", todayStr],
     queryFn: async () => {
-      const BATCH = 1000;
-      let all: any[] = [];
-      let offset = 0;
-      let total = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const { data, error, count } = await supabase
-          .from("demandas")
-          .select("*, areas(nome), municipes(nome)", { count: "exact" })
-          .order("created_at", { ascending: false })
-          .range(offset, offset + BATCH - 1);
-        if (error) {
-          logError("Dashboard demandas:", error);
-          throw error;
-        }
-        if (offset === 0 && count !== null) total = count;
-        if (data && data.length > 0) {
-          all = [...all, ...data];
-          offset += BATCH;
-          hasMore = data.length === BATCH;
-        } else hasMore = false;
-        if (total > 0 && all.length >= total) hasMore = false;
-      }
-      return all;
+      const [totalRes, abertasRes, atrasoRes, atendidasRes, municRes] =
+        await Promise.all([
+          // Total de demandas
+          supabase
+            .from("demandas")
+            .select("id", { count: "exact", head: true }),
+          // Abertas (não concluídas)
+          supabase
+            .from("demandas")
+            .select("id", { count: "exact", head: true })
+            .not("status", "in", `(${CLOSED_SLUGS.join(",")})`),
+          // Em atraso (prazo vencido + aberta)
+          supabase
+            .from("demandas")
+            .select("id", { count: "exact", head: true })
+            .lt("data_prazo", todayStr)
+            .not("status", "in", `(${CLOSED_SLUGS.join(",")})`),
+          // Atendidas
+          supabase
+            .from("demandas")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "atendido"),
+          // Munícipes
+          supabase
+            .from("municipes")
+            .select("id", { count: "exact", head: true }),
+        ]);
+
+      const total = totalRes.count || 0;
+      const atendidas = atendidasRes.count || 0;
+
+      return {
+        totalDemandas: total,
+        demandasAbertas: abertasRes.count || 0,
+        demandasEmAtraso: atrasoRes.count || 0,
+        totalMunicipes: municRes.count || 0,
+        taxaConclusao:
+          total > 0 ? Math.round((atendidas / total) * 100) : 0,
+      };
     },
     retry: 2,
     staleTime: 30000,
   });
 
-  // ── Munícipes (count only - lightweight) ──
-  const { data: totalMunicipes = 0, isLoading: isLoadingMunicipes } = useQuery({
-    queryKey: ["municipes-dashboard-count"],
+  // ── Dados leves para gráficos (só campos necessários) ──
+  const { data: chartDemandas = [], isLoading: isLoadingCharts } = useQuery({
+    queryKey: ["dashboard-chart-data"],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from("municipes")
-        .select("id", { count: "exact", head: true });
+      // Buscar apenas status, humor e área — sem *, sem joins pesados
+      const { data, error } = await supabase
+        .from("demandas")
+        .select("status, humor, area_id, areas(nome)");
+
       if (error) {
-        logError("Dashboard municipes count:", error);
+        logError("Dashboard chart data:", error);
         throw error;
       }
-      return count || 0;
+      return data || [];
     },
-    staleTime: 60000,
+    retry: 2,
+    staleTime: 30000,
+  });
+
+  // ── Demandas em atraso detalhadas (só as atrasadas) ──
+  const { data: overdueData = [], isLoading: isLoadingOverdue } = useQuery({
+    queryKey: ["dashboard-overdue", todayStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("demandas")
+        .select("id, titulo, protocolo, status, data_prazo, bairro, cidade, areas(nome)")
+        .lt("data_prazo", todayStr)
+        .not("status", "in", `(${CLOSED_SLUGS.join(",")})`)
+        .order("data_prazo", { ascending: true });
+
+      if (error) {
+        logError("Dashboard overdue:", error);
+        throw error;
+      }
+      return data || [];
+    },
+    retry: 2,
+    staleTime: 30000,
   });
 
   // ── Projetos & Planilhas ──
@@ -70,29 +113,16 @@ export function useDashboardData() {
   });
 
   // ═══════════════════════════════════════════
-  //  COMPUTED METRICS
+  //  COMPUTED METRICS (a partir de dados leves)
   // ═══════════════════════════════════════════
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  const totalDemandas = demandas.length;
-
-  // Demandas abertas = não concluídas
-  const closedSlugs = ["atendido", "devolvido", "concluido", "arquivado"];
-  const demandasAbertas = demandas.filter(
-    (d) => !closedSlugs.includes(d.status || "")
-  ).length;
-
-  const demandasAtendidas = demandas.filter((d) => d.status === "atendido").length;
-  const taxaConclusao =
-    totalDemandas > 0 ? Math.round((demandasAtendidas / totalDemandas) * 100) : 0;
-
-  // ── Demandas em atraso ──
-  const demandasComAtraso = demandas.filter((d) => {
-    if (!d.data_prazo || closedSlugs.includes(d.status || "")) return false;
-    return today > new Date(d.data_prazo + 'T00:00:00');
-  });
-  const demandasEmAtraso = demandasComAtraso.length;
+  const kpis = kpiData || {
+    totalDemandas: 0,
+    demandasAbertas: 0,
+    demandasEmAtraso: 0,
+    totalMunicipes: 0,
+    taxaConclusao: 0,
+  };
 
   // ── Humorômetro ──
   const humorValues: Record<string, number> = {
@@ -110,15 +140,16 @@ export function useDashboardData() {
     muito_satisfeito: "😍",
   };
 
-  const demandasComHumor = demandas.filter((d) => d.humor && humorValues[d.humor]);
+  const demandasComHumor = chartDemandas.filter(
+    (d: any) => d.humor && humorValues[d.humor]
+  );
   const humorTotal = demandasComHumor.reduce(
-    (sum, d) => sum + (humorValues[d.humor] || 0),
+    (sum: number, d: any) => sum + (humorValues[d.humor] || 0),
     0
   );
   const humorMedia =
     demandasComHumor.length > 0 ? humorTotal / demandasComHumor.length : 0;
 
-  // Map average to closest emoji
   let humorMediaSlug = "neutro";
   if (humorMedia > 0) {
     if (humorMedia <= 1.5) humorMediaSlug = "muito_insatisfeito";
@@ -128,33 +159,34 @@ export function useDashboardData() {
     else humorMediaSlug = "muito_satisfeito";
   }
 
-  // Count per humor level
   const humorDistribuicao = Object.entries(humorValues).map(([slug, _]) => ({
     slug,
     emoji: humorEmojis[slug],
-    count: demandas.filter((d) => d.humor === slug).length,
+    count: chartDemandas.filter((d: any) => d.humor === slug).length,
   }));
 
   // ── Demandas por Status (donut chart) ──
   const statusCountMap: Record<string, number> = {};
-  demandas.forEach((d) => {
+  chartDemandas.forEach((d: any) => {
     const s = d.status || "solicitada";
     statusCountMap[s] = (statusCountMap[s] || 0) + 1;
   });
 
+  const totalForPercent = chartDemandas.length;
   const demandasPorStatus = Object.entries(statusCountMap)
     .map(([slug, count]) => ({
       name: getStatusLabel(slug),
       slug,
       value: count,
-      percent: totalDemandas > 0 ? Math.round((count / totalDemandas) * 100) : 0,
+      percent:
+        totalForPercent > 0 ? Math.round((count / totalForPercent) * 100) : 0,
       color: getStatusColor(slug),
     }))
     .sort((a, b) => b.value - a.value);
 
   // ── Top 5 Áreas × Status (stacked bar) ──
   const areaStatusAcc: Record<string, Record<string, number>> = {};
-  demandas.forEach((d) => {
+  chartDemandas.forEach((d: any) => {
     const area = d.areas?.nome || "Sem área";
     const s = d.status || "solicitada";
     if (!areaStatusAcc[area]) areaStatusAcc[area] = {};
@@ -162,7 +194,7 @@ export function useDashboardData() {
   });
 
   const uniqueStatuses = Array.from(
-    new Set(demandas.map((d) => d.status || "solicitada"))
+    new Set(chartDemandas.map((d: any) => d.status || "solicitada"))
   );
 
   const areaTotals = Object.entries(areaStatusAcc)
@@ -210,10 +242,13 @@ export function useDashboardData() {
     })
   );
 
-  // ── Demandas em atraso detalhadas ──
-  const demandasAtrasoDetalhadas = demandasComAtraso
-    .map((demanda) => {
-      const prazo = new Date(demanda.data_prazo + 'T00:00:00');
+  // ── Demandas em atraso detalhadas (já filtradas no servidor) ──
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const demandasAtrasoDetalhadas = overdueData
+    .map((demanda: any) => {
+      const prazo = new Date(demanda.data_prazo + "T00:00:00");
       const diasAtraso = Math.floor(
         (today.getTime() - prazo.getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -242,15 +277,13 @@ export function useDashboardData() {
   ).length;
 
   return {
-    isLoading: isLoadingDemandas || isLoadingMunicipes || isLoadingProjetos,
+    isLoading:
+      isLoadingKpis ||
+      isLoadingCharts ||
+      isLoadingOverdue ||
+      isLoadingProjetos,
 
-    kpis: {
-      totalDemandas,
-      demandasAbertas,
-      demandasEmAtraso,
-      totalMunicipes,
-      taxaConclusao,
-    },
+    kpis,
 
     humor: {
       media: humorMedia,
@@ -268,7 +301,7 @@ export function useDashboardData() {
     },
 
     overdue: {
-      demandasEmAtraso,
+      demandasEmAtraso: kpis.demandasEmAtraso,
       demandasAtraso30,
       demandasAtraso60,
       demandasAtraso90,
