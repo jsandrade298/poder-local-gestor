@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,6 +122,10 @@ export default function PlanoAcaoDetalhe() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+
+  // Virtualizer scroll container
+  const planilhaContainerRef = useRef<HTMLDivElement>(null);
 
   // Column resizing
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -305,9 +310,27 @@ export default function PlanoAcaoDetalhe() {
 
   const updateLinha = useMutation({
     mutationFn: async ({ linhaId, dados }: { linhaId: string; dados: any }) => {
-      const { error } = await supabase.from("planilha_linhas").update({ dados, updated_at: new Date().toISOString() }).eq("id", linhaId); if (error) throw error;
+      const { error } = await supabase.from("planilha_linhas")
+        .update({ dados, updated_at: new Date().toISOString() })
+        .eq("id", linhaId);
+      if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["planilha-linhas", id] }); }
+    // Optimistic: apply instantly to local cache, no full refetch
+    onMutate: async ({ linhaId, dados }) => {
+      await queryClient.cancelQueries({ queryKey: ["planilha-linhas", id] });
+      const prev = queryClient.getQueryData(["planilha-linhas", id]);
+      queryClient.setQueryData(["planilha-linhas", id], (old: any[]) =>
+        old?.map(l => l.id === linhaId ? { ...l, dados } : l) ?? []
+      );
+      return { prev };
+    },
+    onError: (_err: any, _vars: any, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["planilha-linhas", id], ctx.prev);
+      toast.error("Erro ao salvar alteração");
+    },
+    onSettled: (_data: any, err: any) => {
+      if (err) queryClient.invalidateQueries({ queryKey: ["planilha-linhas", id] });
+    },
   });
 
   const deleteLinha = useMutation({
@@ -476,14 +499,22 @@ export default function PlanoAcaoDetalhe() {
         return { projeto_id: id, dados, ordem: linhas.length + idx };
       });
 
-      const { error } = await supabase.from("planilha_linhas").insert(linhasToInsert);
-      if (error) throw error;
+      // Inserção em lotes de 50 para evitar timeout e manter progresso visível
+      const CHUNK_SIZE = 50;
+      setImportProgress(0);
+      for (let i = 0; i < linhasToInsert.length; i += CHUNK_SIZE) {
+        const chunk = linhasToInsert.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase.from("planilha_linhas").insert(chunk);
+        if (error) throw error;
+        setImportProgress(Math.round(((i + chunk.length) / linhasToInsert.length) * 100));
+      }
 
       queryClient.invalidateQueries({ queryKey: ["planilha-linhas", id] });
       toast.success(`${linhasToInsert.length} linha(s) importada(s) com sucesso!`);
-      setShowImportDialog(false); setImportFile(null); setImportPreview([]);
+      setShowImportDialog(false); setImportFile(null); setImportPreview([]); setImportProgress(0);
     } catch (err: any) {
       toast.error(err.message || "Erro ao importar");
+      setImportProgress(0);
     } finally { setIsImporting(false); }
   };
 
@@ -581,6 +612,16 @@ export default function PlanoAcaoDetalhe() {
 
   useEffect(() => { if (ganttData?.todayPx != null && ganttScrollRef.current) ganttScrollRef.current.scrollLeft = Math.max(0, ganttData.todayPx - 200); }, [ganttData?.todayPx]);
 
+  // ===== VIRTUALIZER (planilha) =====
+  // Renders only the visible rows — crucial for large spreadsheets
+  const ROW_HEIGHT = 36;
+  const rowVirtualizer = useVirtualizer({
+    count: filteredLinhas.length,
+    getScrollElement: () => planilhaContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 15, // render 15 extra rows above/below viewport
+  });
+
   // ===== RENDER HELPERS =====
   const renderColMenu = (col: any, idx: number) => (
     <DropdownMenu>
@@ -597,27 +638,90 @@ export default function PlanoAcaoDetalhe() {
     </DropdownMenu>
   );
 
-  // Table cell renderer
+  // Table cell renderer — lazy: heavy components (Select, Calendar) only mount when cell is active
   const renderCell = (col: any, linha: any) => {
     const valor = linha.dados?.[col.id];
     const isEd = editingCell?.linhaId === linha.id && editingCell?.colunaId === col.id;
 
-    if (col.tipo === "checkbox") return <div className="flex items-center justify-center h-8 px-3"><Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} /></div>;
+    if (col.tipo === "checkbox") return (
+      <div className="flex items-center justify-center h-8 px-3">
+        <Checkbox checked={!!valor} onCheckedChange={() => toggleCheckbox(linha.id, col.id, valor)} />
+      </div>
+    );
 
+    // Status/Select — static badge in normal state, full Select only when active
     if (col.tipo === "status" || col.tipo === "select") {
-      const opcoes = parseOpcoes(col); const sel = opcoes.find((o: any) => o.valor === valor);
-      return <Select value={valor || ""} onValueChange={(v) => setCellSelectValue(linha.id, col.id, v)}>
-        <SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden">{sel ? <Badge variant="secondary" className="text-[11px] px-1.5 py-0 truncate max-w-full" style={{ backgroundColor: `${sel.cor}15`, color: sel.cor }}>{sel.valor}</Badge> : <SelectValue placeholder="—" />}</SelectTrigger>
-        <SelectContent>{opcoes.map((o: any, i: number) => <SelectItem key={i} value={o.valor}><div className="flex items-center gap-2">{o.cor && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: o.cor }} />}{o.valor}</div></SelectItem>)}</SelectContent>
-      </Select>;
+      const opcoes = parseOpcoes(col);
+      const sel = opcoes.find((o: any) => o.valor === valor);
+      if (!isEd) {
+        return (
+          <div
+            className="cursor-pointer hover:bg-muted/30 px-2 h-8 flex items-center overflow-hidden"
+            onClick={() => startEditCell(linha.id, col.id, valor)}
+          >
+            {sel
+              ? <Badge variant="secondary" className="text-[11px] px-1.5 py-0 truncate" style={{ backgroundColor: `${sel.cor}15`, color: sel.cor }}>{sel.valor}</Badge>
+              : <span className="text-muted-foreground/40 text-sm">—</span>
+            }
+          </div>
+        );
+      }
+      return (
+        <Select value={valor || ""} defaultOpen onValueChange={(v) => { setCellSelectValue(linha.id, col.id, v); setEditingCell(null); }}>
+          <SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden">
+            {sel ? <Badge variant="secondary" className="text-[11px] px-1.5 py-0 truncate max-w-full" style={{ backgroundColor: `${sel.cor}15`, color: sel.cor }}>{sel.valor}</Badge> : <SelectValue placeholder="—" />}
+          </SelectTrigger>
+          <SelectContent>
+            {opcoes.map((o: any, i: number) => (
+              <SelectItem key={i} value={o.valor}>
+                <div className="flex items-center gap-2">
+                  {o.cor && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: o.cor }} />}
+                  {o.valor}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
     }
 
-    if (col.tipo === "responsavel") return <Select value={valor || ""} onValueChange={(v) => setCellSelectValue(linha.id, col.id, v)}><SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden"><SelectValue placeholder="—" /></SelectTrigger><SelectContent>{profiles.map((p: any) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}</SelectContent></Select>;
+    // Responsável — static text in normal state
+    if (col.tipo === "responsavel") {
+      if (!isEd) {
+        return (
+          <div
+            className="cursor-pointer hover:bg-muted/30 px-2 h-8 flex items-center text-sm overflow-hidden"
+            onClick={() => startEditCell(linha.id, col.id, valor)}
+          >
+            <span className="truncate">{valor || <span className="text-muted-foreground/40">—</span>}</span>
+          </div>
+        );
+      }
+      return (
+        <Select value={valor || ""} defaultOpen onValueChange={(v) => { setCellSelectValue(linha.id, col.id, v); setEditingCell(null); }}>
+          <SelectTrigger className="h-8 text-xs border-0 bg-transparent hover:bg-muted/50 overflow-hidden"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>{profiles.map((p: any) => <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>)}</SelectContent>
+        </Select>
+      );
+    }
 
-    if (isEd) return <Input autoFocus value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveCellEdit} onKeyDown={(e) => { if (e.key === "Enter") saveCellEdit(); if (e.key === "Escape") setEditingCell(null); }} type={col.tipo === "numero" ? "number" : col.tipo === "data" ? "date" : "text"} className="h-8 text-xs border-0 rounded-none focus-visible:ring-1 focus-visible:ring-inset" />;
+    // Date — static text in normal state, native date input when active
+    if (col.tipo === "data") {
+      const displayVal = valor ? (() => { try { return format(parseISO(valor), "dd/MM/yyyy"); } catch { return valor; } })() : null;
+      if (!isEd) {
+        return (
+          <div className="cursor-pointer hover:bg-muted/30 px-2 h-8 flex items-center text-sm overflow-hidden" onClick={() => startEditCell(linha.id, col.id, valor)}>
+            <span className="truncate">{displayVal || <span className="text-muted-foreground/40">—</span>}</span>
+          </div>
+        );
+      }
+      return <Input autoFocus value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveCellEdit} onKeyDown={(e) => { if (e.key === "Enter") saveCellEdit(); if (e.key === "Escape") setEditingCell(null); }} type="date" className="h-8 text-xs border-0 rounded-none focus-visible:ring-1 focus-visible:ring-inset" />;
+    }
+
+    if (isEd) return <Input autoFocus value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveCellEdit} onKeyDown={(e) => { if (e.key === "Enter") saveCellEdit(); if (e.key === "Escape") setEditingCell(null); }} type={col.tipo === "numero" ? "number" : "text"} className="h-8 text-xs border-0 rounded-none focus-visible:ring-1 focus-visible:ring-inset" />;
 
     return <div className="cursor-pointer hover:bg-muted/30 transition-colors px-2 h-8 flex items-center text-sm overflow-hidden" onClick={() => startEditCell(linha.id, col.id, valor)}>
-      <span className="truncate">{col.tipo === "data" && valor ? (() => { try { return format(parseISO(valor), "dd/MM/yyyy"); } catch { return valor; } })() : valor || <span className="text-muted-foreground/40">—</span>}</span>
+      <span className="truncate">{valor || <span className="text-muted-foreground/40">—</span>}</span>
     </div>;
   };
 
@@ -681,39 +785,128 @@ export default function PlanoAcaoDetalhe() {
           {projeto.tipo === "projeto" && <Progress value={progresso} className="h-2" />}
         </div>
 
-        {/* ====== PROJETO (GANTT) — unchanged ====== */}
+        {/* ====== PROJETO (GANTT) ====== */}
         {projeto.tipo === "projeto" && (
-          <div className="space-y-6">
+          <div className="space-y-4">
+
+            {/* Gantt */}
             {ganttData && sortedTarefas.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base flex items-center gap-2"><GanttChart className="h-4 w-4" /> Cronograma</CardTitle><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">Ordenar:</span><Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}><SelectTrigger className="h-7 text-xs w-[140px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ordem">Ordem padrão</SelectItem><SelectItem value="data_inicio">Data início</SelectItem><SelectItem value="percentual">Progresso</SelectItem><SelectItem value="titulo">Nome</SelectItem></SelectContent></Select></div></div></CardHeader>
-                <CardContent className="p-0">
-                  <div className="flex border-t">
-                    <div className="flex-shrink-0 w-[280px] border-r bg-muted/20">
-                      <div className="h-10 border-b px-3 flex items-center"><span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tarefa</span></div>
-                      {sortedTarefas.map((t: any) => { const ov = isOverdue(t); const cp = isComplete(t); return (
-                        <div key={t.id} className={cn("h-11 px-3 flex items-center gap-2 border-b cursor-pointer hover:bg-muted/50 transition-colors", cp && "opacity-60")} onClick={() => openEditTarefa(t)}>
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 relative" style={{ backgroundColor: t.cor || "#3b82f6" }}>{cp && <CheckCircle className="h-3 w-3 text-green-500 absolute -top-0.5 -right-0.5" />}{ov && <AlertTriangle className="h-3 w-3 text-red-500 absolute -top-0.5 -right-0.5" />}</div>
-                          <div className="min-w-0 flex-1"><p className={cn("text-sm font-medium truncate", cp && "line-through text-muted-foreground")}>{t.titulo}</p><p className="text-[10px] text-muted-foreground truncate">{t.responsavel && `${t.responsavel} · `}{t.data_inicio && format(parseISO(t.data_inicio), "dd/MM")} → {t.data_fim && format(parseISO(t.data_fim), "dd/MM/yy")}</p></div>
-                          <span className={cn("text-xs font-medium flex-shrink-0", ov && "text-red-500")}>{t.percentual || 0}%</span>
-                        </div>); })}
+              <Card className="border border-border/50 shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <GanttChart className="h-4 w-4 text-primary" /> Cronograma
+                      <Badge variant="secondary" className="text-xs font-normal">{sortedTarefas.length} tarefa{sortedTarefas.length !== 1 ? "s" : ""}</Badge>
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground hidden sm:block">Ordenar:</span>
+                      <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
+                        <SelectTrigger className="h-7 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ordem">Ordem padrão</SelectItem>
+                          <SelectItem value="data_inicio">Data início</SelectItem>
+                          <SelectItem value="percentual">Progresso</SelectItem>
+                          <SelectItem value="titulo">Nome</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => { resetTarefaForm(); setShowAddTarefa(true); }}>
+                        <Plus className="h-3.5 w-3.5" /> Tarefa
+                      </Button>
                     </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="flex border-t overflow-hidden rounded-b-lg">
+                    {/* Left panel: task names */}
+                    <div className="flex-shrink-0 w-[260px] border-r bg-muted/20">
+                      <div className="h-10 border-b px-3 flex items-center bg-muted/40">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tarefa</span>
+                      </div>
+                      {sortedTarefas.map((t: any) => {
+                        const ov = isOverdue(t); const cp = isComplete(t);
+                        return (
+                          <div
+                            key={t.id}
+                            className={cn("h-11 px-3 flex items-center gap-2 border-b cursor-pointer hover:bg-muted/50 transition-colors group", cp && "opacity-60")}
+                            onClick={() => openEditTarefa(t)}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 relative" style={{ backgroundColor: t.cor || "#3b82f6" }}>
+                              {cp && <CheckCircle className="h-3 w-3 text-green-500 absolute -top-0.5 -right-0.5" />}
+                              {ov && !cp && <AlertTriangle className="h-3 w-3 text-red-500 absolute -top-0.5 -right-0.5" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={cn("text-sm font-medium truncate", cp && "line-through text-muted-foreground")}>{t.titulo}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                {t.responsavel && `${t.responsavel} · `}
+                                {t.data_inicio && format(parseISO(t.data_inicio), "dd/MM")} → {t.data_fim && format(parseISO(t.data_fim), "dd/MM/yy")}
+                              </p>
+                            </div>
+                            <span className={cn("text-xs font-semibold flex-shrink-0 tabular-nums", ov && !cp ? "text-red-500" : cp ? "text-green-600" : "text-muted-foreground")}>
+                              {t.percentual || 0}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Right panel: timeline */}
                     <div className="flex-1 overflow-x-auto" ref={ganttScrollRef}>
                       <div style={{ width: ganttData.timelineWidth, minWidth: "100%" }}>
+                        {/* Month labels */}
                         <div className="h-10 border-b relative bg-muted/10">
-                          {ganttData.months.map((m, i) => <div key={i} className="absolute top-0 h-full flex items-center px-2 text-xs font-medium text-muted-foreground border-l border-border/40" style={{ left: m.left, width: m.width }}>{m.width > 50 ? m.label : ""}</div>)}
-                          {ganttData.todayPx != null && <div className="absolute top-0 h-full z-20" style={{ left: ganttData.todayPx }}><div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-b shadow-sm">HOJE</div></div>}
+                          {ganttData.months.map((m, i) => (
+                            <div key={i} className="absolute top-0 h-full flex items-center px-2 text-xs font-medium text-muted-foreground border-l border-border/40" style={{ left: m.left, width: m.width }}>
+                              {m.width > 45 ? m.label : ""}
+                            </div>
+                          ))}
+                          {ganttData.todayPx != null && (
+                            <div className="absolute top-0 h-full z-20" style={{ left: ganttData.todayPx }}>
+                              <div className="absolute left-1/2 -translate-x-1/2 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-b shadow-sm whitespace-nowrap">HOJE</div>
+                            </div>
+                          )}
                         </div>
+                        {/* Bars */}
                         <div className="relative">
-                          {ganttData.todayPx != null && <div className="absolute top-0 bottom-0 w-[2px] bg-red-500/70 z-10 pointer-events-none" style={{ left: ganttData.todayPx, height: `${sortedTarefas.length * 44}px` }}><div className="absolute top-0 left-0 w-4 h-full bg-gradient-to-r from-red-500/10 to-transparent" /></div>}
-                          {ganttData.months.map((m, i) => <div key={i} className="absolute top-0 border-l border-border/20" style={{ left: m.left, height: `${sortedTarefas.length * 44}px` }} />)}
-                          {sortedTarefas.map((tarefa: any) => { const ini = parseISO(tarefa.data_inicio); const fim = parseISO(tarefa.data_fim); if (!isValid(ini) || !isValid(fim)) return null; const off = differenceInDays(ini, ganttData.minDate); const dur = Math.max(differenceInDays(fim, ini) + 1, 1); const left = off * ganttData.pxPerDay; const width = dur * ganttData.pxPerDay; const cp = isComplete(tarefa); const ov = isOverdue(tarefa); const pct = tarefa.percentual || 0; return (
-                            <div key={tarefa.id} className="h-11 flex items-center border-b relative">
-                              <div className={cn("absolute h-7 rounded-md flex items-center overflow-hidden cursor-pointer transition-all hover:shadow-md hover:brightness-110", cp && "opacity-50", ov && "ring-2 ring-red-500/60 ring-offset-1 ring-offset-background")} style={{ left, width: Math.max(width, 12), backgroundColor: tarefa.cor || "#3b82f6" }} onClick={() => openEditTarefa(tarefa)} onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPos({ x: r.left + r.width / 2, y: r.top - 8 }); setHoveredTarefa(tarefa); }} onMouseLeave={() => setHoveredTarefa(null)}>
-                                <div className="absolute inset-0 bg-black/20" style={{ left: `${pct}%`, right: 0 }} /><span className="relative z-10 text-[11px] text-white font-medium px-2 truncate">{width > 50 ? `${pct}%` : ""}</span>
-                                {cp && <CheckCircle className="relative z-10 h-3.5 w-3.5 text-white ml-auto mr-1 flex-shrink-0" />}{ov && width > 30 && <AlertTriangle className="relative z-10 h-3.5 w-3.5 text-white ml-auto mr-1 flex-shrink-0" />}
+                          {ganttData.todayPx != null && (
+                            <div className="absolute top-0 w-[2px] bg-red-500/60 z-10 pointer-events-none" style={{ left: ganttData.todayPx, height: `${sortedTarefas.length * 44}px` }}>
+                              <div className="absolute top-0 left-0 w-3 h-full bg-gradient-to-r from-red-500/10 to-transparent" />
+                            </div>
+                          )}
+                          {ganttData.months.map((m, i) => (
+                            <div key={i} className="absolute top-0 border-l border-border/15" style={{ left: m.left, height: `${sortedTarefas.length * 44}px` }} />
+                          ))}
+                          {sortedTarefas.map((tarefa: any) => {
+                            const ini = parseISO(tarefa.data_inicio); const fim = parseISO(tarefa.data_fim);
+                            if (!isValid(ini) || !isValid(fim)) return null;
+                            const off = differenceInDays(ini, ganttData.minDate);
+                            const dur = Math.max(differenceInDays(fim, ini) + 1, 1);
+                            const left = off * ganttData.pxPerDay;
+                            const width = dur * ganttData.pxPerDay;
+                            const cp = isComplete(tarefa); const ov = isOverdue(tarefa);
+                            const pct = tarefa.percentual || 0;
+                            return (
+                              <div key={tarefa.id} className="h-11 flex items-center border-b relative">
+                                <div
+                                  className={cn(
+                                    "absolute h-7 rounded-md flex items-center overflow-hidden cursor-pointer transition-all hover:shadow-md hover:brightness-110",
+                                    cp && "opacity-50",
+                                    ov && !cp && "ring-2 ring-red-500/60 ring-offset-1 ring-offset-background"
+                                  )}
+                                  style={{ left, width: Math.max(width, 14), backgroundColor: tarefa.cor || "#3b82f6" }}
+                                  onClick={() => openEditTarefa(tarefa)}
+                                  onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHoverPos({ x: r.left + r.width / 2, y: r.top - 8 }); setHoveredTarefa(tarefa); }}
+                                  onMouseLeave={() => setHoveredTarefa(null)}
+                                >
+                                  {/* Unfilled portion darker */}
+                                  <div className="absolute inset-0 bg-black/25" style={{ left: `${pct}%`, right: 0 }} />
+                                  <span className="relative z-10 text-[11px] text-white font-semibold px-2 truncate">
+                                    {width > 40 ? `${pct}%` : ""}
+                                  </span>
+                                  {cp && <CheckCircle className="relative z-10 h-3.5 w-3.5 text-white ml-auto mr-1 flex-shrink-0" />}
+                                  {ov && !cp && width > 28 && <AlertTriangle className="relative z-10 h-3.5 w-3.5 text-white ml-auto mr-1 flex-shrink-0" />}
+                                </div>
                               </div>
-                            </div>); })}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -721,8 +914,136 @@ export default function PlanoAcaoDetalhe() {
                 </CardContent>
               </Card>
             )}
-            {hoveredTarefa && <div className="fixed z-50 pointer-events-none" style={{ left: Math.min(hoverPos.x, window.innerWidth - 260), top: hoverPos.y, transform: "translate(-50%, -100%)" }}><div className="bg-popover border rounded-lg shadow-lg p-3 w-[240px] text-sm"><div className="flex items-center gap-2 mb-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hoveredTarefa.cor || "#3b82f6" }} /><span className="font-semibold truncate">{hoveredTarefa.titulo}</span></div>{hoveredTarefa.responsavel && <p className="text-xs text-muted-foreground mb-1">Responsável: {hoveredTarefa.responsavel}</p>}<p className="text-xs text-muted-foreground mb-2">{hoveredTarefa.data_inicio && format(parseISO(hoveredTarefa.data_inicio), "dd/MM/yyyy")} → {hoveredTarefa.data_fim && format(parseISO(hoveredTarefa.data_fim), "dd/MM/yyyy")}</p><div className="flex items-center gap-2"><Progress value={hoveredTarefa.percentual || 0} className="h-1.5 flex-1" /><span className="text-xs font-medium">{hoveredTarefa.percentual || 0}%</span></div>{isOverdue(hoveredTarefa) && <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Atrasada</p>}{isComplete(hoveredTarefa) && <p className="text-xs text-green-500 font-medium mt-1 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Concluída</p>}</div></div>}
-            <Card><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">Tarefas ({tarefas.length})</CardTitle><Button size="sm" onClick={() => { resetTarefaForm(); setShowAddTarefa(true); }} className="gap-1"><Plus className="h-4 w-4" /> Adicionar</Button></div></CardHeader><CardContent>{tarefas.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8">Nenhuma tarefa criada.</p> : <div className="space-y-2">{sortedTarefas.map((t: any) => { const ov = isOverdue(t); const cp = isComplete(t); return (<div key={t.id} className={cn("flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors group", ov && "border-red-500/30 bg-red-50/50 dark:bg-red-950/10", cp && "opacity-60")}><div className="w-2 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: t.cor || "#3b82f6" }} /><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><span className={cn("font-medium text-sm truncate", cp && "line-through text-muted-foreground")}>{t.titulo}</span>{ov && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Atrasada</Badge>}{cp && <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Concluída</Badge>}{t.responsavel && <span className="text-xs text-muted-foreground">· {t.responsavel}</span>}</div><div className="flex items-center gap-3 mt-1"><span className="text-xs text-muted-foreground">{t.data_inicio && format(parseISO(t.data_inicio), "dd/MM")} → {t.data_fim && format(parseISO(t.data_fim), "dd/MM/yy")}</span><Progress value={t.percentual || 0} className="h-1.5 flex-1 max-w-[100px]" /><span className="text-xs font-medium">{t.percentual || 0}%</span></div></div><div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditTarefa(t)}><Edit className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteTarefaId(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button></div></div>); })}</div>}</CardContent></Card>
+
+            {/* Hover tooltip */}
+            {hoveredTarefa && (
+              <div className="fixed z-50 pointer-events-none" style={{ left: Math.min(hoverPos.x, window.innerWidth - 260), top: hoverPos.y, transform: "translate(-50%, -100%)" }}>
+                <div className="bg-popover border rounded-lg shadow-xl p-3 w-[240px] text-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: hoveredTarefa.cor || "#3b82f6" }} />
+                    <span className="font-semibold truncate">{hoveredTarefa.titulo}</span>
+                  </div>
+                  {hoveredTarefa.responsavel && <p className="text-xs text-muted-foreground mb-1">👤 {hoveredTarefa.responsavel}</p>}
+                  <p className="text-xs text-muted-foreground mb-2">
+                    📅 {hoveredTarefa.data_inicio && format(parseISO(hoveredTarefa.data_inicio), "dd/MM/yyyy")} → {hoveredTarefa.data_fim && format(parseISO(hoveredTarefa.data_fim), "dd/MM/yyyy")}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Progress value={hoveredTarefa.percentual || 0} className="h-1.5 flex-1" />
+                    <span className="text-xs font-semibold tabular-nums">{hoveredTarefa.percentual || 0}%</span>
+                  </div>
+                  {isOverdue(hoveredTarefa) && !isComplete(hoveredTarefa) && (
+                    <p className="text-xs text-red-500 font-medium mt-1.5 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Atrasada</p>
+                  )}
+                  {isComplete(hoveredTarefa) && (
+                    <p className="text-xs text-green-500 font-medium mt-1.5 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Concluída</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Task list */}
+            <Card className="border border-border/50 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    Tarefas
+                    <Badge variant="secondary" className="text-xs font-normal">{tarefas.length}</Badge>
+                    {tarefas.filter((t: any) => isOverdue(t)).length > 0 && (
+                      <Badge variant="destructive" className="text-xs font-normal gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {tarefas.filter((t: any) => isOverdue(t)).length} atrasada{tarefas.filter((t: any) => isOverdue(t)).length !== 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <Button size="sm" onClick={() => { resetTarefaForm(); setShowAddTarefa(true); }} className="gap-1">
+                    <Plus className="h-4 w-4" /> Adicionar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {tarefas.length === 0 ? (
+                  <div className="text-center py-10 space-y-3">
+                    <GanttChart className="h-10 w-10 mx-auto text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">Nenhuma tarefa criada ainda.</p>
+                    <Button size="sm" variant="outline" onClick={() => { resetTarefaForm(); setShowAddTarefa(true); }} className="gap-1">
+                      <Plus className="h-4 w-4" /> Adicionar primeira tarefa
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sortedTarefas.map((t: any) => {
+                      const ov = isOverdue(t); const cp = isComplete(t);
+                      return (
+                        <div
+                          key={t.id}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg border transition-colors group cursor-pointer",
+                            ov && !cp ? "border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/10 hover:bg-red-50 dark:hover:bg-red-950/20"
+                              : "border-border/50 hover:bg-muted/50"
+                          )}
+                          onClick={() => openEditTarefa(t)}
+                        >
+                          {/* Color bar */}
+                          <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: t.cor || "#3b82f6", opacity: cp ? 0.4 : 1 }} />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={cn("font-medium text-sm", cp && "line-through text-muted-foreground")}>
+                                {t.titulo}
+                              </span>
+                              {ov && !cp && <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">Atrasada</Badge>}
+                              {cp && <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">✓ Concluída</Badge>}
+                              {t.responsavel && <span className="text-xs text-muted-foreground">· {t.responsavel}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {t.data_inicio && format(parseISO(t.data_inicio), "dd/MM")} → {t.data_fim && format(parseISO(t.data_fim), "dd/MM/yy")}
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-1 max-w-[160px]">
+                                <Progress value={t.percentual || 0} className="h-1.5 flex-1" />
+                                <span className={cn("text-xs font-semibold tabular-nums flex-shrink-0 w-8 text-right",
+                                  cp ? "text-green-600" : ov ? "text-red-500" : "text-muted-foreground"
+                                )}>
+                                  {t.percentual || 0}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick progress buttons — visible on hover */}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            {[0, 25, 50, 75, 100].map(pct => (
+                              <button
+                                key={pct}
+                                className={cn(
+                                  "text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors",
+                                  (t.percentual || 0) === pct
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary"
+                                )}
+                                onClick={() => updateTarefa.mutate({ tarefaId: t.id, updates: { percentual: pct } })}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditTarefa(t); }}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTarefaId(t.id); }}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -754,7 +1075,10 @@ export default function PlanoAcaoDetalhe() {
             </CardHeader>
             <CardContent className="p-0">
               {colunas.length === 0 ? <p className="text-sm text-muted-foreground text-center py-8 px-6">Nenhuma coluna configurada.</p> : (
-                <div className={cn("overflow-x-auto border-t", isFullscreen && "overflow-y-auto max-h-[calc(100vh-220px)]")}>
+                <div
+                  ref={planilhaContainerRef}
+                  className={cn("overflow-auto border-t", isFullscreen ? "max-h-[calc(100vh-220px)]" : "max-h-[60vh]")}
+                >
                   <table className="w-max min-w-full border-collapse" style={{ tableLayout: "fixed" }}>
                     <thead className={cn(isFullscreen && "sticky top-0 z-40")}>
                       <tr className={cn("bg-muted/30", isFullscreen && "bg-muted")}>
@@ -837,19 +1161,25 @@ export default function PlanoAcaoDetalhe() {
                       )}
                     </thead>
                     <tbody>
-                      {filteredLinhas.map((linha: any, idx: number) => {
+                      {/* Virtual spacer top */}
+                      {rowVirtualizer.getVirtualItems().length > 0 && rowVirtualizer.getVirtualItems()[0].start > 0 && (
+                        <tr><td style={{ height: rowVirtualizer.getVirtualItems()[0].start }} colSpan={colunas.length + 3} /></tr>
+                      )}
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const linha = filteredLinhas[virtualRow.index];
+                        const idx = virtualRow.index;
                         const updates = atualizacoesByLinha[linha.id] || [];
                         const isExpanded = expandedLinhas.has(linha.id);
                         const firstCol = colunas[0];
 
                         return (
-                          <tr key={linha.id} className="group hover:bg-muted/20">
+                          <tr key={linha.id} data-index={virtualRow.index} className="group hover:bg-muted/20" style={{ height: ROW_HEIGHT }}>
                             {/* # (sticky) */}
-                            <td className="sticky left-0 z-20 border-b border-r text-center text-xs text-muted-foreground px-2 h-9 bg-background" style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>{idx + 1}</td>
-                            {/* First column (sticky) — with expand button inside */}
+                            <td className="sticky left-0 z-20 border-b border-r text-center text-xs text-muted-foreground px-2 bg-background" style={{ height: ROW_HEIGHT, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>{idx + 1}</td>
+                            {/* First column (sticky) */}
                             {firstCol && (
-                              <td className="sticky z-20 border-b border-r p-0 overflow-hidden bg-background" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id), boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
-                                <div className="flex items-center h-8">
+                              <td className="sticky z-20 border-b border-r p-0 overflow-hidden bg-background" style={{ left: 40, width: getColWidth(firstCol.id), minWidth: getColWidth(firstCol.id), maxWidth: getColWidth(firstCol.id), height: ROW_HEIGHT, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.1)" }}>
+                                <div className="flex items-center h-full">
                                   <div className="flex-1 min-w-0">{renderCell(firstCol, linha)}</div>
                                   <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mr-0.5" onClick={() => openLinhaModal(linha)}><Expand className="h-3 w-3" /></Button>
                                 </div>
@@ -857,38 +1187,34 @@ export default function PlanoAcaoDetalhe() {
                             )}
                             {/* Scrollable columns */}
                             {colunas.slice(1).map((col: any) => (
-                              <td key={col.id} className="border-b border-r p-0 overflow-hidden" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id) }}>
+                              <td key={col.id} className="border-b border-r p-0 overflow-hidden" style={{ width: getColWidth(col.id), minWidth: getColWidth(col.id), maxWidth: getColWidth(col.id), height: ROW_HEIGHT }}>
                                 {renderCell(col, linha)}
                               </td>
                             ))}
                             {/* Atualizações cell */}
-                            <td className="border-b border-r p-0 align-top" style={{ width: 280, minWidth: 280, maxWidth: 280 }}>
-                              <div className="px-2 py-1.5">
+                            <td className="border-b border-r p-0 align-middle" style={{ width: 280, minWidth: 280, maxWidth: 280, height: ROW_HEIGHT }}>
+                              <div className="px-2 py-1">
                                 {updates.length === 0 && !isExpanded ? (
                                   <button className="text-xs text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1" onClick={() => toggleExpanded(linha.id)}>
                                     <Plus className="h-3 w-3" /> Adicionar
                                   </button>
                                 ) : (
                                   <div>
-                                    <button className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 mb-1" onClick={() => toggleExpanded(linha.id)}>
+                                    <button className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1" onClick={() => toggleExpanded(linha.id)}>
                                       {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                       <span className="font-medium">{updates.length} atualização{updates.length !== 1 ? "ões" : ""}</span>
                                     </button>
-                                    {/* Always show latest update preview */}
                                     {!isExpanded && updates.length > 0 && (
                                       <p className="text-[11px] text-muted-foreground truncate">{format(new Date(updates[0].created_at), "dd/MM")} — {updates[0].texto}</p>
                                     )}
-                                    {/* Expanded: all updates + add */}
                                     {isExpanded && (
-                                      <div className="space-y-1.5 mt-1">
-                                        {/* Add input */}
+                                      <div className="space-y-1 mt-1">
                                         <div className="flex gap-1">
                                           <Input value={inlineUpdateText[linha.id] || ""} onChange={(e) => setInlineUpdateText(p => ({ ...p, [linha.id]: e.target.value }))}
                                             placeholder="Nova atualização..." className="h-6 text-xs"
                                             onKeyDown={(e) => { if (e.key === "Enter" && (inlineUpdateText[linha.id] || "").trim()) addLinhaAtualizacao.mutate({ linhaId: linha.id, texto: inlineUpdateText[linha.id] }); }} />
                                           <Button size="icon" className="h-6 w-6 flex-shrink-0" disabled={!(inlineUpdateText[linha.id] || "").trim()} onClick={() => addLinhaAtualizacao.mutate({ linhaId: linha.id, texto: inlineUpdateText[linha.id] || "" })}><Send className="h-3 w-3" /></Button>
                                         </div>
-                                        {/* List */}
                                         {updates.map((a: any) => (
                                           <div key={a.id} className="flex gap-1.5 text-[11px]">
                                             <span className="text-muted-foreground flex-shrink-0 font-medium">{format(new Date(a.created_at), "dd/MM")}</span>
@@ -902,14 +1228,20 @@ export default function PlanoAcaoDetalhe() {
                               </div>
                             </td>
                             {/* Delete */}
-                            <td className="border-b p-0">
-                              <div className="flex items-center justify-center py-1">
+                            <td className="border-b p-0" style={{ height: ROW_HEIGHT }}>
+                              <div className="flex items-center justify-center h-full">
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setDeleteLinhaId(linha.id)}><Trash2 className="h-3 w-3" /></Button>
                               </div>
                             </td>
                           </tr>
                         );
                       })}
+                      {/* Virtual spacer bottom */}
+                      {rowVirtualizer.getVirtualItems().length > 0 && (() => {
+                        const lastItem = rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1];
+                        const remaining = rowVirtualizer.getTotalSize() - lastItem.end;
+                        return remaining > 0 ? <tr><td style={{ height: remaining }} colSpan={colunas.length + 3} /></tr> : null;
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -1121,8 +1453,16 @@ export default function PlanoAcaoDetalhe() {
           </div>
           <DialogFooter className="flex-shrink-0 pt-4 border-t">
             <Button variant="outline" onClick={() => setShowImportDialog(false)}>Cancelar</Button>
+            <div className="flex items-center gap-3 flex-1">
+              {isImporting && importProgress > 0 && (
+                <div className="flex-1 space-y-1">
+                  <Progress value={importProgress} className="h-1.5" />
+                  <p className="text-xs text-muted-foreground">{importProgress}% concluído</p>
+                </div>
+              )}
+            </div>
             <Button onClick={executeImport} disabled={importPreview.length === 0 || isImporting} className="gap-1">
-              {isImporting ? "Importando..." : `Importar ${importPreview.length} linha(s)`}
+              {isImporting ? `Importando... ${importProgress}%` : `Importar ${importPreview.length} linha(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>
