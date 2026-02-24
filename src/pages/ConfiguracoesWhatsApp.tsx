@@ -66,7 +66,7 @@ export default function ConfiguracoesWhatsApp() {
       for (const update of updates) {
         const { data, error } = await supabase
           .from('configuracoes')
-          .upsert(update, { onConflict: 'chave' });
+          .upsert(update, { onConflict: 'tenant_id,chave' });
         
         console.log(`Upsert para ${update.chave}:`, { data, error });
         
