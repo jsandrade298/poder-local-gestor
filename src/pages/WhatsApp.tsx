@@ -261,7 +261,7 @@ const WhatsApp = () => {
             chave: configItem.chave,
             valor: configItem.valor,
             descricao: `Configuração automática do WhatsApp - ${configItem.chave.replace('whatsapp_', '')}`
-          }, { onConflict: 'chave' });
+          }, { onConflict: 'tenant_id,chave' });
 
         if (error) throw error;
       }
