@@ -534,6 +534,7 @@ export default function Demandas() {
         error?: string;
         id?: string;
         geocodificado?: boolean;
+        action?: 'criado' | 'atualizado';
       }> = [];
       
       // FASE 1: Importar demandas
@@ -560,58 +561,94 @@ export default function Demandas() {
               'urgente': 'urgente'
             };
             
-            const statusMap: Record<string, string> = {
-              'solicitada': 'solicitada',
-              'em andamento': 'em_producao',
-              'em_producao': 'em_producao',
-              'encaminhado': 'encaminhado',
-              'atendido': 'atendido',
-              'devolvido': 'devolvido'
-            };
-            
             const prioridadeNormalizada = demanda.prioridade 
               ? prioridadeMap[demanda.prioridade.toLowerCase()] || 'media'
               : 'media';
               
-            const statusNormalizado = demanda.status 
-              ? statusMap[demanda.status.toLowerCase()] || 'solicitada'
-              : 'solicitada';
+            // Status já vem resolvido do parsing (dinâmico)
+            const statusFinal = demanda.status || 'solicitada';
 
-            const { data, error } = await supabase
-              .from('demandas')
-              .insert({
+            // ====== VERIFICAR SE É UPDATE OU INSERT ======
+            if (demanda.existingId) {
+              // ATUALIZAR demanda existente
+              console.log(`🔄 Atualizando demanda existente: ${demanda.protocolo} (${demanda.existingId})`);
+              
+              const updateData: any = {
                 titulo: demanda.titulo,
                 descricao: demanda.descricao,
                 municipe_id: demanda.municipeId,
-                area_id: demanda.areaId || null,
-                responsavel_id: demanda.responsavelId || null,
-                status: statusNormalizado,
+                status: statusFinal,
                 prioridade: prioridadeNormalizada,
-                logradouro: demanda.logradouro || null,
-                numero: demanda.numero || null,
-                bairro: demanda.bairro || null,
-                cidade: demanda.cidade || null,
-                cep: demanda.cep || null,
-                complemento: demanda.complemento || null,
-                data_prazo: demanda.data_prazo || null,
-                observacoes: demanda.observacoes || null,
-                criado_por: userId,
-                geocodificado: false // Será atualizado na fase 2
-              })
-              .select('id')
-              .single();
+                updated_at: new Date().toISOString()
+              };
 
-            if (error) {
-              results.push({ success: false, titulo: demanda.titulo, error: error.message });
+              // Só atualizar campos opcionais se tiverem valor
+              if (demanda.areaId) updateData.area_id = demanda.areaId;
+              if (demanda.responsavelId) updateData.responsavel_id = demanda.responsavelId;
+              if (demanda.logradouro) updateData.logradouro = demanda.logradouro;
+              if (demanda.numero) updateData.numero = demanda.numero;
+              if (demanda.bairro) updateData.bairro = demanda.bairro;
+              if (demanda.cidade) updateData.cidade = demanda.cidade;
+              if (demanda.cep) updateData.cep = demanda.cep;
+              if (demanda.complemento) updateData.complemento = demanda.complemento;
+              if (demanda.data_prazo) updateData.data_prazo = demanda.data_prazo;
+              if (demanda.observacoes) updateData.observacoes = demanda.observacoes;
+
+              const { error } = await supabase
+                .from('demandas')
+                .update(updateData)
+                .eq('id', demanda.existingId);
+
+              if (error) {
+                results.push({ success: false, titulo: demanda.titulo, error: error.message });
+              } else {
+                results.push({ 
+                  success: true, 
+                  titulo: demanda.titulo, 
+                  id: demanda.existingId,
+                  geocodificado: false,
+                  action: 'atualizado',
+                  ...demanda
+                });
+              }
             } else {
-              results.push({ 
-                success: true, 
-                titulo: demanda.titulo, 
-                id: data.id,
-                geocodificado: false,
-                // Guardar dados de endereço para geocodificação
-                ...demanda
-              });
+              // CRIAR nova demanda
+              const { data, error } = await supabase
+                .from('demandas')
+                .insert({
+                  titulo: demanda.titulo,
+                  descricao: demanda.descricao,
+                  municipe_id: demanda.municipeId,
+                  area_id: demanda.areaId || null,
+                  responsavel_id: demanda.responsavelId || null,
+                  status: statusFinal,
+                  prioridade: prioridadeNormalizada,
+                  logradouro: demanda.logradouro || null,
+                  numero: demanda.numero || null,
+                  bairro: demanda.bairro || null,
+                  cidade: demanda.cidade || null,
+                  cep: demanda.cep || null,
+                  complemento: demanda.complemento || null,
+                  data_prazo: demanda.data_prazo || null,
+                  observacoes: demanda.observacoes || null,
+                  criado_por: userId,
+                  geocodificado: false
+                })
+                .select('id')
+                .single();
+
+              if (error) {
+                results.push({ success: false, titulo: demanda.titulo, error: error.message });
+              } else {
+                results.push({ 
+                  success: true, 
+                  titulo: demanda.titulo, 
+                  id: data.id,
+                  geocodificado: false,
+                  action: 'criado',
+                  ...demanda
+                });
+              }
             }
           } catch (err) {
             results.push({ success: false, titulo: demanda.titulo, error: 'Erro inesperado' });
@@ -834,23 +871,35 @@ export default function Demandas() {
           toast.error("CSV deve ter pelo menos 3 colunas (Título, Descrição, Munícipe)");
           return;
         }
-        const columnPositions = {
-          titulo: 0,        // Coluna A
-          descricao: 1,     // Coluna B  
-          municipe_nome: 2, // Coluna C
-          area_nome: 3,     // Coluna D
-          responsavel_nome: 4, // Coluna E
-          status: 5,        // Coluna F
-          prioridade: 6,    // Coluna G
-          logradouro: 7,    // Coluna H
-          numero: 8,        // Coluna I
-          bairro: 9,        // Coluna J
-          cidade: 10,       // Coluna K
-          cep: 11,          // Coluna L
-          complemento: 12,  // Coluna M
-          data_prazo: 13,   // Coluna N
-          observacoes: 14   // Coluna O
-        };
+
+        // Detectar formato pelo NOME dos headers:
+        // - CSV exportado do sistema: tem coluna "protocolo" → ativa modo upsert
+        // - CSV novo (planilha do cliente): sem "protocolo" → só cria novas demandas
+        const hasProtocolo = headers.some(h => 
+          ['protocolo', 'protocol', 'protocolo_demanda'].includes(h.replace(/[^a-z_]/g, ''))
+        );
+        
+        // Construir posições baseadas nos headers reais
+        const columnPositions: Record<string, number> = {};
+        
+        if (hasProtocolo) {
+          // Formato exportado: protocolo, titulo, descricao, municipe_nome, ...
+          console.log('📋 Formato exportado detectado (com protocolo) - modo ATUALIZAÇÃO ativado');
+          const exportOrder = ['protocolo', 'titulo', 'descricao', 'municipe_nome', 'area_nome', 'responsavel_nome', 'status', 'prioridade', 'logradouro', 'numero', 'bairro', 'cidade', 'cep', 'complemento', 'data_prazo', 'observacoes', 'created_at'];
+          exportOrder.forEach((key, idx) => {
+            if (idx < headers.length) columnPositions[key] = idx;
+          });
+        } else {
+          // Formato importação nova: titulo, descricao, municipe_nome, ...
+          console.log('📋 Formato novo detectado (sem protocolo) - modo CRIAÇÃO');
+          columnPositions.protocolo = -1; // Marca como inexistente
+          const importOrder = ['titulo', 'descricao', 'municipe_nome', 'area_nome', 'responsavel_nome', 'status', 'prioridade', 'logradouro', 'numero', 'bairro', 'cidade', 'cep', 'complemento', 'data_prazo', 'observacoes'];
+          importOrder.forEach((key, idx) => {
+            if (idx < headers.length) columnPositions[key] = idx;
+          });
+        }
+        
+        const isOldFormat = !hasProtocolo;
 
         // Buscar dados existentes usando carregamento em lotes
         console.log('🔍 Carregando dados do sistema...');
@@ -891,13 +940,38 @@ export default function Demandas() {
           return allMunicipes;
         };
 
-        const [allMunicipes, existingAreas, existingResponsaveis] = await Promise.all([
+        const [allMunicipes, existingAreas, existingResponsaveis, existingStatusList, existingDemandasProtocolo] = await Promise.all([
           carregarTodosMunicipes(),
           supabase.from('areas').select('id, nome'),
-          supabase.from('profiles').select('id, nome')
+          supabase.from('profiles').select('id, nome'),
+          supabase.from('demanda_status').select('slug, nome').eq('ativo', true),
+          supabase.from('demandas').select('id, protocolo')
         ]);
 
-        console.log(`📊 Dados carregados: ${allMunicipes?.length || 0} munícipes (em lotes), ${existingAreas.data?.length || 0} áreas, ${existingResponsaveis.data?.length || 0} responsáveis`);
+        console.log(`📊 Dados carregados: ${allMunicipes?.length || 0} munícipes (em lotes), ${existingAreas.data?.length || 0} áreas, ${existingResponsaveis.data?.length || 0} responsáveis, ${existingStatusList.data?.length || 0} status, ${existingDemandasProtocolo.data?.length || 0} demandas existentes`);
+
+        // Map de protocolos existentes → demanda id
+        const protocoloMap = new Map<string, string>();
+        existingDemandasProtocolo.data?.forEach((d: any) => {
+          if (d.protocolo) {
+            protocoloMap.set(d.protocolo.toLowerCase().trim(), d.id);
+          }
+        });
+
+        // Map de slugs de status válidos (para aceitar qualquer status dinâmico)
+        const validStatusSlugs = new Set<string>();
+        existingStatusList.data?.forEach((s: any) => {
+          validStatusSlugs.add(s.slug);
+          // Também mapear pelo nome (case-insensitive)
+          validStatusSlugs.add(s.nome.toLowerCase().trim());
+        });
+
+        // Map nome → slug para resolução
+        const statusNameToSlug = new Map<string, string>();
+        existingStatusList.data?.forEach((s: any) => {
+          statusNameToSlug.set(s.slug, s.slug);
+          statusNameToSlug.set(s.nome.toLowerCase().trim(), s.slug);
+        });
 
         // Criar maps normalizados
         const municipeMap = new Map();
@@ -940,17 +1014,18 @@ export default function Demandas() {
           
           console.log(`🔍 Processando linha ${i + 1}:`, {
             totalColunas: values.length,
-            titulo: values[0] || '(vazio)',
-            descricao: values[1] || '(vazio)',
-            municipe: values[2] || '(vazio)',
+            protocolo: values[0] || '(vazio)',
+            titulo: values[1] || '(vazio)',
+            descricao: values[2] || '(vazio)',
+            municipe: values[3] || '(vazio)',
             raw_line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
           });
           
           // Verificar se há colunas suficientes
-          if (values.length < 15) {
-            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, esperado 15. Adicionando colunas vazias.`);
-            // Preencher com valores vazios até ter 15 colunas
-            while (values.length < 15) {
+          const expectedCols = isOldFormat ? 15 : 16;
+          if (values.length < expectedCols) {
+            console.log(`⚠️ Linha ${i + 1} tem apenas ${values.length} colunas, esperado ${expectedCols}. Adicionando colunas vazias.`);
+            while (values.length < expectedCols) {
               values.push('');
             }
           }
@@ -967,9 +1042,9 @@ export default function Demandas() {
               console.warn(`🔄 Linha ${i + 1}: Detectado deslocamento - ajustando posições das colunas`);
               console.log(`   Original: titulo="${values[0]}" | desc="${values[1]}" | municipe="${values[2]}"`);
               
-              // Ajustar todas as posições uma coluna para frente
+              // Ajustar todas as posições uma coluna para frente (exceto posições negativas)
               Object.keys(adjustedPositions).forEach(key => {
-                if (adjustedPositions[key] < values.length - 1) {
+                if (adjustedPositions[key] >= 0 && adjustedPositions[key] < values.length - 1) {
                   adjustedPositions[key] += 1;
                 }
               });
@@ -988,7 +1063,10 @@ export default function Demandas() {
           
           // Processar campos usando posições ajustadas
           Object.keys(adjustedPositions).forEach(key => {
-            const columnIndex = adjustedPositions[key as keyof typeof adjustedPositions];
+            const columnIndex = adjustedPositions[key];
+            // Pular colunas com posição inválida (ex: protocolo=-1 no formato antigo)
+            if (columnIndex < 0 || columnIndex >= values.length) return;
+            
             const value = values[columnIndex];
             
             // Debug específico para título e descrição
@@ -998,7 +1076,18 @@ export default function Demandas() {
             
             if (value && value.trim()) {
               
-              if (key === 'municipe_nome') {
+              if (key === 'protocolo') {
+                // Guardar protocolo para detecção de demanda existente
+                const protocoloVal = value.trim();
+                if (protocoloVal) {
+                  demanda.protocolo = protocoloVal;
+                  // Verificar se existe demanda com este protocolo
+                  const existingId = protocoloMap.get(protocoloVal.toLowerCase().trim());
+                  if (existingId) {
+                    demanda.existingId = existingId;
+                  }
+                }
+              } else if (key === 'municipe_nome') {
                 demanda.municipe_nome_original = value;
                 const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
                 const semAcentos = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1029,15 +1118,17 @@ export default function Demandas() {
                 const normalized = value.toLowerCase().trim().replace(/\s+/g, ' ');
                 demanda.responsavelId = responsavelMap.get(normalized);
               } else if (key === 'status') {
-                const statusMap: Record<string, string> = {
-                  'solicitada': 'solicitada',
-                  'em andamento': 'em_producao',
-                  'em_producao': 'em_producao',
-                  'encaminhado': 'encaminhado',
-                  'atendido': 'atendido',
-                  'devolvido': 'devolvido'
-                };
-                demanda.status = statusMap[value.toLowerCase()] || 'solicitada';
+                // Tentar resolver status dinâmico pelo slug ou nome
+                const statusLower = value.toLowerCase().trim();
+                const resolvedSlug = statusNameToSlug.get(statusLower);
+                if (resolvedSlug) {
+                  demanda.status = resolvedSlug;
+                } else {
+                  // Fallback: aceitar valor literal se parece válido
+                  const slug = statusLower.replace(/\s+/g, '_').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                  demanda.status = slug || 'solicitada';
+                  console.warn(`⚠️ Status "${value}" não encontrado no sistema, usando "${demanda.status}"`);
+                }
               } else if (key === 'prioridade') {
                 const prioridadeMap: Record<string, string> = {
                   'baixa': 'baixa',
@@ -1205,6 +1296,8 @@ export default function Demandas() {
 
       // Preparar demandas para importação
       const demandasParaImportar = demandasValidas.map(d => ({
+        protocolo: d.protocolo || null,
+        existingId: d.existingId || null,
         titulo: d.titulo,
         descricao: d.descricao || d.titulo,
         municipeId: d.municipeId,
