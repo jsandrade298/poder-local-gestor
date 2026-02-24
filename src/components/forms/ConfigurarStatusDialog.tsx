@@ -1,138 +1,106 @@
 import { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
-  Settings,
-  Plus,
-  Trash2,
-  GripVertical,
-  Save,
-  X,
-  Bell,
-  BellOff,
-  Pencil,
+  Settings, Plus, Trash2, GripVertical, Save, X,
+  Bell, BellOff, Pencil, CheckCircle2,
 } from "lucide-react";
 import { useDemandaStatus, DemandaStatus } from "@/hooks/useDemandaStatus";
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
+  arrayMove, SortableContext, sortableKeyboardCoordinates,
+  useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ConfigurarStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-// Cores predefinidas para escolha
 const CORES_DISPONIVEIS = [
-  { nome: "Cinza", valor: "#6b7280" },
-  { nome: "Azul", valor: "#3b82f6" },
-  { nome: "Verde", valor: "#22c55e" },
+  { nome: "Cinza",    valor: "#6b7280" },
+  { nome: "Azul",    valor: "#3b82f6" },
+  { nome: "Verde",   valor: "#22c55e" },
   { nome: "Amarelo", valor: "#f59e0b" },
-  { nome: "Vermelho", valor: "#ef4444" },
-  { nome: "Roxo", valor: "#8b5cf6" },
-  { nome: "Rosa", valor: "#ec4899" },
-  { nome: "Ciano", valor: "#06b6d4" },
+  { nome: "Vermelho",valor: "#ef4444" },
+  { nome: "Roxo",    valor: "#8b5cf6" },
+  { nome: "Rosa",    valor: "#ec4899" },
+  { nome: "Ciano",   valor: "#06b6d4" },
   { nome: "Laranja", valor: "#f97316" },
-  { nome: "Lima", valor: "#84cc16" },
+  { nome: "Lima",    valor: "#84cc16" },
 ];
 
-// Componente para item arrastável
+// ── Item arrastável ──────────────────────────────────────────
 function SortableStatusItem({
-  status,
-  onEdit,
-  onDelete,
+  status, onEdit, onDelete,
 }: {
   status: DemandaStatus;
-  onEdit: (status: DemandaStatus) => void;
-  onDelete: (status: DemandaStatus) => void;
+  onEdit: (s: DemandaStatus) => void;
+  onDelete: (s: DemandaStatus) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: status.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: status.id });
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-3 p-3 bg-white border rounded-lg ${
-        isDragging ? "shadow-lg" : ""
-      }`}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-900 border rounded-lg ${isDragging ? "shadow-lg" : ""}`}
     >
-      <button
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-        {...attributes}
-        {...listeners}
-      >
+      <button className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" {...attributes} {...listeners}>
         <GripVertical className="h-5 w-5" />
       </button>
 
-      <div
-        className="w-4 h-4 rounded-full flex-shrink-0"
-        style={{ backgroundColor: status.cor }}
-      />
+      <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: status.cor }} />
 
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{status.nome}</div>
+        <div className="font-medium truncate flex items-center gap-1.5">
+          {status.nome}
+          {status.is_final && (
+            <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-1.5 py-0.5 rounded-full">
+              conclusão
+            </span>
+          )}
+        </div>
         <div className="text-xs text-gray-500 truncate">slug: {status.slug}</div>
       </div>
 
-      {status.notificar_municipe ? (
-        <Bell className="h-4 w-4 text-blue-500" title="Notifica munícipe" />
-      ) : (
-        <BellOff className="h-4 w-4 text-gray-300" title="Não notifica" />
-      )}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              {status.notificar_municipe
+                ? <Bell className="h-4 w-4 text-blue-500" />
+                : <BellOff className="h-4 w-4 text-gray-300" />}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {status.notificar_municipe ? "Notifica munícipe" : "Não notifica"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <Button variant="ghost" size="icon" onClick={() => onEdit(status)}>
         <Pencil className="h-4 w-4" />
       </Button>
-
       <Button
-        variant="ghost"
-        size="icon"
+        variant="ghost" size="icon"
         onClick={() => onDelete(status)}
         className="text-red-500 hover:text-red-700 hover:bg-red-50"
       >
@@ -142,12 +110,9 @@ function SortableStatusItem({
   );
 }
 
-// Formulário de edição/criação
+// ── Formulário de criação/edição ─────────────────────────────
 function StatusForm({
-  status,
-  onSave,
-  onCancel,
-  isLoading,
+  status, onSave, onCancel, isLoading,
 }: {
   status: Partial<DemandaStatus> | null;
   onSave: (data: Partial<DemandaStatus>) => void;
@@ -155,19 +120,12 @@ function StatusForm({
   isLoading: boolean;
 }) {
   const [formData, setFormData] = useState<Partial<DemandaStatus>>(
-    status || {
-      nome: "",
-      slug: "",
-      cor: "#6b7280",
-      notificar_municipe: false,
-    }
+    status || { nome: "", slug: "", cor: "#6b7280", notificar_municipe: false, is_final: false }
   );
-
   const isEditing = !!status?.id;
 
   const handleNomeChange = (nome: string) => {
     const newData: Partial<DemandaStatus> = { ...formData, nome };
-    // Auto-gerar slug se não estiver editando
     if (!isEditing) {
       newData.slug = nome
         .toLowerCase()
@@ -180,10 +138,8 @@ function StatusForm({
   };
 
   return (
-    <div className="space-y-4 p-4 bg-gray-50 rounded-lg border">
-      <h4 className="font-medium">
-        {isEditing ? "Editar Status" : "Novo Status"}
-      </h4>
+    <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border">
+      <h4 className="font-medium">{isEditing ? "Editar Status" : "Novo Status"}</h4>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -195,7 +151,6 @@ function StatusForm({
             placeholder="Ex: Em Análise"
           />
         </div>
-
         <div className="space-y-2">
           <Label htmlFor="slug">Identificador (slug)</Label>
           <Input
@@ -204,13 +159,9 @@ function StatusForm({
             onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
             placeholder="em_analise"
             disabled={isEditing}
-            className={isEditing ? "bg-gray-100" : ""}
+            className={isEditing ? "bg-gray-100 dark:bg-gray-700" : ""}
           />
-          {isEditing && (
-            <p className="text-xs text-gray-500">
-              O identificador não pode ser alterado
-            </p>
-          )}
+          {isEditing && <p className="text-xs text-gray-500">O identificador não pode ser alterado</p>}
         </div>
       </div>
 
@@ -223,9 +174,7 @@ function StatusForm({
               type="button"
               onClick={() => setFormData({ ...formData, cor: cor.valor })}
               className={`w-8 h-8 rounded-full border-2 transition-all ${
-                formData.cor === cor.valor
-                  ? "border-gray-800 scale-110"
-                  : "border-transparent hover:scale-105"
+                formData.cor === cor.valor ? "border-gray-800 dark:border-white scale-110" : "border-transparent hover:scale-105"
               }`}
               style={{ backgroundColor: cor.valor }}
               title={cor.nome}
@@ -234,31 +183,45 @@ function StatusForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* Notificar munícipe */}
+      <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border">
         <div className="space-y-0.5">
-          <Label htmlFor="notificar">Notificar munícipe</Label>
-          <p className="text-xs text-gray-500">
-            Enviar WhatsApp quando a demanda entrar neste status
-          </p>
+          <Label htmlFor="notificar" className="flex items-center gap-1.5 cursor-pointer">
+            <Bell className="h-4 w-4 text-blue-500" />
+            Notificar munícipe
+          </Label>
+          <p className="text-xs text-gray-500">Enviar WhatsApp quando a demanda entrar neste status</p>
         </div>
         <Switch
           id="notificar"
           checked={formData.notificar_municipe || false}
-          onCheckedChange={(checked) =>
-            setFormData({ ...formData, notificar_municipe: checked })
-          }
+          onCheckedChange={(checked) => setFormData({ ...formData, notificar_municipe: checked })}
+        />
+      </div>
+
+      {/* Status de conclusão — o novo campo */}
+      <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border">
+        <div className="space-y-0.5">
+          <Label htmlFor="is_final" className="flex items-center gap-1.5 cursor-pointer">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            Status de conclusão
+          </Label>
+          <p className="text-xs text-gray-500">
+            Marca este status como "concluído" — usado para calcular taxa de conclusão e KPIs do dashboard
+          </p>
+        </div>
+        <Switch
+          id="is_final"
+          checked={formData.is_final || false}
+          onCheckedChange={(checked) => setFormData({ ...formData, is_final: checked })}
         />
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onCancel} disabled={isLoading}>
-          <X className="h-4 w-4 mr-2" />
-          Cancelar
+          <X className="h-4 w-4 mr-2" />Cancelar
         </Button>
-        <Button
-          onClick={() => onSave(formData)}
-          disabled={!formData.nome || isLoading}
-        >
+        <Button onClick={() => onSave(formData)} disabled={!formData.nome || isLoading}>
           <Save className="h-4 w-4 mr-2" />
           {isLoading ? "Salvando..." : "Salvar"}
         </Button>
@@ -267,95 +230,43 @@ function StatusForm({
   );
 }
 
-export function ConfigurarStatusDialog({
-  open,
-  onOpenChange,
-}: ConfigurarStatusDialogProps) {
-  const {
-    allStatusList,
-    isLoadingAll,
-    createStatus,
-    updateStatus,
-    deleteStatus,
-    reorderStatus,
-  } = useDemandaStatus();
+// ── Dialog principal ─────────────────────────────────────────
+export function ConfigurarStatusDialog({ open, onOpenChange }: ConfigurarStatusDialogProps) {
+  const { allStatusList, isLoadingAll, createStatus, updateStatus, deleteStatus, reorderStatus } =
+    useDemandaStatus();
 
   const [editingStatus, setEditingStatus] = useState<Partial<DemandaStatus> | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [statusToDelete, setStatusToDelete] = useState<DemandaStatus | null>(null);
   const [localOrder, setLocalOrder] = useState<DemandaStatus[]>([]);
 
-  // Sincronizar ordem local com dados do servidor
-  useState(() => {
-    if (allStatusList.length > 0) {
-      setLocalOrder(allStatusList);
-    }
-  });
-
-  // Atualizar ordem local quando dados mudarem
-  if (allStatusList.length > 0 && localOrder.length === 0) {
-    setLocalOrder(allStatusList);
-  }
+  if (allStatusList.length > 0 && localOrder.length === 0) setLocalOrder(allStatusList);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
-      const oldIndex = localOrder.findIndex((s) => s.id === active.id);
-      const newIndex = localOrder.findIndex((s) => s.id === over.id);
-
+      const oldIndex = localOrder.findIndex(s => s.id === active.id);
+      const newIndex = localOrder.findIndex(s => s.id === over.id);
       const newOrder = arrayMove(localOrder, oldIndex, newIndex);
       setLocalOrder(newOrder);
-
-      // Salvar nova ordem no servidor
-      reorderStatus.mutate(newOrder.map((s) => s.id));
-    }
-  };
-
-  const handleEdit = (status: DemandaStatus) => {
-    setEditingStatus(status);
-    setShowForm(true);
-  };
-
-  const handleDelete = (status: DemandaStatus) => {
-    setStatusToDelete(status);
-  };
-
-  const confirmDelete = () => {
-    if (statusToDelete) {
-      deleteStatus.mutate(statusToDelete.id);
-      setStatusToDelete(null);
+      reorderStatus.mutate(newOrder.map(s => s.id));
     }
   };
 
   const handleSave = (data: Partial<DemandaStatus>) => {
-    if (editingStatus?.id) {
-      updateStatus.mutate({ id: editingStatus.id, ...data });
-    } else {
-      createStatus.mutate(data);
-    }
+    if (editingStatus?.id) updateStatus.mutate({ id: editingStatus.id, ...data });
+    else createStatus.mutate(data);
     setShowForm(false);
     setEditingStatus(null);
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingStatus(null);
-  };
-
-  const handleAddNew = () => {
-    setEditingStatus(null);
-    setShowForm(true);
   };
 
   const displayList = localOrder.length > 0 ? localOrder : allStatusList;
+  const finalCount = displayList.filter(s => s.is_final).length;
 
   return (
     <>
@@ -369,32 +280,29 @@ export function ConfigurarStatusDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Arraste para reordenar. A ordem define a sequência nos filtros e
-              selects.
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Arraste para reordenar. A ordem define o funil no dashboard.
+              </p>
+              {finalCount > 0 && (
+                <span className="text-xs text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-2 py-0.5 rounded-full">
+                  {finalCount} de conclusão
+                </span>
+              )}
+            </div>
 
             {isLoadingAll ? (
-              <div className="text-center py-8 text-gray-500">
-                Carregando status...
-              </div>
+              <div className="text-center py-8 text-gray-500">Carregando status...</div>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={displayList.map((s) => s.id)}
-                  strategy={verticalListSortingStrategy}
-                >
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={displayList.map(s => s.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
-                    {displayList.map((status) => (
+                    {displayList.map(status => (
                       <SortableStatusItem
                         key={status.id}
                         status={status}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
+                        onEdit={s => { setEditingStatus(s); setShowForm(true); }}
+                        onDelete={s => setStatusToDelete(s)}
                       />
                     ))}
                   </div>
@@ -406,38 +314,31 @@ export function ConfigurarStatusDialog({
               <StatusForm
                 status={editingStatus}
                 onSave={handleSave}
-                onCancel={handleCancel}
+                onCancel={() => { setShowForm(false); setEditingStatus(null); }}
                 isLoading={createStatus.isPending || updateStatus.isPending}
               />
             ) : (
-              <Button onClick={handleAddNew} className="w-full" variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Novo Status
+              <Button onClick={() => { setEditingStatus(null); setShowForm(true); }} className="w-full" variant="outline">
+                <Plus className="h-4 w-4 mr-2" />Adicionar Novo Status
               </Button>
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={!!statusToDelete}
-        onOpenChange={() => setStatusToDelete(null)}
-      >
+      <AlertDialog open={!!statusToDelete} onOpenChange={() => setStatusToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir status?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o status "{statusToDelete?.nome}"?
-              <br />
-              <br />
-              <strong>Atenção:</strong> Não será possível excluir se houver
-              demandas usando este status.
+              Tem certeza que deseja excluir "{statusToDelete?.nome}"?<br /><br />
+              <strong>Atenção:</strong> Não será possível excluir se houver demandas usando este status.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={() => { if (statusToDelete) { deleteStatus.mutate(statusToDelete.id); setStatusToDelete(null); } }}
               className="bg-red-600 hover:bg-red-700"
             >
               Excluir
