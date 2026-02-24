@@ -446,6 +446,7 @@ export type Database = {
           ordem: number
           ativo: boolean
           notificar_municipe: boolean
+          is_final: boolean
           created_at: string
           updated_at: string
         }
@@ -458,6 +459,7 @@ export type Database = {
           ordem?: number
           ativo?: boolean
           notificar_municipe?: boolean
+          is_final?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -470,6 +472,7 @@ export type Database = {
           ordem?: number
           ativo?: boolean
           notificar_municipe?: boolean
+          is_final?: boolean
           created_at?: string
           updated_at?: string
         }
