@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logError } from "@/lib/errorUtils";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
+export type RecentesDias = 7 | 15 | 30;
+
 export function useDashboardData() {
   const { statusList, finalSlugs, getStatusLabel, getStatusColor } = useDemandaStatus();
+  const [recentesDias, setRecentesDias] = useState<RecentesDias>(7);
 
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -13,33 +17,23 @@ export function useDashboardData() {
   const { data: kpiData, isLoading: isLoadingKpis } = useQuery({
     queryKey: ["dashboard-kpis", todayStr, finalSlugs],
     queryFn: async () => {
-      // Aguardar finalSlugs estar disponível (vem do hook de status)
       const closedFilter = finalSlugs.length > 0
         ? `(${finalSlugs.join(",")})`
-        : "(__never__)"; // fallback seguro que não bate em nada
+        : "(__never__)";
 
-      const [totalRes, abertasRes, atrasoRes, concluidasRes, municRes, recentes7Res, recentes30Res] =
+      const [totalRes, abertasRes, atrasoRes, concluidasRes, municRes] =
         await Promise.all([
           supabase.from("demandas").select("id", { count: "exact", head: true }),
-          // Abertas = não está em nenhum status final
           supabase.from("demandas").select("id", { count: "exact", head: true })
             .not("status", "in", closedFilter),
-          // Em atraso = prazo vencido + não finalizada
           supabase.from("demandas").select("id", { count: "exact", head: true })
             .lt("data_prazo", todayStr)
             .not("status", "in", closedFilter),
-          // Concluídas = está em algum status final
           finalSlugs.length > 0
             ? supabase.from("demandas").select("id", { count: "exact", head: true })
                 .in("status", finalSlugs)
             : Promise.resolve({ count: 0, error: null }),
           supabase.from("municipes").select("id", { count: "exact", head: true }),
-          // Criadas nos últimos 7 dias
-          supabase.from("demandas").select("id", { count: "exact", head: true })
-            .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
-          // Criadas nos últimos 30 dias
-          supabase.from("demandas").select("id", { count: "exact", head: true })
-            .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString()),
         ]);
 
       const total = totalRes.count || 0;
@@ -51,22 +45,20 @@ export function useDashboardData() {
         demandasEmAtraso: atrasoRes.count || 0,
         totalMunicipes: municRes.count || 0,
         taxaConclusao: total > 0 ? Math.round((concluidas / total) * 100) : 0,
-        recentes7dias: recentes7Res.count || 0,
-        recentes30dias: recentes30Res.count || 0,
       };
     },
-    enabled: statusList.length > 0, // só roda quando os status já carregaram
+    enabled: statusList.length > 0,
     retry: 2,
     staleTime: 30000,
   });
 
-  // ── Dados para gráficos de status e áreas ──────────────────
+  // ── Dados para gráficos (status, áreas, prioridade) ─────────
   const { data: chartDemandas = [], isLoading: isLoadingCharts } = useQuery({
     queryKey: ["dashboard-chart-data"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("demandas")
-        .select("status, humor, area_id, areas(nome)");
+        .select("status, humor, area_id, prioridade, areas(nome)");
       if (error) { logError("Dashboard chart data:", error); throw error; }
       return data || [];
     },
@@ -93,15 +85,16 @@ export function useDashboardData() {
     staleTime: 30000,
   });
 
-  // ── Demandas recentes (últimas 8) ───────────────────────────
+  // ── Demandas recentes (baseado no período selecionado) ──────
   const { data: recentesData = [], isLoading: isLoadingRecentes } = useQuery({
-    queryKey: ["dashboard-recentes"],
+    queryKey: ["dashboard-recentes", recentesDias],
     queryFn: async () => {
+      const since = new Date(Date.now() - recentesDias * 86400000).toISOString();
       const { data, error } = await supabase
         .from("demandas")
         .select("id, titulo, protocolo, status, created_at, areas(nome), municipes(nome)")
-        .order("created_at", { ascending: false })
-        .limit(8);
+        .gte("created_at", since)
+        .order("created_at", { ascending: false });
       if (error) { logError("Dashboard recentes:", error); throw error; }
       return data || [];
     },
@@ -109,24 +102,31 @@ export function useDashboardData() {
     staleTime: 30000,
   });
 
-  // ── Aniversariantes do dia ──────────────────────────────────
-  const { data: aniversariantesData = [], isLoading: isLoadingAniversarios } = useQuery({
-    queryKey: ["dashboard-aniversarios", todayStr],
+  // ── Aniversariantes do dia ── busca tudo e filtra client-side
+  // (igual à lógica do WhatsApp — .like() em data não funciona no Postgres)
+  const { data: aniversariantesRaw = [], isLoading: isLoadingAniversarios } = useQuery({
+    queryKey: ["dashboard-aniversarios"],
     queryFn: async () => {
-      const today = new Date();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const dd = String(today.getDate()).padStart(2, "0");
-      // Busca por mês e dia independente do ano
       const { data, error } = await supabase
         .from("municipes")
         .select("id, nome, telefone, bairro, cidade, data_nascimento")
-        .not("data_nascimento", "is", null)
-        .like("data_nascimento", `%-${mm}-${dd}`);
+        .not("data_nascimento", "is", null);
       if (error) { logError("Dashboard aniversarios:", error); throw error; }
       return data || [];
     },
     retry: 2,
     staleTime: 60000,
+  });
+
+  // Filtrar client-side por mês e dia
+  const hoje = new Date();
+  const mesHoje = hoje.getMonth() + 1;
+  const diaHoje = hoje.getDate();
+
+  const aniversariantesData = aniversariantesRaw.filter((m: any) => {
+    if (!m.data_nascimento) return false;
+    const [, mesNasc, diaNasc] = m.data_nascimento.split("-").map(Number);
+    return mesNasc === mesHoje && diaNasc === diaHoje;
   });
 
   // ── Projetos ────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export function useDashboardData() {
 
   const kpis = kpiData || {
     totalDemandas: 0, demandasAbertas: 0, demandasEmAtraso: 0,
-    totalMunicipes: 0, taxaConclusao: 0, recentes7dias: 0, recentes30dias: 0,
+    totalMunicipes: 0, taxaConclusao: 0,
   };
 
   // ── Humorômetro ──
@@ -177,29 +177,42 @@ export function useDashboardData() {
     count: chartDemandas.filter((d: any) => d.humor === slug).length,
   }));
 
-  // ── Demandas por Status (donut) ──
+  // ── Status counts ──
   const statusCountMap: Record<string, number> = {};
   chartDemandas.forEach((d: any) => {
     const s = d.status || "solicitada";
     statusCountMap[s] = (statusCountMap[s] || 0) + 1;
   });
 
-  const totalForPercent = chartDemandas.length;
-  const demandasPorStatus = Object.entries(statusCountMap)
-    .map(([slug, count]) => ({
-      name: getStatusLabel(slug), slug, value: count,
-      percent: totalForPercent > 0 ? Math.round((count / totalForPercent) * 100) : 0,
-      color: getStatusColor(slug),
-    }))
-    .sort((a, b) => b.value - a.value);
-
-  // ── Funil (respeita ordem configurada) ──
+  // ── Funil (ordem configurada) ──
   const funilData = statusList.map(s => ({
     name: s.nome, slug: s.slug,
     value: statusCountMap[s.slug] || 0,
     color: s.cor,
     is_final: s.is_final,
   }));
+
+  // ── Prioridades ──
+  const PRIORIDADE_CONFIG: Record<string, { label: string; color: string; order: number }> = {
+    urgente: { label: "Urgente", color: "#ef4444", order: 0 },
+    alta:    { label: "Alta",    color: "#f97316", order: 1 },
+    media:   { label: "Média",   color: "#eab308", order: 2 },
+    baixa:   { label: "Baixa",   color: "#22c55e", order: 3 },
+  };
+
+  const prioridadeMap: Record<string, number> = {};
+  chartDemandas.forEach((d: any) => {
+    const p = d.prioridade || "media";
+    prioridadeMap[p] = (prioridadeMap[p] || 0) + 1;
+  });
+
+  const prioridadeData = Object.entries(PRIORIDADE_CONFIG)
+    .map(([slug, cfg]) => ({
+      slug, label: cfg.label, color: cfg.color,
+      value: prioridadeMap[slug] || 0,
+      order: cfg.order,
+    }))
+    .sort((a, b) => a.order - b.order);
 
   // ── Top 5 Áreas × Status ──
   const areaStatusAcc: Record<string, Record<string, number>> = {};
@@ -266,6 +279,8 @@ export function useDashboardData() {
                isLoadingProjetos || isLoadingRecentes || isLoadingAniversarios,
 
     kpis,
+    recentesDias,
+    setRecentesDias,
 
     humor: {
       media: humorMedia, mediaSlug: humorMediaSlug,
@@ -273,7 +288,7 @@ export function useDashboardData() {
       total: demandasComHumor.length, distribuicao: humorDistribuicao,
     },
 
-    charts: { demandasPorStatus, funilData, top5Areas, uniqueStatuses, projetosPlanilhasStatus },
+    charts: { funilData, prioridadeData, top5Areas, uniqueStatuses, projetosPlanilhasStatus },
 
     overdue: {
       demandasEmAtraso: kpis.demandasEmAtraso,
