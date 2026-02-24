@@ -13,6 +13,7 @@ interface ImportResult {
   error?: string;
   id?: string;
   geocodificado?: boolean;
+  action?: 'criado' | 'atualizado';
 }
 
 interface ImportCSVDialogDemandasProps {
@@ -133,6 +134,8 @@ export function ImportCSVDialogDemandas({
   const successCount = importResults?.filter(r => r.success).length || 0;
   const errorCount = importResults?.filter(r => !r.success).length || 0;
   const geocodificadosCount = importResults?.filter(r => r.success && r.geocodificado).length || 0;
+  const criadosCount = importResults?.filter(r => r.success && r.action === 'criado').length || 0;
+  const atualizadosCount = importResults?.filter(r => r.success && r.action === 'atualizado').length || 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -203,9 +206,16 @@ export function ImportCSVDialogDemandas({
                   <div>
                     <h3 className="font-semibold text-lg">Importação Concluída</h3>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      <Badge variant="secondary" className="text-green-700 bg-green-100">
-                        {successCount} importadas
-                      </Badge>
+                      {criadosCount > 0 && (
+                        <Badge variant="secondary" className="text-green-700 bg-green-100">
+                          {criadosCount} criadas
+                        </Badge>
+                      )}
+                      {atualizadosCount > 0 && (
+                        <Badge variant="secondary" className="text-orange-700 bg-orange-100">
+                          {atualizadosCount} atualizadas
+                        </Badge>
+                      )}
                       {errorCount > 0 && (
                         <Badge variant="secondary" className="text-red-700 bg-red-100">
                           {errorCount} erros
@@ -236,6 +246,11 @@ export function ImportCSVDialogDemandas({
                         <>
                           <CheckCircle className="h-4 w-4 flex-shrink-0" />
                           <span className="truncate">{result.titulo}</span>
+                          {result.action === 'atualizado' && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px] px-1 py-0 flex-shrink-0">
+                              atualizado
+                            </Badge>
+                          )}
                           {result.geocodificado && (
                             <MapPin className="h-3 w-3 text-blue-600 flex-shrink-0" title="Geocodificado" />
                           )}
@@ -457,6 +472,23 @@ export function ImportCSVDialogDemandas({
                 </Card>
               </div>
 
+              {/* Reimportação */}
+              <Card className="border-orange-500/30 bg-orange-50 dark:bg-orange-950/20">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-orange-600 text-lg">🔄</div>
+                    <div>
+                      <h4 className="font-medium text-orange-900 dark:text-orange-100">Atualização em massa</h4>
+                      <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                        Você também pode <strong>exportar</strong> suas demandas, alterar o status ou outros campos no Excel 
+                        e <strong>reimportar</strong>. O sistema detecta automaticamente a coluna "protocolo" e 
+                        atualiza as demandas existentes em vez de criar duplicatas.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Dicas importantes */}
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Dicas Importantes</h3>
@@ -465,7 +497,7 @@ export function ImportCSVDialogDemandas({
                   <p>• O <strong>municipe_nome</strong> deve corresponder exatamente ao nome de um munícipe já cadastrado (ex: "Maria Silva Santos")</p>
                   <p>• <strong>responsavel_nome</strong> deve corresponder ao nome de um usuário cadastrado</p>
                   <p>• <strong>area_nome</strong> deve corresponder a uma área existente no sistema</p>
-                  <p>• <strong>status</strong> deve ser: solicitada, em_producao, encaminhado, atendido ou devolvido</p>
+                  <p>• <strong>status</strong> deve corresponder ao slug de um status cadastrado no sistema</p>
                   <p>• <strong>prioridade</strong> deve ser: baixa, media, alta ou urgente</p>
                   <p>• <strong>data_prazo</strong> deve estar no formato AAAA-MM-DD (ex: 2025-12-31)</p>
                   <p>• O arquivo modelo usa ponto e vírgula (;) como separador de colunas</p>
