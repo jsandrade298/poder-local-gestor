@@ -51,7 +51,7 @@ export default function Demandas() {
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   
   // Estados para paginação
-  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [pageSize, setPageSize] = useState<number | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [searchParams, setSearchParams] = useSearchParams();
