@@ -320,7 +320,7 @@ export function useMapaUnificado() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Buscar munícipes - TODOS
+  // Buscar munícipes — com join para tags (query única ao invés de 3 sequenciais)
   const { 
     data: municipesRaw = [], 
     isLoading: isLoadingMunicipes,
@@ -328,8 +328,9 @@ export function useMapaUnificado() {
   } = useQuery({
     queryKey: ['mapa-municipes-todos'],
     queryFn: async () => {
-      console.log('🔄 [MAPA] Buscando todos os munícipes...');
+      console.log('🔄 [MAPA] Buscando munícipes com tags (query única)...');
       
+      // Query única com join — substitui 3 queries sequenciais
       const { data, error } = await supabase
         .from('municipes')
         .select(`
@@ -343,7 +344,10 @@ export function useMapaUnificado() {
           endereco,
           cidade,
           cep,
-          categoria_id
+          categoria_id,
+          municipe_tags(
+            tags(id, nome, cor)
+          )
         `);
       
       if (error) {
@@ -352,38 +356,12 @@ export function useMapaUnificado() {
       }
       
       if (!data || data.length === 0) return [];
-      
-      // Buscar tags dos munícipes
-      const { data: tagsData } = await supabase
-        .from('municipe_tags')
-        .select(`
-          municipe_id,
-          tags (id, nome, cor)
-        `)
-        .in('municipe_id', data.map(m => m.id));
-      
-      // Buscar contagem de demandas por munícipe
+
+      // Buscar contagem de demandas — query leve (só municipe_id)
       const { data: demandasCount } = await supabase
         .from('demandas')
-        .select('municipe_id')
-        .in('municipe_id', data.map(m => m.id));
+        .select('municipe_id');
       
-      // Organizar tags por munícipe
-      const tagsPorMunicipe: Record<string, { id: string; nome: string; cor: string | null }[]> = {};
-      (tagsData || []).forEach(item => {
-        if (!tagsPorMunicipe[item.municipe_id]) {
-          tagsPorMunicipe[item.municipe_id] = [];
-        }
-        if (item.tags) {
-          tagsPorMunicipe[item.municipe_id].push({
-            id: item.tags.id,
-            nome: item.tags.nome,
-            cor: item.tags.cor || gerarCorPorTexto(item.tags.nome)
-          });
-        }
-      });
-      
-      // Contar demandas por munícipe
       const contagemDemandas: Record<string, number> = {};
       (demandasCount || []).forEach(d => {
         contagemDemandas[d.municipe_id] = (contagemDemandas[d.municipe_id] || 0) + 1;
@@ -393,10 +371,14 @@ export function useMapaUnificado() {
         const latNum = typeof m.latitude === 'string' ? parseFloat(m.latitude) : (m.latitude || null);
         const lngNum = typeof m.longitude === 'string' ? parseFloat(m.longitude) : (m.longitude || null);
         
-        // Debug: log categoria_id
-        if (m.categoria_id) {
-          console.log(`📌 [MAPA] Munícipe "${m.nome}" tem categoria_id: ${m.categoria_id}`);
-        }
+        // Extrair tags do join
+        const tags = (m.municipe_tags || [])
+          .filter((mt: any) => mt.tags)
+          .map((mt: any) => ({
+            id: mt.tags.id,
+            nome: mt.tags.nome,
+            cor: mt.tags.cor || gerarCorPorTexto(mt.tags.nome)
+          }));
         
         return {
           id: m.id,
@@ -416,17 +398,13 @@ export function useMapaUnificado() {
             m.cidade,
             m.cep
           ),
-          tags: tagsPorMunicipe[m.id] || [],
+          tags,
           categoria_id: m.categoria_id || null,
           demandas_count: contagemDemandas[m.id] || 0,
           geocodificado: isValidCoordinate(latNum, lngNum),
           tipo: 'municipe' as const
         };
       });
-      
-      // Debug: resumo
-      const comCategoria = processados.filter(m => m.categoria_id).length;
-      console.log(`📊 [MAPA] Munícipes com categoria: ${comCategoria}/${processados.length}`);
       
       return processados as MunicipeMapa[];
     },
