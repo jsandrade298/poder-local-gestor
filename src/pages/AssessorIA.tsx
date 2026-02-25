@@ -33,10 +33,13 @@ interface DocumentoModelo {
   created_at: string;
 }
 
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const AssessorIA = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  // Flag para garantir que o state da demanda só é processado uma única vez
+  const processedRef = useRef(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -84,65 +87,53 @@ const AssessorIA = () => {
     }
   };
 
-  // Processar dados vindos de demanda
+  // Processar dados vindos de demanda — executa UMA vez na montagem
   useEffect(() => {
+    if (processedRef.current) return;
     const promptData = location.state?.promptData;
-    if (promptData) {
-      // Construir prompt estruturado baseado nos dados da demanda
-      let prompt = `Com base na demanda a seguir, elabore um [TIPO DE PROPOSITURA]:\n\n`;
-      
-      prompt += `DADOS DA DEMANDA:\n`;
-      prompt += `• DESCRIÇÃO: ${promptData.descricao}\n`;
-      
-      if (promptData.endereco) {
-        prompt += `• ENDEREÇO: ${promptData.endereco}\n`;
-      }
-      
-      if (promptData.area) {
-        prompt += `• Área: ${promptData.area}\n`;
-      }
-      
-      if (promptData.observacoes) {
-        prompt += `• OBSERVAÇÕES: ${promptData.observacoes}\n`;
-      }
+    if (!promptData) return;
 
-      // Incluir histórico de atividades se disponível
-      if (promptData.atividades && promptData.atividades.length > 0) {
-        prompt += `\nHISTÓRICO DE ATIVIDADES DA DEMANDA:\n`;
-        promptData.atividades.forEach((atv: any, index: number) => {
-          prompt += `\n--- Atividade ${index + 1} ---\n`;
-          prompt += `• Tipo: ${atv.tipo}\n`;
-          prompt += `• Título: ${atv.titulo}\n`;
-          if (atv.data) {
-            prompt += `• Data: ${formatAtividadeData(atv.data)}\n`;
-          }
-          if (atv.autor) {
-            prompt += `• Autor: ${atv.autor}\n`;
-          }
-          if (atv.descricao) {
-            prompt += `• Descrição: ${atv.descricao}\n`;
-          }
-          if (atv.propositura) {
-            prompt += `• Propositura: ${atv.propositura}\n`;
-          }
-          if (atv.status_propositura) {
-            prompt += `• Status da Propositura: ${atv.status_propositura}\n`;
-          }
-          if (atv.link_propositura) {
-            prompt += `• Link da Propositura: ${atv.link_propositura}\n`;
-          }
-        });
-      }
-      
-      prompt += `\nPor favor, redija um [TIPO DE PROPOSITURA] oficial baseado nestes dados, seguindo os modelos de documentos enviados no contexto.`;
-      
-      // Pré-preencher o campo de input
-      setInputMessage(prompt);
-      
-      // Limpar os dados do location.state para evitar repetição
-      window.history.replaceState({}, document.title);
+    processedRef.current = true;
+
+    // Construir prompt estruturado com os dados da demanda
+    let prompt = `Com base na demanda a seguir, elabore o documento solicitado:\n\n`;
+    prompt += `📋 DADOS DA DEMANDA\n`;
+    prompt += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (promptData.protocolo) prompt += `• Protocolo: ${promptData.protocolo}\n`;
+    if (promptData.titulo)    prompt += `• Título: ${promptData.titulo}\n`;
+    if (promptData.descricao) prompt += `• Descrição: ${promptData.descricao}\n`;
+    if (promptData.area)      prompt += `• Área: ${promptData.area}\n`;
+    if (promptData.municipe)  prompt += `• Munícipe: ${promptData.municipe}\n`;
+    if (promptData.endereco)  prompt += `• Endereço: ${promptData.endereco}\n`;
+    if (promptData.observacoes) prompt += `• Observações: ${promptData.observacoes}\n`;
+
+    if (promptData.atividades && promptData.atividades.length > 0) {
+      prompt += `\n📅 HISTÓRICO DE ATIVIDADES\n`;
+      prompt += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      promptData.atividades.forEach((atv: any, index: number) => {
+        prompt += `\nAtividade ${index + 1}: ${atv.titulo}\n`;
+        prompt += `  • Tipo: ${atv.tipo}\n`;
+        if (atv.data)               prompt += `  • Data: ${formatAtividadeData(atv.data)}\n`;
+        if (atv.autor)              prompt += `  • Autor: ${atv.autor}\n`;
+        if (atv.descricao)          prompt += `  • Descrição: ${atv.descricao}\n`;
+        if (atv.propositura)        prompt += `  • Propositura: ${atv.propositura}\n`;
+        if (atv.status_propositura) prompt += `  • Status: ${atv.status_propositura}\n`;
+        if (atv.link_propositura)   prompt += `  • Link: ${atv.link_propositura}\n`;
+      });
     }
-  }, [location.state]);
+
+    prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    prompt += `Por favor, indique o tipo de propositura desejado e selecione um modelo na Biblioteca de Documentos antes de enviar.`;
+
+    // Pré-preencher textarea — usando timeout para garantir que o componente está montado
+    setTimeout(() => {
+      setInputMessage(prompt);
+    }, 50);
+
+    // Limpar state do router para não repetir em navegações futuras
+    navigate(location.pathname, { replace: true, state: {} });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
