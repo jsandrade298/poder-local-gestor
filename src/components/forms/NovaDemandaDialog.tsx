@@ -240,6 +240,9 @@ export function NovaDemandaDialog() {
 
       if (error) throw error;
 
+      // Gerar embedding em background (sem await — não bloqueia o usuário)
+      supabase.functions.invoke('gerar-embedding', { body: { demanda_id: demanda.id } });
+
       if (files.length > 0) {
         await uploadFiles(demanda.id);
       }
