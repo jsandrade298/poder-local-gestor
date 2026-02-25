@@ -40,7 +40,7 @@ const AssessorIA = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
-  const [selectedModel, setSelectedModel] = useState<'gpt-5' | 'gpt-5-mini'>('gpt-5-mini');
+  const [selectedModel, setSelectedModel] = useState<'pleno' | 'expert'>('pleno');
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -296,13 +296,13 @@ const AssessorIA = () => {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Modelo:</span>
-                  <Select value={selectedModel} onValueChange={(value: 'gpt-5' | 'gpt-5-mini') => setSelectedModel(value)}>
+                  <Select value={selectedModel} onValueChange={(value: 'pleno' | 'expert') => setSelectedModel(value)}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
-                      <SelectItem value="gpt-5">GPT-5</SelectItem>
+                      <SelectItem value="pleno">Pleno</SelectItem>
+                      <SelectItem value="expert">Expert</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
