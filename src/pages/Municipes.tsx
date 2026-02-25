@@ -31,6 +31,13 @@ import { ConfirmarDuplicadosDialog, DuplicateMatch } from "@/components/forms/Co
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  // Debounce da busca para não disparar query a cada tecla
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   const [tagFilter, setTagFilter] = useState("all");
   const [bairroFilter, setBairroFilter] = useState("all");
   const [cidadeFilter, setCidadeFilter] = useState("all");
@@ -67,7 +74,7 @@ export default function Municipes() {
   const [pendingRawTagNames, setPendingRawTagNames] = useState<Map<string, string>>(new Map()); // lowercase -> original
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(-1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
@@ -75,7 +82,7 @@ export default function Municipes() {
 
   // Buscar munícipes com filtros server-side e paginação
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['municipes-complete', bairroFilter, cidadeFilter, itemsPerPage, currentPage],
+    queryKey: ['municipes-complete', bairroFilter, cidadeFilter, itemsPerPage, currentPage, debouncedSearchTerm],
     queryFn: async () => {
       // Construir query base com filtros server-side
       const buildQuery = () => {
@@ -96,6 +103,12 @@ export default function Municipes() {
         // Filtros server-side
         if (bairroFilter !== "all") query = query.ilike('bairro', bairroFilter);
         if (cidadeFilter !== "all") query = query.ilike('cidade', cidadeFilter);
+
+        // Busca por nome — server-side para funcionar com qualquer pageSize
+        if (debouncedSearchTerm) {
+          const term = `%${debouncedSearchTerm}%`;
+          query = query.or(`nome.ilike.${term},email.ilike.${term},telefone.ilike.${term}`);
+        }
 
         return query;
       };
@@ -260,10 +273,9 @@ export default function Municipes() {
   // Client-side filters (search, tag, demanda — estes envolvem joins ou dados cruzados)
   // Bairro e cidade já são filtrados server-side
   const filteredMunicipes = municipes.filter(municipe => {
-    const matchesSearch = !searchTerm || 
-      municipe.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      municipe.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      municipe.telefone?.includes(searchTerm);
+    // Nome/email/telefone já filtrados server-side quando itemsPerPage !== -1
+    // Quando -1 (todos em memória), server-side também já filtrou
+    const matchesSearch = true;
     
     const matchesTag = tagFilter === "all" || 
       (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => mt.tags?.id === tagFilter));
@@ -289,7 +301,7 @@ export default function Municipes() {
 
   // Paginação — quando server-side (sem filtros client-side ativos), usar total do server
   // Quando há filtros client-side, usar o total filtrado
-  const hasClientFilters = searchTerm || tagFilter !== "all" || demandaFilter !== "all" || demandaStatusFilter !== "all";
+  const hasClientFilters = debouncedSearchTerm || tagFilter !== "all" || demandaFilter !== "all" || demandaStatusFilter !== "all";
   const totalItems = hasClientFilters ? filteredMunicipes.length : municipesPaginado.total;
   const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
   // Quando paginação é server-side e sem filtros client-side, não precisa fatiar
