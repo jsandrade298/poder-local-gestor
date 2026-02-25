@@ -351,6 +351,15 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
 
       if (error) throw error;
 
+      // Regenerar embedding se título, descrição ou bairro foram alterados
+      const camposSemanticos = ['titulo', 'descricao', 'bairro'];
+      const mudouSemantica = camposSemanticos.some(
+        campo => cleanData[campo] !== undefined
+      );
+      if (mudouSemantica) {
+        supabase.functions.invoke('gerar-embedding', { body: { demanda_id: demanda.id } });
+      }
+
       // Criar notificação se o responsável mudou
       if (data.responsavel_id && 
           data.responsavel_id !== responsavelAnterior && 
