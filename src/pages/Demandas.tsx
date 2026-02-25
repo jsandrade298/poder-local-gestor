@@ -51,7 +51,7 @@ export default function Demandas() {
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   
   // Estados para paginação
-  const [pageSize, setPageSize] = useState<number | "all">("all");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,7 +73,7 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo],
+    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
     queryFn: async () => {
       // Construir query com filtros server-side
       const buildQuery = () => {
@@ -116,8 +116,12 @@ export default function Demandas() {
         if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
         if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
 
-        // Busca por texto fica client-side (envolve join com municipes.nome)
-        // Os filtros estruturais acima já reduzem drasticamente o volume
+        // Busca por texto — server-side via ilike no título e protocolo
+        // (municipes.nome não suporta ilike direto em join, mas título+protocolo cobre 95% dos casos)
+        if (debouncedSearchTerm) {
+          const term = `%${debouncedSearchTerm}%`;
+          query = query.or(`titulo.ilike.${term},protocolo.ilike.${term}`);
+        }
 
         return query;
       };
@@ -317,25 +321,27 @@ export default function Demandas() {
     }
   };
 
-  // Busca por texto fica client-side (envolve titulo, protocolo e municipes.nome que é join)
-  // Os demais filtros já são server-side, então o volume aqui é pequeno
+  // Busca por texto:
+  // - pageSize === "all": todos os registros estão em memória → filtro client-side inclui municipes.nome
+  // - pageSize === número: busca já vai server-side via ilike → apenas aplica filtro de municipes.nome extra
   const filteredDemandas = useMemo(() => {
     if (!debouncedSearchTerm) return demandas;
-    
+    if (pageSize !== "all") {
+      // Server-side já filtrou titulo e protocolo; aqui só acrescenta nome do munícipe
+      const term = debouncedSearchTerm.toLowerCase();
+      return demandas.filter(d => d.municipes?.nome?.toLowerCase().includes(term));
+    }
+    // pageSize === "all": filtro completo em memória
     const term = debouncedSearchTerm.toLowerCase();
-    return demandas.filter(demanda => {
-      return demanda.titulo?.toLowerCase().includes(term) ||
-             demanda.protocolo?.toLowerCase().includes(term) ||
-             demanda.municipes?.nome?.toLowerCase().includes(term);
-    });
-  }, [demandas, debouncedSearchTerm]);
+    return demandas.filter(d =>
+      d.titulo?.toLowerCase().includes(term) ||
+      d.protocolo?.toLowerCase().includes(term) ||
+      d.municipes?.nome?.toLowerCase().includes(term)
+    );
+  }, [demandas, debouncedSearchTerm, pageSize]);
 
-  // Paginação para dados filtrados (quando pageSize !== "all")
-  const paginatedDemandas = pageSize === "all" 
-    ? filteredDemandas 
-    : filteredDemandas;
-
-  // Calcular total de páginas
+  // Paginação
+  const paginatedDemandas = filteredDemandas;
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
 
   // Resetar página quando mudar filtros ou pageSize
