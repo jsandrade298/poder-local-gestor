@@ -305,8 +305,9 @@ const AssessorIA = () => {
         body: {
           message: text,
           conversationHistory: history,
-          model: "pleno",
+          modeId: activeMode,
           modeSystemPrompt: currentMode.systemPrompt,
+          demandaProtocolo: demandaContext?.protocolo || undefined,
           documentosContexto: documentosContexto.map((d) => ({ nome: d.nome, categoria: d.categoria, conteudo: truncar(d.conteudo_extraido || "") })),
         },
       });
@@ -350,10 +351,10 @@ const AssessorIA = () => {
     ];
 
     return [
-      { emoji: "📊", text: "Resumo da semana", desc: "Briefing de demandas, tarefas e prazos", action: () => { setActiveMode("resumo"); sendMessage("Me dá um resumo executivo do gabinete desta semana: demandas abertas e fechadas, tarefas pendentes, prazos críticos e destaques."); } },
-      { emoji: "🔍", text: "Padrões nas demandas", desc: "Identificar recorrências para proposituras", action: () => { setActiveMode("analise"); setInputMessage("Analisar as demandas dos últimos 30 dias. Identificar padrões recorrentes por bairro e área, e sugerir proposituras coletivas onde houver 3 ou mais demandas similares."); textareaRef.current?.focus(); } },
+      { emoji: "📊", text: "Resumo da semana", desc: "Briefing de demandas, tarefas e prazos", action: () => { setActiveMode("resumo"); sendMessage("Me dá um resumo executivo do gabinete desta semana: demandas abertas e fechadas, tarefas pendentes, prazos críticos, agenda e aniversariantes."); } },
+      { emoji: "🔍", text: "Padrões nas demandas", desc: "Identificar recorrências para proposituras", action: () => { setActiveMode("analise"); sendMessage("Analisar as demandas dos últimos 30 dias. Identificar padrões recorrentes por bairro e área, e sugerir proposituras coletivas onde houver 3 ou mais demandas similares."); } },
+      { emoji: "🏛️", text: "Preparar para sessão", desc: "Argumentos e temas para o plenário", action: () => { setActiveMode("pauta"); sendMessage("Preparar subsídios para a sessão plenária: quais temas das demandas posso destacar? Que argumentos e dados tenho disponíveis?"); } },
       { emoji: "📝", text: "Novo documento", desc: "Indicação, requerimento, PL ou ofício", action: () => { setActiveMode("redigir"); textareaRef.current?.focus(); } },
-      { emoji: "🎯", text: "Modo entrevista", desc: "IA conduz e monta o documento", action: () => { setActiveMode("entrevista"); sendMessage("Iniciar modo entrevista. Quero criar um documento legislativo e preciso de orientação sobre qual tipo usar."); } },
     ];
   };
 
@@ -599,7 +600,7 @@ const AssessorIA = () => {
                       </div>
 
                       {/* Botão "Transformar em propositura" para respostas de análise */}
-                      {msg.role === "assistant" && msg.modeId === "analise" && (
+                      {msg.role === "assistant" && (msg.modeId === "analise" || msg.modeId === "pauta") && (
                         <button
                           onClick={() => gerarProposituradaAnalise(msg.content)}
                           className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all hover:shadow-sm"
@@ -632,7 +633,7 @@ const AssessorIA = () => {
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <Loader2 className="w-2.5 h-2.5 text-muted-foreground animate-spin" />
                         <span className="text-[11px] font-mono text-muted-foreground">
-                          {activeMode === "analise" ? "Consultando demandas…" : activeMode === "resumo" ? "Compilando dados do gabinete…" : "Redigindo…"}
+                          {activeMode === "analise" ? "Consultando demandas do gabinete…" : activeMode === "resumo" ? "Compilando dados da semana…" : activeMode === "pauta" ? "Preparando subsídios para a sessão…" : activeMode === "whatsapp" ? "Redigindo mensagem…" : activeMode === "entrevista" ? "Analisando contexto…" : "Redigindo…"}
                         </span>
                       </div>
                     </div>
