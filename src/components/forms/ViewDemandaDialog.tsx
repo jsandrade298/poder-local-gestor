@@ -279,10 +279,12 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       atividades: atividadesData,
     };
 
-    // Navegar para o Assessor IA com os dados
-    navigate('/assessor-ia', { state: { promptData } });
-    onOpenChange(false); // Fechar modal
+    // Salvar dados no sessionStorage (mais confiável que location.state + dialog close)
+    sessionStorage.setItem('assessorIA_promptData', JSON.stringify(promptData));
+
+    onOpenChange(false); // Fechar modal primeiro
     setPopoverOpen(false);
+    navigate('/assessor-ia'); // Depois navegar
   };
 
   return (
