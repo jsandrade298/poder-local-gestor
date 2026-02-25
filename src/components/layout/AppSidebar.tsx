@@ -15,7 +15,6 @@ import {
   Target,
   MapPin,
   Layers,
-  Smartphone,
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import {
@@ -40,7 +39,6 @@ const menuItems = [
   { title: "Solicitar Agenda", url: "/solicitar-agenda", icon: Calendar },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
   { title: "Assessor IA", url: "/assessor-ia", icon: Bot },
-  { title: "Assessor WhatsApp", url: "/assessor-whatsapp", icon: Smartphone },
   { title: "Tags", url: "/tags", icon: Tags },
   { title: "Categorias", url: "/categorias", icon: Layers },
   { title: "Áreas", url: "/areas", icon: Building2 },
