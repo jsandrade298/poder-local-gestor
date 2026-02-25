@@ -3,9 +3,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
 import { MarkdownText } from "@/components/ui/markdown-text";
-import { Bot, Plus, Loader2, Send, X, FileText, ChevronDown } from "lucide-react";
+import { Bot, Plus, Loader2, Send, X, FileText, ChevronDown, Trash2, Search, Paperclip } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useQuery } from "@tanstack/react-query";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -29,11 +34,20 @@ interface DocumentoModelo {
   created_at: string;
 }
 
+interface AnexoChat {
+  nome: string;
+  conteudo: string; // texto extraído
+  tamanho: number;
+}
+
 interface DemandaContext {
+  id: string;
   protocolo: string;
   titulo: string;
   municipe?: string;
   area?: string;
+  bairro?: string;
+  status?: string;
 }
 
 interface HistoryItem {
@@ -46,111 +60,40 @@ interface HistoryItem {
   demandaTag?: string;
 }
 
-// ─── Configuração dos modos ───────────────────────────────────────────────────
+// ─── Modos ────────────────────────────────────────────────────────────────────
 
 const MODES = [
-  {
-    id: "redigir",
-    icon: "📝",
-    label: "Redigir documento",
-    color: "#2d5be3",
-    model: "sabiazinho-4",
-    isNew: false,
+  { id: "redigir", icon: "📝", label: "Redigir documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false,
     systemPrompt: `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Redija o documento solicitado com linguagem formal e técnica, seguindo rigorosamente os modelos de referência fornecidos. Use EXCLUSIVAMENTE os documentos de referência para estrutura, formato e linguagem. Não invente dados, base legal ou informações que não constem nos documentos.`,
-    tooltip: {
-      desc: "Cria proposituras legislativas completas com base nos dados da demanda e nos modelos da sua biblioteca.",
-      examples: ["Redigir uma indicação sobre buracos na Rua das Flores usando o modelo padrão", "Elaborar um requerimento de informação sobre o cronograma de obras da Secretaria"],
-    },
-  },
-  {
-    id: "entrevista",
-    icon: "🎯",
-    label: "Modo entrevista",
-    color: "#1a8c5e",
-    model: "sabiazinho-4",
-    isNew: true,
+    tooltip: { desc: "Cria proposituras legislativas completas com base nos dados da demanda e nos modelos da sua biblioteca.", examples: ["Redigir uma indicação sobre buracos na Rua das Flores usando o modelo padrão", "Elaborar um requerimento de informação sobre o cronograma de obras da Secretaria"] } },
+  { id: "entrevista", icon: "🎯", label: "Modo entrevista", color: "#1a8c5e", model: "sabiazinho-4", isNew: true,
     systemPrompt: `Você é um Assessor Legislativo que guia o usuário passo a passo para criar um documento oficial. Faça perguntas objetivas uma de cada vez para coletar: tipo de documento, destinatário, objeto da solicitação, justificativa e dados complementares. Ao final, gere o documento completo seguindo os modelos de referência fornecidos.`,
-    tooltip: {
-      desc: "A IA conduz uma entrevista rápida fazendo perguntas objetivas para montar o documento ideal.",
-      examples: ["Preciso criar um documento mas não sei qual tipo usar", "Me ajuda a redigir algo sobre a iluminação do bairro passo a passo"],
-    },
-  },
-  {
-    id: "analise",
-    icon: "📊",
-    label: "Analisar demandas",
-    color: "#6c3bd4",
-    model: "sabia-4",
-    isNew: false,
+    tooltip: { desc: "A IA conduz uma entrevista rápida fazendo perguntas objetivas para montar o documento ideal.", examples: ["Preciso criar um documento mas não sei qual tipo usar", "Me ajuda a redigir algo sobre a iluminação do bairro passo a passo"] } },
+  { id: "analise", icon: "📊", label: "Analisar demandas", color: "#6c3bd4", model: "sabia-4", isNew: false,
     systemPrompt: `Você é um analista de dados legislativos. Analise os dados fornecidos sobre demandas do gabinete, identifique padrões recorrentes, calcule percentuais e sugira proposituras legislativas coletivas quando houver 3 ou mais demandas similares. Apresente os resultados de forma estruturada com números, percentuais e recomendações concretas de ação legislativa.`,
-    tooltip: {
-      desc: "Analisa o banco de demandas para identificar padrões, recorrências e sugerir proposituras coletivas.",
-      examples: ["Quais demandas se repetem no Bairro Centro nos últimos 30 dias?", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"],
-    },
-  },
-  {
-    id: "resumo",
-    icon: "🗂️",
-    label: "Resumo do gabinete",
-    color: "#c47a0e",
-    model: "sabiazinho-4",
-    isNew: false,
+    tooltip: { desc: "Analisa o banco de demandas para identificar padrões, recorrências e sugerir proposituras coletivas.", examples: ["Quais demandas se repetem no Bairro Centro nos últimos 30 dias?", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"] } },
+  { id: "resumo", icon: "🗂️", label: "Resumo do gabinete", color: "#c47a0e", model: "sabiazinho-4", isNew: false,
     systemPrompt: `Você é um assessor executivo que produz briefings objetivos e acionáveis. Ao receber dados do gabinete, gere um resumo executivo estruturado com: demandas abertas e fechadas, tarefas pendentes, prazos críticos, aniversariantes e destaques do período. Use linguagem direta, organize por prioridade e destaque o que precisa de ação imediata.`,
-    tooltip: {
-      desc: "Gera um briefing executivo com o resumo da semana: demandas, tarefas, prazos e destaques.",
-      examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"],
-    },
-  },
-  {
-    id: "whatsapp",
-    icon: "💬",
-    label: "Resposta WhatsApp",
-    color: "#1a8c5e",
-    model: "sabiazinho-4",
-    isNew: false,
+    tooltip: { desc: "Gera um briefing executivo com o resumo da semana: demandas, tarefas, prazos e destaques.", examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"] } },
+  { id: "whatsapp", icon: "💬", label: "Resposta WhatsApp", color: "#1a8c5e", model: "sabiazinho-4", isNew: false,
     systemPrompt: `Você é um assistente de comunicação política. Redija mensagens de WhatsApp para munícipes com tom profissional mas acolhedor, objetivo e sem jargão técnico excessivo. A mensagem deve ser curta (máximo 3 parágrafos), clara e encerrar com uma sinalização positiva sobre o andamento da demanda. Nunca use linguagem fria ou burocrática.`,
-    tooltip: {
-      desc: "Redige mensagens de WhatsApp para munícipes no tom certo: acolhedor, objetivo e sem juridiquês.",
-      examples: ["Redigir resposta para João Silva sobre a demanda #2847 que foi encaminhada à Secretaria", "Mensagem informando que o buraco da Rua das Flores está no cronograma de obras"],
-    },
-  },
-  {
-    id: "pauta",
-    icon: "🏛️",
-    label: "Assessor de pauta",
-    color: "#d4163c",
-    model: "sabia-4",
-    isNew: false,
+    tooltip: { desc: "Redige mensagens de WhatsApp para munícipes no tom certo: acolhedor, objetivo e sem juridiquês.", examples: ["Redigir resposta para João Silva sobre a demanda #2847 que foi encaminhada à Secretaria", "Mensagem informando que o buraco da Rua das Flores está no cronograma de obras"] } },
+  { id: "pauta", icon: "🏛️", label: "Assessor de pauta", color: "#d4163c", model: "sabia-4", isNew: false,
     systemPrompt: `Você é um assessor parlamentar especializado em preparação para sessões da Câmara. Com base nas demandas e documentos fornecidos, identifique temas relevantes para destaque em plenário, sugira argumentos e dados de apoio, aponte oportunidades de visibilidade política e prepare subsídios objetivos para pronunciamentos.`,
-    tooltip: {
-      desc: "Prepara o vereador para a sessão: argumentos, temas das demandas, oportunidades de destaque.",
-      examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana"],
-    },
-  },
-  {
-    id: "documento",
-    icon: "📑",
-    label: "Analisar documento",
-    color: "#2d5be3",
-    model: "sabiazinho-4",
-    isNew: false,
+    tooltip: { desc: "Prepara o vereador para a sessão: argumentos, temas das demandas, oportunidades de destaque.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana"] } },
+  { id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false,
     systemPrompt: `Você é um analista legislativo especializado em documentos oficiais. Ao receber um documento (ofício, resposta, decisão), produza: 1) Resumo executivo em até 3 linhas, 2) Pontos de ação identificados, 3) Prazos ou compromissos assumidos, 4) Sugestão de resposta ou propositura decorrente. Seja objetivo e prático.`,
-    tooltip: {
-      desc: "Analisa documentos recebidos (ofícios, respostas da prefeitura) e sugere os próximos passos.",
-      examples: ["Analise esta resposta da Secretaria de Obras e diga o que preciso fazer", "Resumir este ofício e identificar se há prazo para resposta"],
-    },
-  },
+    tooltip: { desc: "Analisa documentos recebidos (ofícios, respostas da prefeitura) e sugere os próximos passos.", examples: ["Analise esta resposta da Secretaria de Obras e diga o que preciso fazer", "Resumir este ofício e identificar se há prazo para resposta"] } },
 ];
 
-// ─── localStorage helpers ─────────────────────────────────────────────────────
+// ─── localStorage ─────────────────────────────────────────────────────────────
 
 const HISTORY_KEY = "assessorIA_history";
-const MSGS_PREFIX = "assessorIA_msgs_";
-const MAX_HISTORY = 20;
+const MSGS_PREFIX  = "assessorIA_msgs_";
+const MAX_HISTORY  = 20;
 
 function loadHistory(): HistoryItem[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
-  catch { return []; }
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; }
 }
 function saveHistory(items: HistoryItem[]) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, MAX_HISTORY)));
@@ -165,6 +108,9 @@ function loadMessages(convId: string): Message[] {
     return (JSON.parse(raw) as Message[]).map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
   } catch { return []; }
 }
+function deleteConvStorage(convId: string) {
+  localStorage.removeItem(MSGS_PREFIX + convId);
+}
 function formatTimeLabel(ts: number): string {
   const d = new Date(ts);
   const diff = Math.floor((Date.now() - ts) / 86400000);
@@ -176,6 +122,105 @@ function truncateTitle(text: string, max = 42): string {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
+// ─── Modal de vincular demanda ────────────────────────────────────────────────
+
+function VincularDemandaModal({
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSelect: (d: DemandaContext) => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const { data: demandas = [], isLoading } = useQuery({
+    queryKey: ["demandas-assessor-search"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("demandas")
+        .select("id, protocolo, titulo, status, bairro, areas(nome), municipes(nome)")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  const filtered = demandas.filter((d: any) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      d.protocolo?.toLowerCase().includes(q) ||
+      d.titulo?.toLowerCase().includes(q) ||
+      d.municipes?.nome?.toLowerCase().includes(q) ||
+      d.bairro?.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Vincular demanda ao chat</DialogTitle>
+          <DialogDescription>Selecione uma demanda para usar como contexto nesta conversa.</DialogDescription>
+        </DialogHeader>
+        <div className="relative mb-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            autoFocus
+            placeholder="Buscar por protocolo, título, munícipe ou bairro…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto border rounded-lg divide-y divide-border">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando demandas…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-sm text-muted-foreground">Nenhuma demanda encontrada.</div>
+          ) : (
+            filtered.slice(0, 100).map((d: any) => (
+              <button
+                key={d.id}
+                onClick={() => {
+                  onSelect({
+                    id: d.id,
+                    protocolo: d.protocolo,
+                    titulo: d.titulo,
+                    area: d.areas?.nome,
+                    municipe: d.municipes?.nome,
+                    bairro: d.bairro,
+                    status: d.status,
+                  });
+                  onOpenChange(false);
+                }}
+                className="w-full text-left px-4 py-3 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-[12px] text-muted-foreground flex-shrink-0">#{d.protocolo}</span>
+                  <span className="text-[13px] font-medium flex-1 truncate">{d.titulo}</span>
+                  <StatusBadge status={d.status} size="sm" />
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 pl-[0px]">
+                  {d.municipes?.nome && <span className="text-[11px] text-muted-foreground">{d.municipes.nome}</span>}
+                  {d.bairro && <span className="text-[11px] text-muted-foreground">· {d.bairro}</span>}
+                  {d.areas?.nome && <span className="text-[11px] text-muted-foreground">· {d.areas.nome}</span>}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const AssessorIA = () => {
@@ -183,21 +228,23 @@ const AssessorIA = () => {
   const [inputMessage, setInputMessage]             = useState("");
   const [isLoading, setIsLoading]                   = useState(false);
   const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
+  const [anexosChat, setAnexosChat]                 = useState<AnexoChat[]>([]);
   const [activeMode, setActiveMode]                 = useState("redigir");
   const [demandaContext, setDemandaContext]          = useState<DemandaContext | null>(null);
   const [history, setHistory]                       = useState<HistoryItem[]>(loadHistory);
   const [currentConvId, setCurrentConvId]           = useState<string>(Date.now().toString());
+  const [vincularOpen, setVincularOpen]             = useState(false);
 
-  const { toast }      = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef    = useRef<HTMLTextAreaElement>(null);
+  const { toast }       = useToast();
+  const messagesEndRef  = useRef<HTMLDivElement>(null);
+  const textareaRef     = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef    = useRef<HTMLInputElement>(null);
 
   const currentMode  = MODES.find((m) => m.id === activeMode) ?? MODES[0];
   const realMessages = messages.filter((m) => m.id !== "welcome");
   const showEmpty    = realMessages.length === 0 && !isLoading;
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
-
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -213,7 +260,7 @@ const AssessorIA = () => {
     let data: any;
     try { data = JSON.parse(stored); } catch { return; }
     if (data.protocolo || data.titulo) {
-      setDemandaContext({ protocolo: data.protocolo || "", titulo: data.titulo || "", municipe: data.municipe, area: data.area });
+      setDemandaContext({ id: data.id || "", protocolo: data.protocolo || "", titulo: data.titulo || "", municipe: data.municipe, area: data.area });
     }
     const fmtDate = (s: string) => { try { return new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return s; } };
     let prompt = `Com base na demanda a seguir, elabore o documento solicitado:\n\n📋 DADOS DA DEMANDA\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -228,12 +275,9 @@ const AssessorIA = () => {
       prompt += `\n📅 HISTÓRICO DE ATIVIDADES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       data.atividades.forEach((a: any, i: number) => {
         prompt += `\nAtividade ${i + 1}: ${a.titulo}\n  • Tipo: ${a.tipo}\n`;
-        if (a.data)               prompt += `  • Data: ${fmtDate(a.data)}\n`;
-        if (a.autor)              prompt += `  • Autor: ${a.autor}\n`;
-        if (a.descricao)          prompt += `  • Descrição: ${a.descricao}\n`;
-        if (a.propositura)        prompt += `  • Propositura: ${a.propositura}\n`;
-        if (a.status_propositura) prompt += `  • Status: ${a.status_propositura}\n`;
-        if (a.link_propositura)   prompt += `  • Link: ${a.link_propositura}\n`;
+        if (a.data) prompt += `  • Data: ${fmtDate(a.data)}\n`;
+        if (a.autor) prompt += `  • Autor: ${a.autor}\n`;
+        if (a.descricao) prompt += `  • Descrição: ${a.descricao}\n`;
       });
     }
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nSelecione um modelo na Biblioteca de Documentos, indique o tipo de propositura desejado e envie.`;
@@ -267,11 +311,12 @@ const AssessorIA = () => {
     setMessages([]);
     setInputMessage("");
     setDocumentosContexto([]);
+    setAnexosChat([]);
     setDemandaContext(null);
     setCurrentConvId(Date.now().toString());
   };
 
-  // ─── Retomar conversa do histórico ───────────────────────────────────────
+  // ─── Retomar conversa ────────────────────────────────────────────────────
   const loadConversation = (item: HistoryItem) => {
     if (item.id === currentConvId) return;
     if (messages.filter((m) => m.role === "user").length > 0) persistHistory(messages, activeMode);
@@ -280,7 +325,52 @@ const AssessorIA = () => {
     setCurrentConvId(item.id);
     setInputMessage("");
     setDocumentosContexto([]);
+    setAnexosChat([]);
     setDemandaContext(null);
+  };
+
+  // ─── Excluir conversa ────────────────────────────────────────────────────
+  const deleteConversation = (e: React.MouseEvent, itemId: string) => {
+    e.stopPropagation();
+    const updated = history.filter((h) => h.id !== itemId);
+    setHistory(updated);
+    saveHistory(updated);
+    deleteConvStorage(itemId);
+    if (currentConvId === itemId) {
+      setMessages([]);
+      setInputMessage("");
+      setCurrentConvId(Date.now().toString());
+    }
+  };
+
+  // ─── Anexar documento (PDF/TXT) ───────────────────────────────────────────
+  const handleAnexarDocumento = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast({ title: "Arquivo muito grande", description: "Máximo permitido: 5MB.", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const conteudo = ev.target?.result as string || "";
+      // Para PDF, o conteúdo bruto não é legível — avisamos ao usuário
+      if (file.type === "application/pdf" && !conteudo.includes("extractedText")) {
+        // Tentar extrair texto básico do PDF (funciona para PDFs não-escaneados)
+        const texto = conteudo.replace(/[^\x20-\x7E\n\r\tÀ-ú]/g, " ").replace(/\s+/g, " ").trim();
+        setAnexosChat((prev) => [...prev, { nome: file.name, conteudo: texto.slice(0, 20000), tamanho: file.size }]);
+      } else {
+        setAnexosChat((prev) => [...prev, { nome: file.name, conteudo: conteudo.slice(0, 20000), tamanho: file.size }]);
+      }
+      // Selecionar modo "Analisar documento" automaticamente
+      setActiveMode("documento");
+      toast({ title: "Documento anexado", description: `"${file.name}" pronto para análise.` });
+    };
+    reader.readAsText(file);
   };
 
   // ─── Enviar mensagem ──────────────────────────────────────────────────────
@@ -304,6 +394,8 @@ const AssessorIA = () => {
           modeSystemPrompt: currentMode.systemPrompt,
           demandaProtocolo: demandaContext?.protocolo || undefined,
           documentosContexto: documentosContexto.map((d) => ({ nome: d.nome, categoria: d.categoria, conteudo: truncar(d.conteudo_extraido || "") })),
+          // Anexos do chat (documentos para análise)
+          anexosContexto: anexosChat.map((a) => ({ nome: a.nome, conteudo: truncar(a.conteudo) })),
         },
       });
       if (error) throw new Error(error.message);
@@ -330,6 +422,7 @@ const AssessorIA = () => {
 
   const handleDocumentosSelect = (docs: DocumentoModelo[]) => setDocumentosContexto(docs);
   const removerDoc = (id: string) => setDocumentosContexto((p) => p.filter((d) => d.id !== id));
+  const removerAnexo = (nome: string) => setAnexosChat((p) => p.filter((a) => a.nome !== nome));
 
   // ─── Sugestões ────────────────────────────────────────────────────────────
   const getSugestoes = () => {
@@ -343,7 +436,7 @@ const AssessorIA = () => {
       { emoji: "📊", text: "Resumo da semana", desc: "Briefing de demandas, tarefas e prazos", action: () => { setActiveMode("resumo"); sendMessage("Me dá um resumo executivo do gabinete desta semana: demandas abertas e fechadas, tarefas pendentes, prazos críticos e destaques."); } },
       { emoji: "🔍", text: "Padrões nas demandas", desc: "Identificar recorrências para proposituras", action: () => { setActiveMode("analise"); setInputMessage("Analisar as demandas dos últimos 30 dias. Identificar padrões recorrentes por bairro e área, e sugerir proposituras coletivas onde houver 3 ou mais demandas similares."); textareaRef.current?.focus(); } },
       { emoji: "📝", text: "Novo documento", desc: "Indicação, requerimento, PL ou ofício", action: () => { setActiveMode("redigir"); textareaRef.current?.focus(); } },
-      { emoji: "🎯", text: "Modo entrevista", desc: "IA conduz e monta o documento", action: () => { setActiveMode("entrevista"); sendMessage("Iniciar modo entrevista. Quero criar um documento legislativo e preciso de orientação sobre qual tipo usar."); } },
+      { emoji: "📑", text: "Analisar documento", desc: "Anexe um ofício ou resposta da prefeitura", action: () => { setActiveMode("documento"); fileInputRef.current?.click(); } },
     ];
   };
 
@@ -352,10 +445,10 @@ const AssessorIA = () => {
     <TooltipProvider>
       <div className="flex overflow-hidden" style={{ height: "calc(100vh - 56px)", margin: "-1.5rem" }}>
 
-        {/* ══════════ SIDEBAR ══════════════════════════════════════════════ */}
-        <aside className="flex flex-col overflow-hidden flex-shrink-0 bg-card border-r border-border" style={{ width: 260 }}>
+        {/* ══════════ SIDEBAR — apenas histórico ══════════════════════════ */}
+        <aside className="flex flex-col overflow-hidden flex-shrink-0 bg-card border-r border-border" style={{ width: 252 }}>
 
-          {/* Brand */}
+          {/* Brand + Nova conversa */}
           <div className="px-4 pt-[18px] pb-[14px] border-b border-border">
             <div className="flex items-center gap-2.5 mb-3.5">
               <div className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
@@ -376,74 +469,43 @@ const AssessorIA = () => {
             </button>
           </div>
 
-          {/* Modos */}
-          <div className="px-2.5 py-3 border-b border-border">
-            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70 px-2 mb-1.5">Modos</div>
-            <div className="flex flex-col gap-0.5">
-              {MODES.map((mode) => (
-                <Tooltip key={mode.id} delayDuration={500}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setActiveMode(mode.id)}
-                      className={`w-full flex items-center gap-2.5 px-2 py-[7px] rounded-md text-[13px] font-medium text-left transition-all relative
-                        ${activeMode === mode.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-                    >
-                      {activeMode === mode.id && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-sm bg-primary" />
-                      )}
-                      <span className={`w-[26px] h-[26px] rounded-md flex items-center justify-center text-[13px] flex-shrink-0 ${activeMode === mode.id ? "bg-primary/15" : "bg-muted"}`}>
-                        {mode.icon}
-                      </span>
-                      <span className="flex-1 truncate">{mode.label}</span>
-                      {mode.isNew && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">NOVO</span>}
-                      {mode.model === "sabia-4" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">PRO</span>}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-[230px] p-3 space-y-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <span>{mode.icon}</span>
-                      <span className="font-semibold text-[12px]">{mode.label}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">{mode.tooltip.desc}</p>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Exemplos de uso</div>
-                      {mode.tooltip.examples.map((ex, i) => (
-                        <div key={i} className="text-[11px] text-muted-foreground pl-2 border-l-2 border-muted leading-snug mb-1">"{ex}"</div>
-                      ))}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground/60">Modelo: {mode.model}</div>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </div>
-
           {/* Histórico */}
           <div className="flex-1 flex flex-col overflow-hidden px-2.5 py-3">
-            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70 px-2 mb-1.5">Recentes</div>
+            <div className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70 px-2 mb-1.5">Conversas</div>
             <div className="flex-1 overflow-y-auto flex flex-col gap-0.5">
               {history.length === 0 && (
                 <p className="text-[12px] text-muted-foreground px-2 py-2">Nenhuma conversa ainda.</p>
               )}
               {history.map((item) => (
-                <button
+                <div
                   key={item.id}
+                  className={`group flex items-start gap-1 rounded-md transition-all cursor-pointer px-2 py-[7px]
+                    ${currentConvId === item.id ? "bg-primary/10" : "hover:bg-muted"}`}
                   onClick={() => loadConversation(item)}
-                  className={`w-full text-left px-2 py-[7px] rounded-md transition-all ${currentConvId === item.id ? "bg-primary/10" : "hover:bg-muted"}`}
                 >
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="w-[5px] h-[5px] rounded-full flex-shrink-0 mt-0.5" style={{ background: item.modeColor }} />
-                    <span className={`text-[12.5px] font-medium truncate ${currentConvId === item.id ? "text-primary" : "text-muted-foreground"}`}>
-                      {item.title}
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-[12px] flex-shrink-0">{item.modeIcon}</span>
+                      <span className={`text-[12.5px] font-medium truncate ${currentConvId === item.id ? "text-primary" : "text-muted-foreground"}`}>
+                        {item.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-[20px]">
+                      <span className="text-[10.5px] font-mono text-muted-foreground/60">{formatTimeLabel(item.timestamp)}</span>
+                      {item.demandaTag && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono">#{item.demandaTag}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 pl-[13px]">
-                    <span className="text-[10.5px] font-mono text-muted-foreground/60">{formatTimeLabel(item.timestamp)}</span>
-                    {item.demandaTag && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono">#{item.demandaTag}</span>
-                    )}
-                  </div>
-                </button>
+                  {/* Botão excluir — visível ao hover */}
+                  <button
+                    onClick={(e) => deleteConversation(e, item.id)}
+                    className="flex-shrink-0 mt-0.5 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-muted-foreground/40 transition-all"
+                    title="Excluir conversa"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -456,7 +518,7 @@ const AssessorIA = () => {
           {/* Topbar */}
           <div className="h-[50px] border-b flex items-center gap-2.5 px-5 bg-card flex-shrink-0">
 
-            {/* Dropdown de modo com Tooltip */}
+            {/* Dropdown de modo */}
             <DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -505,23 +567,35 @@ const AssessorIA = () => {
 
             {/* Chip demanda */}
             {demandaContext && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[280px] flex-shrink-0"
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[260px] flex-shrink-0"
                 style={{ background: "#fdf6e8", border: "1px solid #f0d88c", color: "#92540a" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                <span className="truncate">Demanda #{demandaContext.protocolo} — {demandaContext.titulo}</span>
-                <button onClick={() => setDemandaContext(null)} className="flex-shrink-0 hover:text-red-500 transition-colors ml-0.5" style={{ color: "#c47a0e" }}>
+                <span className="truncate">#{demandaContext.protocolo} — {demandaContext.titulo}</span>
+                <button onClick={() => setDemandaContext(null)} className="flex-shrink-0 hover:text-red-500 ml-0.5" style={{ color: "#c47a0e" }}>
                   <X className="w-3 h-3" />
                 </button>
               </div>
             )}
 
-            {/* Chips documentos */}
+            {/* Chips de anexos do chat */}
+            {anexosChat.map((a) => (
+              <div key={a.nome} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[150px] flex-shrink-0"
+                style={{ background: "#f0f4ff", border: "1px solid #c7d7fc", color: "#1e3fa0" }}>
+                <Paperclip className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{a.nome.length > 14 ? a.nome.slice(0, 14) + "…" : a.nome}</span>
+                <button onClick={() => removerAnexo(a.nome)} className="flex-shrink-0 hover:text-red-500 ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {/* Chips de documentos da biblioteca */}
             {documentosContexto.map((doc) => (
-              <div key={doc.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[160px] flex-shrink-0"
+              <div key={doc.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[150px] flex-shrink-0"
                 style={{ background: "#eefbf4", border: "1px solid #b0eacc", color: "#166534" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-green-600 flex-shrink-0" />
-                <span className="truncate">{doc.nome.length > 16 ? doc.nome.slice(0, 16) + "…" : doc.nome}</span>
-                <button onClick={() => removerDoc(doc.id)} className="flex-shrink-0 hover:text-red-500 transition-colors ml-0.5" style={{ color: "#1a8c5e" }}>
+                <span className="truncate">{doc.nome.length > 14 ? doc.nome.slice(0, 14) + "…" : doc.nome}</span>
+                <button onClick={() => removerDoc(doc.id)} className="flex-shrink-0 hover:text-red-500 ml-0.5" style={{ color: "#1a8c5e" }}>
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -547,27 +621,21 @@ const AssessorIA = () => {
                 {demandaContext ? (
                   <>
                     <h2 className="text-[22px] font-bold tracking-tight mb-1.5">Contexto carregado</h2>
-                    <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[420px] mb-7">
-                      Já tenho os dados da demanda vinculada. Escolha uma ação rápida ou descreva o que precisa.
-                    </p>
+                    <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[420px] mb-7">Já tenho os dados da demanda vinculada. Escolha uma ação rápida ou descreva o que precisa.</p>
                     <div className="max-w-[520px] w-full rounded-xl p-4 flex gap-3 items-start mb-7 text-left flex-shrink-0"
                       style={{ border: "1px solid #f0d88c", background: "#fdf6e8" }}>
                       <div className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: "rgba(196,122,14,0.1)" }}>📋</div>
                       <div>
                         <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] mb-1" style={{ color: "#c47a0e" }}>Demanda vinculada</div>
                         <div className="text-[14px] font-semibold mb-0.5">{demandaContext.titulo}</div>
-                        <div className="text-[12px] text-muted-foreground">
-                          {[demandaContext.municipe, demandaContext.area, `Protocolo #${demandaContext.protocolo}`].filter(Boolean).join(" · ")}
-                        </div>
+                        <div className="text-[12px] text-muted-foreground">{[demandaContext.municipe, demandaContext.area, `Protocolo #${demandaContext.protocolo}`].filter(Boolean).join(" · ")}</div>
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
                     <h2 className="text-[22px] font-bold tracking-tight mb-1.5">Olá! Como posso ajudar?</h2>
-                    <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[420px] mb-7">
-                      Escolha um modo no menu ou comece com uma das sugestões abaixo.
-                    </p>
+                    <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[420px] mb-7">Escolha um modo no menu ou comece com uma das sugestões abaixo.</p>
                   </>
                 )}
                 <div className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2.5 w-full max-w-[520px] text-left">
@@ -594,24 +662,20 @@ const AssessorIA = () => {
                     <div className="w-[30px] h-[30px] rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 text-[13px]"
                       style={msg.role === "assistant"
                         ? { background: "linear-gradient(135deg,#3068f0,#6c3bd4)", boxShadow: "0 2px 8px rgba(48,104,240,0.25)" }
-                        : { background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }
-                      }>
+                        : { background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}>
                       {msg.role === "assistant" ? <Bot className="w-4 h-4 text-white" /> : "👤"}
                     </div>
                     <div className="flex flex-col gap-1 min-w-0" style={{ alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
                       <div className="px-4 py-3 text-[13.5px] leading-[1.7]"
                         style={msg.role === "assistant"
                           ? { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "2px 10px 10px 10px" }
-                          : { background: "hsl(var(--primary))", borderRadius: "10px 2px 10px 10px", color: "#fff" }
-                        }>
+                          : { background: "hsl(var(--primary))", borderRadius: "10px 2px 10px 10px", color: "#fff" }}>
                         <MarkdownText className="text-sm">{msg.content}</MarkdownText>
                       </div>
                       {msg.role === "assistant" && (msg.modeId === "analise" || msg.modeId === "pauta") && (
-                        <button
-                          onClick={() => gerarProposituradaAnalise(msg.content)}
+                        <button onClick={() => gerarProposituradaAnalise(msg.content)}
                           className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all hover:shadow-sm"
-                          style={{ background: "hsl(var(--primary)/0.08)", border: "1px solid hsl(var(--primary)/0.2)", color: "hsl(var(--primary))" }}
-                        >
+                          style={{ background: "hsl(var(--primary)/0.08)", border: "1px solid hsl(var(--primary)/0.2)", color: "hsl(var(--primary))" }}>
                           📝 Transformar em propositura
                         </button>
                       )}
@@ -641,8 +705,7 @@ const AssessorIA = () => {
                           {activeMode === "analise" ? "Consultando demandas do gabinete…"
                             : activeMode === "resumo" ? "Compilando dados da semana…"
                             : activeMode === "pauta" ? "Preparando subsídios para a sessão…"
-                            : activeMode === "whatsapp" ? "Redigindo mensagem…"
-                            : activeMode === "entrevista" ? "Analisando contexto…"
+                            : activeMode === "documento" ? "Analisando documento…"
                             : "Redigindo…"}
                         </span>
                       </div>
@@ -665,27 +728,71 @@ const AssessorIA = () => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Mensagem para o Assessor IA (${currentMode.label})…`}
+                placeholder={activeMode === "documento" && anexosChat.length === 0
+                  ? "Anexe um documento e faça sua pergunta…"
+                  : `Mensagem para o Assessor IA (${currentMode.label})…`}
                 disabled={isLoading}
                 rows={2}
                 className="w-full border-none outline-none resize-none bg-transparent text-[14px] leading-[1.6] min-h-[48px] max-h-[150px] px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground/60"
               />
               <div className="flex items-center gap-1 px-2.5 pb-2.5">
+
+                {/* Biblioteca de modelos */}
                 <div className="[&>button]:h-auto [&>button]:px-2.5 [&>button]:py-1.5 [&>button]:text-xs [&>button]:rounded-lg [&>button]:font-medium">
                   <BibliotecaDocumentosDialog onDocumentosSelect={handleDocumentosSelect} />
                 </div>
-                {!demandaContext && (
-                  <>
-                    <div className="w-px h-4 bg-border mx-0.5" />
+
+                <div className="w-px h-4 bg-border mx-0.5" />
+
+                {/* Anexar documento para análise */}
+                <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx,.odt,.rtf" className="hidden" onChange={handleAnexarDocumento} />
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <button
-                      onClick={() => toast({ title: "Como vincular uma demanda", description: "Abra uma demanda em Demandas > clique no ícone de menu > Assessor IA." })}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-muted-foreground border border-transparent hover:bg-muted hover:border-border transition-all"
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all
+                        ${activeMode === "documento"
+                          ? "bg-primary/10 border-primary/20 text-primary"
+                          : "text-muted-foreground border-transparent hover:bg-muted hover:border-border"}`}
                     >
-                      <FileText className="w-3.5 h-3.5" />
-                      Vincular demanda
+                      <Paperclip className="w-3.5 h-3.5" />
+                      Anexar documento
                     </button>
-                  </>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-[11px]">
+                    Anexe um ofício, resposta ou decisão para análise (txt, pdf, doc)
+                  </TooltipContent>
+                </Tooltip>
+
+                <div className="w-px h-4 bg-border mx-0.5" />
+
+                {/* Vincular demanda */}
+                {!demandaContext ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setVincularOpen(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-muted-foreground border border-transparent hover:bg-muted hover:border-border transition-all"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Vincular demanda
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-[11px]">
+                      Selecione uma demanda para usar como contexto nesta conversa
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <button
+                    onClick={() => setVincularOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:opacity-80"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Trocar demanda
+                  </button>
                 )}
+
+                {/* Enviar */}
                 <button
                   onClick={() => sendMessage()}
                   disabled={!inputMessage.trim() || isLoading}
@@ -697,13 +804,18 @@ const AssessorIA = () => {
                 </button>
               </div>
             </div>
-            <p className="text-[10.5px] font-mono text-muted-foreground text-center mt-2">
-              Enter para enviar · Shift+Enter para nova linha
-            </p>
+            <p className="text-[10.5px] font-mono text-muted-foreground text-center mt-2">Enter para enviar · Shift+Enter para nova linha</p>
           </div>
 
         </div>
       </div>
+
+      {/* Modal vincular demanda */}
+      <VincularDemandaModal
+        open={vincularOpen}
+        onOpenChange={setVincularOpen}
+        onSelect={(d) => setDemandaContext(d)}
+      />
 
       <style>{`
         @keyframes bounce { 0%, 80%, 100% { transform: scale(1); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
