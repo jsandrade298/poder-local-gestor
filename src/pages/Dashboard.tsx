@@ -1,4 +1,5 @@
 import { Top5AreasChart } from "@/components/dashboard/Top5AreasChart";
+import { TemasDaSemana } from "@/components/dashboard/TemasDaSemana";
 import { ProjetosPlanilhasChart } from "@/components/dashboard/ProjetosPlanilhasChart";
 import { HumorometroCard } from "@/components/dashboard/HumorometroCard";
 import { OverdueList } from "@/components/dashboard/OverdueList";
@@ -251,6 +252,9 @@ export default function Dashboard() {
             />
           </div>
         </div>
+
+        {/* ─── Temas da Semana (RAG clustering) ─── */}
+        <TemasDaSemana />
 
         {/* ─── Projetos & Planilhas ─── */}
         <ProjetosPlanilhasChart data={charts.projetosPlanilhasStatus} />
