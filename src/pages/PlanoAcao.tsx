@@ -333,7 +333,7 @@ export default function PlanoAcao() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Carregando...</p>
@@ -343,30 +343,30 @@ export default function PlanoAcao() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Plano de Ação</h1>
-            <p className="text-muted-foreground">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-3xl font-bold tracking-tight text-foreground">Plano de Ação</h1>
+            <p className="text-xs md:text-base text-muted-foreground hidden md:block">
               Gerencie seus projetos e planilhas de acompanhamento
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => openCreateDialog("projeto")} className="gap-2">
+          <div className="flex gap-1.5 md:gap-2 shrink-0">
+            <Button onClick={() => openCreateDialog("projeto")} size="sm" className="gap-1.5 md:gap-2 text-xs md:text-sm">
               <GanttChart className="h-4 w-4" />
-              Novo Projeto
+              <span className="hidden md:inline">Novo</span> Projeto
             </Button>
-            <Button onClick={() => openCreateDialog("planilha")} variant="outline" className="gap-2">
+            <Button onClick={() => openCreateDialog("planilha")} variant="outline" size="sm" className="gap-1.5 md:gap-2 text-xs md:text-sm">
               <Table2 className="h-4 w-4" />
-              Nova Planilha
+              <span className="hidden md:inline">Nova</span> Planilha
             </Button>
           </div>
         </div>
 
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -377,7 +377,7 @@ export default function PlanoAcao() {
             />
           </div>
           <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -387,7 +387,7 @@ export default function PlanoAcao() {
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
