@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Bell, BellDot, Check, User, MessageSquare, AlertCircle, Trash2, Calendar } from "lucide-react";
@@ -14,9 +15,18 @@ import { useNavigate } from "react-router-dom";
 
 export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Buscar notificações não lidas
   const { data: notificacoes = [], isLoading } = useQuery({
@@ -43,17 +53,14 @@ export function NotificationsDropdown() {
     },
   });
 
-  // Contagem de notificações não lidas
   const notificacaosPendentes = notificacoes.filter(n => !n.lida).length;
 
-  // Marcar notificação como lida
   const marcarComoLida = useMutation({
     mutationFn: async (notificacaoId: string) => {
       const { error } = await supabase
         .from('notificacoes')
         .update({ lida: true, updated_at: new Date().toISOString() })
         .eq('id', notificacaoId);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -61,18 +68,15 @@ export function NotificationsDropdown() {
     },
   });
 
-  // Marcar todas como lidas
   const marcarTodasComoLidas = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
-
       const { error } = await supabase
         .from('notificacoes')
         .update({ lida: true, updated_at: new Date().toISOString() })
         .eq('destinatario_id', user.user.id)
         .eq('lida', false);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -84,17 +88,14 @@ export function NotificationsDropdown() {
     },
   });
 
-  // Limpar todas as notificações
   const limparNotificacoes = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
-
       const { error } = await supabase
         .from('notificacoes')
         .delete()
         .eq('destinatario_id', user.user.id);
-      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -107,12 +108,9 @@ export function NotificationsDropdown() {
   });
 
   const handleNotificationClick = (notificacao: any) => {
-    // Marcar como lida
     if (!notificacao.lida) {
       marcarComoLida.mutate(notificacao.id);
     }
-
-    // Redirecionar se houver URL destino
     if (notificacao.url_destino) {
       setOpen(false);
       navigate(notificacao.url_destino);
@@ -126,7 +124,6 @@ export function NotificationsDropdown() {
       case 'comentario':
         return <MessageSquare className="h-4 w-4" />;
       case 'atribuicao':
-        return <AlertCircle className="h-4 w-4" />;
       case 'tarefa_atribuida':
         return <AlertCircle className="h-4 w-4" />;
       case 'agenda_solicitada':
@@ -149,7 +146,6 @@ export function NotificationsDropdown() {
       case 'atribuicao':
         return 'bg-orange-500';
       case 'tarefa_atribuida':
-        return 'bg-purple-500';
       case 'agenda_solicitada':
         return 'bg-purple-500';
       case 'agenda_acompanhante':
@@ -163,143 +159,160 @@ export function NotificationsDropdown() {
     }
   };
 
-  // Configurar realtime para notificações
   useEffect(() => {
     const channel = supabase
       .channel('notificacoes-realtime')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notificacoes'
-        },
+        { event: 'INSERT', schema: 'public', table: 'notificacoes' },
         () => {
           queryClient.invalidateQueries({ queryKey: ['notificacoes'] });
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
+  /* ── Conteúdo compartilhado ── */
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {notificacaosPendentes > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => marcarTodasComoLidas.mutate()}
+          disabled={marcarTodasComoLidas.isPending}
+        >
+          <Check className="h-4 w-4 mr-1" />
+          Lidas
+        </Button>
+      )}
+      {notificacoes.length > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => limparNotificacoes.mutate()}
+          disabled={limparNotificacoes.isPending}
+          className="text-destructive hover:text-destructive h-8 w-8 p-0"
+          title="Limpar todas"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const notificationList = (
+    <>
+      {isLoading ? (
+        <div className="p-4 text-center text-muted-foreground">
+          Carregando notificações...
+        </div>
+      ) : notificacoes.length === 0 ? (
+        <div className="p-8 text-center text-muted-foreground">
+          <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p>Nenhuma notificação</p>
+        </div>
+      ) : (
+        <div className="p-2 space-y-2">
+          {notificacoes.map((notificacao) => (
+            <Card 
+              key={notificacao.id}
+              className={`cursor-pointer transition-colors hover:bg-muted/50 ${
+                !notificacao.lida ? 'border-l-4 border-l-primary' : ''
+              }`}
+              onClick={() => handleNotificationClick(notificacao)}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className={`p-1.5 rounded-full ${getTipoColor(notificacao.tipo)} text-white flex-shrink-0`}>
+                    {getTipoIcon(notificacao.tipo)}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-sm font-medium">
+                        {notificacao.titulo}
+                      </p>
+                      {!notificacao.lida && (
+                        <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground mb-1.5">
+                      {notificacao.mensagem}
+                    </p>
+                    
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>De: {notificacao.remetente?.nome || 'Sistema'}</span>
+                      <span>{formatDateTime(notificacao.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  /* ── Trigger button ── */
+  const bellButton = (
+    <Button variant="ghost" size="sm" className="relative">
+      {notificacaosPendentes > 0 ? (
+        <BellDot className="h-5 w-5" />
+      ) : (
+        <Bell className="h-5 w-5" />
+      )}
+      {notificacaosPendentes > 0 && (
+        <Badge 
+          variant="destructive" 
+          className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs"
+        >
+          {notificacaosPendentes > 99 ? '99+' : notificacaosPendentes}
+        </Badge>
+      )}
+    </Button>
+  );
+
+  /* ── Mobile: Sheet (drawer lateral) ── */
+  if (isMobile) {
+    return (
+      <>
+        <div onClick={() => setOpen(true)}>
+          {bellButton}
+        </div>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent side="right" className="w-full p-0 flex flex-col" data-sheet="true">
+            <SheetHeader className="p-4 border-b flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <SheetTitle>Notificações</SheetTitle>
+                {headerActions}
+              </div>
+            </SheetHeader>
+            <ScrollArea className="flex-1">
+              {notificationList}
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  /* ── Desktop: Popover ── */
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative">
-          {notificacaosPendentes > 0 ? (
-            <BellDot className="h-5 w-5" />
-          ) : (
-            <Bell className="h-5 w-5" />
-          )}
-          {notificacaosPendentes > 0 && (
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs"
-            >
-              {notificacaosPendentes > 99 ? '99+' : notificacaosPendentes}
-            </Badge>
-          )}
-        </Button>
+        {bellButton}
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-[calc(100vw-16px)] sm:w-96 p-0" 
-        align="end" 
-        sideOffset={8}
-        collisionPadding={8}
-      >
-        <div className="flex items-center justify-between p-3 md:p-4 border-b">
-          <h4 className="font-semibold text-sm md:text-base">Notificações</h4>
-          <div className="flex items-center gap-2">
-            {notificacaosPendentes > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => marcarTodasComoLidas.mutate()}
-                disabled={marcarTodasComoLidas.isPending}
-                className="text-xs h-7 px-2"
-              >
-                <Check className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden md:inline">Marcar como </span>lidas
-              </Button>
-            )}
-            {notificacoes.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => limparNotificacoes.mutate()}
-                disabled={limparNotificacoes.isPending}
-                className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                title="Limpar todas as notificações"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+      <PopoverContent className="w-96 p-0" align="end" sideOffset={8}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h4 className="font-semibold">Notificações</h4>
+          {headerActions}
         </div>
-        
-        <ScrollArea className="h-72 md:h-80 max-h-[50vh] md:max-h-[60vh]">
-          {isLoading ? (
-            <div className="p-4 text-center text-muted-foreground">
-              Carregando notificações...
-            </div>
-          ) : notificacoes.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground">
-              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Nenhuma notificação</p>
-            </div>
-          ) : (
-            <div className="p-2">
-              {notificacoes.map((notificacao, index) => (
-                <div key={notificacao.id}>
-                  <Card 
-                    className={`mb-2 cursor-pointer transition-colors hover:bg-muted/50 ${
-                      !notificacao.lida ? 'border-l-4 border-l-primary' : ''
-                    }`}
-                    onClick={() => handleNotificationClick(notificacao)}
-                  >
-                     <CardContent className="p-3">
-                       <div className="flex items-start gap-2">
-                         <div className={`p-1.5 rounded-full ${getTipoColor(notificacao.tipo)} text-white flex-shrink-0`}>
-                           {getTipoIcon(notificacao.tipo)}
-                         </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1 mb-1">
-                            <p className="text-sm font-medium break-words">
-                              {notificacao.titulo}
-                            </p>
-                            {!notificacao.lida && (
-                              <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />
-                            )}
-                          </div>
-                          
-                           <p className="text-xs text-muted-foreground mb-1 break-words">
-                             {notificacao.mensagem.length > 120 ? 
-                               `${notificacao.mensagem.substring(0, 120)}...` : 
-                               notificacao.mensagem
-                             }
-                           </p>
-                          
-                           <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground gap-2">
-                             <span className="truncate">
-                               De: {notificacao.remetente?.nome || 'Sistema'}
-                             </span>
-                             <span className="flex-shrink-0">
-                               {formatDateTime(notificacao.created_at)}
-                             </span>
-                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  {index < notificacoes.length - 1 && <Separator />}
-                </div>
-              ))}
-            </div>
-          )}
+        <ScrollArea className="h-80 max-h-[60vh]">
+          {notificationList}
         </ScrollArea>
       </PopoverContent>
     </Popover>
