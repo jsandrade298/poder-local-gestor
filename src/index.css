@@ -324,3 +324,98 @@ table {
 [data-radix-popper-content-wrapper] {
   z-index: 99999 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE / PWA OPTIMIZATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Safe Areas (iPhone notch / Dynamic Island) ──────────── */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── Tap Highlight ───────────────────────────────────────── */
+.tap-highlight-transparent {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Dialogs full-screen no mobile ──────────────────────── */
+@media (max-width: 767px) {
+  /* Transforma todos os dialogs em tela cheia no mobile */
+  [role="dialog"][data-state="open"] {
+    left: 0 !important;
+    top: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    padding: 16px !important;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+  }
+
+  /* Animação de slide-up no mobile em vez de zoom */
+  [role="dialog"][data-state="open"] {
+    animation: dialog-slide-up 200ms ease-out !important;
+  }
+  [role="dialog"][data-state="closed"] {
+    animation: dialog-slide-down 150ms ease-in !important;
+  }
+
+  @keyframes dialog-slide-up {
+    from { transform: translateY(100%); opacity: 0.5; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  @keyframes dialog-slide-down {
+    from { transform: translateY(0);    opacity: 1; }
+    to   { transform: translateY(100%); opacity: 0; }
+  }
+}
+
+/* ─── Touch target mínimo 44px ────────────────────────────── */
+@media (max-width: 767px) {
+  /* Botões e links interativos recebem padding extra para área de toque */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ─── Prevenir zoom em inputs no iOS (fonte <16px causa zoom) ─ */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ─── Smooth scroll em containers ─────────────────────────── */
+@media (max-width: 767px) {
+  .overflow-y-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* ─── Standalone mode (quando instalado como PWA) ─────────── */
+@media (display-mode: standalone) {
+  /* Remove qualquer margem extra quando rodando como app */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
