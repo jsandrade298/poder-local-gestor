@@ -351,39 +351,43 @@ export function AdicionarTarefaDialog({ kanbanType, open: controlledOpen, onOpen
             />
           </div>
 
-          {/* Lembretes de prazo */}
-          {formData.data_prazo && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm">
-                <Bell className="h-4 w-4" />
-                Lembretes antes do prazo
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                {opcoesLembrete.map((opcao) => (
-                  <div key={opcao.dias} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`lembrete-${opcao.dias}`}
-                      checked={formData.lembretes_prazo.includes(opcao.dias)}
-                      onCheckedChange={(checked) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          lembretes_prazo: checked
-                            ? [...prev.lembretes_prazo, opcao.dias].sort((a, b) => b - a)
-                            : prev.lembretes_prazo.filter(d => d !== opcao.dias)
-                        }));
-                      }}
-                    />
-                    <Label htmlFor={`lembrete-${opcao.dias}`} className="text-sm cursor-pointer">
-                      {opcao.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Tarefas em atraso enviam lembrete diário automaticamente.
+          {/* Lembretes de prazo - sempre visível */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Bell className="h-4 w-4" />
+              Lembretes antes do prazo
+            </Label>
+            {!formData.data_prazo && (
+              <p className="text-xs text-muted-foreground italic">
+                Defina uma data de prazo para ativar os lembretes.
               </p>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {opcoesLembrete.map((opcao) => (
+                <div key={opcao.dias} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`lembrete-${opcao.dias}`}
+                    checked={formData.lembretes_prazo.includes(opcao.dias)}
+                    disabled={!formData.data_prazo}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        lembretes_prazo: checked
+                          ? [...prev.lembretes_prazo, opcao.dias].sort((a, b) => b - a)
+                          : prev.lembretes_prazo.filter(d => d !== opcao.dias)
+                      }));
+                    }}
+                  />
+                  <Label htmlFor={`lembrete-${opcao.dias}`} className={`text-sm cursor-pointer ${!formData.data_prazo ? 'text-muted-foreground' : ''}`}>
+                    {opcao.label}
+                  </Label>
+                </div>
+              ))}
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Tarefas em atraso enviam lembrete diário automaticamente.
+            </p>
+          </div>
 
           {/* ══════════════ Checklist ══════════════ */}
           <div className="space-y-2">
