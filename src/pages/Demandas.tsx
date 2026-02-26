@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3 } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
@@ -49,6 +49,7 @@ export default function Demandas() {
     total: number;
   } | undefined>(undefined);
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   
   // Estados para paginação
   const [pageSize, setPageSize] = useState<number | "all">(50);
@@ -429,6 +430,19 @@ export default function Demandas() {
     setDateFrom("");
     setDateTo("");
   };
+
+  // Contagem de filtros ativos (para badge mobile)
+  const activeFilterCount = [
+    statusFilter !== "all",
+    areaFilter !== "all",
+    municipeFilter !== "all",
+    responsavelFilter !== "all",
+    cidadeFilter !== "all",
+    bairroFilter !== "all",
+    atrasoFilter !== "all",
+    dateFrom !== "",
+    dateTo !== "",
+  ].filter(Boolean).length;
 
   // Função para exportar CSV
   const exportToCSV = () => {
@@ -1320,7 +1334,7 @@ export default function Demandas() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Carregando demandas...</p>
@@ -1330,95 +1344,115 @@ export default function Demandas() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="container mx-auto px-4 py-6 space-y-8">
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-3 md:space-y-8">
         {/* Header */}
         <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-3 md:pb-4 px-3 py-3 md:px-6 md:py-6">
             <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <span>Lista de Demandas</span>
+              <div className="flex items-center min-w-0">
+                <span className="text-base md:text-xl truncate">Lista de Demandas</span>
                 {searchParams.get('areaNome') && (
-                  <span className="text-lg text-muted-foreground ml-2">
+                  <span className="text-xs md:text-lg text-muted-foreground ml-2 truncate hidden md:inline">
                     - Área: {decodeURIComponent(searchParams.get('areaNome') || '')}
                   </span>
                 )}
                 {searchParams.get('responsavelNome') && (
-                  <span className="text-lg text-muted-foreground ml-2">
+                  <span className="text-xs md:text-lg text-muted-foreground ml-2 truncate hidden md:inline">
                     - Responsável: {decodeURIComponent(searchParams.get('responsavelNome') || '')}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsConfigStatusOpen(true)}
-                  title="Configurar Status"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/balanco-demandas")}
-                  title="Balanço de Demandas"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Balanço
-                </Button>
-                <ImportCSVDialogDemandas 
-                  onFileSelect={handleFileImport}
-                  isImporting={importDemandas.isPending}
-                  fileInputRef={fileInputRef}
-                  importResults={importResults}
-                  importProgress={importProgress}
-                />
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={exportToCSV}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar CSV
-                </Button>
+
+              {/* Mobile: overflow menu */}
+              <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                <div className="md:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsConfigStatusOpen(true)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configurar Status
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate("/balanco-demandas")}>
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Balanço
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportToCSV}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Exportar CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                {/* Desktop: botões visíveis */}
+                <div className="hidden md:flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsConfigStatusOpen(true)} title="Configurar Status">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/balanco-demandas")} title="Balanço de Demandas">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Balanço
+                  </Button>
+                  <ImportCSVDialogDemandas 
+                    onFileSelect={handleFileImport}
+                    isImporting={importDemandas.isPending}
+                    fileInputRef={fileInputRef}
+                    importResults={importResults}
+                    importProgress={importProgress}
+                  />
+                  <Button variant="outline" size="sm" onClick={exportToCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar CSV
+                  </Button>
+                </div>
+
                 <NovaDemandaDialog />
               </div>
             </CardTitle>
-            <p className="text-base text-muted-foreground lg:text-lg">
-              Acompanhe e gerencie todas as demandas do gabinete
-            </p>
           </CardHeader>
-          <CardContent className="pt-0">
-          </CardContent>
         </Card>
 
 
         {/* Filtros */}
         <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Filter className="h-4 w-4" />
-              Filtros
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Linha 1: Buscar + filtros principais */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              <div className="sm:col-span-2 xl:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Título, protocolo ou munícipe..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+          <CardContent className="px-3 py-3 md:px-6 md:py-4 space-y-3">
+            {/* Busca (sempre visível) + Toggle filtros mobile */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Título, protocolo ou munícipe..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
+              {/* Mobile: botão toggle filtros */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="md:hidden shrink-0 gap-1.5"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filtros
+                {activeFilterCount > 0 && (
+                  <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
+                )}
+                {showFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
+            
+            {/* Filtros expandíveis: sempre visível no desktop, toggle no mobile */}
+            <div className={`space-y-3 ${showFilters ? '' : 'hidden md:block'}`}>
+              {/* Linha 1: filtros principais */}
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 md:gap-3">
               
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
@@ -1506,7 +1540,7 @@ export default function Demandas() {
             </div>
 
             {/* Linha 2: Localização + Atraso + Período */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 md:gap-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Cidade
@@ -1588,13 +1622,14 @@ export default function Demandas() {
               </div>
 
               <div className="flex items-end">
-                <Button variant="outline" onClick={clearFilters} className="w-full">
+                <Button variant="outline" onClick={clearFilters} className="w-full text-xs md:text-sm">
                   Limpar Filtros
                 </Button>
               </div>
             </div>
+            </div> {/* Close collapsible filters */}
 
-            {/* Controles de paginação */}
+            {/* Controles de paginação (sempre visível) */}
             <div className="flex items-center justify-end pt-2 border-t border-border/30">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -1644,19 +1679,20 @@ export default function Demandas() {
                 className="backdrop-blur-sm bg-card/95 border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
                 onClick={() => handleViewDemanda(demanda)}
               >
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex-1 space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-foreground">
+                <CardContent className="p-3 md:p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 md:gap-4">
+                    <div className="flex-1 space-y-1.5 md:space-y-3 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1 md:gap-2">
+                        <h3 className="text-sm md:text-lg font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
                           {demanda.titulo}
                         </h3>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-[10px] md:text-xs shrink-0">
                           #{demanda.protocolo}
                         </Badge>
                         <StatusBadge status={demanda.status} size="md" />
                         <Badge 
                           variant="secondary"
+                          className="text-[10px] md:text-xs shrink-0"
                           style={{ backgroundColor: getPrioridadeColor(demanda.prioridade), color: 'white' }}
                         >
                           {getPrioridadeLabel(demanda.prioridade)}
