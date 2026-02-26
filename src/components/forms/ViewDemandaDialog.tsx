@@ -307,9 +307,9 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
           <TabsContent value="detalhes" className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{demanda.titulo}</CardTitle>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base md:text-lg">{demanda.titulo}</CardTitle>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <StatusBadge status={demanda.status} size="md" />
                       <Badge 
@@ -335,7 +335,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
