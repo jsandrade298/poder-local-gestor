@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -236,6 +237,7 @@ const AssessorIA = () => {
   const [vincularOpen, setVincularOpen]             = useState(false);
 
   const { toast }       = useToast();
+  const location        = useLocation();
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const textareaRef     = useRef<HTMLTextAreaElement>(null);
   const fileInputRef    = useRef<HTMLInputElement>(null);
@@ -252,13 +254,29 @@ const AssessorIA = () => {
     }
   }, [inputMessage]);
 
-  // Ler contexto da demanda via sessionStorage
-  useEffect(() => {
+  // Processar dados do sessionStorage — roda toda vez que a rota é acessada
+  const processarSessionStorage = useCallback(() => {
     const stored = sessionStorage.getItem("assessorIA_promptData");
     if (!stored) return;
     sessionStorage.removeItem("assessorIA_promptData");
     let data: any;
     try { data = JSON.parse(stored); } catch { return; }
+
+    // Trocar modo se especificado
+    if (data.modeId) setActiveMode(data.modeId);
+
+    // ── Fluxo A: prompt direto do relatório estratégico ──────────────────
+    if (data.directPrompt) {
+      setMessages([]);
+      setDemandaContext(null);
+      setDocumentosContexto([]);
+      setAnexosChat([]);
+      setCurrentConvId(Date.now().toString());
+      setTimeout(() => setInputMessage(data.directPrompt), 50);
+      return;
+    }
+
+    // ── Fluxo B: contexto de demanda específica ───────────────────────────
     if (data.protocolo || data.titulo) {
       setDemandaContext({ id: data.id || "", protocolo: data.protocolo || "", titulo: data.titulo || "", municipe: data.municipe, area: data.area });
     }
@@ -284,6 +302,11 @@ const AssessorIA = () => {
     setTimeout(() => setInputMessage(prompt), 50);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Roda na montagem E toda vez que o usuário navega para esta rota
+  useEffect(() => {
+    processarSessionStorage();
+  }, [location.key]);
 
   // ─── Persistir histórico ──────────────────────────────────────────────────
   const persistHistory = (msgs: Message[], modeId: string) => {
