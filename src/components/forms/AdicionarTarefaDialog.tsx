@@ -245,10 +245,11 @@ export function AdicionarTarefaDialog({ kanbanType, open: controlledOpen, onOpen
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
         </DialogHeader>
+        <div className="overflow-y-auto max-h-[calc(85vh-130px)] pr-1">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="titulo">Título *</Label>
@@ -480,6 +481,7 @@ export function AdicionarTarefaDialog({ kanbanType, open: controlledOpen, onOpen
             </Button>
           </div>
         </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
