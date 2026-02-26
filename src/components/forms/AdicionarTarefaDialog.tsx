@@ -14,6 +14,8 @@ import { registrarHistorico } from "@/lib/kanbanHistoricoUtils";
 
 interface AdicionarTarefaDialogProps {
   kanbanType: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const cores = [
@@ -39,8 +41,10 @@ interface ChecklistItem {
   texto: string;
 }
 
-export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AdicionarTarefaDialog({ kanbanType, open: controlledOpen, onOpenChange: controlledOnOpenChange }: AdicionarTarefaDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange || setInternalOpen;
   const [colaboradoresSelecionados, setColaboradoresSelecionados] = useState<string[]>([]);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [novoItemTexto, setNovoItemTexto] = useState("");
@@ -233,12 +237,14 @@ export function AdicionarTarefaDialog({ kanbanType }: AdicionarTarefaDialogProps
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Tarefa
-        </Button>
-      </DialogTrigger>
+      {controlledOpen === undefined && (
+        <DialogTrigger asChild>
+          <Button variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Tarefa
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
