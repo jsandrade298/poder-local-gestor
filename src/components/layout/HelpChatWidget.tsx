@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircleQuestion, Send, X, Loader2, Minimize2, Trash2 } from "lucide-react";
+import { MessageCircleQuestion, Send, X, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+
+// ─── Configuração ────────────────────────────────────────────
+
+const ASSISTANT_NAME = "Navi";
+const ASSISTANT_SUBTITLE = "Sua guia no Poder Local";
 
 // ─── Tipos ───────────────────────────────────────────────────
 
@@ -44,8 +49,7 @@ export function HelpChatWidget() {
         {
           id: "welcome",
           role: "assistant",
-          content:
-            "Olá! 👋 Eu sou a **Bia**, assistente do Poder Local. Posso te ajudar com dúvidas sobre o sistema — como usar funcionalidades, onde encontrar coisas, fluxos de trabalho... É só perguntar!",
+          content: `Olá! 👋 Eu sou a **${ASSISTANT_NAME}**, sua guia no Poder Local.\n\nPosso te ajudar com:\n• Como usar cada funcionalidade\n• Onde encontrar coisas no sistema\n• Dicas e fluxos de trabalho\n\nÉ só perguntar!`,
         },
       ]);
     }
@@ -68,6 +72,11 @@ export function HelpChatWidget() {
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
+
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
 
     try {
       // Histórico para API (sem mensagem de boas-vindas)
@@ -95,12 +104,17 @@ export function HelpChatWidget() {
 
       if (!isOpen) setHasUnread(true);
     } catch (err) {
+      const errorMessage =
+        err instanceof Error && err.message.includes("Maritaca")
+          ? "Estou com dificuldades técnicas no momento. Por favor, tente novamente mais tarde."
+          : "Ops, tive um problema ao processar. Tente novamente em alguns segundos.";
+
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "Ops, tive um problema ao processar sua mensagem. Tente novamente em alguns segundos. 😅",
+          content: errorMessage,
         },
       ]);
     } finally {
@@ -120,17 +134,15 @@ export function HelpChatWidget() {
       {
         id: "welcome",
         role: "assistant",
-        content:
-          "Conversa limpa! 🧹 Como posso te ajudar?",
+        content: "Conversa limpa! 🧹 Como posso te ajudar?",
       },
     ]);
   };
 
   // ──────────────────────────────────────────────
-  // Render: formatação simples de bold em markdown
+  // Render: formatação básica de markdown
   // ──────────────────────────────────────────────
-  const formatContent = (text: string) => {
-    // Negrito: **texto**
+  const renderBold = (text: string) => {
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith("**") && part.endsWith("**")) {
@@ -144,6 +156,46 @@ export function HelpChatWidget() {
     });
   };
 
+  const formatContent = (text: string) => {
+    return text.split("\n").map((line, lineIdx) => {
+      // Bullet points
+      if (line.startsWith("• ") || line.startsWith("- ")) {
+        const content = line.slice(2);
+        return (
+          <div key={lineIdx} className="flex gap-1.5 ml-1">
+            <span className="text-primary mt-0.5 shrink-0">•</span>
+            <span>{renderBold(content)}</span>
+          </div>
+        );
+      }
+      // Numbered items
+      const numMatch = line.match(/^(\d+)\.\s(.+)/);
+      if (numMatch) {
+        return (
+          <div key={lineIdx} className="flex gap-1.5 ml-1">
+            <span className="text-primary font-semibold min-w-[18px] shrink-0">{numMatch[1]}.</span>
+            <span>{renderBold(numMatch[2])}</span>
+          </div>
+        );
+      }
+      // Empty line = spacer
+      if (line.trim() === "") {
+        return <div key={lineIdx} className="h-1.5" />;
+      }
+      // Normal line
+      return <div key={lineIdx}>{renderBold(line)}</div>;
+    });
+  };
+
+  // ──────────────────────────────────────────────
+  // Auto-resize textarea
+  // ──────────────────────────────────────────────
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 96) + "px";
+  };
+
   // ──────────────────────────────────────────────
   // Render
   // ──────────────────────────────────────────────
@@ -153,25 +205,27 @@ export function HelpChatWidget() {
       {isOpen && (
         <div
           className={cn(
-            "fixed z-[9980] bg-background border shadow-2xl flex flex-col",
-            // Mobile: full screen acima do bottom nav
-            "bottom-0 right-0 left-0 top-0",
-            "md:bottom-6 md:right-6 md:left-auto md:top-auto",
+            "fixed z-[9980] bg-background border shadow-2xl",
+            "flex flex-col overflow-hidden",
+            // Mobile: tela cheia
+            "inset-0",
+            // Desktop: janela flutuante
+            "md:inset-auto md:bottom-6 md:right-6",
             "md:w-[380px] md:h-[520px] md:rounded-2xl md:max-h-[80vh]"
           )}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground md:rounded-t-2xl flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                <MessageCircleQuestion className="h-4 w-4" />
+          {/* ── Header ───────────────────────── */}
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground md:rounded-t-2xl shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg">
+                💬
               </div>
               <div>
-                <h3 className="text-sm font-semibold leading-none">Bia — Ajuda</h3>
-                <p className="text-[10px] opacity-80 mt-0.5">Assistente do Poder Local</p>
+                <h3 className="text-sm font-bold leading-none">{ASSISTANT_NAME}</h3>
+                <p className="text-[10px] opacity-80 mt-0.5">{ASSISTANT_SUBTITLE}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               <Button
                 variant="ghost"
                 size="icon"
@@ -192,8 +246,8 @@ export function HelpChatWidget() {
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+          {/* ── Messages ─────────────────────── */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain min-h-0">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -204,10 +258,10 @@ export function HelpChatWidget() {
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words",
+                    "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                     msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-md"
-                      : "bg-muted text-foreground rounded-bl-md"
+                      ? "bg-primary text-primary-foreground rounded-br-sm"
+                      : "bg-muted text-foreground rounded-bl-sm"
                   )}
                 >
                   {formatContent(msg.content)}
@@ -217,11 +271,11 @@ export function HelpChatWidget() {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -230,27 +284,28 @@ export function HelpChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
-          <div className="border-t p-3 flex-shrink-0 safe-area-bottom">
+          {/* ── Input (DENTRO do container) ───── */}
+          <div className="shrink-0 border-t bg-background p-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
             <div className="flex items-end gap-2">
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua dúvida..."
                 rows={1}
                 className={cn(
-                  "flex-1 resize-none rounded-xl border bg-muted/50 px-3 py-2.5 text-sm",
-                  "placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30",
-                  "max-h-24 min-h-[40px]"
+                  "flex-1 resize-none rounded-xl border bg-muted/50 px-3.5 py-2.5 text-sm",
+                  "placeholder:text-muted-foreground/60",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30",
+                  "max-h-24"
                 )}
-                style={{ fontSize: "16px" }} // Evita zoom no iOS
+                style={{ fontSize: "16px", minHeight: "40px" }}
                 disabled={isLoading}
               />
               <Button
                 size="icon"
-                className="h-10 w-10 rounded-xl flex-shrink-0"
+                className="h-10 w-10 rounded-xl shrink-0"
                 onClick={sendMessage}
                 disabled={!input.trim() || isLoading}
               >
@@ -271,29 +326,25 @@ export function HelpChatWidget() {
           onClick={() => setIsOpen(true)}
           className={cn(
             "fixed z-[9980] group",
-            // Mobile: acima do bottom nav (h-14 + safe area)
-            "bottom-[76px] right-4 md:bottom-6 md:right-6",
-            "w-14 h-14 rounded-full",
+            // Mobile: acima do bottom nav
+            "bottom-20 right-4 md:bottom-6 md:right-6",
+            "h-14 rounded-full px-4",
             "bg-primary text-primary-foreground shadow-lg",
             "hover:shadow-xl hover:scale-105 active:scale-95",
             "transition-all duration-200",
-            "flex items-center justify-center"
+            "flex items-center gap-2"
           )}
           title="Precisa de ajuda?"
         >
-          <MessageCircleQuestion className="h-6 w-6" />
-          
+          <MessageCircleQuestion className="h-5 w-5 shrink-0" />
+          <span className="text-sm font-medium pr-0.5">Ajuda</span>
+
           {/* Badge de não lida */}
           {hasUnread && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
-              <span className="text-[9px] font-bold text-destructive-foreground">!</span>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center animate-pulse">
+              <span className="text-[10px] font-bold text-destructive-foreground">1</span>
             </span>
           )}
-          
-          {/* Tooltip */}
-          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap bg-foreground text-background text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden md:block">
-            Precisa de ajuda?
-          </span>
         </button>
       )}
     </>
