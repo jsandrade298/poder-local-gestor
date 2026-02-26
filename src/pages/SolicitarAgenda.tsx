@@ -806,20 +806,20 @@ const SolicitarAgenda = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-      <div className="container mx-auto p-6 space-y-6">
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:p-6 space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Sistema de Agendas</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-lg md:text-3xl font-bold">Sistema de Agendas</h1>
+          <p className="text-xs md:text-base text-muted-foreground mt-1 hidden md:block">
             Gerencie solicitações de agenda e valide compromissos do mandato
           </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="solicitar">Solicitar</TabsTrigger>
-            <TabsTrigger value="minhas">Minhas Agendas</TabsTrigger>
-            <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
+            <TabsTrigger value="solicitar" className="text-xs md:text-sm">Solicitar</TabsTrigger>
+            <TabsTrigger value="minhas" className="text-xs md:text-sm">Minhas</TabsTrigger>
+            <TabsTrigger value="solicitacoes" className="text-xs md:text-sm">Solicitações</TabsTrigger>
           </TabsList>
 
         {/* Tab Solicitar */}
@@ -831,7 +831,7 @@ const SolicitarAgenda = () => {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField
                       control={form.control}
                       name="titulo"
