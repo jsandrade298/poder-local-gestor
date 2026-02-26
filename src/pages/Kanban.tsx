@@ -1142,13 +1142,12 @@ export default function Kanban() {
                         </div>
                       )}
                     </Droppable>
-                  </div>
                 );
               })}
             </div>
           </DragDropContext>
         )}
-        </div> {/* Close md:hidden */}
+        </div>
 
         {/* Desktop: standard 3-column grid */}
         <div className="hidden md:block">
