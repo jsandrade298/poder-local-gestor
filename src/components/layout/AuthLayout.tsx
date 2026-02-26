@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { HelpChatWidget } from "@/components/layout/HelpChatWidget";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
@@ -161,6 +162,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* Bottom Navigation - apenas mobile */}
         <BottomNav />
+
+        {/* Chat de ajuda flutuante */}
+        <HelpChatWidget />
       </div>
     </SidebarProvider>
   );
