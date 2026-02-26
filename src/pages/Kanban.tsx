@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo, MoreHorizontal } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
 import { logError } from '@/lib/errorUtils';
@@ -79,14 +78,13 @@ export default function Kanban() {
   const [isViewRotaDialogOpen, setIsViewRotaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [isAdicionarRotasDialogOpen, setIsAdicionarRotasDialogOpen] = useState(false);
-  const [isAdicionarTarefaOpen, setIsAdicionarTarefaOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
   const [viewMode, setViewMode] = useState<ViewMode>('board');
-  const [activeColumn, setActiveColumn] = useState<string>('a_fazer');
+  const [activeColumn, setActiveColumn] = useState('a_fazer');
+  const [isAdicionarTarefaOpen, setIsAdicionarTarefaOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isDraggingRef = useRef(false);
-  const isMobile = useIsMobile();
   
   const processedTaskIdRef = useRef<string | null>(null);
   const isClosingModalRef = useRef(false);
@@ -703,224 +701,219 @@ export default function Kanban() {
   }
 
   return (
-    <div>
-      <div className="px-3 py-3 md:container md:mx-auto md:p-6">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-3 md:mb-6">
-          <div className="min-w-0 flex-1">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="container mx-auto px-3 py-3 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0 mb-4 md:mb-6">
+          <div className="space-y-1 md:space-y-2">
             <div className="flex items-center gap-2 md:gap-4 flex-wrap">
-              <h1 className="text-lg md:text-3xl font-bold text-foreground">Kanban</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Kanban</h1>
               
-              {/* Dropdown de usuário */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="max-w-[180px] md:max-w-[200px] md:min-w-[200px] justify-between text-xs md:text-sm truncate">
-                    <span className="truncate">
-                      {selectedUser === "producao-legislativa" 
-                        ? "Prod. Legislativa" 
-                        : responsaveis.find(r => r.id === selectedUser)?.nome || "Usuário"
-                      }
-                    </span>
-                    <ChevronDown className="h-3 w-3 opacity-50 shrink-0 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[200px]">
-                  <DropdownMenuItem 
-                    onClick={() => setSelectedUser("producao-legislativa")}
-                    className={selectedUser === "producao-legislativa" ? "bg-accent" : ""}
-                  >
-                    Produção Legislativa
-                  </DropdownMenuItem>
-                  {responsaveis.map((responsavel) => (
-                    <DropdownMenuItem 
-                      key={responsavel.id}
-                      onClick={() => setSelectedUser(responsavel.id)}
-                      className={selectedUser === responsavel.id ? "bg-accent" : ""}
-                    >
-                      {responsavel.nome}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Toggle Board | Histórico */}
-              <div className="flex rounded-lg border bg-muted/30 p-0.5">
-                <button
-                  className={`px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors ${
-                    viewMode === 'board' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
-                  }`}
-                  onClick={() => setViewMode('board')}
-                >
-                  Board
-                </button>
-                <button
-                  className={`px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1 ${
-                    viewMode === 'historico' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
-                  }`}
-                  onClick={() => setViewMode('historico')}
-                >
-                  <History className="h-3 w-3" />
-                  <span className="hidden md:inline">Histórico</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Ações: mobile = overflow menu, desktop = botões */}
-          {viewMode === 'board' && (
-            <>
-              {/* Mobile: menu overflow */}
-              <div className="md:hidden">
+              <div className="flex items-center gap-2 md:gap-3">
+                {/* Dropdown de usuário */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9">
-                      <Plus className="h-4 w-4" />
+                    <Button variant="outline" className="min-w-0 md:min-w-[200px] max-w-[160px] md:max-w-none justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md text-xs md:text-sm h-8 md:h-9">
+                      <span className="truncate">
+                      {selectedUser === "producao-legislativa" 
+                        ? "Produção Legislativa" 
+                        : responsaveis.find(r => r.id === selectedUser)?.nome || "Selecionar usuário"
+                      }
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 md:h-4 md:w-4 opacity-50 shrink-0 ml-1" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setIsAdicionarTarefaOpen(true)}>
-                      <ListTodo className="h-4 w-4 mr-2" />
-                      Nova Tarefa
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsAdicionarDialogOpen(true)}>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Adicionar Demanda
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsAdicionarRotasDialogOpen(true)}>
-                      <Route className="h-4 w-4 mr-2" />
-                      Adicionar Rota
-                    </DropdownMenuItem>
+                  <DropdownMenuContent align="start" className="min-w-[200px] bg-background/95 backdrop-blur border shadow-lg">
                     <DropdownMenuItem 
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => limparKanbanMutation.mutate()}
+                      onClick={() => setSelectedUser("producao-legislativa")}
+                      className={selectedUser === "producao-legislativa" ? "bg-accent" : ""}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Limpar Kanban
+                      Produção Legislativa
                     </DropdownMenuItem>
+                    {responsaveis.map((responsavel) => (
+                      <DropdownMenuItem 
+                        key={responsavel.id}
+                        onClick={() => setSelectedUser(responsavel.id)}
+                        className={selectedUser === responsavel.id ? "bg-accent" : ""}
+                      >
+                        {responsavel.nome}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {/* ── Toggle Board | Histórico ── */}
+                <div className="flex rounded-lg border bg-muted/30 p-0.5">
+                  <button
+                    className={`px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'board'
+                        ? 'bg-background shadow-sm font-medium'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setViewMode('board')}
+                  >
+                    Board
+                  </button>
+                  <button
+                    className={`px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'historico'
+                        ? 'bg-background shadow-sm font-medium'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => setViewMode('historico')}
+                  >
+                    <History className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    <span className="hidden md:inline">Histórico</span>
+                  </button>
+                </div>
               </div>
+            </div>
+            <p className="text-muted-foreground hidden md:block">
+              {viewMode === 'board' 
+                ? 'Visualize e gerencie as tarefas, demandas e rotas em formato kanban'
+                : 'Consulte o histórico de movimentações por período'
+              }
+            </p>
+          </div>
 
-              {/* Desktop: botões visíveis */}
-              <div className="hidden md:flex items-center gap-3">
-                <AdicionarTarefaDialog kanbanType={selectedUser} />
-                
-                <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Adicionar Demanda
-                </Button>
+          {/* Botões de ação (só no modo board) */}
+          {viewMode === 'board' && (
+            <>
+            {/* Desktop: botões originais */}
+            <div className="hidden md:flex items-center gap-3">
+              <AdicionarTarefaDialog kanbanType={selectedUser} />
+              
+              <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Demanda
+              </Button>
 
-                <Button 
-                  onClick={() => setIsAdicionarRotasDialogOpen(true)} 
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <Route className="h-4 w-4" />
-                  Adicionar Rota
-                </Button>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      Limpar Kanban
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={() => limparKanbanMutation.mutate()}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Confirmar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-
-              {/* Dialogs (always rendered) */}
-              <AdicionarTarefaDialog 
-                kanbanType={selectedUser} 
-                open={isAdicionarTarefaOpen} 
-                onOpenChange={setIsAdicionarTarefaOpen} 
-              />
+              <Button 
+                onClick={() => setIsAdicionarRotasDialogOpen(true)} 
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Route className="h-4 w-4" />
+                Adicionar Rota
+              </Button>
+              
               <AdicionarDemandasKanbanDialog 
                 open={isAdicionarDialogOpen}
                 onOpenChange={setIsAdicionarDialogOpen}
                 selectedUser={selectedUser}
               />
+
               <AdicionarRotasKanbanDialog
                 open={isAdicionarRotasDialogOpen}
                 onOpenChange={setIsAdicionarRotasDialogOpen}
                 selectedUser={selectedUser}
               />
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Limpar Kanban
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => limparKanbanMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+
+            {/* Mobile: menu compacto */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setIsAdicionarTarefaOpen(true)}>
+                    <ListTodo className="h-4 w-4 mr-2" />
+                    Nova Tarefa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsAdicionarDialogOpen(true)}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Adicionar Demanda
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsAdicionarRotasDialogOpen(true)}>
+                    <Route className="h-4 w-4 mr-2" />
+                    Adicionar Rota
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <AdicionarTarefaDialog kanbanType={selectedUser} open={isAdicionarTarefaOpen} onOpenChange={setIsAdicionarTarefaOpen} />
+              <AdicionarDemandasKanbanDialog open={isAdicionarDialogOpen} onOpenChange={setIsAdicionarDialogOpen} selectedUser={selectedUser} />
+              <AdicionarRotasKanbanDialog open={isAdicionarRotasDialogOpen} onOpenChange={setIsAdicionarRotasDialogOpen} selectedUser={selectedUser} />
+            </div>
             </>
           )}
         </div>
 
         {/* ══════════════ Conteúdo condicional ══════════════ */}
-        
-        {/* Mobile: unified mode/column tabs */}
-        <div className="md:hidden">
-          {viewMode === 'historico' ? (
-            <>
-              {/* Mobile histórico tab bar */}
-              <div className="flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
-                <button
-                  onClick={() => setViewMode('board')}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-muted-foreground"
-                >
-                  ← Board
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium bg-background shadow-sm text-foreground"
-                >
-                  <History className="h-3 w-3" />
-                  Histórico
-                </button>
-              </div>
-              <HistoricoView selectedUser={selectedUser} responsaveis={responsaveis} />
-            </>
-          ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              {/* Mobile column tab bar */}
-              <div className="flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
-                {statusColumns.map((col) => {
-                  const count = getDemandsByStatus(col.id).length;
-                  const isActive = activeColumn === col.id;
-                  return (
-                    <button
-                      key={col.id}
-                      onClick={() => setActiveColumn(col.id)}
-                      className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-xs font-medium transition-all ${
-                        isActive ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
-                      }`}
-                    >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
-                      <span className="truncate">{col.title}</span>
-                      <Badge variant="secondary" className="h-4 px-1 text-[10px] leading-none">{count}</Badge>
-                    </button>
-                  );
-                })}
-              </div>
+        {viewMode === 'historico' ? (
+          <HistoricoView 
+            selectedUser={selectedUser} 
+            responsaveis={responsaveis} 
+          />
+        ) : (
+          /* ══════════════ Board ══════════════ */
+          <DragDropContext onDragEnd={handleDragEnd}>
+            {/* Mobile: tab bar para alternar colunas */}
+            <div className="md:hidden flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
+              {statusColumns.map((col) => {
+                const count = getDemandsByStatus(col.id).length;
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => setActiveColumn(col.id)}
+                    className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                      activeColumn === col.id ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                    <span className="truncate">{col.title}</span>
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px] leading-none">{count}</Badge>
+                  </button>
+                );
+              })}
+            </div>
 
-              <div>
-                {statusColumns.filter(c => c.id === activeColumn).map((column) => {
-                  const columnItems = getDemandsByStatus(column.id);
-                  return (
-                    <Droppable key={column.id} droppableId={column.id}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              {statusColumns.map((column) => {
+                const columnItems = getDemandsByStatus(column.id);
+                
+                return (
+                  <div key={column.id} className={`space-y-4 ${activeColumn !== column.id ? 'hidden md:block' : ''}`}>
+                    <div className="hidden md:flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
+                        {column.title}
+                        <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
+                      </h2>
+                    </div>
+
+                    <Droppable droppableId={column.id}>
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`min-h-[200px] space-y-2 p-2 rounded-lg border-2 border-dashed transition-colors ${
+                          className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
                             snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
                           }`}
                         >
@@ -1142,144 +1135,14 @@ export default function Kanban() {
                         </div>
                       )}
                     </Droppable>
+                  </div>
                 );
               })}
             </div>
           </DragDropContext>
         )}
-        </div>
 
-        {/* Desktop: standard 3-column grid */}
-        <div className="hidden md:block">
-          {viewMode === 'historico' ? (
-            <HistoricoView selectedUser={selectedUser} responsaveis={responsaveis} />
-          ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <div className="grid grid-cols-3 gap-6">
-                {statusColumns.map((column) => {
-                  const columnItems = getDemandsByStatus(column.id);
-                  return (
-                    <div key={column.id} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
-                          {column.title}
-                          <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
-                        </h2>
-                      </div>
-                      <Droppable droppableId={column.id}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
-                              snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
-                            }`}
-                          >
-                            {columnItems.map((item, index) => (
-                              <Draggable key={item.id} draggableId={item.id} index={index}>
-                                {(provided, snapshot) => (
-                                  <Card
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
-                                      snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
-                                    }`}
-                                    style={{
-                                      borderLeftColor: getCardBorderColor(item),
-                                      ...provided.draggableProps.style
-                                    }}
-                                    onClick={() => {
-                                      if (!snapshot.isDragging && !isDraggingRef.current) {
-                                        if (item.tipo === 'tarefa') {
-                                          setSelectedTarefa(item);
-                                          setIsViewTarefaDialogOpen(true);
-                                        } else if (item.tipo === 'rota') {
-                                          setSelectedRota(item);
-                                          setIsViewRotaDialogOpen(true);
-                                        } else {
-                                          setSelectedDemanda(item);
-                                          setIsViewDialogOpen(true);
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
-                                      onClick={(e) => { e.stopPropagation(); handleRemoveItem(item); }}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                    <CardContent className="p-3">
-                                      {item.tipo === 'tarefa' ? (
-                                        <div className="space-y-2">
-                                          <div className="flex items-start gap-2">
-                                            <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: item.cor || '#3B82F6' }} />
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-medium text-sm text-foreground truncate">{item.titulo}</p>
-                                              {item.descricao && <p className="text-xs text-muted-foreground line-clamp-2">{item.descricao}</p>}
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <Badge variant="outline" className="text-[10px]">Tarefa</Badge>
-                                            <Badge variant={item.prioridade === 'alta' ? 'destructive' : item.prioridade === 'media' ? 'default' : 'secondary'} className="text-[10px]">
-                                              {item.prioridade}
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                      ) : item.tipo === 'rota' ? (
-                                        <div className="space-y-2">
-                                          <div className="flex items-start gap-2">
-                                            <Route className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-medium text-sm text-foreground truncate">{item.titulo}</p>
-                                              <p className="text-xs text-muted-foreground">
-                                                {item.pontos_count || 0} pontos • {item.distancia_km ? `${item.distancia_km.toFixed(1)}km` : '—'}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600">Rota</Badge>
-                                        </div>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          <p className="font-medium text-sm text-foreground line-clamp-2">{item.titulo}</p>
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <Badge variant="outline" className="text-[10px]">#{item.protocolo}</Badge>
-                                            {item.prioridade && (
-                                              <Badge variant={item.prioridade === 'alta' ? 'destructive' : item.prioridade === 'media' ? 'default' : 'secondary'} className="text-[10px]">
-                                                {item.prioridade}
-                                              </Badge>
-                                            )}
-                                          </div>
-                                          {item.municipe_nome && (
-                                            <p className="text-xs text-muted-foreground truncate">{item.municipe_nome}</p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </CardContent>
-                                  </Card>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                            {columnItems.length === 0 && (
-                              <div className="text-center text-muted-foreground py-8">
-                                Nenhum item nesta coluna
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </Droppable>
-                    </div>
-                  );
-                })}
-              </div>
-            </DragDropContext>
-          )}
-        </div>
+        {/* ══════════════ Dialogs ══════════════ */}
         <ViewDemandaDialog
           demanda={selectedDemanda}
           open={isViewDialogOpen}
