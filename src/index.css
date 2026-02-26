@@ -342,9 +342,52 @@ table {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ─── CRITICAL: Prevent pages from breaking out of app shell ─ */
+@media (max-width: 767px) {
+  /* Remove min-h-screen from ALL page root containers */
+  main > div {
+    min-height: auto !important;
+  }
+
+  /* Reduce container padding on mobile */
+  main .container {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  /* Reduce space-y gaps on mobile */
+  main .space-y-8 {
+    --tw-space-y-reverse: 0;
+    row-gap: 1rem;
+  }
+  main .space-y-6 {
+    --tw-space-y-reverse: 0;
+    row-gap: 0.75rem;
+  }
+
+  /* Make card padding compact on mobile */
+  main .p-6 {
+    padding: 0.75rem !important;
+  }
+  main .p-8 {
+    padding: 1rem !important;
+  }
+
+  /* Compact headers */
+  main .text-3xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+  main .text-2xl {
+    font-size: 1.125rem !important;
+    line-height: 1.5rem !important;
+  }
+}
+
 /* ─── Dialogs full-screen no mobile ──────────────────────── */
 @media (max-width: 767px) {
-  /* Transforma todos os dialogs em tela cheia no mobile */
   [role="dialog"][data-state="open"] {
     left: 0 !important;
     top: 0 !important;
@@ -360,7 +403,6 @@ table {
     overflow-y: auto !important;
   }
 
-  /* Animação de slide-up no mobile em vez de zoom */
   [role="dialog"][data-state="open"] {
     animation: dialog-slide-up 200ms ease-out !important;
   }
@@ -380,7 +422,6 @@ table {
 
 /* ─── Touch target mínimo 44px ────────────────────────────── */
 @media (max-width: 767px) {
-  /* Botões e links interativos recebem padding extra para área de toque */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
@@ -408,13 +449,11 @@ table {
   .overflow-y-auto,
   .overflow-auto {
     -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
   }
 }
 
 /* ─── Standalone mode (quando instalado como PWA) ─────────── */
 @media (display-mode: standalone) {
-  /* Remove qualquer margem extra quando rodando como app */
   body {
     overscroll-behavior-y: contain;
   }
