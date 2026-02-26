@@ -274,7 +274,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             Adicionar Demandas ao Kanban{" "}
@@ -294,9 +294,9 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
 
         <div className="space-y-4 flex-1 min-h-0 flex flex-col">
           {/* Filtros organizados */}
-          <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg space-y-3 md:space-y-4">
             {/* Grid de filtros com labels */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
               {/* Status */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -476,30 +476,30 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
           </div>
 
           {/* Seleção e estatísticas */}
-          <div className="flex items-center justify-between p-4 bg-card border rounded-lg">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 md:p-4 bg-card border rounded-lg">
+            <div className="flex items-center gap-2 md:gap-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="select-all"
                   checked={selectedDemandas.length === filteredDemandas.length && filteredDemandas.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
-                <label htmlFor="select-all" className="text-sm font-medium">
-                  Selecionar todas ({filteredDemandas.length} de {demandas.length} total)
+                <label htmlFor="select-all" className="text-xs md:text-sm font-medium">
+                  Todas ({filteredDemandas.length})
                 </label>
               </div>
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="text-xs">
                 {selectedDemandas.length} selecionada(s)
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {filteredDemandas.length} de {demandas.length} demanda(s) disponível(is)
+            <p className="text-xs text-muted-foreground">
+              {filteredDemandas.length} de {demandas.length} disponível(is)
               {demandas.length > 1000 && " (carregadas em lotes)"}
             </p>
           </div>
 
           {/* Lista de demandas */}
-          <div className="border rounded-lg flex-1 min-h-0 overflow-y-auto">
+          <div className="border rounded-lg flex-1 min-h-0 overflow-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -517,15 +517,15 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Protocolo</TableHead>
+                    <TableHead className="w-10 md:w-12"></TableHead>
+                    <TableHead className="hidden md:table-cell">Protocolo</TableHead>
                     <TableHead>Título</TableHead>
-                    <TableHead>Munícipe</TableHead>
-                    <TableHead>Área</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Prioridade</TableHead>
-                    <TableHead>Responsável</TableHead>
-                    <TableHead>Data</TableHead>
+                    <TableHead className="hidden lg:table-cell">Munícipe</TableHead>
+                    <TableHead className="hidden lg:table-cell">Área</TableHead>
+                    <TableHead className="hidden md:table-cell">Status</TableHead>
+                    <TableHead className="hidden lg:table-cell">Prioridade</TableHead>
+                    <TableHead className="hidden lg:table-cell">Responsável</TableHead>
+                    <TableHead className="hidden md:table-cell">Data</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -539,37 +539,38 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                           }
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <span className="font-mono text-sm">#{demanda.protocolo}</span>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium line-clamp-1">{demanda.titulo}</p>
+                          <p className="font-medium line-clamp-1 text-xs md:text-sm">{demanda.titulo}</p>
+                          <p className="text-[10px] text-muted-foreground md:hidden font-mono">#{demanda.protocolo}</p>
                           {demanda.descricao && (
-                            <p className="text-xs text-muted-foreground line-clamp-1">
+                            <p className="text-xs text-muted-foreground line-clamp-1 hidden md:block">
                               {demanda.descricao}
                             </p>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <span className="text-sm">{getMunicipeNome(demanda.municipe_id)}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <span className="text-sm">{getAreaNome(demanda.area_id)}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <StatusBadge status={demanda.status} size="sm" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Badge variant={getPrioridadeVariant(demanda.prioridade)}>
                           {getPrioridadeLabel(demanda.prioridade)}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <span className="text-sm">{getResponsavelNome(demanda.responsavel_id)}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <span className="text-sm">{formatDateTime(demanda.created_at).split(' ')[0]}</span>
                       </TableCell>
                     </TableRow>
