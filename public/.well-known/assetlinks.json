@@ -1,0 +1,32 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.poderlocal.gestor",
+      "sha256_cert_fingerprints": [
+        "B1:59:B0:19:3F:D9:CB:3F:C3:C2:00:91:DE:3A:88:FF:2D:29:EC:2B:0A:BB:5D:E8:55:A9:70:D6:CF:52:C0:EC"
+      ]
+    }
+  }
+]
+```
+- Commit
+
+**2. Editar o `_redirects`:**
+- Clique no arquivo `_redirects` → lápis (editar)
+- Substitua por:
+```
+/.well-known/*  /.well-known/:splat  200
+/*    /index.html   200
+```
+- Commit
+
+**3. Criar o `_headers`:**
+- Clique em **"Add file" → "Create new file"**
+- Nome: `_headers`
+- Conteúdo:
+```
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
