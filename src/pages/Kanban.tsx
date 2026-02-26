@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo } from "lucide-react";
+import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo, MoreHorizontal } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
 import { logError } from '@/lib/errorUtils';
@@ -80,9 +81,11 @@ export default function Kanban() {
   const [isAdicionarRotasDialogOpen, setIsAdicionarRotasDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
   const [viewMode, setViewMode] = useState<ViewMode>('board');
+  const [activeColumn, setActiveColumn] = useState<string>('a_fazer');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isDraggingRef = useRef(false);
+  const isMobile = useIsMobile();
   
   const processedTaskIdRef = useRef<string | null>(null);
   const isClosingModalRef = useRef(false);
@@ -699,134 +702,166 @@ export default function Kanban() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold text-foreground">Kanban</h1>
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:p-6">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between mb-3 md:mb-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+              <h1 className="text-lg md:text-3xl font-bold text-foreground">Kanban</h1>
               
-              <div className="flex items-center gap-3">
-                {/* Dropdown de usuário */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="min-w-[200px] justify-between bg-background/50 backdrop-blur border shadow-sm hover:shadow-md">
+              {/* Dropdown de usuário */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="max-w-[180px] md:max-w-[200px] md:min-w-[200px] justify-between text-xs md:text-sm truncate">
+                    <span className="truncate">
                       {selectedUser === "producao-legislativa" 
-                        ? "Produção Legislativa" 
-                        : responsaveis.find(r => r.id === selectedUser)?.nome || "Selecionar usuário"
+                        ? "Prod. Legislativa" 
+                        : responsaveis.find(r => r.id === selectedUser)?.nome || "Usuário"
                       }
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="min-w-[200px] bg-background/95 backdrop-blur border shadow-lg">
+                    </span>
+                    <ChevronDown className="h-3 w-3 opacity-50 shrink-0 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[200px]">
+                  <DropdownMenuItem 
+                    onClick={() => setSelectedUser("producao-legislativa")}
+                    className={selectedUser === "producao-legislativa" ? "bg-accent" : ""}
+                  >
+                    Produção Legislativa
+                  </DropdownMenuItem>
+                  {responsaveis.map((responsavel) => (
                     <DropdownMenuItem 
-                      onClick={() => setSelectedUser("producao-legislativa")}
-                      className={selectedUser === "producao-legislativa" ? "bg-accent" : ""}
+                      key={responsavel.id}
+                      onClick={() => setSelectedUser(responsavel.id)}
+                      className={selectedUser === responsavel.id ? "bg-accent" : ""}
                     >
-                      Produção Legislativa
+                      {responsavel.nome}
                     </DropdownMenuItem>
-                    {responsaveis.map((responsavel) => (
-                      <DropdownMenuItem 
-                        key={responsavel.id}
-                        onClick={() => setSelectedUser(responsavel.id)}
-                        className={selectedUser === responsavel.id ? "bg-accent" : ""}
-                      >
-                        {responsavel.nome}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* ── Toggle Board | Histórico ── */}
-                <div className="flex rounded-lg border bg-muted/30 p-0.5">
-                  <button
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
-                      viewMode === 'board'
-                        ? 'bg-background shadow-sm font-medium'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                    onClick={() => setViewMode('board')}
-                  >
-                    Board
-                  </button>
-                  <button
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
-                      viewMode === 'historico'
-                        ? 'bg-background shadow-sm font-medium'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                    onClick={() => setViewMode('historico')}
-                  >
-                    <History className="h-3.5 w-3.5" />
-                    Histórico
-                  </button>
-                </div>
+              {/* Toggle Board | Histórico */}
+              <div className="flex rounded-lg border bg-muted/30 p-0.5">
+                <button
+                  className={`px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors ${
+                    viewMode === 'board' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                  }`}
+                  onClick={() => setViewMode('board')}
+                >
+                  Board
+                </button>
+                <button
+                  className={`px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1 ${
+                    viewMode === 'historico' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                  }`}
+                  onClick={() => setViewMode('historico')}
+                >
+                  <History className="h-3 w-3" />
+                  <span className="hidden md:inline">Histórico</span>
+                </button>
               </div>
             </div>
-            <p className="text-muted-foreground">
-              {viewMode === 'board' 
-                ? 'Visualize e gerencie as tarefas, demandas e rotas em formato kanban'
-                : 'Consulte o histórico de movimentações por período'
-              }
-            </p>
           </div>
 
-          {/* Botões de ação (só no modo board) */}
+          {/* Ações: mobile = overflow menu, desktop = botões */}
           {viewMode === 'board' && (
-            <div className="flex items-center gap-3">
-              <AdicionarTarefaDialog kanbanType={selectedUser} />
-              
-              <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Adicionar Demanda
-              </Button>
+            <>
+              {/* Mobile: menu overflow */}
+              <div className="md:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => {
+                      // Trigger tarefa dialog via simulating the button
+                      const btn = document.querySelector('[data-tarefa-trigger]') as HTMLElement;
+                      btn?.click();
+                    }}>
+                      <ListTodo className="h-4 w-4 mr-2" />
+                      Nova Tarefa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsAdicionarDialogOpen(true)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Adicionar Demanda
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsAdicionarRotasDialogOpen(true)}>
+                      <Route className="h-4 w-4 mr-2" />
+                      Adicionar Rota
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => limparKanbanMutation.mutate()}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Limpar Kanban
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-              <Button 
-                onClick={() => setIsAdicionarRotasDialogOpen(true)} 
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Route className="h-4 w-4" />
-                Adicionar Rota
-              </Button>
-              
+              {/* Desktop: botões visíveis */}
+              <div className="hidden md:flex items-center gap-3">
+                <AdicionarTarefaDialog kanbanType={selectedUser} />
+                
+                <Button onClick={() => setIsAdicionarDialogOpen(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Demanda
+                </Button>
+
+                <Button 
+                  onClick={() => setIsAdicionarRotasDialogOpen(true)} 
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <Route className="h-4 w-4" />
+                  Adicionar Rota
+                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Limpar Kanban
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => limparKanbanMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Confirmar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+
+              {/* Dialogs (always rendered) */}
               <AdicionarDemandasKanbanDialog 
                 open={isAdicionarDialogOpen}
                 onOpenChange={setIsAdicionarDialogOpen}
                 selectedUser={selectedUser}
               />
-
               <AdicionarRotasKanbanDialog
                 open={isAdicionarRotasDialogOpen}
                 onOpenChange={setIsAdicionarRotasDialogOpen}
                 selectedUser={selectedUser}
               />
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="gap-2">
-                    <Trash2 className="h-4 w-4" />
-                    Limpar Kanban
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={() => limparKanbanMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+              {/* Hidden trigger for mobile menu */}
+              <div className="hidden"><AdicionarTarefaDialog kanbanType={selectedUser} /></div>
+            </>
           )}
         </div>
 
@@ -839,13 +874,38 @@ export default function Kanban() {
         ) : (
           /* ══════════════ Board ══════════════ */
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* ── Mobile: Tab bar ── */}
+            <div className="md:hidden flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
+              {statusColumns.map((col) => {
+                const count = getDemandsByStatus(col.id).length;
+                const isActive = activeColumn === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => setActiveColumn(col.id)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                    <span>{col.title}</span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{count}</Badge>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
               {statusColumns.map((column) => {
                 const columnItems = getDemandsByStatus(column.id);
+                const isActive = activeColumn === column.id;
                 
                 return (
-                  <div key={column.id} className="space-y-4">
-                    <div className="flex items-center justify-between">
+                  <div key={column.id} className={`space-y-2 md:space-y-4 ${!isActive ? 'hidden md:block' : ''}`}>
+                    {/* Column header - desktop only */}
+                    <div className="hidden md:flex items-center justify-between">
                       <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
                         {column.title}
@@ -858,7 +918,7 @@ export default function Kanban() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
+                          className={`min-h-[200px] md:min-h-[300px] space-y-2 md:space-y-3 p-2 md:p-3 rounded-lg border-2 border-dashed transition-colors ${
                             snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
                           }`}
                         >
