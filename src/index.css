@@ -388,8 +388,12 @@ table {
 
 /* ─── Mobile dialog helpers ──────────────────────────────── */
 @media (max-width: 639px) {
-  /* Override max-h/max-w constraints inside fullscreen mobile dialogs */
-  /* Use :not([data-sheet]) to avoid affecting Sheet drawers */
+  /* On mobile, dialogs are fullscreen (inset-0), so remove any max-h constraints */
+  [role="dialog"]:not([data-sheet]) {
+    max-height: 100dvh !important;
+    height: 100dvh !important;
+  }
+  /* Also override max-h on children inside dialogs */
   [role="dialog"]:not([data-sheet]) .max-h-\[90vh\],
   [role="dialog"]:not([data-sheet]) .max-h-\[85vh\],
   [role="dialog"]:not([data-sheet]) .max-h-\[80vh\] {
