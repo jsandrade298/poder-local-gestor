@@ -1630,10 +1630,10 @@ export default function Demandas() {
             </div> {/* Close collapsible filters */}
 
             {/* Controles de paginação (sempre visível) */}
-            <div className="flex items-center justify-end pt-2 border-t border-border/30">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Mostrar:</span>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-border/30">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Mostrar:</span>
                   <Select 
                     value={pageSize.toString()} 
                     onValueChange={(value) => {
@@ -1641,7 +1641,7 @@ export default function Demandas() {
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-28 md:w-40 h-8 text-xs md:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
