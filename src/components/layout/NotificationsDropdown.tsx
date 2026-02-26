@@ -204,7 +204,12 @@ export function NotificationsDropdown() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[calc(100vw-24px)] md:w-96 max-w-[400px] p-0" align="end" sideOffset={8}>
+      <PopoverContent 
+        className="w-[calc(100vw-16px)] sm:w-96 p-0" 
+        align="end" 
+        sideOffset={8}
+        collisionPadding={8}
+      >
         <div className="flex items-center justify-between p-3 md:p-4 border-b">
           <h4 className="font-semibold text-sm md:text-base">Notificações</h4>
           <div className="flex items-center gap-2">
