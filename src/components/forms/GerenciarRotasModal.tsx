@@ -518,8 +518,8 @@ export function GerenciarRotasModal({
           {/* Filtros */}
           <div className="flex flex-col gap-3 pb-4 border-b">
             {/* Busca e Filtros */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative flex-1 min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar rotas..."
@@ -535,14 +535,14 @@ export function GerenciarRotasModal({
                   checked={apenasMinhas}
                   onCheckedChange={(checked) => setApenasMinhas(!!checked)}
                 />
-                <label htmlFor="apenas-minhas" className="text-sm whitespace-nowrap cursor-pointer">
+                <label htmlFor="apenas-minhas" className="text-xs md:text-sm whitespace-nowrap cursor-pointer">
                   Apenas minhas
                 </label>
               </div>
 
               {!apenasMinhas && (
                 <Select value={usuarioSelecionado} onValueChange={setUsuarioSelecionado}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-36 md:w-48">
                     <SelectValue placeholder="Filtrar por usuário" />
                   </SelectTrigger>
                   <SelectContent>
@@ -560,7 +560,7 @@ export function GerenciarRotasModal({
             </div>
 
             {/* Filtros de Status */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {Object.entries(STATUS_CONFIG).map(([key, config]) => {
                 const count = contagemStatus[key] || 0;
                 const isSelected = statusFiltro.includes(key);
@@ -622,7 +622,7 @@ export function GerenciarRotasModal({
                   return (
                     <Card key={rota.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-medium truncate">{rota.titulo}</h3>
@@ -637,7 +637,7 @@ export function GerenciarRotasModal({
                               )}
                             </div>
                             
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground flex-wrap">
                               <span className="flex items-center gap-1">
                                 <CalendarIcon className="h-3.5 w-3.5" />
                                 {formatarDataRelativa(rota.data_programada)}
