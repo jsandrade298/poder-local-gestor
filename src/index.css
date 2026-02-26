@@ -386,14 +386,25 @@ table {
   }
 }
 
-/* ─── Mobile dialog helpers ──────────────────────────────── */
+/* ─── Mobile dialog fullscreen ──────────────────────────── */
 @media (max-width: 639px) {
-  /* On mobile, dialogs are fullscreen (inset-0), so remove any max-h constraints */
-  [role="dialog"]:not([data-sheet]) {
-    max-height: 100dvh !important;
+  /* Make dialogs fullscreen on mobile, but NOT sheets/sidebars */
+  [role="dialog"]:not([data-sheet]):not([data-sidebar]) {
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
-  /* Also override max-h on children inside dialogs */
+
+  /* Override max-h constraints on children inside fullscreen dialogs */
   [role="dialog"]:not([data-sheet]) .max-h-\[90vh\],
   [role="dialog"]:not([data-sheet]) .max-h-\[85vh\],
   [role="dialog"]:not([data-sheet]) .max-h-\[80vh\] {
@@ -404,10 +415,12 @@ table {
     max-height: calc(100dvh - 140px) !important;
     overflow-y: auto !important;
   }
-  /* Fix flex+overflow-hidden containers in dialogs on mobile */
-  [role="dialog"]:not([data-sheet]) > .flex.flex-col.overflow-hidden {
+
+  /* Fix flex+overflow-hidden containers (tabbed dialogs) */
+  [role="dialog"]:not([data-sheet]) .overflow-hidden.flex.flex-col {
     overflow: auto !important;
     height: auto !important;
+    max-height: calc(100dvh - 60px) !important;
   }
 }
 
