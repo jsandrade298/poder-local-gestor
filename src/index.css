@@ -386,37 +386,24 @@ table {
   }
 }
 
-/* ─── Dialogs full-screen no mobile ──────────────────────── */
-@media (max-width: 767px) {
-  [role="dialog"][data-state="open"] {
-    left: 0 !important;
-    top: 0 !important;
-    transform: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    padding: 16px !important;
-    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+/* ─── Mobile dialog helpers ──────────────────────────────── */
+@media (max-width: 639px) {
+  /* Override max-h/max-w constraints inside fullscreen mobile dialogs */
+  /* Use :not([data-sheet]) to avoid affecting Sheet drawers */
+  [role="dialog"]:not([data-sheet]) .max-h-\[90vh\],
+  [role="dialog"]:not([data-sheet]) .max-h-\[85vh\],
+  [role="dialog"]:not([data-sheet]) .max-h-\[80vh\] {
+    max-height: calc(100dvh - 80px) !important;
     overflow-y: auto !important;
   }
-
-  [role="dialog"][data-state="open"] {
-    animation: dialog-slide-up 200ms ease-out !important;
+  [role="dialog"]:not([data-sheet]) .max-h-\[calc\(90vh-200px\)\] {
+    max-height: calc(100dvh - 140px) !important;
+    overflow-y: auto !important;
   }
-  [role="dialog"][data-state="closed"] {
-    animation: dialog-slide-down 150ms ease-in !important;
-  }
-
-  @keyframes dialog-slide-up {
-    from { transform: translateY(100%); opacity: 0.5; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-  @keyframes dialog-slide-down {
-    from { transform: translateY(0);    opacity: 1; }
-    to   { transform: translateY(100%); opacity: 0; }
+  /* Fix flex+overflow-hidden containers in dialogs on mobile */
+  [role="dialog"]:not([data-sheet]) > .flex.flex-col.overflow-hidden {
+    overflow: auto !important;
+    height: auto !important;
   }
 }
 
@@ -457,4 +444,13 @@ table {
   body {
     overscroll-behavior-y: contain;
   }
+}
+
+/* ─── Scrollbar hide utility ───────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
