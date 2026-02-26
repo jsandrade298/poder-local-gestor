@@ -1340,14 +1340,14 @@ export default function Municipes() {
           
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             {/* Mobile: overflow menu */}
-            <div className="md:hidden">
-              <DropdownMenu>
+            <div className="md:hidden relative">
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
+                  <Button variant="outline" size="icon" className="h-9 w-9">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => {
                     queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
                     queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
@@ -1631,11 +1631,12 @@ export default function Municipes() {
               </div>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 md:p-6">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <Checkbox
                       checked={selectAll}
                       onCheckedChange={handleSelectAll}
@@ -1643,11 +1644,11 @@ export default function Municipes() {
                     />
                   </TableHead>
                   <TableHead>Munícipe</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Endereço</TableHead>
-                  <TableHead>Tags</TableHead>
+                  <TableHead className="hidden md:table-cell">Contato</TableHead>
+                  <TableHead className="hidden lg:table-cell">Endereço</TableHead>
+                  <TableHead className="hidden md:table-cell">Tags</TableHead>
                   <TableHead className="text-center">Demandas</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="text-right w-12">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1679,12 +1680,15 @@ export default function Municipes() {
                       <TableCell>
                         <div>
                           <p className="font-medium text-foreground">{municipe.nome}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground md:hidden">
+                            {municipe.telefone || municipe.email || ''}
+                          </p>
+                          <p className="text-xs text-muted-foreground hidden md:block">
                             {municipe.data_nascimento && `Nascimento: ${formatDateOnly(municipe.data_nascimento)}`}
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1 text-sm text-foreground">
                             <Mail className="h-3 w-3" />
@@ -1696,7 +1700,7 @@ export default function Municipes() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <div className="flex items-start gap-1 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3 mt-0.5 shrink-0" />
                           <div className="space-y-1">
@@ -1707,7 +1711,7 @@ export default function Municipes() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <div className="flex flex-wrap gap-1">
                           {municipe.municipe_tags && municipe.municipe_tags.length > 0 ? (
                             municipe.municipe_tags.map((mt: any) => (
@@ -1799,6 +1803,7 @@ export default function Municipes() {
                 )}
               </TableBody>
             </Table>
+            </div> {/* close overflow-x-auto */}
           </CardContent>
           
           {/* Paginação */}
@@ -1879,21 +1884,16 @@ export default function Municipes() {
 
         {/* Botão Flutuante de Ações em Massa */}
         {selectedMunicipes.length > 0 && (
-          <div className="fixed bottom-6 right-6 z-50 animate-scale-in">
-            <div className="bg-card border border-border rounded-2xl shadow-lg backdrop-blur-sm p-4 min-w-[280px]">
-              <div className="flex items-center justify-between mb-3">
+          <div className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-50 animate-scale-in">
+            <div className="bg-card border border-border rounded-2xl shadow-lg backdrop-blur-sm p-3 md:p-4 md:min-w-[280px]">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                    <CheckSquare className="h-4 w-4 text-primary-foreground" />
+                  <div className="w-7 h-7 md:w-8 md:h-8 bg-primary rounded-full flex items-center justify-center">
+                    <CheckSquare className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {selectedMunicipes.length} selecionado{selectedMunicipes.length > 1 ? 's' : ''}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Clique para gerenciar
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedMunicipes.length} selecionado{selectedMunicipes.length > 1 ? 's' : ''}
+                  </p>
                 </div>
                 <Button
                   variant="ghost"
