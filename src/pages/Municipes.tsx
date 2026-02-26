@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
@@ -325,6 +325,15 @@ export default function Municipes() {
     setDemandaStatusFilter("all");
     resetPage();
   };
+
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilterCount = [
+    tagFilter !== "all",
+    bairroFilter !== "all",
+    cidadeFilter !== "all",
+    demandaFilter !== "all",
+    demandaStatusFilter !== "all",
+  ].filter(Boolean).length;
 
   // Gerenciar seleção de munícipes
   const handleSelectMunicipe = (municipeId: string, checked: boolean) => {
@@ -1316,92 +1325,113 @@ export default function Municipes() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-3 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-3xl font-bold tracking-tight text-foreground">
               Munícipes
             </h1>
-            <p className="text-base text-muted-foreground lg:text-lg">
+            <p className="text-xs md:text-base text-muted-foreground hidden md:block">
               Gerencie o cadastro de munícipes e suas informações
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => {
-                console.log('🔄 Refresh manual dos munícipes');
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+            {/* Mobile: overflow menu */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+                    queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
+                    queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
+                    toast({ title: "Dados atualizados!", description: "Lista de munícipes foi atualizada." });
+                  }}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Atualizar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={findDuplicates}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Detectar Duplicados
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop: botões visíveis */}
+            <div className="hidden md:flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => {
                 queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
                 queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
                 queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
-                toast({
-                  title: "Dados atualizados!",
-                  description: "Lista de munícipes foi atualizada."
-                });
-              }}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Atualizar
-            </Button>
-            <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={findDuplicates}
-              className="gap-2"
-            >
-              <Users className="h-4 w-4" />
-              Detectar Duplicados
-            </Button>
-            <ImportCSVDialog
-              onFileSelect={handleFileImport}
-              isImporting={importMunicipes.isPending}
-              fileInputRef={fileInputRef}
-              importResults={importResults}
-              importProgress={importProgress}
-              onClearResults={() => setImportResults([])}
-            />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={exportToCSV}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
-            </Button>
+                toast({ title: "Dados atualizados!", description: "Lista de munícipes foi atualizada." });
+              }} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
+              </Button>
+              <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
+              <Button variant="outline" size="sm" onClick={findDuplicates} className="gap-2">
+                <Users className="h-4 w-4" />
+                Detectar Duplicados
+              </Button>
+              <ImportCSVDialog
+                onFileSelect={handleFileImport}
+                isImporting={importMunicipes.isPending}
+                fileInputRef={fileInputRef}
+                importResults={importResults}
+                importProgress={importProgress}
+                onClearResults={() => setImportResults([])}
+              />
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
+
             <NovoMunicipeDialog />
           </div>
         </div>
 
         {/* Filtros */}
         <Card className="shadow-sm border-0 bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Filtros</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Nome, email ou telefone..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      resetPage();
-                    }}
-                    className="pl-10"
-                  />
-                </div>
+          <CardContent className="px-3 py-3 md:px-6 md:py-4 space-y-3">
+            {/* Busca sempre visível + toggle filtros */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Nome, email ou telefone..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
+                  className="pl-10"
+                />
               </div>
+              <Button 
+                variant="outline" size="sm" className="md:hidden shrink-0 gap-1.5"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                {activeFilterCount > 0 && (
+                  <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
+                )}
+                {showFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
+
+            {/* Filtros colapsáveis */}
+            <div className={`space-y-3 ${showFilters ? '' : 'hidden md:block'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 md:gap-4">
               
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
@@ -1529,20 +1559,21 @@ export default function Municipes() {
               <div className="flex items-end">
                 <Button 
                   variant="outline" 
-                  className="w-full"
+                  className="w-full text-xs md:text-sm"
                   onClick={clearFilters}
                 >
                   Limpar Filtros
                 </Button>
               </div>
             </div>
+            </div> {/* Close collapsible filters */}
           </CardContent>
         </Card>
 
         {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 md:gap-4">
           <Card className="shadow-sm border-0 bg-card">
-            <CardContent className="p-6">
+            <CardContent className="p-3 md:p-6">
               <div className="flex items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Total de Munícipes</p>
@@ -1553,7 +1584,7 @@ export default function Municipes() {
           </Card>
 
           <Card className="shadow-sm border-0 bg-card">
-            <CardContent className="p-6">
+            <CardContent className="p-3 md:p-6">
               <div className="flex items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Resultado da Busca</p>
