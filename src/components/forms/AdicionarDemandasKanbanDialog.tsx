@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Search, Filter, Check, ChevronsUpDown } from "lucide-react";
+import { Search, Filter, Check, ChevronsUpDown, ChevronDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedDemandas, setSelectedDemandas] = useState<string[]>([]);
   const [municipeOpen, setMunicipeOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const queryClient = useQueryClient();
   
   // Hook de status dinâmicos
@@ -292,11 +293,35 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
-          {/* Filtros organizados */}
-          <div className="p-3 md:p-4 bg-muted/50 rounded-lg space-y-3 md:space-y-4">
-            {/* Grid de filtros com labels */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
+        <div className="space-y-3 md:space-y-4 flex-1 min-h-0 flex flex-col">
+          {/* Busca + filtros */}
+          <div className="p-3 md:p-4 bg-muted/50 rounded-lg space-y-3">
+            {/* Busca sempre visível */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Buscar por título, protocolo ou munícipe..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 text-sm"
+                />
+              </div>
+              {/* Toggle filtros no mobile */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="md:hidden shrink-0 gap-1"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4" />
+                <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
+
+            {/* Grid de filtros - sempre visível no desktop, colapsável no mobile */}
+            <div className={`space-y-3 md:space-y-4 ${showFilters ? '' : 'hidden md:block'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
               {/* Status */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -440,20 +465,6 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
               </div>
             </div>
 
-            {/* Campo de busca textual */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Buscar</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Buscar por título, protocolo ou munícipe..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
             {/* Botão limpar filtros */}
             <div className="flex justify-end">
               <Button
@@ -472,6 +483,7 @@ export function AdicionarDemandasKanbanDialog({ open, onOpenChange, selectedUser
                 <Filter className="h-4 w-4 mr-2" />
                 Limpar Filtros
               </Button>
+            </div>
             </div>
           </div>
 
