@@ -1,24 +1,22 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X, ChevronDown, MapPin, Loader2, Search, CheckCircle2 } from "lucide-react";
+import { Plus, Upload, X, MapPin, Loader2, Search, CheckCircle2 } from "lucide-react";
 import { HumorSelector, HumorType } from "./HumorSelector";
+import { MunicipeCombobox } from "./MunicipeCombobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  const [searchMunicipe, setSearchMunicipe] = useState("");
-  const [showMunicipeDropdown, setShowMunicipeDropdown] = useState(false);
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null; fonte: string | null }>({ lat: null, lng: null, fonte: null });
   const [enderecoPreenchido, setEnderecoPreenchido] = useState(false);
   
@@ -47,15 +45,6 @@ export function NovaDemandaDialog() {
   const queryClient = useQueryClient();
   const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
   const { statusList } = useDemandaStatus();
-
-  const { data: municipes = [] } = useMunicipesSelect();
-
-  const filteredMunicipes = useMemo(() => {
-    if (!searchMunicipe) return municipes;
-    return municipes.filter(municipe =>
-      municipe.nome.toLowerCase().includes(searchMunicipe.toLowerCase())
-    );
-  }, [municipes, searchMunicipe]);
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
@@ -292,8 +281,6 @@ export function NovaDemandaDialog() {
 
   const resetForm = () => {
     setFiles([]);
-    setSearchMunicipe("");
-    setShowMunicipeDropdown(false);
     setCoordenadas({ lat: null, lng: null, fonte: null });
     setEnderecoPreenchido(false);
     setFormData({
@@ -330,8 +317,6 @@ export function NovaDemandaDialog() {
     }
     createDemanda.mutate(formData);
   };
-
-  const selectedMunicipe = municipes.find(m => m.id === formData.municipe_id);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -377,55 +362,11 @@ export function NovaDemandaDialog() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="municipe">Munícipe *</Label>
-                <div className="relative">
-                  {selectedMunicipe && (
-                    <div className="flex items-center justify-between p-2 border rounded-md bg-accent mb-2">
-                      <span className="text-sm">{selectedMunicipe.nome}</span>
-                      <X 
-                        className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground" 
-                        onClick={() => setFormData(prev => ({ ...prev, municipe_id: "" }))}
-                      />
-                    </div>
-                  )}
-                  <Input
-                    placeholder="Buscar munícipe..."
-                    value={searchMunicipe}
-                    onChange={(e) => {
-                      setSearchMunicipe(e.target.value);
-                      setShowMunicipeDropdown(true);
-                    }}
-                    onFocus={() => setShowMunicipeDropdown(true)}
-                    onBlur={() => {
-                      setTimeout(() => setShowMunicipeDropdown(false), 200);
-                    }}
-                    className="pr-10"
-                  />
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
-                  
-                  {showMunicipeDropdown && (searchMunicipe.length > 0 || !formData.municipe_id) && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                      {filteredMunicipes.length > 0 ? (
-                        filteredMunicipes.map((municipe) => (
-                          <div
-                            key={municipe.id}
-                            className="px-3 py-2 hover:bg-accent cursor-pointer text-sm border-b last:border-b-0"
-                            onClick={() => {
-                              setFormData(prev => ({ ...prev, municipe_id: municipe.id }));
-                              setSearchMunicipe("");
-                              setShowMunicipeDropdown(false);
-                            }}
-                          >
-                            {municipe.nome}
-                          </div>
-                        ))
-                      ) : searchMunicipe.length > 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          Nenhum munícipe encontrado
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
+                <MunicipeCombobox
+                  value={formData.municipe_id}
+                  onChange={(id) => setFormData(prev => ({ ...prev, municipe_id: id }))}
+                  placeholder="Buscar por nome, telefone ou bairro..."
+                />
               </div>
 
               <div className="space-y-2">
