@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BibliotecaDocumentosDialog } from "@/components/forms/BibliotecaDocumentosDialog";
 import { MarkdownText } from "@/components/ui/markdown-text";
-import { Bot, Plus, Loader2, Send, X, FileText, ChevronDown, Trash2, Search, Paperclip } from "lucide-react";
+import { Bot, Plus, Loader2, Send, X, FileText, ChevronDown, Trash2, Search, Paperclip, PanelLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -229,6 +229,7 @@ const AssessorIA = () => {
   const [inputMessage, setInputMessage]             = useState("");
   const [isLoading, setIsLoading]                   = useState(false);
   const [documentosContexto, setDocumentosContexto] = useState<DocumentoModelo[]>([]);
+  const [showSidebar, setShowSidebar]               = useState(false);
   const [anexosChat, setAnexosChat]                 = useState<AnexoChat[]>([]);
   const [activeMode, setActiveMode]                 = useState("redigir");
   const [demandaContext, setDemandaContext]          = useState<DemandaContext | null>(null);
@@ -466,10 +467,21 @@ const AssessorIA = () => {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <TooltipProvider>
-      <div className="flex overflow-hidden" style={{ height: "calc(100vh - 56px)", margin: "-1.5rem" }}>
+      <div className="flex overflow-hidden relative -m-3 md:-m-6" style={{ height: "calc(100vh - 56px)" }}>
+
+        {/* ══════════ Mobile sidebar overlay ══════════════════════════ */}
+        {showSidebar && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/40 z-40"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
 
         {/* ══════════ SIDEBAR — apenas histórico ══════════════════════════ */}
-        <aside className="flex flex-col overflow-hidden flex-shrink-0 bg-card border-r border-border" style={{ width: 252 }}>
+        <aside className={`flex flex-col overflow-hidden flex-shrink-0 bg-card border-r border-border transition-transform duration-200 z-50
+          fixed md:relative inset-y-0 left-0 w-[280px] md:w-[252px]
+          ${showSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
 
           {/* Brand + Nova conversa */}
           <div className="px-4 pt-[18px] pb-[14px] border-b border-border">
@@ -504,7 +516,7 @@ const AssessorIA = () => {
                   key={item.id}
                   className={`group flex items-start gap-1 rounded-md transition-all cursor-pointer px-2 py-[7px]
                     ${currentConvId === item.id ? "bg-primary/10" : "hover:bg-muted"}`}
-                  onClick={() => loadConversation(item)}
+                  onClick={() => { loadConversation(item); setShowSidebar(false); }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5">
@@ -539,7 +551,15 @@ const AssessorIA = () => {
         <div className="flex-1 flex flex-col bg-background overflow-hidden">
 
           {/* Topbar */}
-          <div className="h-[50px] border-b flex items-center gap-2.5 px-5 bg-card flex-shrink-0">
+          <div className="h-[50px] border-b flex items-center gap-2 md:gap-2.5 px-3 md:px-5 bg-card flex-shrink-0">
+
+            {/* Mobile: toggle sidebar */}
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+            >
+              <PanelLeft className="w-5 h-5" />
+            </button>
 
             {/* Dropdown de modo */}
             <DropdownMenu>
