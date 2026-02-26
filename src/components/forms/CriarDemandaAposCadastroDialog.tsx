@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, X, FileText, UserCheck, Search, Loader2, MapPin } from "lucide-react";
+import { Upload, X, FileText, UserCheck, Search, Loader2, MapPin, User } from "lucide-react";
 import { HumorSelector, HumorType } from "./HumorSelector";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -347,6 +347,15 @@ export function CriarDemandaAposCadastroDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Munícipe vinculado */}
+          <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <User className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs text-muted-foreground">Munícipe vinculado</span>
+              <span className="text-sm font-semibold text-foreground truncate">{municipeName}</span>
+            </div>
+          </div>
+
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações da Demanda</h3>
