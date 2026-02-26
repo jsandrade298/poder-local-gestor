@@ -551,12 +551,12 @@ const AssessorIA = () => {
         <div className="flex-1 flex flex-col bg-background overflow-hidden">
 
           {/* Topbar */}
-          <div className="h-[50px] border-b flex items-center gap-2 md:gap-2.5 px-3 md:px-5 bg-card flex-shrink-0">
+          <div className="h-[50px] border-b flex items-center gap-2 md:gap-2.5 px-3 md:px-5 bg-card flex-shrink-0 overflow-x-auto overflow-y-hidden scrollbar-hide">
 
             {/* Mobile: toggle sidebar */}
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+              className="md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
             >
               <PanelLeft className="w-5 h-5" />
             </button>
@@ -778,7 +778,7 @@ const AssessorIA = () => {
                 rows={2}
                 className="w-full border-none outline-none resize-none bg-transparent text-[14px] leading-[1.6] min-h-[48px] max-h-[150px] px-4 pt-3 pb-2 text-foreground placeholder:text-muted-foreground/60"
               />
-              <div className="flex items-center gap-1 px-2.5 pb-2.5">
+              <div className="flex items-center gap-1 px-2.5 pb-2.5 overflow-x-auto scrollbar-hide">
 
                 {/* Biblioteca de modelos */}
                 <div className="[&>button]:h-auto [&>button]:px-2.5 [&>button]:py-1.5 [&>button]:text-xs [&>button]:rounded-lg [&>button]:font-medium">
