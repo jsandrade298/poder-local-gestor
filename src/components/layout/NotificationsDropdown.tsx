@@ -261,25 +261,25 @@ export function NotificationsDropdown() {
                            {getTipoIcon(notificacao.tipo)}
                          </div>
                         
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-sm font-medium truncate">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <p className="text-sm font-medium break-words">
                               {notificacao.titulo}
                             </p>
                             {!notificacao.lida && (
-                              <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0 ml-2" />
+                              <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0 mt-1.5" />
                             )}
                           </div>
                           
-                           <p className="text-xs text-muted-foreground mb-1 break-words overflow-hidden">
-                             {notificacao.mensagem.length > 80 ? 
-                               `${notificacao.mensagem.substring(0, 80)}...` : 
+                           <p className="text-xs text-muted-foreground mb-1 break-words">
+                             {notificacao.mensagem.length > 120 ? 
+                               `${notificacao.mensagem.substring(0, 120)}...` : 
                                notificacao.mensagem
                              }
                            </p>
                           
-                           <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground">
-                             <span className="truncate max-w-[100px] md:max-w-[120px]">
+                           <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground gap-2">
+                             <span className="truncate">
                                De: {notificacao.remetente?.nome || 'Sistema'}
                              </span>
                              <span className="flex-shrink-0">
