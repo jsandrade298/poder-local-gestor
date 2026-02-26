@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { supabase as sb } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,9 @@ export function TemasDaSemana() {
   const navigate = useNavigate();
   const [gerandoClusters, setGerandoClusters] = useState(false);
 
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
   const { data: temas = [], isLoading, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["temas-semana"],
     queryFn: async () => {
@@ -78,24 +81,21 @@ export function TemasDaSemana() {
 
   // Acionar clustering manual
   const acionarClustering = async () => {
+    if (!profile?.tenant_id) {
+      toast({ title: "Erro", description: "Tenant não identificado. Tente recarregar a página.", variant: "destructive" });
+      return;
+    }
     setGerandoClusters(true);
     try {
-      // Buscar o tenant_id do usuário atual
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .single();
-
-      if (!profile?.tenant_id) throw new Error("Tenant não encontrado");
-
       const { error } = await supabase.functions.invoke("clusterizar-temas", {
         body: { tenant_id: profile.tenant_id, periodo_dias: 30, min_cluster_size: 3 },
       });
-
       if (error) throw error;
+      toast({ title: "Análise concluída!", description: "Os temas da semana foram atualizados." });
       await refetch();
     } catch (err) {
       console.error("Erro ao gerar clustering:", err);
+      toast({ title: "Erro na análise", description: err instanceof Error ? err.message : "Tente novamente.", variant: "destructive" });
     } finally {
       setGerandoClusters(false);
     }
