@@ -204,9 +204,9 @@ export function NotificationsDropdown() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 md:w-96 p-0" align="end">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h4 className="font-semibold">Notificações</h4>
+      <PopoverContent className="w-[calc(100vw-24px)] md:w-96 max-w-[400px] p-0" align="end" sideOffset={8}>
+        <div className="flex items-center justify-between p-3 md:p-4 border-b">
+          <h4 className="font-semibold text-sm md:text-base">Notificações</h4>
           <div className="flex items-center gap-2">
             {notificacaosPendentes > 0 && (
               <Button
@@ -214,9 +214,10 @@ export function NotificationsDropdown() {
                 size="sm"
                 onClick={() => marcarTodasComoLidas.mutate()}
                 disabled={marcarTodasComoLidas.isPending}
+                className="text-xs h-7 px-2"
               >
-                <Check className="h-4 w-4 mr-2" />
-                Marcar como lidas
+                <Check className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden md:inline">Marcar como </span>lidas
               </Button>
             )}
             {notificacoes.length > 0 && (
@@ -234,7 +235,7 @@ export function NotificationsDropdown() {
           </div>
         </div>
         
-        <ScrollArea className="h-80 max-h-[60vh]">
+        <ScrollArea className="h-72 md:h-80 max-h-[50vh] md:max-h-[60vh]">
           {isLoading ? (
             <div className="p-4 text-center text-muted-foreground">
               Carregando notificações...
@@ -277,8 +278,8 @@ export function NotificationsDropdown() {
                              }
                            </p>
                           
-                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                             <span className="truncate max-w-[120px]">
+                           <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground">
+                             <span className="truncate max-w-[100px] md:max-w-[120px]">
                                De: {notificacao.remetente?.nome || 'Sistema'}
                              </span>
                              <span className="flex-shrink-0">
