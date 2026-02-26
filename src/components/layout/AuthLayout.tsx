@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
@@ -106,18 +107,20 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         
-        <div className="flex-1 flex flex-col">
-          <header className="h-14 flex items-center justify-between border-b bg-card px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <h1 className="text-lg font-semibold text-foreground">
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 flex items-center justify-between border-b bg-card px-4 safe-area-top">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* No mobile, esconder o trigger pois temos o BottomNav */}
+              <SidebarTrigger className="hidden md:flex" />
+              <h1 className="text-sm md:text-lg font-semibold text-foreground truncate">
                 Sistema de Gestão do Gabinete
               </h1>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
               <NotificationsDropdown />
-              <div className="flex items-center gap-2">
+              {/* No mobile, ocultar nome e email para economizar espaço */}
+              <div className="hidden md:flex items-center gap-2">
                 <User className="h-4 w-4" />
                 <span className="text-sm text-muted-foreground">
                   {user?.user_metadata?.full_name || user?.email}
@@ -130,17 +133,34 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                   await signOut();
                   window.location.href = '/login';
                 }}
+                className="hidden md:flex"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sair
               </Button>
+              {/* No mobile, botão compacto de logout */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = '/login';
+                }}
+                className="md:hidden h-9 w-9"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </header>
 
-          <main className="flex-1 p-6 bg-muted/20">
+          {/* pb-16 no mobile para não ficar atrás do BottomNav */}
+          <main className="flex-1 p-3 md:p-6 bg-muted/20 pb-20 md:pb-6">
             {children}
           </main>
         </div>
+
+        {/* Bottom Navigation - apenas mobile */}
+        <BottomNav />
       </div>
     </SidebarProvider>
   );
