@@ -112,6 +112,12 @@ export function TemasDaSemana() {
     staleTime: 1000 * 60 * 15,
   });
 
+  // ── Navegar para Assessor IA com modo e prompt pré-definidos ─────────────
+  const navegarAssessor = (modeId: string, prompt: string) => {
+    sessionStorage.setItem("assessorIA_promptData", JSON.stringify({ modeId, directPrompt: prompt }));
+    navigate("/assessor-ia");
+  };
+
   const gerarRelatorio = async (forcar = false) => {
     if (!profile?.tenant_id) {
       toast({ title: "Erro", description: "Tenant não identificado.", variant: "destructive" });
@@ -279,7 +285,13 @@ export function TemasDaSemana() {
                         <div className="mt-2 ml-14 space-y-1.5">
                           <p className="text-[12px] text-muted-foreground leading-relaxed">{s.justificativa}</p>
                           <p className="text-[11px] text-muted-foreground/60 italic">{s.base_dados}</p>
-                          <button onClick={() => navigate("/assessor-ia")}
+                          <button onClick={() => navegarAssessor("redigir",
+                            `Preciso redigir uma ${s.tipo} com base na seguinte análise do gabinete:\n\n` +
+                            `📋 PROPOSITURA SUGERIDA: ${s.titulo}\n` +
+                            `📊 JUSTIFICATIVA: ${s.justificativa}\n` +
+                            `🔍 BASE DE DADOS: ${s.base_dados}\n\n` +
+                            `Selecione um modelo na Biblioteca de Documentos e redija a propositura completa, incorporando os dados acima como fundamento.`
+                          )}
                             className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-primary hover:underline mt-0.5">
                             <Gavel className="w-3 h-3" /> Redigir no Assessor IA
                           </button>
@@ -312,7 +324,19 @@ export function TemasDaSemana() {
                     <TooltipContent side="top" className="max-w-[280px] text-[11px]">{rel.observacoes}</TooltipContent>
                   </Tooltip>
                 )}
-                <button onClick={() => navigate("/assessor-ia")}
+                <button onClick={() => {
+                  const temas = rel.temas_prioritarios?.slice(0, 3).map((t: any) =>
+                    `• ${t.nome} (${t.quantidade} dem.) — ${t.descricao}`).join("\n") ?? "";
+                  const sugestoes = rel.sugestoes_legislativas?.slice(0, 2).map((s: any) =>
+                    `• ${s.tipo}: ${s.titulo}`).join("\n") ?? "";
+                  navegarAssessor("analise",
+                    `Com base no relatório estratégico da semana, faça uma análise aprofundada:\n\n` +
+                    `📊 RESUMO: ${rel.resumo_executivo}\n\n` +
+                    `🎯 TEMAS PRIORITÁRIOS:\n${temas}\n\n` +
+                    `📋 SUGESTÕES PENDENTES:\n${sugestoes}\n\n` +
+                    `Aprofunde a análise identificando padrões adicionais, cruzamentos entre temas e quais ações são mais urgentes para o gabinete esta semana.`
+                  );
+                }}
                   className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                   <Sparkles className="w-3 h-3" /> Aprofundar no Assessor IA
                 </button>
