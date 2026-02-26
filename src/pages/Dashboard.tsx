@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Carregando dados...</p>
@@ -38,8 +38,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
-      <div className="container mx-auto px-4 py-6 space-y-6 max-w-[1400px]">
+    <div>
+      <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-4 md:space-y-6 max-w-[1400px]">
 
         {/* ─── Header ─── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
