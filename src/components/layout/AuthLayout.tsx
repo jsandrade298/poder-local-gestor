@@ -113,7 +113,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             <div className="flex items-center gap-2 min-w-0">
               {/* No mobile, esconder o trigger pois temos o BottomNav */}
               <SidebarTrigger className="hidden md:flex" />
-              <h1 className="text-sm md:text-lg font-semibold text-foreground truncate">
+              <h1 className="text-sm md:text-lg font-semibold text-foreground truncate hidden md:block">
                 Sistema de Gestão do Gabinete
               </h1>
             </div>
