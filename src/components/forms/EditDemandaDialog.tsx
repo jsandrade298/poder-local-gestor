@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Upload, X, Download, Search, MapPin, Loader2 } from "lucide-react";
 import { HumorSelector, HumorType, getHumorLabel, getHumorEmoji } from "./HumorSelector";
+import { MunicipeCombobox } from "./MunicipeCombobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMunicipesSelect } from "@/hooks/useMunicipesSelect";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useDemandaNotification } from "@/contexts/DemandaNotificationContext";
@@ -63,8 +63,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     },
     enabled: !!demanda?.id
   });
-
-  const { data: municipes = [] } = useMunicipesSelect();
 
   const { data: areas = [] } = useQuery({
     queryKey: ['areas'],
@@ -691,22 +689,12 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="municipe">Munícipe *</Label>
-                <Select
+                <MunicipeCombobox
                   value={formData.municipe_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, municipe_id: value }))}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o munícipe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {municipes.map((municipe) => (
-                      <SelectItem key={municipe.id} value={municipe.id}>
-                        {municipe.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(id) => setFormData(prev => ({ ...prev, municipe_id: id }))}
+                  initialDisplayName={(demanda?.municipes as any)?.nome}
+                  placeholder="Buscar por nome, telefone ou bairro..."
+                />
               </div>
 
               <div className="space-y-2">
