@@ -79,6 +79,7 @@ export default function Kanban() {
   const [isViewRotaDialogOpen, setIsViewRotaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [isAdicionarRotasDialogOpen, setIsAdicionarRotasDialogOpen] = useState(false);
+  const [isAdicionarTarefaOpen, setIsAdicionarTarefaOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [activeColumn, setActiveColumn] = useState<string>('a_fazer');
@@ -777,11 +778,7 @@ export default function Kanban() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => {
-                      // Trigger tarefa dialog via simulating the button
-                      const btn = document.querySelector('[data-tarefa-trigger]') as HTMLElement;
-                      btn?.click();
-                    }}>
+                    <DropdownMenuItem onClick={() => setIsAdicionarTarefaOpen(true)}>
                       <ListTodo className="h-4 w-4 mr-2" />
                       Nova Tarefa
                     </DropdownMenuItem>
@@ -849,6 +846,11 @@ export default function Kanban() {
               </div>
 
               {/* Dialogs (always rendered) */}
+              <AdicionarTarefaDialog 
+                kanbanType={selectedUser} 
+                open={isAdicionarTarefaOpen} 
+                onOpenChange={setIsAdicionarTarefaOpen} 
+              />
               <AdicionarDemandasKanbanDialog 
                 open={isAdicionarDialogOpen}
                 onOpenChange={setIsAdicionarDialogOpen}
@@ -859,66 +861,66 @@ export default function Kanban() {
                 onOpenChange={setIsAdicionarRotasDialogOpen}
                 selectedUser={selectedUser}
               />
-              {/* Hidden trigger for mobile menu */}
-              <div className="hidden"><AdicionarTarefaDialog kanbanType={selectedUser} /></div>
             </>
           )}
         </div>
 
         {/* ══════════════ Conteúdo condicional ══════════════ */}
-        {viewMode === 'historico' ? (
-          <HistoricoView 
-            selectedUser={selectedUser} 
-            responsaveis={responsaveis} 
-          />
-        ) : (
-          /* ══════════════ Board ══════════════ */
-          <DragDropContext onDragEnd={handleDragEnd}>
-            {/* ── Mobile: Tab bar ── */}
-            <div className="md:hidden flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
-              {statusColumns.map((col) => {
-                const count = getDemandsByStatus(col.id).length;
-                const isActive = activeColumn === col.id;
-                return (
-                  <button
-                    key={col.id}
-                    onClick={() => setActiveColumn(col.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-background shadow-sm text-foreground'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
-                    <span>{col.title}</span>
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{count}</Badge>
-                  </button>
-                );
-              })}
-            </div>
+        
+        {/* Mobile: unified mode/column tabs */}
+        <div className="md:hidden">
+          {viewMode === 'historico' ? (
+            <>
+              {/* Mobile histórico tab bar */}
+              <div className="flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
+                <button
+                  onClick={() => setViewMode('board')}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-muted-foreground"
+                >
+                  ← Board
+                </button>
+                <button
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium bg-background shadow-sm text-foreground"
+                >
+                  <History className="h-3 w-3" />
+                  Histórico
+                </button>
+              </div>
+              <HistoricoView selectedUser={selectedUser} responsaveis={responsaveis} />
+            </>
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              {/* Mobile column tab bar */}
+              <div className="flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
+                {statusColumns.map((col) => {
+                  const count = getDemandsByStatus(col.id).length;
+                  const isActive = activeColumn === col.id;
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={() => setActiveColumn(col.id)}
+                      className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                        isActive ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'
+                      }`}
+                    >
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                      <span className="truncate">{col.title}</span>
+                      <Badge variant="secondary" className="h-4 px-1 text-[10px] leading-none">{count}</Badge>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
-              {statusColumns.map((column) => {
-                const columnItems = getDemandsByStatus(column.id);
-                const isActive = activeColumn === column.id;
-                
-                return (
-                  <div key={column.id} className={`space-y-2 md:space-y-4 ${!isActive ? 'hidden md:block' : ''}`}>
-                    {/* Column header - desktop only */}
-                    <div className="hidden md:flex items-center justify-between">
-                      <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
-                        {column.title}
-                        <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
-                      </h2>
-                    </div>
-
-                    <Droppable droppableId={column.id}>
+              <div>
+                {statusColumns.filter(c => c.id === activeColumn).map((column) => {
+                  const columnItems = getDemandsByStatus(column.id);
+                  return (
+                    <Droppable key={column.id} droppableId={column.id}>
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`min-h-[200px] md:min-h-[300px] space-y-2 md:space-y-3 p-2 md:p-3 rounded-lg border-2 border-dashed transition-colors ${
+                          className={`min-h-[200px] space-y-2 p-2 rounded-lg border-2 border-dashed transition-colors ${
                             snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
                           }`}
                         >
@@ -1146,8 +1148,139 @@ export default function Kanban() {
             </div>
           </DragDropContext>
         )}
+        </div> {/* Close md:hidden */}
 
-        {/* ══════════════ Dialogs ══════════════ */}
+        {/* Desktop: standard 3-column grid */}
+        <div className="hidden md:block">
+          {viewMode === 'historico' ? (
+            <HistoricoView selectedUser={selectedUser} responsaveis={responsaveis} />
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <div className="grid grid-cols-3 gap-6">
+                {statusColumns.map((column) => {
+                  const columnItems = getDemandsByStatus(column.id);
+                  return (
+                    <div key={column.id} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
+                          {column.title}
+                          <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
+                        </h2>
+                      </div>
+                      <Droppable droppableId={column.id}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`min-h-[300px] space-y-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
+                              snapshot.isDraggingOver ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'
+                            }`}
+                          >
+                            {columnItems.map((item, index) => (
+                              <Draggable key={item.id} draggableId={item.id} index={index}>
+                                {(provided, snapshot) => (
+                                  <Card
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`cursor-pointer transition-all duration-200 hover:shadow-md relative group border-l-4 ${
+                                      snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
+                                    }`}
+                                    style={{
+                                      borderLeftColor: getCardBorderColor(item),
+                                      ...provided.draggableProps.style
+                                    }}
+                                    onClick={() => {
+                                      if (!snapshot.isDragging && !isDraggingRef.current) {
+                                        if (item.tipo === 'tarefa') {
+                                          setSelectedTarefa(item);
+                                          setIsViewTarefaDialogOpen(true);
+                                        } else if (item.tipo === 'rota') {
+                                          setSelectedRota(item);
+                                          setIsViewRotaDialogOpen(true);
+                                        } else {
+                                          setSelectedDemanda(item);
+                                          setIsViewDialogOpen(true);
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
+                                      onClick={(e) => { e.stopPropagation(); handleRemoveItem(item); }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                    <CardContent className="p-3">
+                                      {item.tipo === 'tarefa' ? (
+                                        <div className="space-y-2">
+                                          <div className="flex items-start gap-2">
+                                            <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: item.cor || '#3B82F6' }} />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-sm text-foreground truncate">{item.titulo}</p>
+                                              {item.descricao && <p className="text-xs text-muted-foreground line-clamp-2">{item.descricao}</p>}
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Badge variant="outline" className="text-[10px]">Tarefa</Badge>
+                                            <Badge variant={item.prioridade === 'alta' ? 'destructive' : item.prioridade === 'media' ? 'default' : 'secondary'} className="text-[10px]">
+                                              {item.prioridade}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      ) : item.tipo === 'rota' ? (
+                                        <div className="space-y-2">
+                                          <div className="flex items-start gap-2">
+                                            <Route className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-sm text-foreground truncate">{item.titulo}</p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {item.pontos_count || 0} pontos • {item.distancia_km ? `${item.distancia_km.toFixed(1)}km` : '—'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600">Rota</Badge>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          <p className="font-medium text-sm text-foreground line-clamp-2">{item.titulo}</p>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Badge variant="outline" className="text-[10px]">#{item.protocolo}</Badge>
+                                            {item.prioridade && (
+                                              <Badge variant={item.prioridade === 'alta' ? 'destructive' : item.prioridade === 'media' ? 'default' : 'secondary'} className="text-[10px]">
+                                                {item.prioridade}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          {item.municipe_nome && (
+                                            <p className="text-xs text-muted-foreground truncate">{item.municipe_nome}</p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                            {columnItems.length === 0 && (
+                              <div className="text-center text-muted-foreground py-8">
+                                Nenhum item nesta coluna
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Droppable>
+                    </div>
+                  );
+                })}
+              </div>
+            </DragDropContext>
+          )}
+        </div>
         <ViewDemandaDialog
           demanda={selectedDemanda}
           open={isViewDialogOpen}
