@@ -285,7 +285,7 @@ export function NotificationsDropdown() {
         </div>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="right" className="w-full p-0 flex flex-col" data-sheet="true">
-            <SheetHeader className="p-4 border-b flex-shrink-0">
+            <SheetHeader className="p-4 pr-12 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
                 <SheetTitle>Notificações</SheetTitle>
                 {headerActions}
