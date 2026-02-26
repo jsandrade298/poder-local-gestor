@@ -743,8 +743,8 @@ export default function PlanoAcaoDetalhe() {
   };
 
   // ===== LOADING / NOT FOUND =====
-  if (isLoading) return <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
-  if (!projeto) return <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center"><div className="text-center space-y-4"><p className="text-muted-foreground">Projeto não encontrado</p><Button onClick={() => navigate("/plano-acao")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Button></div></div>;
+  if (isLoading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
+  if (!projeto) return <div className="flex items-center justify-center py-20"><div className="text-center space-y-4"><p className="text-muted-foreground">Projeto não encontrado</p><Button onClick={() => navigate("/plano-acao")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Button></div></div>;
 
   const sc = statusConfig[projeto.status] || statusConfig.em_andamento;
   const StatusIcon = sc.icon;
@@ -754,9 +754,9 @@ export default function PlanoAcaoDetalhe() {
     <div className={cn(
       isFullscreen
         ? "fixed inset-0 z-50 bg-background overflow-auto"
-        : "min-h-screen bg-gradient-to-br from-background via-muted/30 to-background"
+        : ""
     )}>
-      <div className={cn("mx-auto px-4 py-6 space-y-6", !isFullscreen && "container")}>
+      <div className={cn("px-3 py-3 md:px-4 md:py-6 space-y-4 md:space-y-6", !isFullscreen && "md:container md:mx-auto")}>
 
         {/* ====== HEADER ====== */}
         <div className="space-y-4">
