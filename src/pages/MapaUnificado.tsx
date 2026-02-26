@@ -195,8 +195,10 @@ export default function MapaUnificado() {
   const [municipeParaEditar, setMunicipeParaEditar] = useState<any>(null);
   const [isEditMunicipeOpen, setIsEditMunicipeOpen] = useState(false);
 
-  // Estado da sidebar minimizada
-  const [sidebarMinimizada, setSidebarMinimizada] = useState(false);
+  // Estado da sidebar minimizada (começa minimizada no mobile)
+  const [sidebarMinimizada, setSidebarMinimizada] = useState(
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
 
   // Estado da aba do cluster
   const [abaCluster, setAbaCluster] = useState<'demandas' | 'municipes'>('demandas');
@@ -819,10 +821,10 @@ export default function MapaUnificado() {
   };
 
   return (
-    <div id="mapa-container" className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
+    <div id="mapa-container" className="flex overflow-hidden bg-background -m-3 md:-m-6" style={{ height: "calc(100vh - 3.5rem)" }}>
       {/* Sidebar Esquerda */}
       <div className={`border-r bg-background flex flex-col h-full overflow-hidden transition-all duration-300 ${
-        sidebarMinimizada ? 'w-16' : 'w-80'
+        sidebarMinimizada ? 'w-10 md:w-16' : 'w-64 md:w-80'
       }`}>
         {sidebarMinimizada ? (
           // Versão Minimizada
@@ -1998,7 +2000,7 @@ export default function MapaUnificado() {
 
       {/* Sidebar Direita - Detalhes */}
       {itemSelecionado && (
-        <div className="w-80 border-l bg-background flex flex-col">
+        <div className="absolute md:relative right-0 top-0 bottom-0 w-full md:w-80 border-l bg-background flex flex-col z-30 shadow-xl md:shadow-none">
           <div className="p-4 border-b flex items-center justify-between">
             <h2 className="font-semibold">Detalhes</h2>
             <Button 
@@ -2101,7 +2103,7 @@ export default function MapaUnificado() {
 
       {/* Sidebar Direita - Cluster Selecionado */}
       {clusterSelecionado && (
-        <div className="w-96 border-l bg-background flex flex-col">
+        <div className="absolute md:relative right-0 top-0 bottom-0 w-full md:w-96 border-l bg-background flex flex-col z-30 shadow-xl md:shadow-none">
           <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
             <div>
               <h2 className="font-semibold flex items-center gap-2">
@@ -2322,7 +2324,7 @@ export default function MapaUnificado() {
       
       {/* Sidebar Direita - Região Selecionada */}
       {regiaoSelecionada && dadosRegiaoSelecionada && (
-        <div className="w-96 border-l bg-background flex flex-col">
+        <div className="absolute md:relative right-0 top-0 bottom-0 w-full md:w-96 border-l bg-background flex flex-col z-30 shadow-xl md:shadow-none">
           <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
             <div>
               <h2 className="font-semibold flex items-center gap-2">
