@@ -249,7 +249,7 @@ function ThinkingIndicator({ steps, isLoading }: { steps: ToolStep[]; isLoading:
   const metaUltima       = ultimaFerramenta ? TOOL_META[ultimaFerramenta] : null;
 
   return (
-    <div className="my-1.5 rounded-lg border overflow-hidden text-xs" style={{ borderColor: "hsl(var(--primary)/0.15)", background: "hsl(var(--primary)/0.03)" }}>
+    <div className="my-1.5 rounded-lg border overflow-hidden text-xs max-w-[600px]" style={{ borderColor: "hsl(var(--primary)/0.15)", background: "hsl(var(--primary)/0.03)" }}>
       <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
         {isLoading ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
@@ -884,7 +884,23 @@ const AssessorIA = () => {
     reader.readAsText(file);
   };
 
-  // ─── Enviar mensagem (com suporte ao loop agêntico) ───────────────────────
+  // ─── Helpers para SSE ───────────────────────────────────────────────────────
+  const getSupabaseFunctionsUrl = () => {
+    // Extrai URL base do client supabase (funciona com supabase-js v2)
+    const url = (supabase as any).supabaseUrl || (supabase as any).rest?.url?.replace("/rest/v1", "");
+    return `${url}/functions/v1`;
+  };
+
+  const getSupabaseHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      "Authorization": `Bearer ${session?.access_token || ""}`,
+      "Content-Type": "application/json",
+      "apikey": (supabase as any).supabaseKey || "",
+    };
+  };
+
+  // ─── Enviar mensagem com SSE streaming em tempo real ──────────────────────
   const sendMessage = async (overrideText?: string) => {
     const text = (overrideText ?? inputMessage).trim();
     if (!text || isLoading) return;
@@ -902,58 +918,163 @@ const AssessorIA = () => {
     setIsLoading(true);
     setPendingToolSteps([]);
 
+    const historyForApi = messages
+      .filter((m) => m.id !== "welcome")
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    const truncar = (t: string, max = 10000) =>
+      t && t.length > max ? t.slice(0, max) + "\n[... truncado ...]" : t;
+
+    const requestBody = {
+      message:             text,
+      conversationHistory: historyForApi,
+      modeId:              activeMode,
+      model:               currentMode.model,
+      modeSystemPrompt:    currentMode.systemPrompt,
+      demandaProtocolo:    demandaContext?.protocolo || undefined,
+      documentosContexto:  documentosContexto.map((d) => ({
+        nome:      d.nome,
+        categoria: d.categoria,
+        conteudo:  truncar(d.conteudo_extraido || ""),
+      })),
+      anexosContexto: anexosChat.map((a) => ({
+        nome:     a.nome,
+        conteudo: truncar(a.conteudo),
+      })),
+      stream: currentMode.agente, // SSE apenas para modos agente
+    };
+
+    const isAgentMode = currentMode.agente;
+
     try {
-      const historyForApi = messages
-        .filter((m) => m.id !== "welcome")
-        .map((m) => ({ role: m.role, content: m.content }));
+      if (isAgentMode) {
+        // ── SSE STREAMING: ferramentas aparecem em tempo real ──────────────
+        const functionsUrl = getSupabaseFunctionsUrl();
+        const headers      = await getSupabaseHeaders();
 
-      const truncar = (t: string, max = 10000) =>
-        t && t.length > max ? t.slice(0, max) + "\n[... truncado ...]" : t;
+        const response = await fetch(`${functionsUrl}/chat-ia`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(requestBody),
+        });
 
-      const { data, error } = await supabase.functions.invoke("chat-ia", {
-        body: {
-          message:             text,
-          conversationHistory: historyForApi,
-          modeId:              activeMode,
-          model:               currentMode.model,
-          modeSystemPrompt:    currentMode.systemPrompt,
-          demandaProtocolo:    demandaContext?.protocolo || undefined,
-          documentosContexto:  documentosContexto.map((d) => ({
-            nome:      d.nome,
-            categoria: d.categoria,
-            conteudo:  truncar(d.conteudo_extraido || ""),
-          })),
-          anexosContexto: anexosChat.map((a) => ({
-            nome:     a.nome,
-            conteudo: truncar(a.conteudo),
-          })),
-        },
-      });
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Erro ${response.status}: ${errText}`);
+        }
 
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+        const reader  = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer    = "";
+        let finalData: any = null;
 
-      const aiMsg: Message = {
-        id:                 (Date.now() + 1).toString(),
-        role:               "assistant",
-        content:            data.message,
-        timestamp:          new Date(),
-        modeId:             activeMode,
-        model:              currentMode.model,
-        feedback:           null,
-        toolSteps:          data.tool_steps || [],
-        memorias_injetadas: data.memorias_injetadas || 0,
-        iteracoes:          data.iteracoes || 0,
-      };
-      const final = [...nextMsgs, aiMsg];
-      setMessages(final);
-      persistHistory(final, activeMode);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      if (data.memorias_injetadas > 0) {
-        console.log(`🧠 ${data.memorias_injetadas} memórias usadas nesta resposta`);
-      }
-      if (data.tool_steps?.length > 0) {
-        console.log(`🔧 ${data.tool_steps.length} ferramentas usadas em ${data.iteracoes} iterações`);
+          buffer += decoder.decode(value, { stream: true });
+
+          // Processar mensagens SSE completas (separadas por \n\n)
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || ""; // Última parte pode estar incompleta
+
+          for (const part of parts) {
+            const trimmed = part.trim();
+            if (!trimmed) continue;
+
+            for (const line of trimmed.split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              const payload = line.substring(6);
+
+              if (payload === "[DONE]") continue;
+
+              try {
+                const event = JSON.parse(payload);
+
+                if (event.type === "tool_start") {
+                  setPendingToolSteps((prev) => [...prev, {
+                    ferramenta:       event.ferramenta,
+                    args:             event.args || {},
+                    resultado_resumo: "",
+                    iteracao:         event.iteracao || 1,
+                  }]);
+                }
+
+                else if (event.type === "tool_end") {
+                  setPendingToolSteps((prev) => {
+                    const updated = [...prev];
+                    // Encontrar o último step com esta ferramenta sem resultado
+                    for (let i = updated.length - 1; i >= 0; i--) {
+                      if (updated[i].ferramenta === event.ferramenta && !updated[i].resultado_resumo) {
+                        updated[i] = {
+                          ...updated[i],
+                          resultado_resumo: event.resultado_resumo || "",
+                          duracao_ms:       event.duracao_ms,
+                        };
+                        break;
+                      }
+                    }
+                    return updated;
+                  });
+                }
+
+                else if (event.type === "response") {
+                  finalData = event;
+                }
+
+                else if (event.type === "error") {
+                  throw new Error(event.message || "Erro no processamento");
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) continue; // JSON parcial, ignorar
+                throw e;
+              }
+            }
+          }
+        }
+
+        if (!finalData) throw new Error("Resposta não recebida");
+
+        const aiMsg: Message = {
+          id:                 (Date.now() + 1).toString(),
+          role:               "assistant",
+          content:            finalData.message || "",
+          timestamp:          new Date(),
+          modeId:             activeMode,
+          model:              currentMode.model,
+          feedback:           null,
+          toolSteps:          finalData.tool_steps || [],
+          memorias_injetadas: finalData.memorias_injetadas || 0,
+          iteracoes:          finalData.iteracoes || 0,
+        };
+        const finalMsgs = [...nextMsgs, aiMsg];
+        setMessages(finalMsgs);
+        persistHistory(finalMsgs, activeMode);
+
+      } else {
+        // ── MODO CLÁSSICO (JSON) para redigir, entrevista, whatsapp, documento ──
+        const { data, error } = await supabase.functions.invoke("chat-ia", {
+          body: requestBody,
+        });
+
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+
+        const aiMsg: Message = {
+          id:                 (Date.now() + 1).toString(),
+          role:               "assistant",
+          content:            data.message,
+          timestamp:          new Date(),
+          modeId:             activeMode,
+          model:              currentMode.model,
+          feedback:           null,
+          toolSteps:          data.tool_steps || [],
+          memorias_injetadas: data.memorias_injetadas || 0,
+          iteracoes:          data.iteracoes || 0,
+        };
+        const finalMsgs = [...nextMsgs, aiMsg];
+        setMessages(finalMsgs);
+        persistHistory(finalMsgs, activeMode);
       }
 
     } catch (err) {
@@ -1452,11 +1573,13 @@ const AssessorIA = () => {
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <Loader2 className="w-2.5 h-2.5 text-muted-foreground animate-spin" />
                         <span className="text-[11px] font-mono text-muted-foreground">
-                          {activeMode === "analise"   ? "Consultando demandas e memórias do gabinete…"
-                           : activeMode === "resumo"  ? "Compilando dados da semana…"
-                           : activeMode === "pauta"   ? "Preparando subsídios para a sessão…"
-                           : activeMode === "documento" ? "Analisando documento…"
-                           : "Redigindo…"}
+                          {currentMode.agente && pendingToolSteps.length > 0
+                            ? `${pendingToolSteps.length} consulta${pendingToolSteps.length !== 1 ? "s" : ""} realizada${pendingToolSteps.length !== 1 ? "s" : ""} — analisando dados…`
+                            : activeMode === "analise"   ? "Consultando demandas e memórias do gabinete…"
+                            : activeMode === "resumo"    ? "Compilando dados da semana…"
+                            : activeMode === "pauta"     ? "Preparando subsídios para a sessão…"
+                            : activeMode === "documento" ? "Analisando documento…"
+                            : "Redigindo…"}
                         </span>
                       </div>
                     </div>
