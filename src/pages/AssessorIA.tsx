@@ -10,14 +10,25 @@ import { MarkdownText } from "@/components/ui/markdown-text";
 import {
   Bot, Plus, Loader2, Send, X, FileText, ChevronDown, Trash2,
   Search, Paperclip, PanelLeft, ThumbsUp, ThumbsDown, Brain,
-  RefreshCw, AlertCircle, CheckCircle2, Sparkles,
+  RefreshCw, AlertCircle, CheckCircle2, Sparkles, TrendingUp,
+  Database, Users, Layers, KanbanSquare, Lightbulb, Clock, MapPin,
+  BarChart2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface ToolStep {
+  ferramenta: string;
+  args: Record<string, unknown>;
+  resultado_resumo: string;
+  iteracao: number;
+  duracao_ms?: number;
+}
 
 interface Message {
   id: string;
@@ -27,6 +38,9 @@ interface Message {
   modeId?: string;
   model?: string;
   feedback?: "positivo" | "negativo" | null;
+  toolSteps?: ToolStep[];
+  memorias_injetadas?: number;
+  iteracoes?: number;
 }
 
 interface DocumentoModelo {
@@ -76,45 +90,105 @@ interface MemoriaIA {
   created_at: string;
 }
 
-// ─── Modos ────────────────────────────────────────────────────────────────────
+// ─── Modos — todos os 7 originais + flag agente ─────────────────────────────
 
 const MODES = [
   {
-    id: "redigir", icon: "📝", label: "Redigir documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false,
+    id: "redigir", icon: "📝", label: "Redigir documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Redija o documento solicitado com linguagem formal e técnica, seguindo rigorosamente os modelos de referência fornecidos. Use EXCLUSIVAMENTE os documentos de referência para estrutura, formato e linguagem. Não invente dados, base legal ou informações que não constem nos documentos.`,
     tooltip: { desc: "Cria proposituras legislativas completas com base nos dados da demanda e nos modelos da sua biblioteca.", examples: ["Redigir uma indicação sobre buracos na Rua das Flores usando o modelo padrão", "Elaborar um requerimento de informação sobre o cronograma de obras da Secretaria"] },
   },
   {
-    id: "entrevista", icon: "🎯", label: "Modo entrevista", color: "#1a8c5e", model: "sabiazinho-4", isNew: true,
+    id: "entrevista", icon: "🎯", label: "Modo entrevista", color: "#1a8c5e", model: "sabiazinho-4", isNew: true, agente: false,
     systemPrompt: `Você é um Assessor Legislativo que guia o usuário passo a passo para criar um documento oficial. Faça perguntas objetivas uma de cada vez para coletar: tipo de documento, destinatário, objeto da solicitação, justificativa e dados complementares. Ao final, gere o documento completo seguindo os modelos de referência fornecidos.`,
     tooltip: { desc: "A IA conduz uma entrevista rápida fazendo perguntas objetivas para montar o documento ideal.", examples: ["Preciso criar um documento mas não sei qual tipo usar", "Me ajuda a redigir algo sobre a iluminação do bairro passo a passo"] },
   },
   {
-    id: "analise", icon: "📊", label: "Analisar demandas", color: "#6c3bd4", model: "sabia-4", isNew: false,
-    systemPrompt: `Você é um analista de dados legislativos. Analise os dados fornecidos sobre demandas do gabinete, identifique padrões recorrentes, calcule percentuais e sugira proposituras legislativas coletivas quando houver 3 ou mais demandas similares. Apresente os resultados de forma estruturada com números, percentuais e recomendações concretas de ação legislativa.`,
-    tooltip: { desc: "Analisa o banco de demandas para identificar padrões, recorrências e sugerir proposituras coletivas.", examples: ["Quais demandas se repetem no Bairro Centro nos últimos 30 dias?", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"] },
+    id: "analise", icon: "📊", label: "Analisar demandas", color: "#6c3bd4", model: "sabia-4", isNew: false, agente: true,
+    systemPrompt: `Você é um analista de dados legislativos de um gabinete de vereador. Analise os dados do gabinete usando as ferramentas disponíveis, identifique padrões recorrentes, calcule percentuais e sugira proposituras legislativas coletivas quando houver 3 ou mais demandas similares. Apresente os resultados de forma estruturada com números, percentuais e recomendações concretas de ação legislativa. Use dados REAIS — nunca invente números.`,
+    tooltip: { desc: "Agente analítico que consulta o banco de dados do gabinete para identificar padrões e sugerir proposituras.", examples: ["Quais demandas se repetem no Bairro Centro nos últimos 30 dias?", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"] },
   },
   {
-    id: "resumo", icon: "🗂️", label: "Resumo do gabinete", color: "#c47a0e", model: "sabiazinho-4", isNew: false,
-    systemPrompt: `Você é um assessor executivo que produz briefings objetivos e acionáveis. Ao receber dados do gabinete, gere um resumo executivo estruturado com: demandas abertas e fechadas, tarefas pendentes, prazos críticos, aniversariantes e destaques do período. Use linguagem direta, organize por prioridade e destaque o que precisa de ação imediata.`,
-    tooltip: { desc: "Gera um briefing executivo com o resumo da semana: demandas, tarefas, prazos e destaques.", examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"] },
+    id: "resumo", icon: "🗂️", label: "Resumo do gabinete", color: "#c47a0e", model: "sabia-4", isNew: false, agente: true,
+    systemPrompt: `Você é um assessor executivo que produz briefings objetivos e acionáveis usando dados reais do gabinete. Use as ferramentas para consultar estatísticas, sinais, tarefas e relatórios. Gere um resumo executivo estruturado com: demandas abertas e fechadas, tarefas pendentes, prazos críticos, anomalias detectadas e destaques do período. Use linguagem direta, organize por prioridade e destaque o que precisa de ação imediata. Sempre cite números e bairros específicos.`,
+    tooltip: { desc: "Agente que gera briefing executivo consultando todos os dados do gabinete.", examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"] },
   },
   {
-    id: "whatsapp", icon: "💬", label: "Resposta WhatsApp", color: "#1a8c5e", model: "sabiazinho-4", isNew: false,
+    id: "whatsapp", icon: "💬", label: "Resposta WhatsApp", color: "#1a8c5e", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um assistente de comunicação política. Redija mensagens de WhatsApp para munícipes com tom profissional mas acolhedor, objetivo e sem jargão técnico excessivo. A mensagem deve ser curta (máximo 3 parágrafos), clara e encerrar com uma sinalização positiva sobre o andamento da demanda. Nunca use linguagem fria ou burocrática.`,
     tooltip: { desc: "Redige mensagens de WhatsApp para munícipes no tom certo: acolhedor, objetivo e sem juridiquês.", examples: ["Redigir resposta para João Silva sobre a demanda #2847 que foi encaminhada à Secretaria", "Mensagem informando que o buraco da Rua das Flores está no cronograma de obras"] },
   },
   {
-    id: "pauta", icon: "🏛️", label: "Assessor de pauta", color: "#d4163c", model: "sabia-4", isNew: false,
-    systemPrompt: `Você é um assessor parlamentar especializado em preparação para sessões da Câmara. Com base nas demandas e documentos fornecidos, identifique temas relevantes para destaque em plenário, sugira argumentos e dados de apoio, aponte oportunidades de visibilidade política e prepare subsídios objetivos para pronunciamentos.`,
-    tooltip: { desc: "Prepara o vereador para a sessão: argumentos, temas das demandas, oportunidades de destaque.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana"] },
+    id: "pauta", icon: "🏛️", label: "Assessor de pauta", color: "#d4163c", model: "sabia-4", isNew: false, agente: true,
+    systemPrompt: `Você é um assessor parlamentar especializado em preparação para sessões da Câmara. Use as ferramentas para consultar dados reais de demandas, sinais estatísticos, clusters temáticos e dados eleitorais. Com base nesses dados, identifique temas relevantes para destaque em plenário, sugira argumentos com dados concretos, aponte oportunidades de visibilidade política e prepare subsídios objetivos para pronunciamentos. Sempre cite números, bairros e dados específicos.`,
+    tooltip: { desc: "Agente que prepara o vereador para a sessão com dados reais do gabinete.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana"] },
   },
   {
-    id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false,
+    id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um analista legislativo especializado em documentos oficiais. Ao receber um documento (ofício, resposta, decisão), produza: 1) Resumo executivo em até 3 linhas, 2) Pontos de ação identificados, 3) Prazos ou compromissos assumidos, 4) Sugestão de resposta ou propositura decorrente. Seja objetivo e prático.`,
     tooltip: { desc: "Analisa documentos recebidos (ofícios, respostas da prefeitura) e sugere os próximos passos.", examples: ["Analise esta resposta da Secretaria de Obras e diga o que preciso fazer", "Resumir este ofício e identificar se há prazo para resposta"] },
   },
 ];
+
+// ─── Meta das ferramentas (Etapa 3 — visualização de tool steps) ────────────
+
+const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descricao: (args: Record<string, unknown>) => string }> = {
+  buscar_demandas: {
+    icon: <Search className="w-3 h-3" />,
+    label: "Buscando demandas",
+    descricao: (a) => [a.bairro && `em ${a.bairro}`, a.area && `área ${a.area}`, a.status && `status ${a.status}`].filter(Boolean).join(" · ") || "sem filtros",
+  },
+  buscar_demandas_similares: {
+    icon: <Layers className="w-3 h-3" />,
+    label: "Busca semântica",
+    descricao: (a) => `"${String(a.texto_consulta || "").slice(0, 40)}…"`,
+  },
+  consultar_sinais: {
+    icon: <TrendingUp className="w-3 h-3" />,
+    label: "Analisando sinais",
+    descricao: (a) => [a.bairro && `${a.bairro}`, a.area && `${a.area}`].filter(Boolean).join(" · ") || "todos os bairros",
+  },
+  consultar_relatorio: {
+    icon: <BarChart2 className="w-3 h-3" />,
+    label: "Carregando relatório estratégico",
+    descricao: () => "último relatório semanal",
+  },
+  consultar_clusters: {
+    icon: <Layers className="w-3 h-3" />,
+    label: "Mapeando clusters temáticos",
+    descricao: (a) => `últimos ${a.periodo ?? 30} dias`,
+  },
+  buscar_municipe: {
+    icon: <Users className="w-3 h-3" />,
+    label: "Buscando munícipe",
+    descricao: (a) => String(a.nome || ""),
+  },
+  buscar_proposituras: {
+    icon: <FileText className="w-3 h-3" />,
+    label: "Verificando proposituras",
+    descricao: (a) => [a.tipo, a.tema].filter(Boolean).join(" · ") || `últimos ${a.periodo ?? 90} dias`,
+  },
+  consultar_memorias: {
+    icon: <Brain className="w-3 h-3" />,
+    label: "Consultando memória do gabinete",
+    descricao: (a) => `"${String(a.texto_consulta || "").slice(0, 40)}"`,
+  },
+  estatisticas_gerais: {
+    icon: <Database className="w-3 h-3" />,
+    label: "Calculando estatísticas",
+    descricao: (a) => `últimos ${a.periodo ?? 30} dias`,
+  },
+  consultar_tarefas_kanban: {
+    icon: <KanbanSquare className="w-3 h-3" />,
+    label: "Consultando kanban",
+    descricao: (a) => [a.kanban_type, a.posicao].filter(Boolean).join(" · ") || "todos os quadros",
+  },
+  consultar_dados_eleitorais: {
+    icon: <MapPin className="w-3 h-3" />,
+    label: "Consultando dados eleitorais",
+    descricao: (a) => [a.regiao, a.eleicao, a.cargo].filter(Boolean).join(" · ") || "todas as regiões",
+  },
+};
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
 
@@ -161,6 +235,97 @@ const CATEGORIA_CONFIG: Record<string, { emoji: string; label: string; color: st
   correcao:                 { emoji: "⚠️", label: "Correção Aprendida",   color: "#92400e", bg: "#fffbeb" },
 };
 
+// ─── ThinkingIndicator (Etapa 3) ─────────────────────────────────────────────
+
+function ThinkingIndicator({ steps, isLoading }: { steps: ToolStep[]; isLoading: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasSteps = steps.length > 0;
+
+  useEffect(() => { if (isLoading) setExpanded(true); }, [isLoading]);
+
+  if (!isLoading && !hasSteps) return null;
+
+  const ultimaFerramenta = steps[steps.length - 1]?.ferramenta;
+  const metaUltima       = ultimaFerramenta ? TOOL_META[ultimaFerramenta] : null;
+
+  return (
+    <div className="my-1.5 rounded-lg border overflow-hidden text-xs" style={{ borderColor: "hsl(var(--primary)/0.15)", background: "hsl(var(--primary)/0.03)" }}>
+      <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
+        {isLoading ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+        ) : (
+          <Lightbulb className="w-3.5 h-3.5 text-primary shrink-0" />
+        )}
+        <span className="flex-1 text-primary font-medium text-[12px]">
+          {isLoading
+            ? metaUltima ? metaUltima.label + "…" : "Consultando dados…"
+            : `${steps.length} consulta${steps.length !== 1 ? "s" : ""} realizadas`}
+        </span>
+        {hasSteps && (
+          <span className="flex items-center gap-1.5 text-muted-foreground/60">
+            <span className="font-mono text-[10px]">{steps.length} passo{steps.length !== 1 ? "s" : ""}</span>
+            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </span>
+        )}
+      </button>
+
+      {isLoading && (
+        <div className="h-0.5 mx-3 mb-1 rounded-full overflow-hidden" style={{ background: "hsl(var(--primary)/0.1)" }}>
+          <div
+            className="h-full rounded-full transition-all duration-700 ease-out"
+            style={{ background: "hsl(var(--primary)/0.5)", width: steps.length === 0 ? "8%" : `${Math.min(15 + steps.length * 12, 88)}%` }}
+          />
+        </div>
+      )}
+
+      {expanded && hasSteps && (
+        <div className="border-t divide-y" style={{ borderColor: "hsl(var(--primary)/0.1)" }}>
+          {steps.map((step, i) => {
+            const meta        = TOOL_META[step.ferramenta];
+            const isLast      = i === steps.length - 1;
+            const emAndamento = isLoading && isLast;
+            return (
+              <div key={i} className={`flex items-start gap-2 px-3 py-1.5 ${emAndamento ? "bg-primary/5" : ""}`}>
+                <span className="mt-0.5 shrink-0 w-3.5 flex justify-center">
+                  {emAndamento
+                    ? <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                    : <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <span className="text-muted-foreground/60">{meta?.icon}</span>
+                    <span className="font-medium text-foreground">{meta?.label ?? step.ferramenta}</span>
+                    {meta && (
+                      <span className="text-muted-foreground/50 font-normal truncate">
+                        · {meta.descricao(step.args)}
+                      </span>
+                    )}
+                  </div>
+                  {!emAndamento && step.resultado_resumo && (
+                    <div className="text-[10px] text-muted-foreground/40 mt-0.5 truncate">{step.resultado_resumo}</div>
+                  )}
+                </div>
+                {step.duracao_ms !== undefined && (
+                  <span className="flex items-center gap-0.5 shrink-0 text-[10px] text-muted-foreground/40 mt-0.5">
+                    <Clock className="w-2.5 h-2.5" />
+                    {step.duracao_ms < 1000 ? `${step.duracao_ms}ms` : `${(step.duracao_ms / 1000).toFixed(1)}s`}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {isLoading && (
+            <div className="flex items-center gap-2 px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/30 animate-pulse" />
+              <span className="text-[10px] text-muted-foreground/40 italic">aguardando próxima etapa…</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Modal de feedback negativo ───────────────────────────────────────────────
 
 function FeedbackModal({
@@ -201,7 +366,6 @@ function FeedbackModal({
             Seu feedback ajuda o Assessor IA a aprender com este gabinete.
           </DialogDescription>
         </DialogHeader>
-
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-1 gap-2">
             {motivos.map((m) => (
@@ -218,7 +382,6 @@ function FeedbackModal({
               </button>
             ))}
           </div>
-
           <div>
             <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
               Detalhe (opcional)
@@ -231,24 +394,9 @@ function FeedbackModal({
               className="w-full text-[13px] px-3 py-2 rounded-lg border border-border bg-background resize-none outline-none focus:border-primary"
             />
           </div>
-
           <div className="flex gap-2 pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              className="flex-1"
-              disabled={!motivo}
-              onClick={handleSubmit}
-            >
-              Enviar feedback
-            </Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button size="sm" className="flex-1" disabled={!motivo} onClick={handleSubmit}>Enviar feedback</Button>
           </div>
         </div>
       </DialogContent>
@@ -309,30 +457,20 @@ function PainelMemorias({
         className="w-[360px] h-full bg-card border-l border-border flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <Brain className="w-4 h-4 text-primary" />
             <span className="text-[14px] font-bold">Memória do Gabinete</span>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => refetch()}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
-              title="Atualizar"
-            >
+            <button onClick={() => refetch()} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground" title="Atualizar">
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
-            >
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
-
-        {/* Descrição */}
         <div className="px-4 py-2.5 bg-primary/5 border-b flex-shrink-0">
           <p className="text-[11.5px] text-muted-foreground leading-relaxed">
             Fatos e padrões aprendidos automaticamente nas conversas. São injetados no contexto dos modos
@@ -341,8 +479,6 @@ function PainelMemorias({
             <span className="font-medium text-foreground"> Resumo</span>.
           </p>
         </div>
-
-        {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground text-sm">
@@ -375,7 +511,6 @@ function PainelMemorias({
                       >
                         <span className="flex-1" style={{ color: cfg.color }}>{mem.conteudo}</span>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          {/* Barra de confiança */}
                           <div className="flex items-center gap-1">
                             <div className="w-12 h-1 rounded-full bg-black/10 overflow-hidden">
                               <div
@@ -390,7 +525,6 @@ function PainelMemorias({
                               {Math.round(mem.confianca * 100)}%
                             </span>
                           </div>
-                          {/* Botão remover */}
                           <button
                             onClick={() => desativarMemoria(mem.id)}
                             className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground/40 hover:text-destructive transition-all"
@@ -407,8 +541,6 @@ function PainelMemorias({
             })
           )}
         </div>
-
-        {/* Footer — total */}
         {memorias.length > 0 && (
           <div className="px-4 py-2.5 border-t flex-shrink-0">
             <p className="text-[11px] text-muted-foreground text-center">
@@ -502,15 +634,13 @@ function VincularDemandaModal({
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-muted transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-[12px] text-muted-foreground flex-shrink-0">#{d.protocolo}</span>
-                  <span className="text-[13px] font-medium flex-1 truncate">{d.titulo}</span>
-                  <StatusBadge status={d.status} size="sm" />
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-bold text-primary font-mono">#{d.protocolo}</span>
+                  {d.status && <StatusBadge status={d.status} />}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {d.municipes?.nome && <span className="text-[11px] text-muted-foreground">{d.municipes.nome}</span>}
-                  {d.bairro && <span className="text-[11px] text-muted-foreground">· {d.bairro}</span>}
-                  {d.areas?.nome && <span className="text-[11px] text-muted-foreground">· {d.areas.nome}</span>}
+                <div className="text-[13px] font-medium truncate">{d.titulo}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  {[d.municipes?.nome, d.areas?.nome, d.bairro].filter(Boolean).join(" · ")}
                 </div>
               </button>
             ))
@@ -521,7 +651,9 @@ function VincularDemandaModal({
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Componente Principal ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const AssessorIA = () => {
   const [messages, setMessages]                       = useState<Message[]>([]);
@@ -539,6 +671,7 @@ const AssessorIA = () => {
   const [feedbackModalOpen, setFeedbackModalOpen]     = useState(false);
   const [feedbackPendingMsg, setFeedbackPendingMsg]   = useState<Message | null>(null);
   const [tenantId, setTenantId]                       = useState<string | null>(null);
+  const [pendingToolSteps, setPendingToolSteps]       = useState<ToolStep[]>([]);
 
   const { toast }       = useToast();
   const location        = useLocation();
@@ -550,20 +683,19 @@ const AssessorIA = () => {
   const realMessages = messages.filter((m) => m.id !== "welcome");
   const showEmpty    = realMessages.length === 0 && !isLoading;
 
-  // ─── Buscar tenant_id do usuário logado ────────────────────────────────────
+  const MODOS_AGENTE       = ["analise", "pauta", "resumo"];
+  const MODOS_COM_EXTRACAO = ["analise", "pauta", "resumo"];
+
+  // ─── Buscar tenant_id ──────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .single()
+      supabase.from("profiles").select("tenant_id").eq("id", user.id).single()
         .then(({ data }) => setTenantId(data?.tenant_id || null));
     });
   }, []);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading, pendingToolSteps]);
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -571,7 +703,7 @@ const AssessorIA = () => {
     }
   }, [inputMessage]);
 
-  // ─── Processar sessionStorage ─────────────────────────────────────────────
+  // ─── Processar sessionStorage (navegação de demandas) ──────────────────────
   const processarSessionStorage = useCallback(() => {
     const stored = sessionStorage.getItem("assessorIA_promptData");
     if (!stored) return;
@@ -611,7 +743,6 @@ const AssessorIA = () => {
     }
     prompt += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nSelecione um modelo na Biblioteca de Documentos, indique o tipo de propositura desejado e envie.`;
     setTimeout(() => setInputMessage(prompt), 50);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { processarSessionStorage(); }, [location.key]);
@@ -636,26 +767,15 @@ const AssessorIA = () => {
     saveMessages(currentConvId, msgs);
   };
 
-  // ─── Extrair memórias ao encerrar conversa nos modos certos ───────────────
-  const MODOS_COM_EXTRACAO = ["analise", "pauta", "resumo"];
-
+  // ─── Extrair memórias ao encerrar conversa ────────────────────────────────
   const triggerExtrairMemorias = useCallback(async (msgs: Message[], modeId: string) => {
     if (!MODOS_COM_EXTRACAO.includes(modeId)) return;
     const trocas = msgs.filter((m) => m.role === "assistant").length;
     if (trocas < 2) return;
-
-    // Fire and forget — não bloquear a UI
-    const historico = msgs
-      .filter((m) => m.id !== "welcome")
-      .map((m) => ({ role: m.role, content: m.content }));
-
+    const historico = msgs.filter((m) => m.id !== "welcome").map((m) => ({ role: m.role, content: m.content }));
     try {
-      await supabase.functions.invoke("extrair-memorias", {
-        body: { historico, modoId },
-      });
-    } catch {
-      // silencioso — não interrompe o fluxo
-    }
+      await supabase.functions.invoke("extrair-memorias", { body: { historico, modoId } });
+    } catch { /* silencioso */ }
   }, []);
 
   // ─── Nova conversa ────────────────────────────────────────────────────────
@@ -670,9 +790,9 @@ const AssessorIA = () => {
     setAnexosChat([]);
     setDemandaContext(null);
     setCurrentConvId(Date.now().toString());
+    setPendingToolSteps([]);
   };
 
-  // ─── Retomar conversa ────────────────────────────────────────────────────
   const loadConversation = (item: HistoryItem) => {
     if (item.id === currentConvId) return;
     if (messages.filter((m) => m.role === "user").length > 0) {
@@ -686,9 +806,9 @@ const AssessorIA = () => {
     setDocumentosContexto([]);
     setAnexosChat([]);
     setDemandaContext(null);
+    setPendingToolSteps([]);
   };
 
-  // ─── Excluir conversa ────────────────────────────────────────────────────
   const deleteConversation = (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     const updated = history.filter((h) => h.id !== itemId);
@@ -702,72 +822,40 @@ const AssessorIA = () => {
     }
   };
 
-  // ─── Feedback de mensagem ─────────────────────────────────────────────────
+  // ─── Feedback ─────────────────────────────────────────────────────────────
   const handleFeedbackPositivo = async (msg: Message) => {
-    // Atualizar estado local imediatamente
-    setMessages((prev) =>
-      prev.map((m) => m.id === msg.id ? { ...m, feedback: "positivo" } : m)
-    );
-
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, feedback: "positivo" } : m));
     try {
       await supabase.functions.invoke("registrar-feedback", {
         body: {
-          conversa_id:      currentConvId,
-          mensagem_usuario: messages.find(
-            (m, i) => messages[i + 1]?.id === msg.id && m.role === "user"
-          )?.content || "",
-          resposta_ia:  msg.content,
-          modo:         msg.modeId || activeMode,
-          modelo:       msg.model || currentMode.model,
-          tipo:         "positivo",
+          conversa_id: currentConvId,
+          mensagem_usuario: messages.find((m, i) => messages[i + 1]?.id === msg.id && m.role === "user")?.content || "",
+          resposta_ia: msg.content, modo: msg.modeId || activeMode, modelo: msg.model || currentMode.model, tipo: "positivo",
         },
       });
-    } catch {
-      // silencioso
-    }
-
-    toast({
-      title: "👍 Obrigado pelo feedback!",
-      description: "Isso ajuda o Assessor IA a melhorar suas respostas.",
-    });
+    } catch { /* silencioso */ }
+    toast({ title: "👍 Obrigado pelo feedback!", description: "Isso ajuda o Assessor IA a melhorar suas respostas." });
   };
 
   const handleFeedbackNegativo = (msg: Message) => {
     setFeedbackPendingMsg(msg);
     setFeedbackModalOpen(true);
-    // Atualizar estado local imediatamente
-    setMessages((prev) =>
-      prev.map((m) => m.id === msg.id ? { ...m, feedback: "negativo" } : m)
-    );
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, feedback: "negativo" } : m));
   };
 
   const submitFeedbackNegativo = async (motivo: string, detalhe: string) => {
     if (!feedbackPendingMsg) return;
-
     try {
       await supabase.functions.invoke("registrar-feedback", {
         body: {
-          conversa_id:      currentConvId,
-          mensagem_usuario: messages.find(
-            (m, i) => messages[i + 1]?.id === feedbackPendingMsg.id && m.role === "user"
-          )?.content || "",
-          resposta_ia:  feedbackPendingMsg.content,
-          modo:         feedbackPendingMsg.modeId || activeMode,
-          modelo:       feedbackPendingMsg.model || currentMode.model,
-          tipo:         "negativo",
-          motivo,
-          detalhe,
+          conversa_id: currentConvId,
+          mensagem_usuario: messages.find((m, i) => messages[i + 1]?.id === feedbackPendingMsg.id && m.role === "user")?.content || "",
+          resposta_ia: feedbackPendingMsg.content, modo: feedbackPendingMsg.modeId || activeMode,
+          modelo: feedbackPendingMsg.model || currentMode.model, tipo: "negativo", motivo, detalhe,
         },
       });
-    } catch {
-      // silencioso
-    }
-
-    toast({
-      title: "Feedback registrado",
-      description: "O Assessor IA vai aprender com isso.",
-    });
-
+    } catch { /* silencioso */ }
+    toast({ title: "Feedback registrado", description: "O Assessor IA vai aprender com isso." });
     setFeedbackPendingMsg(null);
   };
 
@@ -796,22 +884,23 @@ const AssessorIA = () => {
     reader.readAsText(file);
   };
 
-  // ─── Enviar mensagem ──────────────────────────────────────────────────────
+  // ─── Enviar mensagem (com suporte ao loop agêntico) ───────────────────────
   const sendMessage = async (overrideText?: string) => {
     const text = (overrideText ?? inputMessage).trim();
     if (!text || isLoading) return;
 
     const userMsg: Message = {
-      id:        Date.now().toString(),
-      role:      "user",
-      content:   text,
+      id: Date.now().toString(),
+      role: "user",
+      content: text,
       timestamp: new Date(),
-      modeId:    activeMode,
+      modeId: activeMode,
     };
     const nextMsgs = [...messages, userMsg];
     setMessages(nextMsgs);
     if (!overrideText) setInputMessage("");
     setIsLoading(true);
+    setPendingToolSteps([]);
 
     try {
       const historyForApi = messages
@@ -845,41 +934,47 @@ const AssessorIA = () => {
       if (data?.error) throw new Error(data.error);
 
       const aiMsg: Message = {
-        id:        (Date.now() + 1).toString(),
-        role:      "assistant",
-        content:   data.message,
-        timestamp: new Date(),
-        modeId:    activeMode,
-        model:     currentMode.model,
-        feedback:  null,
+        id:                 (Date.now() + 1).toString(),
+        role:               "assistant",
+        content:            data.message,
+        timestamp:          new Date(),
+        modeId:             activeMode,
+        model:              currentMode.model,
+        feedback:           null,
+        toolSteps:          data.tool_steps || [],
+        memorias_injetadas: data.memorias_injetadas || 0,
+        iteracoes:          data.iteracoes || 0,
       };
       const final = [...nextMsgs, aiMsg];
       setMessages(final);
       persistHistory(final, activeMode);
 
-      // Memórias injetadas (informativo)
       if (data.memorias_injetadas > 0) {
         console.log(`🧠 ${data.memorias_injetadas} memórias usadas nesta resposta`);
+      }
+      if (data.tool_steps?.length > 0) {
+        console.log(`🔧 ${data.tool_steps.length} ferramentas usadas em ${data.iteracoes} iterações`);
       }
 
     } catch (err) {
       toast({
-        title:       "Erro",
+        title: "Erro",
         description: err instanceof Error ? err.message : "Erro ao comunicar com a IA",
-        variant:     "destructive",
+        variant: "destructive",
       });
       setMessages((prev) => [
         ...prev,
         {
-          id:        (Date.now() + 1).toString(),
-          role:      "assistant",
-          content:   "Ocorreu um erro ao processar sua mensagem. Tente novamente.",
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Ocorreu um erro ao processar sua mensagem. Tente novamente.",
           timestamp: new Date(),
-          modeId:    activeMode,
+          modeId: activeMode,
         },
       ]);
     } finally {
       setIsLoading(false);
+      setPendingToolSteps([]);
     }
   };
 
@@ -946,15 +1041,12 @@ const AssessorIA = () => {
     <TooltipProvider>
       <div className="flex overflow-hidden relative -m-3 md:-m-6" style={{ height: "calc(100vh - 56px)" }}>
 
-        {/* ══════════ Mobile sidebar overlay ══════════════════════════ */}
+        {/* Mobile sidebar overlay */}
         {showSidebar && (
-          <div
-            className="md:hidden fixed inset-0 bg-black/40 z-40"
-            onClick={() => setShowSidebar(false)}
-          />
+          <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setShowSidebar(false)} />
         )}
 
-        {/* ══════════ SIDEBAR ══════════════════════════════════════════ */}
+        {/* SIDEBAR */}
         <aside className={`flex flex-col overflow-hidden flex-shrink-0 bg-card border-r border-border transition-transform duration-200 z-50
           fixed md:relative inset-y-0 left-0 w-[280px] md:w-[252px]
           ${showSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
@@ -970,7 +1062,7 @@ const AssessorIA = () => {
               </div>
               <div>
                 <div className="text-[15px] font-bold tracking-tight text-foreground">Assessor IA</div>
-                <div className="text-[11px] text-muted-foreground">Poder Local Gestor</div>
+                <div className="text-[11px] text-muted-foreground">Fase 3 · Agente + Memória</div>
               </div>
             </div>
             <button
@@ -1038,12 +1130,11 @@ const AssessorIA = () => {
           </div>
         </aside>
 
-        {/* ══════════ MAIN ════════════════════════════════════════════════ */}
+        {/* MAIN */}
         <div className="flex-1 flex flex-col bg-background overflow-hidden">
 
           {/* Topbar */}
           <div className="h-[50px] border-b flex items-center gap-2 md:gap-2.5 px-3 md:px-5 bg-card flex-shrink-0 overflow-x-auto overflow-y-hidden scrollbar-hide">
-
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className="md:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
@@ -1060,8 +1151,8 @@ const AssessorIA = () => {
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex-shrink-0 transition-colors hover:opacity-90"
                       style={{
                         background: "hsl(var(--primary)/0.08)",
-                        border:     "1px solid hsl(var(--primary)/0.2)",
-                        color:      "hsl(var(--primary))",
+                        border: "1px solid hsl(var(--primary)/0.2)",
+                        color: "hsl(var(--primary))",
                       }}
                     >
                       <span>{currentMode.icon}</span>
@@ -1085,7 +1176,8 @@ const AssessorIA = () => {
                       >
                         <span className="w-6 h-6 rounded flex items-center justify-center bg-muted text-[12px] flex-shrink-0">{mode.icon}</span>
                         <span className="flex-1">{mode.label}</span>
-                        {mode.model === "sabia-4" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">PRO</span>}
+                        {mode.agente && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">AGENTE</span>}
+                        {mode.model === "sabia-4" && !mode.agente && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">PRO</span>}
                         {mode.isNew && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">NOVO</span>}
                       </DropdownMenuItem>
                     </TooltipTrigger>
@@ -1104,10 +1196,8 @@ const AssessorIA = () => {
 
             {/* Chip demanda */}
             {demandaContext && (
-              <div
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[260px] flex-shrink-0"
-                style={{ background: "#fdf6e8", border: "1px solid #f0d88c", color: "#92540a" }}
-              >
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium max-w-[260px] flex-shrink-0"
+                style={{ background: "#fdf6e8", border: "1px solid #f0d88c", color: "#92540a" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
                 <span className="truncate">#{demandaContext.protocolo} — {demandaContext.titulo}</span>
                 <button onClick={() => setDemandaContext(null)} className="flex-shrink-0 hover:text-red-500 ml-0.5" style={{ color: "#c47a0e" }}>
@@ -1136,8 +1226,21 @@ const AssessorIA = () => {
               </div>
             ))}
 
-            {/* Modelo ativo + badge de memória nos modos com injeção */}
+            {/* Modelo ativo + badge memória/agente */}
             <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+              {currentMode.agente && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium border border-violet-200 bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:border-violet-800 dark:text-violet-400 cursor-default">
+                      <Database className="w-3 h-3" />
+                      11 ferramentas
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-[11px]">
+                    Modo agente: consulta demandas, sinais, clusters, memórias e mais
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {MODOS_COM_EXTRACAO.includes(activeMode) && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1211,13 +1314,13 @@ const AssessorIA = () => {
             {/* Mensagens */}
             {!showEmpty && (
               <div className="flex-1 overflow-y-auto p-7 space-y-5">
-                {realMessages.map((msg, idx) => (
+                {realMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className="flex gap-3 max-w-[700px]"
                     style={{
                       flexDirection: msg.role === "user" ? "row-reverse" : "row",
-                      marginLeft:    msg.role === "user" ? "auto" : "0",
+                      marginLeft: msg.role === "user" ? "auto" : "0",
                       animationName: "fadeUp",
                       animationDuration: "0.3s",
                     }}
@@ -1231,10 +1334,13 @@ const AssessorIA = () => {
                       {msg.role === "assistant" ? <Bot className="w-4 h-4 text-white" /> : "👤"}
                     </div>
 
-                    <div
-                      className="flex flex-col gap-1 min-w-0"
-                      style={{ alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}
-                    >
+                    <div className="flex flex-col gap-1 min-w-0" style={{ alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
+
+                      {/* Tool steps (only for assistant in agent modes) */}
+                      {msg.role === "assistant" && msg.toolSteps && msg.toolSteps.length > 0 && (
+                        <ThinkingIndicator steps={msg.toolSteps} isLoading={false} />
+                      )}
+
                       <div
                         className="px-4 py-3 text-[13.5px] leading-[1.7]"
                         style={msg.role === "assistant"
@@ -1244,24 +1350,35 @@ const AssessorIA = () => {
                         <MarkdownText className="text-sm">{msg.content}</MarkdownText>
                       </div>
 
-                      {/* Botões de ação para respostas da IA */}
+                      {/* Ações para respostas da IA */}
                       {msg.role === "assistant" && (
                         <div className="flex items-center gap-1.5">
-
-                          {/* Transformar em propositura (analise/pauta) */}
+                          {/* Transformar em propositura */}
                           {(msg.modeId === "analise" || msg.modeId === "pauta") && (
                             <button
                               onClick={() => gerarProposituradaAnalise(msg.content)}
                               className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg transition-all hover:shadow-sm"
-                              style={{
-                                background: "hsl(var(--primary)/0.08)",
-                                border:     "1px solid hsl(var(--primary)/0.2)",
-                                color:      "hsl(var(--primary))",
-                              }}
+                              style={{ background: "hsl(var(--primary)/0.08)", border: "1px solid hsl(var(--primary)/0.2)", color: "hsl(var(--primary))" }}
                             >
                               📝 Transformar em propositura
                             </button>
                           )}
+
+                          {/* Meta info: memórias e iterações */}
+                          {(msg.memorias_injetadas || msg.iteracoes) ? (
+                            <div className="flex items-center gap-2">
+                              {!!msg.memorias_injetadas && (
+                                <span className="text-[10px] text-primary/60 flex items-center gap-0.5">
+                                  <Brain className="w-2.5 h-2.5" /> {msg.memorias_injetadas} memórias
+                                </span>
+                              )}
+                              {!!msg.iteracoes && msg.iteracoes > 1 && (
+                                <span className="text-[10px] text-muted-foreground/50 flex items-center gap-0.5">
+                                  <RefreshCw className="w-2.5 h-2.5" /> {msg.iteracoes} iterações
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
 
                           {/* Feedback 👍 */}
                           <Tooltip>
@@ -1274,10 +1391,7 @@ const AssessorIA = () => {
                                     : "text-muted-foreground/40 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                 }`}
                               >
-                                {msg.feedback === "positivo"
-                                  ? <CheckCircle2 className="w-3.5 h-3.5" />
-                                  : <ThumbsUp className="w-3.5 h-3.5" />
-                                }
+                                {msg.feedback === "positivo" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <ThumbsUp className="w-3.5 h-3.5" />}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-[11px]">Boa resposta</TooltipContent>
@@ -1294,10 +1408,7 @@ const AssessorIA = () => {
                                     : "text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                                 }`}
                               >
-                                {msg.feedback === "negativo"
-                                  ? <AlertCircle className="w-3.5 h-3.5" />
-                                  : <ThumbsDown className="w-3.5 h-3.5" />
-                                }
+                                {msg.feedback === "negativo" ? <AlertCircle className="w-3.5 h-3.5" /> : <ThumbsDown className="w-3.5 h-3.5" />}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-[11px]">Resposta ruim</TooltipContent>
@@ -1322,20 +1433,26 @@ const AssessorIA = () => {
                     >
                       <Bot className="w-4 h-4 text-white" />
                     </div>
-                    <div>
-                      <div
-                        className="flex items-center gap-1.5 px-4 py-3"
-                        style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "2px 10px 10px 10px" }}
-                      >
-                        {[0, 200, 400].map((delay) => (
-                          <span key={delay} className="w-2 h-2 rounded-full bg-muted-foreground/40"
-                            style={{ animation: `bounce 1.4s ease-in-out ${delay}ms infinite` }} />
-                        ))}
-                      </div>
+                    <div className="min-w-0">
+                      {/* ThinkingIndicator com steps em tempo real (quando houver) */}
+                      {currentMode.agente && (
+                        <ThinkingIndicator steps={pendingToolSteps} isLoading={true} />
+                      )}
+                      {!currentMode.agente && (
+                        <div
+                          className="flex items-center gap-1.5 px-4 py-3"
+                          style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "2px 10px 10px 10px" }}
+                        >
+                          {[0, 200, 400].map((delay) => (
+                            <span key={delay} className="w-2 h-2 rounded-full bg-muted-foreground/40"
+                              style={{ animation: `bounce 1.4s ease-in-out ${delay}ms infinite` }} />
+                          ))}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <Loader2 className="w-2.5 h-2.5 text-muted-foreground animate-spin" />
                         <span className="text-[11px] font-mono text-muted-foreground">
-                          {activeMode === "analise"  ? "Consultando demandas e memórias do gabinete…"
+                          {activeMode === "analise"   ? "Consultando demandas e memórias do gabinete…"
                            : activeMode === "resumo"  ? "Compilando dados da semana…"
                            : activeMode === "pauta"   ? "Preparando subsídios para a sessão…"
                            : activeMode === "documento" ? "Analisando documento…"
@@ -1372,6 +1489,8 @@ const AssessorIA = () => {
                 placeholder={
                   activeMode === "documento" && anexosChat.length === 0
                     ? "Anexe um documento e faça sua pergunta…"
+                    : currentMode.agente
+                    ? "Pergunte sobre demandas, bairros, tendências, dados eleitorais…"
                     : `Mensagem para o Assessor IA (${currentMode.label})…`
                 }
                 disabled={isLoading}
@@ -1442,7 +1561,7 @@ const AssessorIA = () => {
                   className="ml-auto flex items-center gap-1.5 h-[34px] px-4 rounded-lg text-[13px] font-semibold transition-colors disabled:cursor-not-allowed"
                   style={{
                     background: !inputMessage.trim() || isLoading ? "hsl(var(--muted))" : "hsl(var(--primary))",
-                    color:      !inputMessage.trim() || isLoading ? "hsl(var(--muted-foreground))" : "#fff",
+                    color: !inputMessage.trim() || isLoading ? "hsl(var(--muted-foreground))" : "#fff",
                   }}
                 >
                   {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -1457,25 +1576,10 @@ const AssessorIA = () => {
         </div>
       </div>
 
-      {/* ══ Modais e painéis ══ */}
-      <VincularDemandaModal
-        open={vincularOpen}
-        onOpenChange={setVincularOpen}
-        onSelect={(d) => setDemandaContext(d)}
-      />
-
-      <FeedbackModal
-        open={feedbackModalOpen}
-        onOpenChange={setFeedbackModalOpen}
-        onSubmit={submitFeedbackNegativo}
-      />
-
-      {showMemoriaPanel && (
-        <PainelMemorias
-          tenantId={tenantId}
-          onClose={() => setShowMemoriaPanel(false)}
-        />
-      )}
+      {/* Modais e painéis */}
+      <VincularDemandaModal open={vincularOpen} onOpenChange={setVincularOpen} onSelect={(d) => setDemandaContext(d)} />
+      <FeedbackModal open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen} onSubmit={submitFeedbackNegativo} />
+      {showMemoriaPanel && <PainelMemorias tenantId={tenantId} onClose={() => setShowMemoriaPanel(false)} />}
 
       <style>{`
         @keyframes bounce { 0%, 80%, 100% { transform: scale(1); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
