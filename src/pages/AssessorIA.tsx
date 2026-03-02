@@ -1031,9 +1031,13 @@ const AssessorIA = () => {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+          if (done) {
+            // Flush final do decoder — garante bytes pendentes de UTF-8 (acentos)
+            buffer += decoder.decode();
+          } else {
+            buffer += decoder.decode(value, { stream: true });
+          }
 
           // Processar mensagens SSE completas (separadas por \n\n)
           const parts = buffer.split("\n\n");
@@ -1092,6 +1096,9 @@ const AssessorIA = () => {
               }
             }
           }
+
+          // Sai APÓS processar o buffer final (antes saía ANTES de processar)
+          if (done) break;
         }
 
         if (!finalData) throw new Error("Resposta não recebida");
