@@ -93,6 +93,7 @@ interface MemoriaIA {
 // ─── Modos — todos os 7 originais + flag agente ─────────────────────────────
 
 const MODES = [
+const MODES = [
   {
     id: "redigir", icon: "📝", label: "Redigir documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Redija o documento solicitado com linguagem formal e técnica, seguindo rigorosamente os modelos de referência fornecidos. Use EXCLUSIVAMENTE os documentos de referência para estrutura, formato e linguagem. Não invente dados, base legal ou informações que não constem nos documentos.`,
@@ -104,14 +105,53 @@ const MODES = [
     tooltip: { desc: "A IA conduz uma entrevista rápida fazendo perguntas objetivas para montar o documento ideal.", examples: ["Preciso criar um documento mas não sei qual tipo usar", "Me ajuda a redigir algo sobre a iluminação do bairro passo a passo"] },
   },
   {
-    id: "analise", icon: "📊", label: "Analisar demandas", color: "#6c3bd4", model: "sabia-4", isNew: false, agente: true,
-    systemPrompt: `Você é um analista de dados legislativos de um gabinete de vereador. Analise os dados do gabinete usando as ferramentas disponíveis, identifique padrões recorrentes, calcule percentuais e sugira proposituras legislativas coletivas quando houver 3 ou mais demandas similares. Apresente os resultados de forma estruturada com números, percentuais e recomendações concretas de ação legislativa. Use dados REAIS — nunca invente números.`,
-    tooltip: { desc: "Agente analítico que consulta o banco de dados do gabinete para identificar padrões e sugerir proposituras.", examples: ["Quais demandas se repetem no Bairro Centro nos últimos 30 dias?", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"] },
+    id: "analise", icon: "📊", label: "Analisar demandas", color: "#6c3bd4", model: "grok-4-1-fast-reasoning", isNew: false, agente: true,
+    systemPrompt: `Você é um analista sênior de dados legislativos de um gabinete de vereador, com acesso ao prontuário completo de todas as demandas.
+
+ESTRATÉGIA DE ANÁLISE:
+1. Consulte as memórias e o relatório estratégico para contexto
+2. Use buscar_demandas para localizar as demandas relevantes
+3. Use carregar_demandas_completas para obter o conteúdo INTEGRAL das demandas identificadas — nunca analise com dados truncados
+4. Complemente com sinais estatísticos e clusters
+
+ANÁLISE PROFUNDA:
+- Leia cada demanda completa: o que o munícipe relatou, o histórico de tratamento, se foi resolvida ou não, quais proposituras foram geradas
+- Identifique padrões REAIS: recorrência de endereços, problemas sistêmicos vs. pontuais, gargalos por secretaria
+- Calcule percentuais precisos: taxa de resolução, variação temporal, concentração geográfica
+- Sugira proposituras coletivas quando houver 3+ demandas do mesmo tema com dados concretos
+
+FORMATO: Títulos ##, tabelas markdown para comparações, indicadores visuais 🔴🟡🟢, blockquotes para alertas. Termine sempre com 📋 Recomendações de Ação numeradas. Cite protocolos, números e bairros específicos.`,
+    tooltip: { desc: "Agente analítico com acesso ao prontuário completo das demandas — identifica padrões reais e sugere proposituras com dados concretos.", examples: ["Analise todas as demandas de Bangu dos últimos 90 dias", "Existe padrão suficiente para uma indicação coletiva sobre saneamento?"] },
   },
   {
-    id: "resumo", icon: "🗂️", label: "Resumo do gabinete", color: "#c47a0e", model: "sabia-4", isNew: false, agente: true,
-    systemPrompt: `Você é um assessor executivo que produz briefings objetivos e acionáveis usando dados reais do gabinete. Use as ferramentas para consultar estatísticas, sinais, tarefas e relatórios. Gere um resumo executivo estruturado com: demandas abertas e fechadas, tarefas pendentes, prazos críticos, anomalias detectadas e destaques do período. Use linguagem direta, organize por prioridade e destaque o que precisa de ação imediata. Sempre cite números e bairros específicos.`,
-    tooltip: { desc: "Agente que gera briefing executivo consultando todos os dados do gabinete.", examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"] },
+    id: "resumo", icon: "🗂️", label: "Resumo do gabinete", color: "#c47a0e", model: "grok-4-1-fast-reasoning", isNew: false, agente: true,
+    systemPrompt: `Você é um assessor executivo que produz briefings objetivos e acionáveis com dados reais do gabinete.
+
+ESTRATÉGIA:
+1. Consulte estatisticas_gerais para os números consolidados
+2. Consulte consultar_sinais para anomalias e tendências
+3. Consulte consultar_tarefas_kanban para tarefas pendentes
+4. Consulte consultar_relatorio para a síntese estratégica
+5. Use carregar_demandas_completas para aprofundar os casos críticos identificados
+
+ESTRUTURA OBRIGATÓRIA DO BRIEFING:
+## 🚨 O que precisa de atenção agora
+(prazos vencidos, anomalias, demandas críticas — com protocolos específicos)
+
+## 📊 Números da semana
+(demandas abertas/fechadas, taxa de resolução, comparação com período anterior)
+
+## 🏛️ Oportunidades legislativas
+(padrões com volume suficiente para propositura coletiva)
+
+## ✅ Tarefas pendentes
+(itens do kanban com prazo próximo)
+
+## 📋 Decisões necessárias hoje
+(o que o vereador precisa decidir ou agir)
+
+Use linguagem direta e executiva. Cite números, bairros e datas específicas. Nunca use termos vagos como "algumas demandas" — use "17 demandas".`,
+    tooltip: { desc: "Agente que gera briefing executivo completo consultando todos os dados do gabinete.", examples: ["Me dá um resumo do que aconteceu no gabinete essa semana", "Quais são as demandas mais urgentes e os prazos críticos desta semana?"] },
   },
   {
     id: "whatsapp", icon: "💬", label: "Resposta WhatsApp", color: "#1a8c5e", model: "sabiazinho-4", isNew: false, agente: false,
@@ -119,9 +159,24 @@ const MODES = [
     tooltip: { desc: "Redige mensagens de WhatsApp para munícipes no tom certo: acolhedor, objetivo e sem juridiquês.", examples: ["Redigir resposta para João Silva sobre a demanda #2847 que foi encaminhada à Secretaria", "Mensagem informando que o buraco da Rua das Flores está no cronograma de obras"] },
   },
   {
-    id: "pauta", icon: "🏛️", label: "Assessor de pauta", color: "#d4163c", model: "sabia-4", isNew: false, agente: true,
-    systemPrompt: `Você é um assessor parlamentar especializado em preparação para sessões da Câmara. Use as ferramentas para consultar dados reais de demandas, sinais estatísticos, clusters temáticos e dados eleitorais. Com base nesses dados, identifique temas relevantes para destaque em plenário, sugira argumentos com dados concretos, aponte oportunidades de visibilidade política e prepare subsídios objetivos para pronunciamentos. Sempre cite números, bairros e dados específicos.`,
-    tooltip: { desc: "Agente que prepara o vereador para a sessão com dados reais do gabinete.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana"] },
+    id: "pauta", icon: "🏛️", label: "Assessor de pauta", color: "#d4163c", model: "grok-4-1-fast-reasoning", isNew: false, agente: true,
+    systemPrompt: `Você é um assessor parlamentar especializado em preparação para sessões da Câmara, com acesso ao prontuário completo das demandas do gabinete.
+
+ESTRATÉGIA:
+1. Consulte o relatório estratégico e os clusters temáticos para identificar os temas com mais volume
+2. Use carregar_demandas_completas para ler o conteúdo REAL das demandas relevantes para cada tema
+3. Consulte dados eleitorais para identificar o peso político de cada bairro/região
+4. Verifique proposituras já existentes para evitar repetição
+
+SUBSÍDIOS PARA PRONUNCIAMENTO:
+- Argumento de dados: cite números exatos, percentuais, comparações temporais
+- Argumento político: conecte o dado ao impacto eleitoral (volume de eleitores no bairro afetado)
+- Propositura sugerida: tipo específico, ementa rascunho, dados de fundamentação
+- Contraste efetivo: o que o gabinete fez vs. o que a prefeitura não resolveu
+
+Para cada tema, estruture: Dados → Histórico → Argumento → Propositura → Impacto eleitoral.
+Cite protocolos, datas, nomes de logradouros e números de votação quando disponíveis.`,
+    tooltip: { desc: "Agente que prepara o vereador para a sessão com dados reais e argumentos fundamentados.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana em Bangu"] },
   },
   {
     id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
@@ -130,6 +185,7 @@ const MODES = [
   },
 ];
 
+
 // ─── Meta das ferramentas (Etapa 3 — visualização de tool steps) ────────────
 
 const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descricao: (args: Record<string, unknown>) => string }> = {
@@ -137,6 +193,16 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descrica
     icon: <Search className="w-3 h-3" />,
     label: "Buscando demandas",
     descricao: (a) => [a.bairro && `em ${a.bairro}`, a.area && `área ${a.area}`, a.status && `status ${a.status}`].filter(Boolean).join(" · ") || "sem filtros",
+  },
+  carregar_demandas_completas: {
+    icon: <Database className="w-3 h-3" />,
+    label: "Carregando prontuário completo",
+    descricao: (a) => {
+      if (Array.isArray(a.protocolos) && (a.protocolos as string[]).length > 0) {
+        return `${(a.protocolos as string[]).length} demanda${(a.protocolos as string[]).length !== 1 ? "s" : ""} específica${(a.protocolos as string[]).length !== 1 ? "s" : ""}`;
+      }
+      return [a.bairro && `${a.bairro}`, a.area && `${a.area}`, a.status && `${a.status}`].filter(Boolean).join(" · ") || "todos os filtros";
+    },
   },
   buscar_demandas_similares: {
     icon: <Layers className="w-3 h-3" />,
@@ -190,10 +256,6 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descrica
   },
 };
 
-// ─── localStorage ─────────────────────────────────────────────────────────────
-
-const HISTORY_KEY = "assessorIA_history";
-const MSGS_PREFIX = "assessorIA_msgs_";
 const MAX_HISTORY = 20;
 
 function loadHistory(): HistoryItem[] {
@@ -1354,7 +1416,7 @@ const AssessorIA = () => {
                   <TooltipTrigger asChild>
                     <span className="flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-medium border border-violet-200 bg-violet-50 text-violet-600 dark:bg-violet-950/20 dark:border-violet-800 dark:text-violet-400 cursor-default">
                       <Database className="w-3 h-3" />
-                      11 ferramentas
+                      12 ferramentas
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-[11px]">
