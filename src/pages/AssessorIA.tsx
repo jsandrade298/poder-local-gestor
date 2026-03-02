@@ -93,7 +93,6 @@ interface MemoriaIA {
 // ─── Modos — todos os 7 originais + flag agente ─────────────────────────────
 
 const MODES = [
-const MODES = [
   {
     id: "redigir", icon: "📝", label: "Redigir documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um Assessor Legislativo Municipal especializado em redação de documentos oficiais. Redija o documento solicitado com linguagem formal e técnica, seguindo rigorosamente os modelos de referência fornecidos. Use EXCLUSIVAMENTE os documentos de referência para estrutura, formato e linguagem. Não invente dados, base legal ou informações que não constem nos documentos.`,
