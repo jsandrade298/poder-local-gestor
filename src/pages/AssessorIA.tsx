@@ -178,6 +178,11 @@ Cite protocolos, datas, nomes de logradouros e números de votação quando disp
     tooltip: { desc: "Agente que prepara o vereador para a sessão com dados reais e argumentos fundamentados.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana em Bangu"] },
   },
   {
+    id: "tendencias", icon: "📡", label: "Tendências X", color: "#1d9bf0", model: "grok-4-1-fast-reasoning", isNew: true, agente: true,
+    systemPrompt: "", // Definido dinamicamente no backend com base no toggle cruzarGabinete
+    tooltip: { desc: "Pesquisa tendências no X/Twitter e na web, com opção de cruzar com dados internos do gabinete.", examples: ["O que estão falando sobre saúde em Campo Grande no X?", "O que o Diário do Grande ABC publicou sobre IPTU essa semana?", "Compare menções ao vereador X vs vereador Y sobre infraestrutura"] },
+  },
+  {
     id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
     systemPrompt: `Você é um analista legislativo especializado em documentos oficiais. Ao receber um documento (ofício, resposta, decisão), produza: 1) Resumo executivo em até 3 linhas, 2) Pontos de ação identificados, 3) Prazos ou compromissos assumidos, 4) Sugestão de resposta ou propositura decorrente. Seja objetivo e prático.`,
     tooltip: { desc: "Analisa documentos recebidos (ofícios, respostas da prefeitura) e sugere os próximos passos.", examples: ["Analise esta resposta da Secretaria de Obras e diga o que preciso fazer", "Resumir este ofício e identificar se há prazo para resposta"] },
@@ -252,6 +257,11 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descrica
     icon: <MapPin className="w-3 h-3" />,
     label: "Consultando dados eleitorais",
     descricao: (a) => [a.regiao, a.eleicao, a.cargo].filter(Boolean).join(" · ") || "todas as regiões",
+  },
+  buscar_tendencias_x: {
+    icon: <TrendingUp className="w-3 h-3" />,
+    label: "Analisando tendências no X",
+    descricao: (a) => [a.topico && `"${a.topico}"`, a.regiao && `em ${a.regiao}`].filter(Boolean).join(" ") || "tendências gerais",
   },
 };
 
@@ -735,6 +745,7 @@ const AssessorIA = () => {
   const [feedbackPendingMsg, setFeedbackPendingMsg]   = useState<Message | null>(null);
   const [tenantId, setTenantId]                       = useState<string | null>(null);
   const [pendingToolSteps, setPendingToolSteps]       = useState<ToolStep[]>([]);
+  const [cruzarGabinete, setCruzarGabinete]           = useState(false);
 
   const { toast }       = useToast();
   const location        = useLocation();
@@ -746,7 +757,7 @@ const AssessorIA = () => {
   const realMessages = messages.filter((m) => m.id !== "welcome");
   const showEmpty    = realMessages.length === 0 && !isLoading;
 
-  const MODOS_AGENTE       = ["analise", "pauta", "resumo"];
+  const MODOS_AGENTE       = ["analise", "pauta", "resumo", "tendencias"];
   const MODOS_COM_EXTRACAO = ["analise", "pauta", "resumo"];
 
   // ─── Buscar tenant_id ──────────────────────────────────────────────────────
@@ -854,6 +865,7 @@ const AssessorIA = () => {
     setDemandaContext(null);
     setCurrentConvId(Date.now().toString());
     setPendingToolSteps([]);
+    setCruzarGabinete(false);
   };
 
   const loadConversation = (item: HistoryItem) => {
@@ -870,6 +882,7 @@ const AssessorIA = () => {
     setAnexosChat([]);
     setDemandaContext(null);
     setPendingToolSteps([]);
+    setCruzarGabinete(false);
   };
 
   const deleteConversation = (e: React.MouseEvent, itemId: string) => {
@@ -995,6 +1008,7 @@ const AssessorIA = () => {
       model:               currentMode.model,
       modeSystemPrompt:    currentMode.systemPrompt,
       demandaProtocolo:    demandaContext?.protocolo || undefined,
+      cruzarGabinete:      activeMode === "tendencias" ? cruzarGabinete : undefined,
       documentosContexto:  documentosContexto.map((d) => ({
         nome:      d.nome,
         categoria: d.categoria,
@@ -1648,6 +1662,7 @@ const AssessorIA = () => {
                             : activeMode === "analise"   ? "Consultando demandas e memórias do gabinete…"
                             : activeMode === "resumo"    ? "Compilando dados da semana…"
                             : activeMode === "pauta"     ? "Preparando subsídios para a sessão…"
+                            : activeMode === "tendencias" ? "Pesquisando tendências no X…"
                             : activeMode === "documento" ? "Analisando documento…"
                             : "Redigindo…"}
                         </span>
@@ -1682,6 +1697,10 @@ const AssessorIA = () => {
                 placeholder={
                   activeMode === "documento" && anexosChat.length === 0
                     ? "Anexe um documento e faça sua pergunta…"
+                    : activeMode === "tendencias"
+                    ? cruzarGabinete
+                      ? "Pesquise no X e cruze com dados do gabinete…"
+                      : "Pesquise tendências no X, notícias, veículos de comunicação…"
                     : currentMode.agente
                     ? "Pergunte sobre demandas, bairros, tendências, dados eleitorais…"
                     : `Mensagem para o Assessor IA (${currentMode.label})…`
@@ -1745,6 +1764,40 @@ const AssessorIA = () => {
                     <FileText className="w-3.5 h-3.5" />
                     Trocar demanda
                   </button>
+                )}
+
+                {/* Toggle cruzar gabinete (apenas no modo Tendências) */}
+                {activeMode === "tendencias" && (
+                  <>
+                    <div className="w-px h-4 bg-border mx-0.5" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setCruzarGabinete((v) => !v)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all ${
+                            cruzarGabinete
+                              ? "bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-400"
+                              : "text-muted-foreground border-transparent hover:bg-muted hover:border-border"
+                          }`}
+                        >
+                          <Database className="w-3.5 h-3.5" />
+                          Cruzar gabinete
+                          <span className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-full text-[10px] font-bold ${
+                            cruzarGabinete
+                              ? "bg-sky-600 text-white"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {cruzarGabinete ? "✓" : "✗"}
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-[11px] max-w-[220px]">
+                        {cruzarGabinete
+                          ? "Ativado: a IA cruza dados do X com demandas, sinais e dados eleitorais do gabinete."
+                          : "Desativado: a IA pesquisa livremente no X e na web, sem acessar dados internos."}
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
                 )}
 
                 {/* Enviar */}
