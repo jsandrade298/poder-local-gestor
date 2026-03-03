@@ -255,6 +255,8 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descrica
   },
 };
 
+const HISTORY_KEY = "assessor-ia-history";
+const MSGS_PREFIX = "assessor-ia-msgs-";
 const MAX_HISTORY = 20;
 
 function loadHistory(): HistoryItem[] {
