@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { HelpChatWidget } from "@/components/layout/HelpChatWidget";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
+import { RepresentanteLayout } from "@/components/layout/RepresentanteLayout";
 import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +23,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const isAdminArea = location.pathname.startsWith("/admin");
   const isPublicPage = location.pathname === "/site";
   const isConvitePage = location.pathname === "/convite";
-  const { user, loading, profileLoading, isSuperAdmin, signOut } = useAuth();
+  const isRepArea = location.pathname.startsWith("/rep");
+  const { user, loading, profileLoading, isSuperAdmin, roleNoTenant, signOut } = useAuth();
   
   // Ativar monitor de status de demandas apenas se autenticado e no gabinete
   useDemandaStatusMonitor();
@@ -68,6 +70,10 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       if (isSuperAdmin) {
         return <Navigate to="/escolher" replace />;
       }
+      // Representante → portal próprio
+      if (roleNoTenant === "representante") {
+        return <Navigate to="/rep" replace />;
+      }
       // Usuário normal → gabinete
       return <Navigate to="/" replace />;
     }
@@ -87,6 +93,25 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       return <Navigate to="/" replace />;
     }
     return <>{children}</>;
+  }
+
+  // ========== ÁREA REPRESENTANTE (layout próprio) ==========
+  if (isRepArea) {
+    if (profileLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+    // Apenas representantes podem acessar /rep
+    if (roleNoTenant !== "representante") {
+      return <Navigate to="/" replace />;
+    }
+    return <RepresentanteLayout>{children}</RepresentanteLayout>;
   }
 
   // ========== ÁREA ADMIN (layout próprio) ==========
@@ -109,6 +134,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   }
 
   // ========== GABINETE (layout padrão com sidebar) ==========
+  // Representante não pode acessar o gabinete
+  if (roleNoTenant === "representante") {
+    return <Navigate to="/rep" replace />;
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
