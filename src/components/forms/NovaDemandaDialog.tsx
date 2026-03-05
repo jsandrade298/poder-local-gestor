@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Upload, X, MapPin, Loader2, Search, CheckCircle2 } from "lucide-react";
+import { Plus, Upload, X, MapPin, Loader2, Search, CheckCircle2, Eye } from "lucide-react";
 import { HumorSelector, HumorType } from "./HumorSelector";
 import { MunicipeCombobox } from "./MunicipeCombobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,10 +13,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
 
 export function NovaDemandaDialog() {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null; fonte: string | null }>({ lat: null, lng: null, fonte: null });
   const [enderecoPreenchido, setEnderecoPreenchido] = useState(false);
   
@@ -664,13 +666,41 @@ export function NovaDemandaDialog() {
               <div className="space-y-2">
                 {files.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-accent rounded-md">
-                    <span className="text-sm truncate">{file.name}</span>
-                    <X 
-                      className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground" 
-                      onClick={() => removeFile(index)}
-                    />
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <LocalFileThumbnail
+                        file={file}
+                        onClick={() => isPreviewable(file.name, file.type) ? setPreviewIndex(index) : undefined}
+                      />
+                      <div className="min-w-0">
+                        <span className="text-sm truncate block">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                      {isPreviewable(file.name, file.type) && (
+                        <Eye
+                          className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground"
+                          onClick={() => setPreviewIndex(index)}
+                        />
+                      )}
+                      <X 
+                        className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground" 
+                        onClick={() => removeFile(index)}
+                      />
+                    </div>
                   </div>
                 ))}
+
+                {/* Preview Dialog */}
+                <AnexoPreviewDialog
+                  open={previewIndex !== null}
+                  onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}
+                  localFile={previewIndex !== null ? files[previewIndex] : null}
+                  hasPrev={previewIndex !== null && previewIndex > 0}
+                  hasNext={previewIndex !== null && previewIndex < files.length - 1}
+                  onPrev={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  onNext={() => setPreviewIndex((i) => (i !== null && i < files.length - 1 ? i + 1 : i))}
+                />
               </div>
             )}
           </div>
