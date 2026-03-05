@@ -6,12 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, X, Search, Loader2, MapPin, Star, Circle, Square, Triangle, Hexagon, Heart, Pentagon, Diamond, Cross, RectangleHorizontal } from "lucide-react";
+import { Edit, X, Search, Loader2, MapPin, Star, Circle, Square, Triangle, Hexagon, Heart, Pentagon, Diamond, Cross, RectangleHorizontal, UserCheck, Copy, RefreshCw, ShieldOff } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 // Mapeamento de ícones de categoria
 const categoriaIcons: Record<string, any> = {
@@ -54,8 +55,15 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     data_nascimento: "",
     observacoes: "",
     tag_ids: [] as string[],
-    categoria_id: "" as string
+    categoria_id: "" as string,
+    representante_id: "" as string
   });
+
+  // Estados para o painel de acesso de representante
+  const [representanteAtivo, setRepresentanteAtivo] = useState(false);
+  const [isGerandoConvite, setIsGerandoConvite] = useState(false);
+  const [linkConvite, setLinkConvite] = useState<string | null>(null);
+  const [conviteExpiresAt, setConviteExpiresAt] = useState<string | null>(null);
 
   // Atualizar formData quando municipe muda
   useEffect(() => {
@@ -74,8 +82,12 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         data_nascimento: municipe.data_nascimento || "",
         observacoes: municipe.observacoes || "",
         tag_ids: [],
-        categoria_id: municipe.categoria_id || ""
+        categoria_id: municipe.categoria_id || "",
+        representante_id: municipe.representante_id || ""
       });
+      setRepresentanteAtivo(municipe.representante_ativo || false);
+      setLinkConvite(null);
+      setConviteExpiresAt(municipe.invite_expires_at || null);
     }
   }, [municipe]);
 
@@ -248,6 +260,20 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     }
   });
 
+  // Buscar representantes do tenant para o campo "Representante Responsável"
+  const { data: representantes = [] } = useQuery({
+    queryKey: ['representantes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .eq('role_no_tenant', 'representante')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Buscar tags atuais do munícipe
   const { data: currentTags = [] } = useQuery({
     queryKey: ['municipe-tags', municipe?.id],
@@ -335,6 +361,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
           categoria_id: data.categoria_id || null,
+          representante_id: data.representante_id || null,
           // Coordenadas atualizadas pela geocodificação
           latitude,
           longitude,
@@ -395,9 +422,60 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     }
   });
 
+  // ── Funções de convite de representante ────────────────────────────────
+  const handleToggleRepresentante = async (ativo: boolean) => {
+    if (ativo) {
+      await handleGerarConvite();
+    } else {
+      try {
+        await supabase.rpc('revogar_acesso_representante', { p_municipe_id: municipe.id });
+        setRepresentanteAtivo(false);
+        setLinkConvite(null);
+        setConviteExpiresAt(null);
+        queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+        toast({ title: "Acesso de representante revogado." });
+      } catch {
+        toast({ title: "Erro ao revogar acesso", variant: "destructive" });
+      }
+    }
+  };
+
+  const handleGerarConvite = async () => {
+    setIsGerandoConvite(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('representante-invite', {
+        body: { municipe_id: municipe.id },
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      if (error || !data?.success) throw new Error(data?.error || 'Erro ao gerar convite');
+      setRepresentanteAtivo(true);
+      setLinkConvite(data.link_convite);
+      setConviteExpiresAt(data.expires_at);
+      queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
+      toast({
+        title: data.whatsapp_enviado ? "Convite enviado por WhatsApp!" : "Convite gerado!",
+        description: data.whatsapp_enviado ? "O link foi enviado ao representante." : "Copie o link e envie manualmente."
+      });
+    } catch (err: any) {
+      toast({ title: "Erro ao gerar convite", description: err.message, variant: "destructive" });
+    } finally {
+      setIsGerandoConvite(false);
+    }
+  };
+
+  const handleCopiarLink = () => {
+    if (linkConvite) {
+      navigator.clipboard.writeText(linkConvite);
+      toast({ title: "Link copiado!" });
+    }
+  };
+
+  const conviteExpirado = conviteExpiresAt ? new Date(conviteExpiresAt) < new Date() : false;
+  const conviteUsado = municipe?.invite_token_usado === true;
+  const temProfile = !!municipe?.representante_id && conviteUsado;
+
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.nome) {
       toast({
         title: "Campo obrigatório",
         description: "O nome é obrigatório.",
@@ -729,6 +807,117 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                 rows={3}
               />
             </div>
+
+            {/* Representante Responsável */}
+            <div className="space-y-2">
+              <Label>Representante Responsável</Label>
+              <Select
+                value={formData.representante_id || "none"}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhum representante" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Nenhum representante</span>
+                  </SelectItem>
+                  {representantes.map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O representante designado poderá ver este munícipe e suas demandas vinculadas.
+              </p>
+            </div>
+          </div>
+
+          {/* Acesso de Representante */}
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">Acesso de Representante</h3>
+              </div>
+              <Switch
+                checked={representanteAtivo}
+                onCheckedChange={handleToggleRepresentante}
+                disabled={isGerandoConvite}
+              />
+            </div>
+
+            {representanteAtivo && (
+              <div className="space-y-3">
+                {temProfile ? (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <UserCheck className="h-4 w-4" />
+                    <span>Acesso ativo — conta criada com sucesso.</span>
+                  </div>
+                ) : linkConvite ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Convite gerado. Envie o link abaixo ao representante:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={linkConvite}
+                        className="flex-1 text-xs bg-background border rounded px-2 py-1.5 truncate"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={handleCopiarLink}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {conviteExpiresAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Expira em: {new Date(conviteExpiresAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+                ) : conviteExpirado ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-600">Convite expirado.</p>
+                    <Button type="button" size="sm" variant="outline" onClick={handleGerarConvite} disabled={isGerandoConvite}>
+                      {isGerandoConvite ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                      Gerar novo convite
+                    </Button>
+                  </div>
+                ) : conviteExpiresAt && !conviteUsado ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Convite enviado. Aguardando aceitação até {new Date(conviteExpiresAt).toLocaleDateString('pt-BR')}.
+                    </p>
+                    <Button type="button" size="sm" variant="outline" onClick={handleGerarConvite} disabled={isGerandoConvite}>
+                      {isGerandoConvite ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                      Reenviar convite
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" onClick={handleGerarConvite} disabled={isGerandoConvite}>
+                    {isGerandoConvite ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UserCheck className="h-3.5 w-3.5 mr-1" />}
+                    Gerar link de convite
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive w-full"
+                  onClick={() => handleToggleRepresentante(false)}
+                >
+                  <ShieldOff className="h-3.5 w-3.5 mr-1" />
+                  Revogar acesso
+                </Button>
+              </div>
+            )}
+
+            {!representanteAtivo && (
+              <p className="text-xs text-muted-foreground">
+                Ative para gerar um link de convite e dar acesso de Representante a este munícipe.
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
