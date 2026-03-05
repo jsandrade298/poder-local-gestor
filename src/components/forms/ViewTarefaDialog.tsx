@@ -26,6 +26,7 @@ import {
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { logError } from "@/lib/errorUtils";
 import { toast } from "sonner";
+import { Linkify } from "@/components/ui/Linkify";
 
 interface ViewTarefaDialogProps {
   tarefa: any;
@@ -399,7 +400,7 @@ export function ViewTarefaDialog({
               <div className="space-y-1.5">
                 <h3 className="text-sm font-medium">Descrição</h3>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-lg p-3">
-                  {tarefa.descricao}
+                  <Linkify>{tarefa.descricao}</Linkify>
                 </p>
               </div>
             )}
@@ -617,7 +618,7 @@ export function ViewTarefaDialog({
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-9">
-                    {comentario.texto}
+                    <Linkify>{comentario.texto}</Linkify>
                   </p>
                 </div>
               ))}
