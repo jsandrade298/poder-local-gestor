@@ -40,6 +40,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     numero: "",
     bairro: "",
     cidade: "São Paulo",
+    estado: "SP",
     cep: "",
     complemento: "",
     observacoes: "",
@@ -219,6 +220,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         numero: demanda.numero || "",
         bairro: demanda.bairro || "",
         cidade: demanda.cidade || "São Paulo",
+        estado: demanda.estado || "SP",
         cep: demanda.cep || "",
         complemento: demanda.complemento || "",
         observacoes: demanda.observacoes || "",
@@ -573,7 +575,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações Básicas</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="titulo">Título *</Label>
               <Input
@@ -595,6 +597,287 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                 rows={4}
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="municipe">Munícipe *</Label>
+                <MunicipeCombobox
+                  value={formData.municipe_id}
+                  onChange={(id) => setFormData(prev => ({ ...prev, municipe_id: id }))}
+                  initialDisplayName={(demanda?.municipes as any)?.nome}
+                  placeholder="Buscar por nome, telefone ou bairro..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="area">Área</Label>
+                <Select
+                  value={formData.area_id}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, area_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {areas.map((area) => (
+                      <SelectItem key={area.id} value={area.id}>{area.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <HumorSelector
+                  value={formData.humor}
+                  onChange={(value) => setFormData(prev => ({ ...prev, humor: value }))}
+                  label="Como o munícipe está se sentindo?"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsavel">Responsável</Label>
+                <Select
+                  value={formData.responsavel_id}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {usuarios.map((usuario) => (
+                      <SelectItem key={usuario.id} value={usuario.id}>{usuario.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Representante</Label>
+                <Select
+                  value={formData.representante_id || "none"}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhum representante" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Nenhum representante</span>
+                    </SelectItem>
+                    {representantes.map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.cor }} />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Endereço */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cep"
+                    value={formData.cep}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleBuscarCep}
+                    disabled={isBuscandoCep || !validarCep(formData.cep)}
+                  >
+                    {isBuscandoCep ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="logradouro">Logradouro</Label>
+                <Input
+                  id="logradouro"
+                  value={formData.logradouro}
+                  onChange={(e) => setFormData(prev => ({ ...prev, logradouro: e.target.value }))}
+                  placeholder="Rua, Avenida, etc."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="numero">Número</Label>
+                <Input
+                  id="numero"
+                  value={formData.numero}
+                  onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
+                  placeholder="Número"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bairro">Bairro</Label>
+                <Input
+                  id="bairro"
+                  value={formData.bairro}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bairro: e.target.value }))}
+                  placeholder="Bairro"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input
+                  id="cidade"
+                  value={formData.cidade}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
+                  placeholder="Cidade"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input
+                  id="estado"
+                  value={formData.estado}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                  placeholder="SP"
+                  maxLength={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="complemento">Complemento</Label>
+                <Input
+                  id="complemento"
+                  value={formData.complemento}
+                  onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
+                  placeholder="Apt, Bloco, etc."
+                />
+              </div>
+            </div>
+
+            {/* Geolocalização */}
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Geolocalização</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAtualizarGeolocalizacao}
+                  disabled={isGeocodificando || !formData.logradouro}
+                >
+                  {isGeocodificando ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <MapPin className="h-4 w-4 mr-2" />
+                  )}
+                  Atualizar Coordenadas
+                </Button>
+              </div>
+              {coordenadas.lat && coordenadas.lng ? (
+                <p className="text-xs text-muted-foreground">
+                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Sem coordenadas. Clique em "Atualizar Coordenadas" após preencher o endereço.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Configurações */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Configurações</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="prioridade">Prioridade</Label>
+                <Select
+                  value={formData.prioridade}
+                  onValueChange={(value: "baixa" | "media" | "alta" | "urgente") =>
+                    setFormData(prev => ({ ...prev, prioridade: value }))
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="baixa">Baixa</SelectItem>
+                    <SelectItem value="media">Média</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="data_prazo">Prazo de Entrega</Label>
+                <Input
+                  id="data_prazo"
+                  type="date"
+                  value={formData.data_prazo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="origem">Origem da Demanda</Label>
+              <Select
+                value={formData.origem}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, origem: value }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione a origem" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp_mandato">WhatsApp Mandato</SelectItem>
+                  <SelectItem value="whatsapp_assessoria">WhatsApp Assessoria</SelectItem>
+                  <SelectItem value="whatsapp_parlamentar">WhatsApp Parlamentar</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="tiktok">Tiktok</SelectItem>
+                  <SelectItem value="gabinete">Gabinete</SelectItem>
+                  <SelectItem value="em_agenda">Em Agenda</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -658,8 +941,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                   </div>
                 ))}
               </div>
-
-              {/* Preview Dialog para anexos existentes */}
               <AnexoPreviewDialog
                 open={previewAnexoIndex !== null}
                 onOpenChange={(open) => { if (!open) setPreviewAnexoIndex(null); }}
@@ -672,10 +953,10 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
             </div>
           )}
 
-          {/* Upload de Novos Arquivos */}
+          {/* Adicionar Novos Anexos */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Adicionar Novos Anexos</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="files">Arquivos (PDF, JPG, PNG)</Label>
               <Input
@@ -722,8 +1003,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                     </div>
                   ))}
                 </div>
-
-                {/* Preview Dialog para novos arquivos */}
                 <AnexoPreviewDialog
                   open={previewFileIndex !== null}
                   onOpenChange={(open) => { if (!open) setPreviewFileIndex(null); }}
@@ -735,300 +1014,6 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                 />
               </div>
             )}
-          </div>
-
-          {/* Vinculações */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Vinculações</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="municipe">Munícipe *</Label>
-                <MunicipeCombobox
-                  value={formData.municipe_id}
-                  onChange={(id) => setFormData(prev => ({ ...prev, municipe_id: id }))}
-                  initialDisplayName={(demanda?.municipes as any)?.nome}
-                  placeholder="Buscar por nome, telefone ou bairro..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="area">Área</Label>
-                <Select
-                  value={formData.area_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, area_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a área" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Humorômetro - Humor do Munícipe */}
-              <div className="md:col-span-2">
-                <HumorSelector
-                  value={formData.humor}
-                  onChange={(value) => setFormData(prev => ({ ...prev, humor: value }))}
-                  label="Como o munícipe está se sentindo?"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="responsavel">Responsável</Label>
-                <Select
-                  value={formData.responsavel_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {usuarios.map((usuario) => (
-                      <SelectItem key={usuario.id} value={usuario.id}>
-                        {usuario.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {representantes.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Representante</Label>
-                  <Select
-                    value={formData.representante_id || "none"}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum representante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <span className="text-muted-foreground">Nenhum representante</span>
-                      </SelectItem>
-                      {representantes.map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => 
-                    setFormData(prev => ({ ...prev, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusList.map((status) => (
-                      <SelectItem key={status.slug} value={status.slug}>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: status.cor }}
-                          />
-                          {status.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Endereço */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </div>
-
-            {/* Campo CEP com busca */}
-            <div className="flex gap-2">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="cep"
-                    value={formData.cep}
-                    onChange={(e) => handleCepChange(e.target.value)}
-                    placeholder="00000-000"
-                    maxLength={9}
-                    className="flex-1"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="secondary"
-                    onClick={handleBuscarCep}
-                    disabled={isBuscandoCep || !validarCep(formData.cep)}
-                  >
-                    {isBuscandoCep ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="logradouro">Logradouro</Label>
-                <Input
-                  id="logradouro"
-                  value={formData.logradouro}
-                  onChange={(e) => setFormData(prev => ({ ...prev, logradouro: e.target.value }))}
-                  placeholder="Rua, Avenida, etc."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="numero">Número</Label>
-                <Input
-                  id="numero"
-                  value={formData.numero}
-                  onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
-                  placeholder="Número"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bairro">Bairro</Label>
-                <Input
-                  id="bairro"
-                  value={formData.bairro}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bairro: e.target.value }))}
-                  placeholder="Bairro"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cidade">Cidade</Label>
-                <Input
-                  id="cidade"
-                  value={formData.cidade}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                  placeholder="Cidade"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="complemento">Complemento</Label>
-                <Input
-                  id="complemento"
-                  value={formData.complemento}
-                  onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
-                  placeholder="Apt, Bloco, etc."
-                />
-              </div>
-            </div>
-
-            {/* Geolocalização */}
-            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Geolocalização</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAtualizarGeolocalizacao}
-                  disabled={isGeocodificando || !formData.logradouro}
-                >
-                  {isGeocodificando ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <MapPin className="h-4 w-4 mr-2" />
-                  )}
-                  Atualizar Coordenadas
-                </Button>
-              </div>
-              {coordenadas.lat && coordenadas.lng ? (
-                <p className="text-xs text-muted-foreground">
-                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Sem coordenadas. Clique em "Atualizar Coordenadas" após preencher o endereço.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Configurações */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Configurações</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="prioridade">Prioridade</Label>
-                <Select
-                  value={formData.prioridade}
-                  onValueChange={(value: "baixa" | "media" | "alta" | "urgente") => 
-                    setFormData(prev => ({ ...prev, prioridade: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="baixa">Baixa</SelectItem>
-                    <SelectItem value="media">Média</SelectItem>
-                    <SelectItem value="alta">Alta</SelectItem>
-                    <SelectItem value="urgente">Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="data_prazo">Prazo de Entrega</Label>
-                <Input
-                  id="data_prazo"
-                  type="date"
-                  value={formData.data_prazo}
-                  onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="origem">Origem da Demanda</Label>
-              <Select
-                value={formData.origem}
-                onValueChange={(value) => 
-                  setFormData(prev => ({ ...prev, origem: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a origem" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="whatsapp_mandato">WhatsApp Mandato</SelectItem>
-                  <SelectItem value="whatsapp_assessoria">WhatsApp Assessoria</SelectItem>
-                  <SelectItem value="whatsapp_parlamentar">WhatsApp Parlamentar</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="tiktok">Tiktok</SelectItem>
-                  <SelectItem value="gabinete">Gabinete</SelectItem>
-                  <SelectItem value="em_agenda">Em Agenda</SelectItem>
-                  <SelectItem value="outro">Outro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
