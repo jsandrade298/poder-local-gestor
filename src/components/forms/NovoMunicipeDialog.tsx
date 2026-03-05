@@ -47,7 +47,8 @@ export function NovoMunicipeDialog() {
     data_nascimento: "",
     observacoes: "",
     tag_ids: [] as string[],
-    categoria_id: "" as string
+    categoria_id: "" as string,
+    representante_id: "" as string
   });
 
   const { toast } = useToast();
@@ -174,6 +175,20 @@ export function NovoMunicipeDialog() {
     }
   });
 
+  // Buscar representantes do tenant
+  const { data: representantes = [] } = useQuery({
+    queryKey: ['representantes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .eq('role_no_tenant', 'representante')
+        .order('nome');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const createMunicipe = useMutation({
     mutationFn: async (data: typeof formData) => {
       // ========== GEOCODIFICAR ANTES DE SALVAR ==========
@@ -216,6 +231,7 @@ export function NovoMunicipeDialog() {
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
           categoria_id: data.categoria_id || null,
+          representante_id: data.representante_id || null,
           // Coordenadas obtidas pela geocodificação
           latitude,
           longitude,
@@ -264,7 +280,8 @@ export function NovoMunicipeDialog() {
         data_nascimento: "",
         observacoes: "",
         tag_ids: [],
-        categoria_id: ""
+        categoria_id: "",
+        representante_id: ""
       });
       
       // Abrir dialog para criar demanda
@@ -609,6 +626,29 @@ export function NovoMunicipeDialog() {
                   rows={3}
                 />
               </div>
+
+              {/* Representante Responsável */}
+              {representantes.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Representante Responsável</Label>
+                  <Select
+                    value={formData.representante_id || "none"}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhum representante" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">Nenhum representante</span>
+                      </SelectItem>
+                      {representantes.map((r: any) => (
+                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
