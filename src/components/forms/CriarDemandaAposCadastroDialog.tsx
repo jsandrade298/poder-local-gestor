@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, X, FileText, UserCheck, Search, Loader2, MapPin, User } from "lucide-react";
+import { Upload, X, FileText, UserCheck, Search, Loader2, MapPin, User, Eye } from "lucide-react";
 import { HumorSelector, HumorType } from "./HumorSelector";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
 
 interface CriarDemandaAposCadastroDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function CriarDemandaAposCadastroDialog({
   municipeName 
 }: CriarDemandaAposCadastroDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -406,24 +408,47 @@ export function CriarDemandaAposCadastroDialog({
                 <div className="space-y-2">
                   {files.map((file, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        <span className="text-sm">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <LocalFileThumbnail
+                          file={file}
+                          onClick={() => isPreviewable(file.name, file.type) ? setPreviewIndex(index) : undefined}
+                        />
+                        <div className="min-w-0">
+                          <span className="text-sm truncate block">{file.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
+                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {isPreviewable(file.name, file.type) && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewIndex(index)} title="Visualizar">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
+
+                {/* Preview Dialog */}
+                <AnexoPreviewDialog
+                  open={previewIndex !== null}
+                  onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}
+                  localFile={previewIndex !== null ? files[previewIndex] : null}
+                  hasPrev={previewIndex !== null && previewIndex > 0}
+                  hasNext={previewIndex !== null && previewIndex < files.length - 1}
+                  onPrev={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  onNext={() => setPreviewIndex((i) => (i !== null && i < files.length - 1 ? i + 1 : i))}
+                />
               </div>
             )}
           </div>
