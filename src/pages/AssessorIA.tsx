@@ -178,9 +178,55 @@ Cite protocolos, datas, nomes de logradouros e números de votação quando disp
     tooltip: { desc: "Agente que prepara o vereador para a sessão com dados reais e argumentos fundamentados.", examples: ["Que temas das minhas demandas posso abordar na sessão de amanhã?", "Prepare subsídios para pronunciamento sobre infraestrutura urbana em Bangu"] },
   },
   {
-    id: "tendencias", icon: "📡", label: "Tendências X", color: "#1d9bf0", model: "grok-4-1-fast-reasoning", isNew: true, agente: true,
-    systemPrompt: "", // Definido dinamicamente no backend com base no toggle cruzarGabinete
-    tooltip: { desc: "Pesquisa tendências no X/Twitter e na web, com opção de cruzar com dados internos do gabinete.", examples: ["O que estão falando sobre saúde em Campo Grande no X?", "O que o Diário do Grande ABC publicou sobre IPTU essa semana?", "Compare menções ao vereador X vs vereador Y sobre infraestrutura"] },
+    id: "mkt", icon: "🎬", label: "MKT Digital", color: "#e11d78", model: "gpt-4o", isNew: true, agente: true,
+    systemPrompt: `Você é um especialista em marketing digital e comunicação política, focado em criar conteúdo para redes sociais de gabinetes parlamentares.
+
+SEU ESTILO DE TRABALHO:
+Você conduz uma conversa consultiva antes de produzir qualquer conteúdo. Primeiro entenda o que o usuário precisa, depois produza.
+
+NA PRIMEIRA MENSAGEM, sempre pergunte (de forma natural, não como lista):
+- Que formato deseja? (Roteiro para Reels/TikTok, carrossel Instagram, post único, story, thread, vídeo longo)
+- Qual tom? (institucional, próximo/popular, informativo, urgente/denúncia, celebração)
+- Tem alguma referência ou preferência de linguagem?
+
+SE O USUÁRIO JÁ TROUXER CONTEXTO SUFICIENTE, pode pular as perguntas e produzir diretamente.
+
+SE DADOS DO GABINETE ESTIVEREM DISPONÍVEIS (ferramentas ativas):
+- Use buscar_demandas ou carregar_demandas_completas para extrair dados reais
+- Crie conteúdo ancorado em fatos: nomes de ruas, números reais, casos concretos
+- Isso dá credibilidade e diferencia de conteúdo genérico
+
+FORMATOS DE SAÍDA — use sempre estrutura clara:
+
+REELS/TIKTOK:
+🎬 ROTEIRO — [TÍTULO]
+⏱️ Duração estimada: Xs
+[00:00-00:05] GANCHO: ...
+[00:05-00:15] DESENVOLVIMENTO: ...
+[00:15-00:25] DADOS/PROVA: ...
+[00:25-00:30] CTA: ...
+📝 Legenda sugerida: ...
+#️⃣ Hashtags: ...
+
+CARROSSEL:
+📱 CARROSSEL — [TÍTULO]
+[CAPA] Título impactante
+[SLIDE 2] ...
+[SLIDE N] ...
+[ÚLTIMO] CTA
+📝 Legenda do post: ...
+
+POST ÚNICO:
+📄 POST
+Texto completo formatado para a rede social indicada
+📝 Legenda + hashtags
+
+REGRAS:
+- Nunca produza conteúdo genérico quando há dados reais disponíveis
+- Pergunte antes se o usuário não especificou o formato
+- Adapte a linguagem ao público local
+- Sugira sempre um CTA claro (comentar, compartilhar, contato do gabinete)`,
+    tooltip: { desc: "Cria roteiros para Reels, carrosséis, posts e conteúdo para redes sociais — com opção de basear o conteúdo em dados reais do gabinete.", examples: ["Quero um Reels sobre os buracos do bairro X com dados das demandas", "Crie um carrossel sobre o trabalho do gabinete esse mês", "Roteiro de vídeo para divulgar a conquista de uma obra"] },
   },
   {
     id: "documento", icon: "📑", label: "Analisar documento", color: "#2d5be3", model: "sabiazinho-4", isNew: false, agente: false,
@@ -764,7 +810,7 @@ const AssessorIA = () => {
   const realMessages = messages.filter((m) => m.id !== "welcome");
   const showEmpty    = realMessages.length === 0 && !isLoading;
 
-  const MODOS_AGENTE       = ["analise", "pauta", "resumo", "tendencias"];
+  const MODOS_AGENTE       = ["analise", "pauta", "resumo", "mkt"];
   const MODOS_COM_EXTRACAO = ["analise", "pauta", "resumo"];
 
   // ─── Buscar tenant_id ──────────────────────────────────────────────────────
@@ -1029,7 +1075,7 @@ const AssessorIA = () => {
       model:               currentMode.model,
       modeSystemPrompt:    currentMode.systemPrompt,
       demandaProtocolo:    demandaContext?.protocolo || undefined,
-      cruzarGabinete:      activeMode === "tendencias" ? cruzarGabinete : undefined,
+      cruzarGabinete:      activeMode === "mkt" ? cruzarGabinete : undefined,
       documentosContexto:  documentosContexto.map((d) => ({
         nome:      d.nome,
         categoria: d.categoria,
@@ -1683,7 +1729,7 @@ const AssessorIA = () => {
                             : activeMode === "analise"   ? "Consultando demandas e memórias do gabinete…"
                             : activeMode === "resumo"    ? "Compilando dados da semana…"
                             : activeMode === "pauta"     ? "Preparando subsídios para a sessão…"
-                            : activeMode === "tendencias" ? "Pesquisando tendências no X…"
+                            : activeMode === "mkt"       ? "Criando conteúdo…"
                             : activeMode === "documento" ? "Analisando documento…"
                             : "Redigindo…"}
                         </span>
@@ -1718,10 +1764,10 @@ const AssessorIA = () => {
                 placeholder={
                   activeMode === "documento" && anexosChat.length === 0
                     ? "Anexe um documento e faça sua pergunta…"
-                    : activeMode === "tendencias"
+                    : activeMode === "mkt"
                     ? cruzarGabinete
-                      ? "Pesquise no X e cruze com dados do gabinete…"
-                      : "Pesquise tendências no X, notícias, veículos de comunicação…"
+                      ? "Descreva o conteúdo — a IA pode usar dados reais do gabinete…"
+                      : "Descreva o que quer criar: Reels, carrossel, post, roteiro…"
                     : currentMode.agente
                     ? "Pergunte sobre demandas, bairros, tendências, dados eleitorais…"
                     : `Mensagem para o Assessor IA (${currentMode.label})…`
@@ -1787,8 +1833,8 @@ const AssessorIA = () => {
                   </button>
                 )}
 
-                {/* Toggle cruzar gabinete (apenas no modo Tendências) */}
-                {activeMode === "tendencias" && (
+                {/* Toggle usar dados do gabinete (apenas no modo MKT Digital) */}
+                {activeMode === "mkt" && (
                   <>
                     <div className="w-px h-4 bg-border mx-0.5" />
                     <Tooltip>
@@ -1797,15 +1843,15 @@ const AssessorIA = () => {
                           onClick={() => setCruzarGabinete((v) => !v)}
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all ${
                             cruzarGabinete
-                              ? "bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-400"
+                              ? "bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-800 text-pink-700 dark:text-pink-400"
                               : "text-muted-foreground border-transparent hover:bg-muted hover:border-border"
                           }`}
                         >
                           <Database className="w-3.5 h-3.5" />
-                          Cruzar gabinete
+                          Usar dados do gabinete
                           <span className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-full text-[10px] font-bold ${
                             cruzarGabinete
-                              ? "bg-sky-600 text-white"
+                              ? "bg-pink-600 text-white"
                               : "bg-muted text-muted-foreground"
                           }`}>
                             {cruzarGabinete ? "✓" : "✗"}
@@ -1814,8 +1860,8 @@ const AssessorIA = () => {
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-[11px] max-w-[220px]">
                         {cruzarGabinete
-                          ? "Ativado: a IA cruza dados do X com demandas, sinais e dados eleitorais do gabinete."
-                          : "Desativado: a IA pesquisa livremente no X e na web, sem acessar dados internos."}
+                          ? "Ativado: a IA pode consultar demandas e dados reais do gabinete para criar conteúdo fundamentado."
+                          : "Desativado: criação livre, sem acesso aos dados internos do gabinete."}
                       </TooltipContent>
                     </Tooltip>
                   </>
