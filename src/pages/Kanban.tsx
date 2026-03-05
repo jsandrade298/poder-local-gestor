@@ -463,7 +463,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
       toast.success("Kanban limpo com sucesso!");
     },
     onError: (error) => {
@@ -494,7 +494,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
       toast.success("Demanda removida do kanban!");
     },
     onError: (error) => {
@@ -527,7 +527,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
       toast.success("Tarefa removida!");
     },
     onError: (error) => {
@@ -557,7 +557,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
       toast.success("Rota removida do kanban!");
     },
     onError: (error) => {
@@ -654,7 +654,7 @@ export default function Kanban() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-historico'] });
+      queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
       setTimeout(() => { isDraggingRef.current = false; }, 100);
     },
     onError: (error) => {
