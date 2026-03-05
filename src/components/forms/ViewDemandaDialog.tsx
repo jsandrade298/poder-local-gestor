@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot, Link2, Check } from "lucide-react";
+import { Calendar, MapPin, User, FileText, Clock, AlertTriangle, Edit, Bot, Link2, Check, Eye, Download } from "lucide-react";
 import { HumorBadge, getHumorLabel } from "./HumorSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { AnexoPreviewDialog, StorageAnexoThumbnail, isPreviewable, getFileTypeIcon } from "@/components/ui/AnexoPreview";
 import {
   Popover,
   PopoverContent,
@@ -34,6 +35,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
   const [includeAtividades, setIncludeAtividades] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const copyLink = () => {
     const url = `${window.location.origin}/demandas?protocolo=${demanda.protocolo}`;
@@ -532,21 +534,37 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
               </div>
             ) : (
               <div className="space-y-2">
-                {anexos.map((anexo) => (
-                  <Card key={anexo.id} className="cursor-pointer hover:bg-muted/50" onClick={() => downloadAnexo(anexo)}>
+                {anexos.map((anexo, index) => (
+                  <Card key={anexo.id} className="hover:bg-muted/50 transition-colors">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-8 w-8 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{anexo.nome_arquivo}</p>
+                        <div
+                          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                          onClick={() => isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) ? setPreviewIndex(index) : downloadAnexo(anexo)}
+                        >
+                          <StorageAnexoThumbnail
+                            anexo={anexo}
+                            onClick={() => isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) ? setPreviewIndex(index) : downloadAnexo(anexo)}
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{anexo.nome_arquivo}</p>
                             <p className="text-sm text-muted-foreground">
                               {(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB
                             </p>
                           </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(anexo.created_at)}
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <span className="text-sm text-muted-foreground hidden sm:inline">
+                            {formatDateTime(anexo.created_at)}
+                          </span>
+                          {isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) && (
+                            <Button variant="ghost" size="sm" onClick={() => setPreviewIndex(index)} title="Visualizar">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" onClick={() => downloadAnexo(anexo)} title="Baixar">
+                            <Download className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -554,6 +572,17 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                 ))}
               </div>
             )}
+
+            {/* Preview Dialog */}
+            <AnexoPreviewDialog
+              open={previewIndex !== null}
+              onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}
+              anexo={previewIndex !== null ? anexos[previewIndex] : null}
+              hasPrev={previewIndex !== null && previewIndex > 0}
+              hasNext={previewIndex !== null && previewIndex < anexos.length - 1}
+              onPrev={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+              onNext={() => setPreviewIndex((i) => (i !== null && i < anexos.length - 1 ? i + 1 : i))}
+            />
           </TabsContent>
         </Tabs>
       </DialogContent>
