@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
@@ -38,11 +39,11 @@ export default function Municipes() {
     const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
-  const [tagFilter, setTagFilter] = useState("all");
-  const [bairroFilter, setBairroFilter] = useState("all");
-  const [cidadeFilter, setCidadeFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [bairroFilter, setBairroFilter] = useState<string[]>([]);
+  const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
   const [demandaFilter, setDemandaFilter] = useState("all");
-  const [demandaStatusFilter, setDemandaStatusFilter] = useState("all");
+  const [demandaStatusFilter, setDemandaStatusFilter] = useState<string[]>([]);
   const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -80,9 +81,15 @@ export default function Municipes() {
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
 
+  // Chaves estáveis para arrays de filtros
+  const bairroKey = bairroFilter.join(",");
+  const cidadeKey = cidadeFilter.join(",");
+  const tagKey = tagFilter.join(",");
+  const demandaStatusKey = demandaStatusFilter.join(",");
+
   // Buscar munícipes com filtros server-side e paginação
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['municipes-complete', bairroFilter, cidadeFilter, itemsPerPage, currentPage, debouncedSearchTerm],
+    queryKey: ['municipes-complete', bairroKey, cidadeKey, itemsPerPage, currentPage, debouncedSearchTerm],
     queryFn: async () => {
       // Construir query base com filtros server-side
       const buildQuery = () => {
@@ -100,9 +107,15 @@ export default function Municipes() {
           `, { count: 'exact' })
           .order('nome');
 
-        // Filtros server-side
-        if (bairroFilter !== "all") query = query.ilike('bairro', bairroFilter);
-        if (cidadeFilter !== "all") query = query.ilike('cidade', cidadeFilter);
+        // Filtros server-side (multi-select com ilike para case-insensitive)
+        if (bairroFilter.length > 0) {
+          const conditions = bairroFilter.map(b => `bairro.ilike.${b}`).join(',');
+          query = query.or(conditions);
+        }
+        if (cidadeFilter.length > 0) {
+          const conditions = cidadeFilter.map(c => `cidade.ilike.${c}`).join(',');
+          query = query.or(conditions);
+        }
 
         // Busca por nome — server-side para funcionar com qualquer pageSize
         if (debouncedSearchTerm) {
@@ -277,8 +290,8 @@ export default function Municipes() {
     // Quando -1 (todos em memória), server-side também já filtrou
     const matchesSearch = true;
     
-    const matchesTag = tagFilter === "all" || 
-      (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => mt.tags?.id === tagFilter));
+    const matchesTag = tagFilter.length === 0 || 
+      (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => tagFilter.includes(mt.tags?.id)));
 
     // Filtro de demandas
     const demandaCount = demandasCountMap.get(municipe.id) || 0;
@@ -290,10 +303,10 @@ export default function Municipes() {
       matchesDemanda = demandaCount === 0;
     }
 
-    // Sub-filtro por status de demanda
+    // Sub-filtro por status de demanda (multi-select)
     let matchesDemandaStatus = true;
-    if (demandaStatusFilter !== "all") {
-      matchesDemandaStatus = !!municipeStatuses && municipeStatuses.has(demandaStatusFilter);
+    if (demandaStatusFilter.length > 0) {
+      matchesDemandaStatus = !!municipeStatuses && demandaStatusFilter.some(s => municipeStatuses.has(s));
     }
     
     return matchesSearch && matchesTag && matchesDemanda && matchesDemandaStatus;
@@ -301,7 +314,7 @@ export default function Municipes() {
 
   // Paginação — quando server-side (sem filtros client-side ativos), usar total do server
   // Quando há filtros client-side, usar o total filtrado
-  const hasClientFilters = debouncedSearchTerm || tagFilter !== "all" || demandaFilter !== "all" || demandaStatusFilter !== "all";
+  const hasClientFilters = debouncedSearchTerm || tagFilter.length > 0 || demandaFilter !== "all" || demandaStatusFilter.length > 0;
   const totalItems = hasClientFilters ? filteredMunicipes.length : municipesPaginado.total;
   const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
   // Quando paginação é server-side e sem filtros client-side, não precisa fatiar
@@ -318,21 +331,21 @@ export default function Municipes() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setTagFilter("all");
-    setBairroFilter("all");
-    setCidadeFilter("all");
+    setTagFilter([]);
+    setBairroFilter([]);
+    setCidadeFilter([]);
     setDemandaFilter("all");
-    setDemandaStatusFilter("all");
+    setDemandaStatusFilter([]);
     resetPage();
   };
 
   const [showFilters, setShowFilters] = useState(false);
   const activeFilterCount = [
-    tagFilter !== "all",
-    bairroFilter !== "all",
-    cidadeFilter !== "all",
+    tagFilter.length > 0,
+    bairroFilter.length > 0,
+    cidadeFilter.length > 0,
     demandaFilter !== "all",
-    demandaStatusFilter !== "all",
+    demandaStatusFilter.length > 0,
   ].filter(Boolean).length;
 
   // Gerenciar seleção de munícipes
@@ -1437,72 +1450,39 @@ export default function Municipes() {
                 <label className="text-sm font-medium text-foreground">
                   Tag
                 </label>
-                <Select value={tagFilter} onValueChange={(value) => {
-                  setTagFilter(value);
-                  resetPage();
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as tags" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as tags</SelectItem>
-                    {tags.map((tag) => (
-                      <SelectItem key={tag.id} value={tag.id}>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: tag.cor }}
-                          />
-                          {tag.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={tags.map((t) => ({ value: t.id, label: t.nome, color: t.cor }))}
+                  selected={tagFilter}
+                  onChange={(values) => { setTagFilter(values); resetPage(); }}
+                  placeholder="Todas as tags"
+                  searchPlaceholder="Buscar tag…"
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
                   Bairro
                 </label>
-                <Select value={bairroFilter} onValueChange={(value) => {
-                  setBairroFilter(value);
-                  resetPage();
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os bairros" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os bairros</SelectItem>
-                    {bairros.map((bairro) => (
-                      <SelectItem key={bairro} value={bairro.toLowerCase()}>
-                        {bairro}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={bairros.map((b) => ({ value: b.toLowerCase(), label: b }))}
+                  selected={bairroFilter}
+                  onChange={(values) => { setBairroFilter(values); resetPage(); }}
+                  placeholder="Todos os bairros"
+                  searchPlaceholder="Buscar bairro…"
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
                   Cidade
                 </label>
-                <Select value={cidadeFilter} onValueChange={(value) => {
-                  setCidadeFilter(value);
-                  resetPage();
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as cidades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as cidades</SelectItem>
-                    {cidades.map((cidade) => (
-                      <SelectItem key={cidade} value={cidade.toLowerCase()}>
-                        {cidade}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={cidades.map((c) => ({ value: c.toLowerCase(), label: c }))}
+                  selected={cidadeFilter}
+                  onChange={(values) => { setCidadeFilter(values); resetPage(); }}
+                  placeholder="Todas as cidades"
+                  searchPlaceholder="Buscar cidade…"
+                />
               </div>
 
               <div className="space-y-2">
@@ -1511,7 +1491,7 @@ export default function Municipes() {
                 </label>
                 <Select value={demandaFilter} onValueChange={(value) => {
                   setDemandaFilter(value);
-                  if (value === "sem_demanda") setDemandaStatusFilter("all");
+                  if (value === "sem_demanda") setDemandaStatusFilter([]);
                   resetPage();
                 }}>
                   <SelectTrigger>
@@ -1530,29 +1510,17 @@ export default function Municipes() {
                   <label className="text-sm font-medium text-foreground">
                     Status da Demanda
                   </label>
-                  <Select value={demandaStatusFilter} onValueChange={(value) => {
-                    setDemandaStatusFilter(value);
-                    if (value !== "all" && demandaFilter === "all") setDemandaFilter("com_demanda");
-                    resetPage();
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      {statusList.map((status) => (
-                        <SelectItem key={status.id} value={status.slug}>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full" 
-                              style={{ backgroundColor: status.cor }}
-                            />
-                            {status.nome}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <MultiSelectFilter
+                    options={statusList.map((s) => ({ value: s.slug, label: s.nome, color: s.cor }))}
+                    selected={demandaStatusFilter}
+                    onChange={(values) => {
+                      setDemandaStatusFilter(values);
+                      if (values.length > 0 && demandaFilter === "all") setDemandaFilter("com_demanda");
+                      resetPage();
+                    }}
+                    placeholder="Todos os status"
+                    searchPlaceholder="Buscar status…"
+                  />
                 </div>
               )}
 
