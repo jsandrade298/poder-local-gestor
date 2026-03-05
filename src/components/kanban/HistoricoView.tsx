@@ -18,6 +18,10 @@ import {
   Clock,
   User,
   MapPin,
+  MessageSquare,
+  Palette,
+  Users,
+  AlertTriangle,
 } from "lucide-react";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { logError } from "@/lib/errorUtils";
@@ -40,6 +44,7 @@ interface HistoricoRecord {
   acao: "adicionado" | "movido" | "removido";
   movido_por: string | null;
   created_at: string;
+  snapshot: any | null;
 }
 
 interface ItemHistorico {
@@ -51,6 +56,7 @@ interface ItemHistorico {
   movimentos: HistoricoRecord[];
   primeira_entrada: string; // timestamp
   ultima_atividade: string; // timestamp
+  snapshot: any | null;
 }
 
 const MESES_PT = [
@@ -210,6 +216,7 @@ export function HistoricoView({
           movimentos: [],
           primeira_entrada: reg.created_at,
           ultima_atividade: reg.created_at,
+          snapshot: null,
         });
       }
       const item = itemMap.get(key)!;
@@ -217,6 +224,7 @@ export function HistoricoView({
       if (reg.acao === "removido") {
         item.posicao_final = null;
         item.removido = true;
+        if (reg.snapshot) item.snapshot = reg.snapshot;
       } else {
         item.posicao_final = reg.posicao_nova;
         item.removido = false;
@@ -245,6 +253,7 @@ export function HistoricoView({
           movimentos: [],
           primeira_entrada: reg.created_at,
           ultima_atividade: reg.created_at,
+          snapshot: null,
         });
       }
       const item = itemMap.get(key)!;
@@ -256,6 +265,7 @@ export function HistoricoView({
       if (reg.acao === "removido") {
         item.posicao_final = reg.posicao_anterior;
         item.removido = true;
+        if (reg.snapshot) item.snapshot = reg.snapshot;
       } else {
         item.posicao_final = reg.posicao_nova;
         item.removido = false;
@@ -586,6 +596,10 @@ function HistoricoCard({
   isRemovido?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const snap = item.snapshot;
+  const hasSnapshot = !!snap;
+  const hasMovimentos = item.movimentos.length > 0;
+  const isExpandable = hasMovimentos || hasSnapshot;
 
   return (
     <Card
@@ -598,7 +612,7 @@ function HistoricoCard({
           ? "border-l-violet-500"
           : "border-l-blue-500"
       }`}
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => isExpandable && setExpanded(!expanded)}
     >
       <CardHeader className="pb-2 pt-3 px-3">
         <div className="space-y-1">
@@ -615,7 +629,15 @@ function HistoricoCard({
                 Removido
               </Badge>
             )}
-            {item.movimentos.length > 0 && (
+            {hasSnapshot && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400"
+              >
+                Dados preservados
+              </Badge>
+            )}
+            {hasMovimentos && (
               <span className="text-[10px] text-muted-foreground">
                 {item.movimentos.length} movimentação(ões)
               </span>
@@ -635,7 +657,7 @@ function HistoricoCard({
               month: "2-digit",
             })}
           </span>
-          {item.movimentos.length > 0 && (
+          {hasMovimentos && (
             <>
               <ArrowRight className="h-3 w-3" />
               <span>
@@ -649,71 +671,190 @@ function HistoricoCard({
           )}
         </div>
 
-        {/* Timeline expandida */}
-        {expanded && item.movimentos.length > 0 && (
-          <div className="mt-3 space-y-1.5 border-t pt-2">
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Movimentações no período:
-            </p>
-            {item.movimentos.map((mov) => (
-              <div
-                key={mov.id}
-                className="flex items-start gap-2 text-xs"
-              >
-                {getAcaoIcon(mov.acao)}
-                <div className="flex-1">
-                  <span className="text-muted-foreground">
-                    {mov.acao === "adicionado" && (
-                      <>
-                        Adicionado em{" "}
-                        <span className="font-medium text-foreground">
-                          {getPosicaoLabel(mov.posicao_nova)}
-                        </span>
-                      </>
-                    )}
-                    {mov.acao === "movido" && (
-                      <>
-                        <span className="font-medium text-foreground">
-                          {getPosicaoLabel(mov.posicao_anterior)}
-                        </span>
-                        {" → "}
-                        <span className="font-medium text-foreground">
-                          {getPosicaoLabel(mov.posicao_nova)}
-                        </span>
-                      </>
-                    )}
-                    {mov.acao === "removido" && (
-                      <>
-                        Removido de{" "}
-                        <span className="font-medium text-foreground">
-                          {getPosicaoLabel(mov.posicao_anterior)}
-                        </span>
-                      </>
-                    )}
-                  </span>
-                  <span className="ml-2 text-muted-foreground/60">
-                    {new Date(mov.created_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  {getMovidoPorNome(mov.movido_por) && (
-                    <span className="ml-1 text-muted-foreground/60">
-                      por {getMovidoPorNome(mov.movido_por)}
+        {/* ── Conteúdo expandido ── */}
+        {expanded && (
+          <div className="mt-3 space-y-3 border-t pt-3">
+
+            {/* Snapshot: detalhes da tarefa */}
+            {hasSnapshot && (
+              <div className="space-y-3">
+                {/* Descrição */}
+                {snap.descricao && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Descrição</p>
+                    <p className="text-xs text-foreground bg-muted/50 rounded-md p-2 whitespace-pre-wrap">{snap.descricao}</p>
+                  </div>
+                )}
+
+                {/* Metadados */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {snap.prioridade && (
+                    <span className="flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Prioridade: <span className="font-medium text-foreground capitalize">{snap.prioridade}</span>
+                    </span>
+                  )}
+                  {snap.responsavel?.nome && (
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {snap.responsavel.nome}
+                    </span>
+                  )}
+                  {snap.data_prazo && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Prazo: {new Date(snap.data_prazo + "T12:00:00").toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                  {snap.completed && (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <CheckSquare className="h-3 w-3" />
+                      Concluída
                     </span>
                   )}
                 </div>
+
+                {/* Colaboradores */}
+                {snap.colaboradores?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Users className="h-3 w-3" /> Colaboradores
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {snap.colaboradores.map((c: any, i: number) => (
+                        <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {c.nome}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Checklist */}
+                {snap.checklist?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <CheckSquare className="h-3 w-3" />
+                      Checklist ({snap.checklist.filter((c: any) => c.concluido).length}/{snap.checklist.length})
+                    </p>
+                    <div className="space-y-1 bg-muted/30 rounded-md p-2">
+                      {snap.checklist.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <div className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 ${
+                            item.concluido
+                              ? "bg-green-500 border-green-500 text-white"
+                              : "border-muted-foreground/40"
+                          }`}>
+                            {item.concluido && <span className="text-[8px]">✓</span>}
+                          </div>
+                          <span className={item.concluido ? "line-through text-muted-foreground" : "text-foreground"}>
+                            {item.texto}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comentários */}
+                {snap.comentarios?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Comentários ({snap.comentarios.length})
+                    </p>
+                    <div className="space-y-2 bg-muted/30 rounded-md p-2">
+                      {snap.comentarios.map((c: any, i: number) => (
+                        <div key={i} className="text-xs space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{c.autor_nome}</span>
+                            <span className="text-muted-foreground/60">
+                              {new Date(c.created_at).toLocaleDateString("pt-BR", {
+                                day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground whitespace-pre-wrap pl-0.5">{c.texto}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            )}
+
+            {/* Movimentações */}
+            {hasMovimentos && (
+              <div className="space-y-1.5">
+                {hasSnapshot && <div className="border-t pt-2" />}
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Movimentações no período:
+                </p>
+                {item.movimentos.map((mov) => (
+                  <div
+                    key={mov.id}
+                    className="flex items-start gap-2 text-xs"
+                  >
+                    {getAcaoIcon(mov.acao)}
+                    <div className="flex-1">
+                      <span className="text-muted-foreground">
+                        {mov.acao === "adicionado" && (
+                          <>
+                            Adicionado em{" "}
+                            <span className="font-medium text-foreground">
+                              {getPosicaoLabel(mov.posicao_nova)}
+                            </span>
+                          </>
+                        )}
+                        {mov.acao === "movido" && (
+                          <>
+                            <span className="font-medium text-foreground">
+                              {getPosicaoLabel(mov.posicao_anterior)}
+                            </span>
+                            {" → "}
+                            <span className="font-medium text-foreground">
+                              {getPosicaoLabel(mov.posicao_nova)}
+                            </span>
+                          </>
+                        )}
+                        {mov.acao === "removido" && (
+                          <>
+                            Removido de{" "}
+                            <span className="font-medium text-foreground">
+                              {getPosicaoLabel(mov.posicao_anterior)}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <span className="ml-2 text-muted-foreground/60">
+                        {new Date(mov.created_at).toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {getMovidoPorNome(mov.movido_por) && (
+                        <span className="ml-1 text-muted-foreground/60">
+                          por {getMovidoPorNome(mov.movido_por)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Indicador de expandir */}
-        {item.movimentos.length > 0 && (
+        {isExpandable && (
           <p className="text-[10px] text-muted-foreground/50 mt-1 text-center">
-            {expanded ? "Clique para recolher" : "Clique para ver movimentações"}
+            {expanded
+              ? "Clique para recolher"
+              : hasSnapshot
+              ? "Clique para ver detalhes e movimentações"
+              : "Clique para ver movimentações"}
           </p>
         )}
       </CardContent>
