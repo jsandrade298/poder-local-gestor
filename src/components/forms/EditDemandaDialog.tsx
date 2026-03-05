@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Upload, X, Download, Search, MapPin, Loader2 } from "lucide-react";
+import { Upload, X, Download, Search, MapPin, Loader2, Eye } from "lucide-react";
 import { HumorSelector, HumorType, getHumorLabel, getHumorEmoji } from "./HumorSelector";
 import { MunicipeCombobox } from "./MunicipeCombobox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useDemandaNotification } from "@/contexts/DemandaNotificationContext";
+import { AnexoPreviewDialog, StorageAnexoThumbnail, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
 
 interface EditDemandaDialogProps {
   open: boolean;
@@ -23,6 +24,8 @@ interface EditDemandaDialogProps {
 
 export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [previewAnexoIndex, setPreviewAnexoIndex] = useState<number | null>(null);
+  const [previewFileIndex, setPreviewFileIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
@@ -605,36 +608,50 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Anexos Existentes</h3>
               <div className="space-y-2">
-                {anexos.map((anexo) => (
+                {anexos.map((anexo, index) => (
                   <div key={anexo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{anexo.nome_arquivo}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
-                      </span>
+                    <div
+                      className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                      onClick={() => isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) ? setPreviewAnexoIndex(index) : downloadAnexo(anexo)}
+                    >
+                      <StorageAnexoThumbnail
+                        anexo={anexo}
+                        onClick={() => isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) ? setPreviewAnexoIndex(index) : downloadAnexo(anexo)}
+                      />
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium truncate block">{anexo.nome_arquivo}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(anexo.tamanho_arquivo / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadAnexo(anexo)}
-                      >
+                    <div className="flex gap-1 ml-2 shrink-0">
+                      {isPreviewable(anexo.nome_arquivo, anexo.tipo_arquivo) && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => setPreviewAnexoIndex(index)} title="Visualizar">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button type="button" variant="outline" size="sm" onClick={() => downloadAnexo(anexo)} title="Baixar">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteAnexo.mutate(anexo.id)}
-                        disabled={deleteAnexo.isPending}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={() => deleteAnexo.mutate(anexo.id)} disabled={deleteAnexo.isPending} title="Remover">
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Preview Dialog para anexos existentes */}
+              <AnexoPreviewDialog
+                open={previewAnexoIndex !== null}
+                onOpenChange={(open) => { if (!open) setPreviewAnexoIndex(null); }}
+                anexo={previewAnexoIndex !== null ? anexos[previewAnexoIndex] : null}
+                hasPrev={previewAnexoIndex !== null && previewAnexoIndex > 0}
+                hasNext={previewAnexoIndex !== null && previewAnexoIndex < anexos.length - 1}
+                onPrev={() => setPreviewAnexoIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                onNext={() => setPreviewAnexoIndex((i) => (i !== null && i < anexos.length - 1 ? i + 1 : i))}
+              />
             </div>
           )}
 
@@ -660,24 +677,45 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                 <div className="space-y-2">
                   {files.map((file, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        <span className="text-sm">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
+                      <div
+                        className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+                        onClick={() => isPreviewable(file.name, file.type) ? setPreviewFileIndex(index) : undefined}
                       >
-                        <X className="h-4 w-4" />
-                      </Button>
+                        <LocalFileThumbnail
+                          file={file}
+                          onClick={() => isPreviewable(file.name, file.type) ? setPreviewFileIndex(index) : undefined}
+                        />
+                        <div className="min-w-0">
+                          <span className="text-sm truncate block">{file.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {isPreviewable(file.name, file.type) && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewFileIndex(index)} title="Visualizar">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
+
+                {/* Preview Dialog para novos arquivos */}
+                <AnexoPreviewDialog
+                  open={previewFileIndex !== null}
+                  onOpenChange={(open) => { if (!open) setPreviewFileIndex(null); }}
+                  localFile={previewFileIndex !== null ? files[previewFileIndex] : null}
+                  hasPrev={previewFileIndex !== null && previewFileIndex > 0}
+                  hasNext={previewFileIndex !== null && previewFileIndex < files.length - 1}
+                  onPrev={() => setPreviewFileIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  onNext={() => setPreviewFileIndex((i) => (i !== null && i < files.length - 1 ? i + 1 : i))}
+                />
               </div>
             )}
           </div>
