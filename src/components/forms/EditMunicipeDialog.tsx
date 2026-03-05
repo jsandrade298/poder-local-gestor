@@ -49,7 +49,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "São Paulo",
+    cidade: "Santo André",
+    estado: "SP",
     cep: "",
     complemento: "",
     data_nascimento: "",
@@ -76,7 +77,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         logradouro: "",
         numero: "",
         bairro: municipe.bairro || "",
-        cidade: municipe.cidade || "São Paulo",
+        cidade: municipe.cidade || "Santo André",
+        estado: municipe.estado || "SP",
         cep: municipe.cep || "",
         complemento: "",
         data_nascimento: municipe.data_nascimento || "",
@@ -142,7 +144,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         ...prev,
         logradouro: resultado.logradouro || prev.logradouro,
         bairro: resultado.bairro || prev.bairro,
-        cidade: resultado.cidade || prev.cidade
+        cidade: resultado.cidade || prev.cidade,
+        estado: resultado.estado || prev.estado
       }));
       
       // Coordenadas serão obtidas ao SALVAR (quando o número estiver preenchido)
@@ -357,6 +360,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
           endereco: endereco || null,
           bairro: data.bairro || null,
           cidade: data.cidade,
+          estado: data.estado || null,
           cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
@@ -642,7 +646,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="bairro">Bairro</Label>
                 <Input
@@ -660,6 +664,17 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                   value={formData.cidade}
                   onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
                   placeholder="Santo André"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input
+                  id="estado"
+                  value={formData.estado}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                  placeholder="SP"
+                  maxLength={2}
                 />
               </div>
             </div>
@@ -705,15 +720,39 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
             </div>
           </div>
 
-          {/* Categoria, Tags e Observações */}
+          {/* Informações Adicionais */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações Adicionais</h3>
-            
+
+            {/* Representante Responsável */}
+            <div className="space-y-2">
+              <Label>Representante Responsável</Label>
+              <Select
+                value={formData.representante_id || "none"}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhum representante" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Nenhum representante</span>
+                  </SelectItem>
+                  {representantes.map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O representante designado poderá ver este munícipe e suas demandas vinculadas.
+              </p>
+            </div>
+
             {/* Categoria */}
             <div className="space-y-2">
               <Label>Categoria</Label>
-              <Select 
-                value={formData.categoria_id} 
+              <Select
+                value={formData.categoria_id}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, categoria_id: value === "none" ? "" : value }))}
               >
                 <SelectTrigger>
@@ -810,29 +849,6 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
               />
             </div>
 
-            {/* Representante Responsável */}
-            <div className="space-y-2">
-              <Label>Representante Responsável</Label>
-              <Select
-                value={formData.representante_id || "none"}
-                onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Nenhum representante" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="text-muted-foreground">Nenhum representante</span>
-                  </SelectItem>
-                  {representantes.map((r: any) => (
-                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                O representante designado poderá ver este munícipe e suas demandas vinculadas.
-              </p>
-            </div>
           </div>
 
           {/* Acesso de Representante */}
