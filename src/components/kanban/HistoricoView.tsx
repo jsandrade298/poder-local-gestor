@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { formatDateTime, formatDateOnly } from "@/lib/dateUtils";
 import { logError } from "@/lib/errorUtils";
+import { Linkify } from "@/components/ui/Linkify";
 
 interface HistoricoViewProps {
   selectedUser: string;
@@ -682,7 +683,7 @@ function HistoricoCard({
                 {snap.descricao && (
                   <div className="space-y-1">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Descrição</p>
-                    <p className="text-xs text-foreground bg-muted/50 rounded-md p-2 whitespace-pre-wrap">{snap.descricao}</p>
+                    <p className="text-xs text-foreground bg-muted/50 rounded-md p-2 whitespace-pre-wrap"><Linkify>{snap.descricao}</Linkify></p>
                   </div>
                 )}
 
@@ -774,7 +775,7 @@ function HistoricoCard({
                               })}
                             </span>
                           </div>
-                          <p className="text-muted-foreground whitespace-pre-wrap pl-0.5">{c.texto}</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap pl-0.5"><Linkify>{c.texto}</Linkify></p>
                         </div>
                       ))}
                     </div>
