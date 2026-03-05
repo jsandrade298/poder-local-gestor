@@ -439,27 +439,25 @@ export function NovaDemandaDialog() {
                 </Select>
               </div>
 
-              {representantes.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Representante</Label>
-                  <Select
-                    value={formData.representante_id || "none"}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum representante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <span className="text-muted-foreground">Nenhum representante</span>
-                      </SelectItem>
-                      {representantes.map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Representante</Label>
+                <Select
+                  value={formData.representante_id || "none"}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhum representante" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Nenhum representante</span>
+                    </SelectItem>
+                    {representantes.map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
