@@ -41,7 +41,8 @@ export function NovoMunicipeDialog() {
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "São Paulo",
+    cidade: "Santo André",
+    estado: "SP",
     cep: "",
     complemento: "",
     data_nascimento: "",
@@ -92,7 +93,8 @@ export function NovoMunicipeDialog() {
         ...prev,
         logradouro: resultado.logradouro || prev.logradouro,
         bairro: resultado.bairro || prev.bairro,
-        cidade: resultado.cidade || prev.cidade
+        cidade: resultado.cidade || prev.cidade,
+        estado: resultado.estado || prev.estado
       }));
       
       // Coordenadas serão obtidas ao SALVAR (quando o número estiver preenchido)
@@ -227,6 +229,7 @@ export function NovoMunicipeDialog() {
           endereco: `${data.logradouro}${data.numero ? ', ' + data.numero : ''}${data.complemento ? ' - ' + data.complemento : ''}`,
           bairro: data.bairro,
           cidade: data.cidade,
+          estado: data.estado || null,
           cep: data.cep?.replace(/\D/g, '') || null,
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
@@ -274,7 +277,8 @@ export function NovoMunicipeDialog() {
         logradouro: "",
         numero: "",
         bairro: "",
-        cidade: "São Paulo",
+        cidade: "Santo André",
+        estado: "SP",
         cep: "",
         complemento: "",
         data_nascimento: "",
@@ -344,7 +348,7 @@ export function NovoMunicipeDialog() {
             {/* Informações Pessoais */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Informações Pessoais</h3>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome Completo *</Label>
                 <Input
@@ -366,7 +370,6 @@ export function NovoMunicipeDialog() {
                     placeholder="(11) 99999-9999"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="email">E-mail</Label>
                   <Input
@@ -407,7 +410,6 @@ export function NovoMunicipeDialog() {
                 <MapPin className="h-4 w-4 text-muted-foreground" />
               </div>
 
-              {/* Campo CEP com busca */}
               <div className="space-y-2">
                 <Label htmlFor="cep">CEP</Label>
                 <div className="flex gap-2">
@@ -419,24 +421,20 @@ export function NovoMunicipeDialog() {
                     maxLength={9}
                     className="flex-1"
                   />
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="secondary"
                     onClick={handleBuscarCep}
                     disabled={isBuscandoCep || !validarCep(formData.cep)}
                   >
-                    {isBuscandoCep ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
+                    {isBuscandoCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Digite o CEP e clique na lupa para buscar o endereço automaticamente
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="logradouro">Logradouro</Label>
@@ -447,7 +445,6 @@ export function NovoMunicipeDialog() {
                     placeholder="Rua, Avenida, etc."
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="numero">Número</Label>
                   <Input
@@ -459,7 +456,7 @@ export function NovoMunicipeDialog() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bairro">Bairro</Label>
                   <Input
@@ -469,7 +466,6 @@ export function NovoMunicipeDialog() {
                     placeholder="Centro, Vila Nova, etc."
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="cidade">Cidade</Label>
                   <Input
@@ -477,6 +473,16 @@ export function NovoMunicipeDialog() {
                     value={formData.cidade}
                     onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
                     placeholder="Santo André"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="estado">Estado</Label>
+                  <Input
+                    id="estado"
+                    value={formData.estado}
+                    onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                    placeholder="SP"
+                    maxLength={2}
                   />
                 </div>
               </div>
@@ -502,11 +508,7 @@ export function NovoMunicipeDialog() {
                     onClick={handleAtualizarGeolocalizacao}
                     disabled={isGeocodificando || !formData.logradouro}
                   >
-                    {isGeocodificando ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <MapPin className="h-4 w-4 mr-2" />
-                    )}
+                    {isGeocodificando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <MapPin className="h-4 w-4 mr-2" />}
                     Obter Coordenadas
                   </Button>
                 </div>
@@ -522,15 +524,39 @@ export function NovoMunicipeDialog() {
               </div>
             </div>
 
-            {/* Categoria, Tags e Observações */}
+            {/* Informações Adicionais */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Informações Adicionais</h3>
-              
+
+              {/* Representante Responsável */}
+              <div className="space-y-2">
+                <Label>Representante Responsável</Label>
+                <Select
+                  value={formData.representante_id || "none"}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhum representante" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Nenhum representante</span>
+                    </SelectItem>
+                    {representantes.map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O representante designado poderá ver este munícipe e suas demandas vinculadas.
+                </p>
+              </div>
+
               {/* Categoria */}
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select 
-                  value={formData.categoria_id} 
+                <Select
+                  value={formData.categoria_id}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, categoria_id: value === "none" ? "" : value }))}
                 >
                   <SelectTrigger>
@@ -557,42 +583,28 @@ export function NovoMunicipeDialog() {
                   A categoria define o ícone do munícipe no mapa
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Tags</Label>
-                
-                {/* Tags selecionadas */}
                 {formData.tag_ids.length > 0 && (
                   <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
                     {formData.tag_ids.map(tagId => {
                       const tag = tags.find(t => t.id === tagId);
                       return tag ? (
-                        <Badge 
-                          key={tag.id} 
+                        <Badge
+                          key={tag.id}
                           variant="secondary"
                           className="flex items-center gap-1"
-                          style={{ 
-                            backgroundColor: `${tag.cor}20`,
-                            borderColor: tag.cor,
-                            color: tag.cor
-                          }}
+                          style={{ backgroundColor: `${tag.cor}20`, borderColor: tag.cor, color: tag.cor }}
                         >
-                          <div 
-                            className="w-2 h-2 rounded-full" 
-                            style={{ backgroundColor: tag.cor }}
-                          />
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.cor }} />
                           {tag.nome}
-                          <X 
-                            className="h-3 w-3 cursor-pointer hover:bg-white/20 rounded-full" 
-                            onClick={() => removeTag(tag.id)}
-                          />
+                          <X className="h-3 w-3 cursor-pointer hover:bg-white/20 rounded-full" onClick={() => removeTag(tag.id)} />
                         </Badge>
                       ) : null;
                     })}
                   </div>
                 )}
-                
-                {/* Seletor de tags */}
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-lg p-3">
                   {tags.map((tag) => (
                     <div key={tag.id} className="flex items-center space-x-2">
@@ -601,14 +613,8 @@ export function NovoMunicipeDialog() {
                         checked={formData.tag_ids.includes(tag.id)}
                         onCheckedChange={() => handleTagToggle(tag.id)}
                       />
-                      <label
-                        htmlFor={`tag-${tag.id}`}
-                        className="flex items-center gap-2 text-sm cursor-pointer"
-                      >
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: tag.cor }}
-                        />
+                      <label htmlFor={`tag-${tag.id}`} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.cor }} />
                         {tag.nome}
                       </label>
                     </div>
@@ -626,29 +632,6 @@ export function NovoMunicipeDialog() {
                   rows={3}
                 />
               </div>
-
-              {/* Representante Responsável */}
-              {representantes.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Representante Responsável</Label>
-                  <Select
-                    value={formData.representante_id || "none"}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum representante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <span className="text-muted-foreground">Nenhum representante</span>
-                      </SelectItem>
-                      {representantes.map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
