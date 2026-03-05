@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -29,12 +30,12 @@ import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [areaFilter, setAreaFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [municipeFilter, setMunicipeFilter] = useState("all");
-  const [responsavelFilter, setResponsavelFilter] = useState("all");
-  const [cidadeFilter, setCidadeFilter] = useState("all");
-  const [bairroFilter, setBairroFilter] = useState("all");
+  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
+  const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
+  const [bairroFilter, setBairroFilter] = useState<string[]>([]);
   const [atrasoFilter, setAtrasoFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -74,7 +75,7 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
+    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeFilter, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
     queryFn: async () => {
       // Construir query com filtros server-side
       const buildQuery = () => {
@@ -87,13 +88,13 @@ export default function Demandas() {
           `, { count: 'exact' })
           .order('created_at', { ascending: false });
 
-        // Filtros simples: delegar ao PostgreSQL
-        if (statusFilter !== "all") query = query.eq('status', statusFilter);
-        if (areaFilter !== "all") query = query.eq('area_id', areaFilter);
+        // Filtros: delegar ao PostgreSQL
+        if (statusFilter.length > 0) query = query.in('status', statusFilter);
+        if (areaFilter.length > 0) query = query.in('area_id', areaFilter);
         if (municipeFilter !== "all") query = query.eq('municipe_id', municipeFilter);
-        if (responsavelFilter !== "all") query = query.eq('responsavel_id', responsavelFilter);
-        if (cidadeFilter !== "all") query = query.eq('cidade', cidadeFilter);
-        if (bairroFilter !== "all") query = query.eq('bairro', bairroFilter);
+        if (responsavelFilter.length > 0) query = query.in('responsavel_id', responsavelFilter);
+        if (cidadeFilter.length > 0) query = query.in('cidade', cidadeFilter);
+        if (bairroFilter.length > 0) query = query.in('bairro', bairroFilter);
 
         // Filtro de atraso
         if (atrasoFilter !== "all") {
@@ -188,8 +189,8 @@ export default function Demandas() {
 
     // Aplicar filtros vindos de outras páginas
     if (atrasoParam) setAtrasoFilter(atrasoParam);
-    if (areaParam) setAreaFilter(areaParam);
-    if (responsavelParam) setResponsavelFilter(responsavelParam);
+    if (areaParam) setAreaFilter([areaParam]);
+    if (responsavelParam) setResponsavelFilter([responsavelParam]);
 
     // Processar redirecionamento de notificação ou de outros locais
     if ((protocolo || demandaId) && demandas.length > 0) {
@@ -345,10 +346,17 @@ export default function Demandas() {
   const paginatedDemandas = filteredDemandas;
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
 
+  // Chaves estáveis para arrays de filtros (evita re-render infinito)
+  const statusKey = statusFilter.join(",");
+  const areaKey = areaFilter.join(",");
+  const responsavelKey = responsavelFilter.join(",");
+  const cidadeKey = cidadeFilter.join(",");
+  const bairroKey = bairroFilter.join(",");
+
   // Resetar página quando mudar filtros ou pageSize
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, areaFilter, municipeFilter, responsavelFilter, cidadeFilter, bairroFilter, atrasoFilter, dateFrom, dateTo, pageSize]);
+  }, [statusKey, areaKey, municipeFilter, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize]);
 
 
   // Mutação para excluir demanda
@@ -420,12 +428,12 @@ export default function Demandas() {
   const clearFilters = () => {
     setSearchTerm("");
     setDebouncedSearchTerm("");
-    setStatusFilter("all");
-    setAreaFilter("all");
+    setStatusFilter([]);
+    setAreaFilter([]);
     setMunicipeFilter("all");
-    setResponsavelFilter("all");
-    setCidadeFilter("all");
-    setBairroFilter("all");
+    setResponsavelFilter([]);
+    setCidadeFilter([]);
+    setBairroFilter([]);
     setAtrasoFilter("all");
     setDateFrom("");
     setDateTo("");
@@ -433,12 +441,12 @@ export default function Demandas() {
 
   // Contagem de filtros ativos (para badge mobile)
   const activeFilterCount = [
-    statusFilter !== "all",
-    areaFilter !== "all",
+    statusFilter.length > 0,
+    areaFilter.length > 0,
     municipeFilter !== "all",
-    responsavelFilter !== "all",
-    cidadeFilter !== "all",
-    bairroFilter !== "all",
+    responsavelFilter.length > 0,
+    cidadeFilter.length > 0,
+    bairroFilter.length > 0,
     atrasoFilter !== "all",
     dateFrom !== "",
     dateTo !== "",
@@ -1458,44 +1466,26 @@ export default function Demandas() {
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Status
                 </label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    {statusList.map((status) => (
-                      <SelectItem key={status.slug} value={status.slug}>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: status.cor }}
-                          />
-                          {status.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={statusList.map((s) => ({ value: s.slug, label: s.nome, color: s.cor }))}
+                  selected={statusFilter}
+                  onChange={setStatusFilter}
+                  placeholder="Todos os status"
+                  searchPlaceholder="Buscar status…"
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Área
                 </label>
-                <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as áreas</SelectItem>
-                    {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={areas.map((a) => ({ value: a.id, label: a.nome }))}
+                  selected={areaFilter}
+                  onChange={setAreaFilter}
+                  placeholder="Todas as áreas"
+                  searchPlaceholder="Buscar área…"
+                />
               </div>
 
               <div>
@@ -1523,19 +1513,13 @@ export default function Demandas() {
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Responsável
                 </label>
-                <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os responsáveis</SelectItem>
-                    {responsaveis.map((responsavel) => (
-                      <SelectItem key={responsavel.id} value={responsavel.id}>
-                        {responsavel.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={responsaveis.map((r) => ({ value: r.id, label: r.nome }))}
+                  selected={responsavelFilter}
+                  onChange={setResponsavelFilter}
+                  placeholder="Todos os responsáveis"
+                  searchPlaceholder="Buscar responsável…"
+                />
               </div>
             </div>
 
@@ -1545,38 +1529,26 @@ export default function Demandas() {
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Cidade
                 </label>
-                <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as cidades</SelectItem>
-                    {cidades.map((cidade) => (
-                      <SelectItem key={cidade} value={cidade}>
-                        {cidade}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={cidades.map((c) => ({ value: c, label: c }))}
+                  selected={cidadeFilter}
+                  onChange={setCidadeFilter}
+                  placeholder="Todas as cidades"
+                  searchPlaceholder="Buscar cidade…"
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Bairro
                 </label>
-                <Select value={bairroFilter} onValueChange={setBairroFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os bairros</SelectItem>
-                    {bairros.map((bairro) => (
-                      <SelectItem key={bairro} value={bairro}>
-                        {bairro}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={bairros.map((b) => ({ value: b, label: b }))}
+                  selected={bairroFilter}
+                  onChange={setBairroFilter}
+                  placeholder="Todos os bairros"
+                  searchPlaceholder="Buscar bairro…"
+                />
               </div>
 
               <div>
