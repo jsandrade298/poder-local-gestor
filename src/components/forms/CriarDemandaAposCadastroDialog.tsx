@@ -377,7 +377,7 @@ export function CriarDemandaAposCadastroDialog({
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações da Demanda</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="titulo">Título *</Label>
               <Input
@@ -400,79 +400,7 @@ export function CriarDemandaAposCadastroDialog({
                 required
               />
             </div>
-          </div>
 
-          {/* Upload de Arquivos */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Anexos</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="files">Arquivos (PDF, JPG, PNG)</Label>
-              <Input
-                id="files"
-                type="file"
-                multiple
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-            </div>
-
-            {files.length > 0 && (
-              <div className="space-y-2">
-                <Label>Arquivos selecionados:</Label>
-                <div className="space-y-2">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <LocalFileThumbnail
-                          file={file}
-                          onClick={() => isPreviewable(file.name, file.type) ? setPreviewIndex(index) : undefined}
-                        />
-                        <div className="min-w-0">
-                          <span className="text-sm truncate block">{file.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2 shrink-0">
-                        {isPreviewable(file.name, file.type) && (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewIndex(index)} title="Visualizar">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Preview Dialog */}
-                <AnexoPreviewDialog
-                  open={previewIndex !== null}
-                  onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}
-                  localFile={previewIndex !== null ? files[previewIndex] : null}
-                  hasPrev={previewIndex !== null && previewIndex > 0}
-                  hasNext={previewIndex !== null && previewIndex < files.length - 1}
-                  onPrev={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
-                  onNext={() => setPreviewIndex((i) => (i !== null && i < files.length - 1 ? i + 1 : i))}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Vinculações */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Configurações</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="area">Área</Label>
@@ -480,20 +408,15 @@ export function CriarDemandaAposCadastroDialog({
                   value={formData.area_id}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, area_id: value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a área" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione a área" /></SelectTrigger>
                   <SelectContent>
                     {areas.map((area) => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.nome}
-                      </SelectItem>
+                      <SelectItem key={area.id} value={area.id}>{area.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Humorômetro - Humor do Munícipe */}
               <div className="md:col-span-2">
                 <HumorSelector
                   value={formData.humor}
@@ -508,52 +431,139 @@ export function CriarDemandaAposCadastroDialog({
                   value={formData.responsavel_id}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o responsável" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
                   <SelectContent>
                     {usuarios.map((usuario) => (
-                      <SelectItem key={usuario.id} value={usuario.id}>
-                        {usuario.nome}
-                      </SelectItem>
+                      <SelectItem key={usuario.id} value={usuario.id}>{usuario.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {representantes.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Representante</Label>
-                  <Select
-                    value={formData.representante_id || "none"}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum representante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <span className="text-muted-foreground">Nenhum representante</span>
-                      </SelectItem>
-                      {representantes.map((r: any) => (
-                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Representante</Label>
+                <Select
+                  value={formData.representante_id || "none"}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Nenhum representante" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">Nenhum representante</span>
+                    </SelectItem>
+                    {representantes.map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {statusList.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.cor }} />
+                          {status.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Endereço */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cep">CEP</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={(e) => handleCepChange(e.target.value)}
+                  placeholder="00000-000"
+                  maxLength={9}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleBuscarCep}
+                  disabled={isBuscandoCep || !validarCep(formData.cep)}
+                >
+                  {isBuscandoCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="logradouro">Logradouro</Label>
+                <Input id="logradouro" value={formData.logradouro} onChange={(e) => setFormData(prev => ({ ...prev, logradouro: e.target.value }))} placeholder="Rua, Avenida, etc." />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="numero">Número</Label>
+                <Input id="numero" value={formData.numero} onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))} placeholder="Número" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bairro">Bairro</Label>
+                <Input id="bairro" value={formData.bairro} onChange={(e) => setFormData(prev => ({ ...prev, bairro: e.target.value }))} placeholder="Bairro" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input id="cidade" value={formData.cidade} onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))} placeholder="Santo André" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input id="estado" value={(formData as any).estado || "SP"} onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value } as any))} placeholder="SP" maxLength={2} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="complemento">Complemento</Label>
+                <Input id="complemento" value={formData.complemento} onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))} placeholder="Apt, Bloco, etc." />
+              </div>
+            </div>
+
+            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Geolocalização</Label>
+                <Button type="button" variant="outline" size="sm" onClick={handleAtualizarGeolocalizacao} disabled={isGeocodificando || !formData.logradouro}>
+                  {isGeocodificando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <MapPin className="h-4 w-4 mr-2" />}
+                  Obter Coordenadas
+                </Button>
+              </div>
+              {coordenadas.lat && coordenadas.lng ? (
+                <p className="text-xs text-green-600">📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Preencha o endereço e clique em "Obter Coordenadas" para localizar no mapa.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Configurações */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Configurações</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="prioridade">Prioridade</Label>
                 <Select
                   value={formData.prioridade}
-                  onValueChange={(value: "baixa" | "media" | "alta" | "urgente") => 
-                    setFormData(prev => ({ ...prev, prioridade: value }))
-                  }
+                  onValueChange={(value: "baixa" | "media" | "alta" | "urgente") => setFormData(prev => ({ ...prev, prioridade: value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="baixa">Baixa</SelectItem>
                     <SelectItem value="media">Média</SelectItem>
@@ -562,29 +572,16 @@ export function CriarDemandaAposCadastroDialog({
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="data_prazo">Prazo de Entrega</Label>
-                <Input
-                  id="data_prazo"
-                  type="date"
-                  value={formData.data_prazo}
-                  onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))}
-                />
+                <Input id="data_prazo" type="date" value={formData.data_prazo} onChange={(e) => setFormData(prev => ({ ...prev, data_prazo: e.target.value }))} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="origem">Origem da Demanda</Label>
-              <Select
-                value={formData.origem}
-                onValueChange={(value) => 
-                  setFormData(prev => ({ ...prev, origem: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a origem" />
-                </SelectTrigger>
+              <Select value={formData.origem} onValueChange={(value) => setFormData(prev => ({ ...prev, origem: value }))}>
+                <SelectTrigger><SelectValue placeholder="Selecione a origem" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="whatsapp_mandato">WhatsApp Mandato</SelectItem>
                   <SelectItem value="whatsapp_assessoria">WhatsApp Assessoria</SelectItem>
@@ -598,137 +595,65 @@ export function CriarDemandaAposCadastroDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Endereço */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Endereço da Demanda</h3>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </div>
-
-            {/* Campo CEP com busca */}
             <div className="space-y-2">
-              <Label htmlFor="cep">CEP</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => handleCepChange(e.target.value)}
-                  placeholder="00000-000"
-                  maxLength={9}
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="secondary"
-                  onClick={handleBuscarCep}
-                  disabled={isBuscandoCep || !validarCep(formData.cep)}
-                >
-                  {isBuscandoCep ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Digite o CEP e clique na lupa para buscar o endereço automaticamente
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="logradouro">Logradouro</Label>
-                <Input
-                  id="logradouro"
-                  value={formData.logradouro}
-                  onChange={(e) => setFormData(prev => ({ ...prev, logradouro: e.target.value }))}
-                  placeholder="Rua, Avenida, etc."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="numero">Número</Label>
-                <Input
-                  id="numero"
-                  value={formData.numero}
-                  onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
-                  placeholder="Número"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bairro">Bairro</Label>
-                <Input
-                  id="bairro"
-                  value={formData.bairro}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bairro: e.target.value }))}
-                  placeholder="Bairro"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cidade">Cidade</Label>
-                <Input
-                  id="cidade"
-                  value={formData.cidade}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                  placeholder="Santo André"
-                />
-              </div>
-
-              <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="complemento">Complemento</Label>
-                <Input
-                  id="complemento"
-                  value={formData.complemento}
-                  onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
-                  placeholder="Apt, Bloco, etc."
-                />
-              </div>
-            </div>
-
-            {/* Geolocalização */}
-            <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Geolocalização</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAtualizarGeolocalizacao}
-                  disabled={isGeocodificando || !formData.logradouro}
-                >
-                  {isGeocodificando ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <MapPin className="h-4 w-4 mr-2" />
-                  )}
-                  Obter Coordenadas
-                </Button>
-              </div>
-              {coordenadas.lat && coordenadas.lng ? (
-                <p className="text-xs text-green-600">
-                  📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Preencha o endereço e clique em "Obter Coordenadas" para localizar no mapa.
-                </p>
-              )}
+              <Label htmlFor="observacoes">Observações</Label>
+              <Textarea
+                id="observacoes"
+                value={formData.observacoes}
+                onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+                placeholder="Observações adicionais"
+                rows={3}
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="observacoes">Observações</Label>
-            <Textarea
-              id="observacoes"
-              value={formData.observacoes}
-              onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-              placeholder="Observações adicionais"
-              rows={3}
-            />
+          {/* Anexos */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Anexos</h3>
+
+            <div className="space-y-2">
+              <Label htmlFor="files">Arquivos (PDF, JPG, PNG)</Label>
+              <Input id="files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} className="cursor-pointer" />
+            </div>
+
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <Label>Arquivos selecionados:</Label>
+                <div className="space-y-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <LocalFileThumbnail file={file} onClick={() => isPreviewable(file.name, file.type) ? setPreviewIndex(index) : undefined} />
+                        <div className="min-w-0">
+                          <span className="text-sm truncate block">{file.name}</span>
+                          <span className="text-xs text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {isPreviewable(file.name, file.type) && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewIndex(index)} title="Visualizar">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <AnexoPreviewDialog
+                  open={previewIndex !== null}
+                  onOpenChange={(open) => { if (!open) setPreviewIndex(null); }}
+                  localFile={previewIndex !== null ? files[previewIndex] : null}
+                  hasPrev={previewIndex !== null && previewIndex > 0}
+                  hasNext={previewIndex !== null && previewIndex < files.length - 1}
+                  onPrev={() => setPreviewIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
+                  onNext={() => setPreviewIndex((i) => (i !== null && i < files.length - 1 ? i + 1 : i))}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
