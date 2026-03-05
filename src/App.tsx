@@ -35,6 +35,9 @@ import AdminNotificacoesWhatsApp from "./pages/AdminNotificacoesWhatsApp";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 import ConviteRepresentante from "./pages/ConviteRepresentante";
+import RepresentanteDashboard from "./pages/representante/RepresentanteDashboard";
+import RepresentanteMunicipes from "./pages/representante/RepresentanteMunicipes";
+import RepresentanteDemandas from "./pages/representante/RepresentanteDemandas";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +68,9 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/site" element={<LandingPage />} />
               <Route path="/convite" element={<ConviteRepresentante />} />
+              <Route path="/rep" element={<RepresentanteDashboard />} />
+              <Route path="/rep/municipes" element={<RepresentanteMunicipes />} />
+              <Route path="/rep/demandas" element={<RepresentanteDemandas />} />
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
