@@ -33,12 +33,9 @@ export default function ConviteRepresentante() {
       return;
     }
 
-    // Verificar token diretamente no banco (sem autenticação)
+    // Verificar token via função SQL (bypassa RLS para não-autenticados)
     supabase
-      .from("municipes")
-      .select("nome, invite_expires_at, invite_token_usado")
-      .eq("invite_token", token)
-      .single()
+      .rpc("validar_token_convite", { p_token: token })
       .then(({ data, error }) => {
         if (error || !data) {
           setErroMensagem("Convite inválido. Solicite um novo link ao gabinete.");
@@ -46,14 +43,8 @@ export default function ConviteRepresentante() {
           return;
         }
 
-        if (data.invite_token_usado) {
-          setErroMensagem("Este convite já foi utilizado. Solicite um novo link ao gabinete.");
-          setEstado("erro");
-          return;
-        }
-
-        if (new Date(data.invite_expires_at) < new Date()) {
-          setErroMensagem("Este convite expirou. Solicite um novo link ao gabinete.");
+        if (!data.valido) {
+          setErroMensagem(`${data.erro}. Solicite um novo link ao gabinete.`);
           setEstado("erro");
           return;
         }
