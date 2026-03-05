@@ -73,6 +73,13 @@ export default function Demandas() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Chaves estáveis para arrays de filtros (evita re-render infinito)
+  const statusKey = statusFilter.join(",");
+  const areaKey = areaFilter.join(",");
+  const responsavelKey = responsavelFilter.join(",");
+  const cidadeKey = cidadeFilter.join(",");
+  const bairroKey = bairroFilter.join(",");
+
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
     queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeFilter, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
@@ -345,13 +352,6 @@ export default function Demandas() {
   // Paginação
   const paginatedDemandas = filteredDemandas;
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
-
-  // Chaves estáveis para arrays de filtros (evita re-render infinito)
-  const statusKey = statusFilter.join(",");
-  const areaKey = areaFilter.join(",");
-  const responsavelKey = responsavelFilter.join(",");
-  const cidadeKey = cidadeFilter.join(",");
-  const bairroKey = bairroFilter.join(",");
 
   // Resetar página quando mudar filtros ou pageSize
   useEffect(() => {
