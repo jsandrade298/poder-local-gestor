@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
 import { logError } from '@/lib/errorUtils';
-import { registrarHistorico } from '@/lib/kanbanHistoricoUtils';
+import { registrarHistorico, capturarSnapshotTarefa } from '@/lib/kanbanHistoricoUtils';
 import { AdicionarDemandasKanbanDialog } from "@/components/forms/AdicionarDemandasKanbanDialog";
 import { AdicionarTarefaDialog } from "@/components/forms/AdicionarTarefaDialog";
 import { AdicionarRotasKanbanDialog } from "@/components/forms/AdicionarRotasKanbanDialog";
@@ -392,7 +392,14 @@ export default function Kanban() {
   // ══════════════════════════════════════════════
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
-      // Registrar remoção de todos os itens no histórico
+      // Capturar snapshots das tarefas ANTES de deletar
+      const tarefasNaLista = demandas.filter(d => (d.tipo || 'demanda') === 'tarefa');
+      const { capturarSnapshotsTarefaBatch } = await import('@/lib/kanbanHistoricoUtils');
+      const snapshots = tarefasNaLista.length > 0
+        ? await capturarSnapshotsTarefaBatch(tarefasNaLista.map(t => t.id))
+        : new Map();
+
+      // Registrar remoção de todos os itens no histórico (com snapshot para tarefas)
       const itensParaRegistrar = demandas.map(item => ({
         item_id: item.id,
         item_tipo: (item.tipo || 'demanda') as 'demanda' | 'tarefa' | 'rota',
@@ -401,6 +408,7 @@ export default function Kanban() {
         posicao_anterior: item.kanban_position,
         posicao_nova: null as string | null,
         acao: 'removido' as const,
+        snapshot: snapshots.get(item.id) || null,
       }));
 
       // Registrar em batch (não bloqueia)
@@ -498,6 +506,10 @@ export default function Kanban() {
   const removerTarefaMutation = useMutation({
     mutationFn: async (tarefaId: string) => {
       const item = demandas.find(d => d.id === tarefaId);
+
+      // Capturar snapshot completo ANTES de deletar
+      const snapshot = await capturarSnapshotTarefa(tarefaId);
+
       if (item) {
         registrarHistorico({
           item_id: tarefaId,
@@ -506,6 +518,7 @@ export default function Kanban() {
           kanban_type: selectedUser,
           posicao_anterior: item.kanban_position,
           acao: 'removido',
+          snapshot,
         });
       }
 
