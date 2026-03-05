@@ -33,6 +33,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     area_id: "",
     prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
     responsavel_id: "",
+    representante_id: "",
     status: "solicitada",
     data_prazo: "",
     logradouro: "",
@@ -81,13 +82,27 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
   });
 
   const { data: usuarios = [] } = useQuery({
-    queryKey: ['usuarios'],
+    queryKey: ['usuarios-gabinete'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, nome')
+        .neq('role_no_tenant', 'representante')
         .order('nome');
       
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: representantes = [] } = useQuery({
+    queryKey: ['representantes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, nome')
+        .eq('role_no_tenant', 'representante')
+        .order('nome');
       if (error) throw error;
       return data;
     }
@@ -197,6 +212,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         area_id: demanda.area_id || "",
         prioridade: demanda.prioridade || "media",
         responsavel_id: demanda.responsavel_id || "",
+        representante_id: demanda.representante_id || "",
         status: mapStatusAntigoParaNovo(demanda.status || "solicitada"),
         data_prazo: demanda.data_prazo || "",
         logradouro: demanda.logradouro || "",
@@ -326,9 +342,10 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       // Atualizar demanda
       const cleanData = {
         ...data,
-        status: statusMapeado, // Usar status mapeado para garantir valor válido
+        status: statusMapeado,
         area_id: data.area_id || null,
         responsavel_id: data.responsavel_id || null,
+        representante_id: data.representante_id || null,
         data_prazo: data.data_prazo || null,
         logradouro: data.logradouro || null,
         numero: data.numero || null,
@@ -781,6 +798,28 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
                   </SelectContent>
                 </Select>
               </div>
+
+              {representantes.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Representante</Label>
+                  <Select
+                    value={formData.representante_id || "none"}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, representante_id: v === "none" ? "" : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhum representante" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">Nenhum representante</span>
+                      </SelectItem>
+                      {representantes.map((r: any) => (
+                        <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
