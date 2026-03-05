@@ -476,6 +476,8 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
   const temProfile = !!municipe?.representante_id && conviteUsado;
 
   const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nome) {
       toast({
         title: "Campo obrigatório",
         description: "O nome é obrigatório.",
