@@ -9,6 +9,7 @@ interface RegistrarHistoricoParams {
   posicao_anterior?: string | null;
   posicao_nova?: string | null;
   acao: "adicionado" | "movido" | "removido";
+  snapshot?: Record<string, unknown> | null;
 }
 
 /**
@@ -31,6 +32,7 @@ export async function registrarHistorico(params: RegistrarHistoricoParams) {
       posicao_nova: params.posicao_nova || null,
       acao: params.acao,
       movido_por: user?.id || null,
+      snapshot: params.snapshot || null,
     });
 
     if (error) {
@@ -63,6 +65,7 @@ export async function registrarHistoricoBatch(
       posicao_nova: params.posicao_nova || null,
       acao: params.acao,
       movido_por: user?.id || null,
+      snapshot: params.snapshot || null,
     }));
 
     const { error } = await supabase.from("kanban_historico").insert(records);
@@ -73,4 +76,125 @@ export async function registrarHistoricoBatch(
   } catch (err) {
     logError("Erro inesperado ao registrar histórico batch:", err);
   }
+}
+
+// ─── Snapshot de Tarefa ──────────────────────────────────────────────────────
+
+export interface TarefaSnapshot {
+  titulo: string;
+  descricao: string | null;
+  prioridade: string;
+  cor: string | null;
+  data_prazo: string | null;
+  kanban_position: string;
+  kanban_type: string;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+  responsavel: { id: string; nome: string } | null;
+  colaboradores: { id: string; nome: string }[];
+  checklist: { texto: string; concluido: boolean; ordem: number }[];
+  comentarios: { texto: string; autor_nome: string; created_at: string }[];
+}
+
+/**
+ * Captura um snapshot completo de uma tarefa antes de removê-la.
+ * Inclui: dados da tarefa, checklist, comentários e colaboradores.
+ * Retorna null se a tarefa não for encontrada (nunca bloqueia).
+ */
+export async function capturarSnapshotTarefa(
+  tarefaId: string
+): Promise<TarefaSnapshot | null> {
+  try {
+    // Buscar tarefa + responsável
+    const { data: tarefa, error: tarefaErr } = await supabase
+      .from("tarefas")
+      .select(`
+        titulo, descricao, prioridade, cor, data_prazo,
+        kanban_position, kanban_type, completed, completed_at, created_at,
+        responsavel:profiles!tarefas_responsavel_id_fkey(id, nome)
+      `)
+      .eq("id", tarefaId)
+      .single();
+
+    if (tarefaErr || !tarefa) return null;
+
+    // Buscar checklist
+    const { data: checklist = [] } = await supabase
+      .from("tarefa_checklist_items")
+      .select("texto, concluido, ordem")
+      .eq("tarefa_id", tarefaId)
+      .order("ordem", { ascending: true });
+
+    // Buscar comentários com autor
+    const { data: comentarios = [] } = await supabase
+      .from("tarefa_comentarios")
+      .select(`
+        texto, created_at,
+        autor:profiles!tarefa_comentarios_autor_id_fkey(nome)
+      `)
+      .eq("tarefa_id", tarefaId)
+      .order("created_at", { ascending: true });
+
+    // Buscar colaboradores
+    const { data: colaboradores = [] } = await supabase
+      .from("tarefa_colaboradores")
+      .select(`
+        colaborador:profiles!tarefa_colaboradores_colaborador_id_fkey(id, nome)
+      `)
+      .eq("tarefa_id", tarefaId);
+
+    return {
+      titulo: tarefa.titulo,
+      descricao: tarefa.descricao,
+      prioridade: tarefa.prioridade,
+      cor: tarefa.cor,
+      data_prazo: tarefa.data_prazo,
+      kanban_position: tarefa.kanban_position,
+      kanban_type: tarefa.kanban_type,
+      completed: tarefa.completed,
+      completed_at: tarefa.completed_at,
+      created_at: tarefa.created_at,
+      responsavel: tarefa.responsavel
+        ? { id: (tarefa.responsavel as any).id, nome: (tarefa.responsavel as any).nome }
+        : null,
+      colaboradores: (colaboradores || []).map((c: any) => ({
+        id: c.colaborador?.id || "",
+        nome: c.colaborador?.nome || "Desconhecido",
+      })),
+      checklist: (checklist || []).map((item: any) => ({
+        texto: item.texto,
+        concluido: item.concluido,
+        ordem: item.ordem,
+      })),
+      comentarios: (comentarios || []).map((c: any) => ({
+        texto: c.texto,
+        autor_nome: c.autor?.nome || "Desconhecido",
+        created_at: c.created_at,
+      })),
+    };
+  } catch (err) {
+    logError("Erro ao capturar snapshot da tarefa:", err);
+    return null;
+  }
+}
+
+/**
+ * Captura snapshots de múltiplas tarefas.
+ * Retorna um Map<tarefaId, snapshot>.
+ */
+export async function capturarSnapshotsTarefaBatch(
+  tarefaIds: string[]
+): Promise<Map<string, TarefaSnapshot>> {
+  const snapshots = new Map<string, TarefaSnapshot>();
+  
+  // Paralelizar as capturas para performance
+  const results = await Promise.allSettled(
+    tarefaIds.map(async (id) => {
+      const snapshot = await capturarSnapshotTarefa(id);
+      if (snapshot) snapshots.set(id, snapshot);
+    })
+  );
+
+  return snapshots;
 }
