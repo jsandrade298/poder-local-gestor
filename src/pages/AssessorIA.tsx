@@ -265,28 +265,35 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string; descrica
   },
 };
 
-const HISTORY_KEY = "assessor-ia-history";
-const MSGS_PREFIX = "assessor-ia-msgs-";
 const MAX_HISTORY = 20;
 
-function loadHistory(): HistoryItem[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; }
+// Chaves isoladas por tenant — evita vazamento de histórico entre gabinetes
+function historyKey(tenantId: string)  { return `assessor-ia-history-${tenantId}`; }
+function msgsKey(tenantId: string, convId: string) { return `assessor-ia-msgs-${tenantId}-${convId}`; }
+
+function loadHistory(tenantId: string | null): HistoryItem[] {
+  if (!tenantId) return [];
+  try { return JSON.parse(localStorage.getItem(historyKey(tenantId)) || "[]"); } catch { return []; }
 }
-function saveHistory(items: HistoryItem[]) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, MAX_HISTORY)));
+function saveHistory(tenantId: string | null, items: HistoryItem[]) {
+  if (!tenantId) return;
+  localStorage.setItem(historyKey(tenantId), JSON.stringify(items.slice(0, MAX_HISTORY)));
 }
-function saveMessages(convId: string, msgs: Message[]) {
-  try { localStorage.setItem(MSGS_PREFIX + convId, JSON.stringify(msgs)); } catch { /* quota */ }
+function saveMessages(tenantId: string | null, convId: string, msgs: Message[]) {
+  if (!tenantId) return;
+  try { localStorage.setItem(msgsKey(tenantId, convId), JSON.stringify(msgs)); } catch { /* quota */ }
 }
-function loadMessages(convId: string): Message[] {
+function loadMessages(tenantId: string | null, convId: string): Message[] {
+  if (!tenantId) return [];
   try {
-    const raw = localStorage.getItem(MSGS_PREFIX + convId);
+    const raw = localStorage.getItem(msgsKey(tenantId, convId));
     if (!raw) return [];
     return (JSON.parse(raw) as Message[]).map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
   } catch { return []; }
 }
-function deleteConvStorage(convId: string) {
-  localStorage.removeItem(MSGS_PREFIX + convId);
+function deleteConvStorage(tenantId: string | null, convId: string) {
+  if (!tenantId) return;
+  localStorage.removeItem(msgsKey(tenantId, convId));
 }
 function formatTimeLabel(ts: number): string {
   const d    = new Date(ts);
@@ -737,7 +744,7 @@ const AssessorIA = () => {
   const [anexosChat, setAnexosChat]                   = useState<AnexoChat[]>([]);
   const [activeMode, setActiveMode]                   = useState("redigir");
   const [demandaContext, setDemandaContext]            = useState<DemandaContext | null>(null);
-  const [history, setHistory]                         = useState<HistoryItem[]>(loadHistory);
+  const [history, setHistory]                         = useState<HistoryItem[]>([]);
   const [currentConvId, setCurrentConvId]             = useState<string>(Date.now().toString());
   const [vincularOpen, setVincularOpen]               = useState(false);
   const [showMemoriaPanel, setShowMemoriaPanel]       = useState(false);
@@ -768,6 +775,20 @@ const AssessorIA = () => {
         .then(({ data }) => setTenantId(data?.tenant_id || null));
     });
   }, []);
+
+  // ─── Ao trocar de tenant: limpar estado e recarregar histórico isolado ─────
+  useEffect(() => {
+    if (!tenantId) return;
+    setMessages([]);
+    setInputMessage("");
+    setDocumentosContexto([]);
+    setAnexosChat([]);
+    setDemandaContext(null);
+    setPendingToolSteps([]);
+    setCruzarGabinete(false);
+    setCurrentConvId(Date.now().toString());
+    setHistory(loadHistory(tenantId));
+  }, [tenantId]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading, pendingToolSteps]);
   useEffect(() => {
@@ -837,8 +858,8 @@ const AssessorIA = () => {
     };
     const updated = [item, ...history.filter((h) => h.id !== currentConvId)];
     setHistory(updated);
-    saveHistory(updated);
-    saveMessages(currentConvId, msgs);
+    saveHistory(tenantId, updated);
+    saveMessages(tenantId, currentConvId, msgs);
   };
 
   // ─── Extrair memórias ao encerrar conversa ────────────────────────────────
@@ -874,7 +895,7 @@ const AssessorIA = () => {
       persistHistory(messages, activeMode);
       triggerExtrairMemorias(messages, activeMode);
     }
-    setMessages(loadMessages(item.id));
+    setMessages(loadMessages(tenantId, item.id));
     setActiveMode(item.modeId);
     setCurrentConvId(item.id);
     setInputMessage("");
@@ -889,8 +910,8 @@ const AssessorIA = () => {
     e.stopPropagation();
     const updated = history.filter((h) => h.id !== itemId);
     setHistory(updated);
-    saveHistory(updated);
-    deleteConvStorage(itemId);
+    saveHistory(tenantId, updated);
+    deleteConvStorage(tenantId, itemId);
     if (currentConvId === itemId) {
       setMessages([]);
       setInputMessage("");
