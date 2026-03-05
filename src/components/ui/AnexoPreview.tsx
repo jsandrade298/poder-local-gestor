@@ -234,7 +234,7 @@ export function AnexoPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto p-0 gap-0 overflow-hidden [&>button]:hidden">
+      <DialogContent className={`max-w-[95vw] max-h-[95vh] p-0 gap-0 overflow-hidden [&>button]:hidden ${tipo === "pdf" ? "w-[95vw] sm:w-[90vw]" : "w-auto"}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm">
           <div className="flex items-center gap-2 min-w-0">
