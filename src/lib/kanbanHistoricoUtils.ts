@@ -106,18 +106,32 @@ export async function capturarSnapshotTarefa(
   tarefaId: string
 ): Promise<TarefaSnapshot | null> {
   try {
-    // Buscar tarefa + responsável
+    // Buscar tarefa (sem join no responsável — a FK aponta para auth.users, não profiles)
     const { data: tarefa, error: tarefaErr } = await supabase
       .from("tarefas")
       .select(`
         titulo, descricao, prioridade, cor, data_prazo,
         kanban_position, kanban_type, completed, completed_at, created_at,
-        responsavel:profiles!tarefas_responsavel_id_fkey(id, nome)
+        responsavel_id
       `)
       .eq("id", tarefaId)
       .single();
 
-    if (tarefaErr || !tarefa) return null;
+    if (tarefaErr || !tarefa) {
+      logError("Erro ao buscar tarefa para snapshot:", tarefaErr);
+      return null;
+    }
+
+    // Buscar nome do responsável via profiles (profiles.id = auth.users.id)
+    let responsavel: { id: string; nome: string } | null = null;
+    if (tarefa.responsavel_id) {
+      const { data: perfil } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .eq("id", tarefa.responsavel_id)
+        .single();
+      if (perfil) responsavel = { id: perfil.id, nome: perfil.nome };
+    }
 
     // Buscar checklist
     const { data: checklist = [] } = await supabase
@@ -155,9 +169,7 @@ export async function capturarSnapshotTarefa(
       completed: tarefa.completed,
       completed_at: tarefa.completed_at,
       created_at: tarefa.created_at,
-      responsavel: tarefa.responsavel
-        ? { id: (tarefa.responsavel as any).id, nome: (tarefa.responsavel as any).nome }
-        : null,
+      responsavel,
       colaboradores: (colaboradores || []).map((c: any) => ({
         id: c.colaborador?.id || "",
         nome: c.colaborador?.nome || "Desconhecido",
