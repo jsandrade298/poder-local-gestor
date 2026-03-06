@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Building, Lock, Mail, CheckCircle, AlertCircle, Loader2 } from "lucide-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type Estado = "validando" | "formulario" | "sucesso" | "erro";
+type Estado = "formulario" | "sucesso" | "erro_token";
 
 export default function ConviteRepresentante() {
   const [searchParams]  = useSearchParams();
@@ -17,44 +17,13 @@ export default function ConviteRepresentante() {
 
   const token = searchParams.get("token") || "";
 
-  const [estado, setEstado]         = useState<Estado>("validando");
-  const [nomeRepresentante, setNomeRepresentante] = useState("");
-  const [erroMensagem, setErroMensagem] = useState("");
+  const [estado, setEstado]         = useState<Estado>(token ? "formulario" : "erro_token");
   const [email, setEmail]           = useState("");
   const [senha, setSenha]           = useState("");
   const [confirmar, setConfirmar]   = useState("");
   const [isLoading, setIsLoading]   = useState(false);
+  const [erroMsg, setErroMsg]       = useState("");
 
-  // ── Validar token ao carregar ────────────────────────────────────────────
-  useEffect(() => {
-    if (!token) {
-      setErroMensagem("Link de convite inválido. Solicite um novo link ao gabinete.");
-      setEstado("erro");
-      return;
-    }
-
-    // Verificar token via função SQL (bypassa RLS para não-autenticados)
-    supabase
-      .rpc("validar_token_convite", { p_token: token })
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setErroMensagem("Convite inválido. Solicite um novo link ao gabinete.");
-          setEstado("erro");
-          return;
-        }
-
-        if (!data.valido) {
-          setErroMensagem(`${data.erro}. Solicite um novo link ao gabinete.`);
-          setEstado("erro");
-          return;
-        }
-
-        setNomeRepresentante(data.nome);
-        setEstado("formulario");
-      });
-  }, [token]);
-
-  // ── Submeter formulário ──────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!email.trim()) {
       toast({ title: "Informe seu email", variant: "destructive" });
@@ -77,27 +46,26 @@ export default function ConviteRepresentante() {
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || "Erro ao criar conta");
+        const msg = data?.error || error?.message || "Erro ao criar conta";
+        setErroMsg(msg);
+        toast({ title: "Erro", description: msg, variant: "destructive" });
+        return;
       }
 
       setEstado("sucesso");
     } catch (err: any) {
-      toast({
-        title: "Erro ao criar conta",
-        description: err.message,
-        variant: "destructive",
-      });
+      const msg = err.message || "Erro inesperado";
+      setErroMsg(msg);
+      toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
 
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center mx-auto mb-4">
             <Building className="h-8 w-8 text-white" />
@@ -109,28 +77,21 @@ export default function ConviteRepresentante() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg text-center">
-              {estado === "validando" && "Validando convite…"}
-              {estado === "formulario" && `Olá, ${nomeRepresentante.split(" ")[0]}!`}
+              {estado === "formulario" && "Ativar acesso de Representante"}
               {estado === "sucesso"    && "Conta criada com sucesso!"}
-              {estado === "erro"       && "Convite inválido"}
+              {estado === "erro_token" && "Link inválido"}
             </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-4">
 
-            {/* Validando */}
-            {estado === "validando" && (
-              <div className="flex flex-col items-center gap-3 py-6">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Verificando seu convite…</p>
-              </div>
-            )}
-
-            {/* Erro */}
-            {estado === "erro" && (
+            {/* Sem token na URL */}
+            {estado === "erro_token" && (
               <div className="flex flex-col items-center gap-3 py-4 text-center">
                 <AlertCircle className="w-10 h-10 text-destructive" />
-                <p className="text-sm text-muted-foreground">{erroMensagem}</p>
+                <p className="text-sm text-muted-foreground">
+                  Link de convite inválido ou expirado. Solicite um novo link ao gabinete.
+                </p>
                 <Button variant="outline" className="mt-2" onClick={() => navigate("/login")}>
                   Ir para o login
                 </Button>
@@ -195,11 +156,11 @@ export default function ConviteRepresentante() {
                   </div>
                 </div>
 
-                <Button
-                  className="w-full"
-                  onClick={handleSubmit}
-                  disabled={isLoading}
-                >
+                {erroMsg && (
+                  <p className="text-sm text-destructive text-center">{erroMsg}</p>
+                )}
+
+                <Button className="w-full" onClick={handleSubmit} disabled={isLoading}>
                   {isLoading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando conta…</>
                   ) : (
