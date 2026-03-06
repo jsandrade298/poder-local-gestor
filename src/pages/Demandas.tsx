@@ -32,7 +32,7 @@ export default function Demandas() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [areaFilter, setAreaFilter] = useState<string[]>([]);
-  const [municipeFilter, setMunicipeFilter] = useState("all");
+  const [municipeFilter, setMunicipeFilter] = useState<string[]>([]);
   const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
   const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
   const [bairroFilter, setBairroFilter] = useState<string[]>([]);
@@ -64,26 +64,36 @@ export default function Demandas() {
   // Hook de status dinâmicos
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
-  // Debounce do termo de busca
+  // Debounce do termo de busca — 600ms para não disparar query a cada tecla
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 300); // 300ms de delay
-
+    }, 600);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Chaves estáveis para arrays de filtros (evita re-render infinito)
   const statusKey = statusFilter.join(",");
   const areaKey = areaFilter.join(",");
+  const municipeKey = municipeFilter.join(",");
   const responsavelKey = responsavelFilter.join(",");
   const cidadeKey = cidadeFilter.join(",");
   const bairroKey = bairroFilter.join(",");
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeFilter, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
+    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
     queryFn: async () => {
+      // Se há termo de busca, resolver IDs de munícipes que correspondem ao nome
+      let municipeIdsFromSearch: string[] = [];
+      if (debouncedSearchTerm) {
+        const term = `%${debouncedSearchTerm}%`;
+        const { data: matchingMunicipes } = await supabase
+          .from('municipes')
+          .select('id')
+          .ilike('nome', term);
+        municipeIdsFromSearch = (matchingMunicipes || []).map((m: any) => m.id);
+      }
+
       // Construir query com filtros server-side
       const buildQuery = () => {
         let query = supabase
@@ -98,7 +108,7 @@ export default function Demandas() {
         // Filtros: delegar ao PostgreSQL
         if (statusFilter.length > 0) query = query.in('status', statusFilter);
         if (areaFilter.length > 0) query = query.in('area_id', areaFilter);
-        if (municipeFilter !== "all") query = query.eq('municipe_id', municipeFilter);
+        if (municipeFilter.length > 0) query = query.in('municipe_id', municipeFilter);
         if (responsavelFilter.length > 0) query = query.in('responsavel_id', responsavelFilter);
         if (cidadeFilter.length > 0) query = query.in('cidade', cidadeFilter);
         if (bairroFilter.length > 0) query = query.in('bairro', bairroFilter);
@@ -125,11 +135,18 @@ export default function Demandas() {
         if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
         if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
 
-        // Busca por texto — server-side via ilike no título e protocolo
-        // (municipes.nome não suporta ilike direto em join, mas título+protocolo cobre 95% dos casos)
+        // Busca por texto — OR entre título, protocolo e IDs de munícipes que batem no nome
         if (debouncedSearchTerm) {
           const term = `%${debouncedSearchTerm}%`;
-          query = query.or(`titulo.ilike.${term},protocolo.ilike.${term}`);
+          if (municipeIdsFromSearch.length > 0) {
+            // Há munícipes com esse nome: OR entre título, protocolo e municipe_id
+            const municipeOrClauses = municipeIdsFromSearch
+              .map(id => `municipe_id.eq.${id}`)
+              .join(',');
+            query = query.or(`titulo.ilike.${term},protocolo.ilike.${term},${municipeOrClauses}`);
+          } else {
+            query = query.or(`titulo.ilike.${term},protocolo.ilike.${term}`);
+          }
         }
 
         return query;
@@ -292,6 +309,20 @@ export default function Demandas() {
     }
   });
 
+  // Query dedicada de munícipes para o filtro (id + nome, ordenado)
+  const { data: municipesList = [] } = useQuery({
+    queryKey: ['municipes-filtro-demandas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipes')
+        .select('id, nome')
+        .order('nome');
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: bairros = [] } = useQuery({
     queryKey: ['bairros-demandas'],
     queryFn: async () => {
@@ -330,24 +361,9 @@ export default function Demandas() {
     }
   };
 
-  // Busca por texto:
-  // - pageSize === "all": todos os registros estão em memória → filtro client-side inclui municipes.nome
-  // - pageSize === número: busca já vai server-side via ilike → apenas aplica filtro de municipes.nome extra
-  const filteredDemandas = useMemo(() => {
-    if (!debouncedSearchTerm) return demandas;
-    if (pageSize !== "all") {
-      // Server-side já filtrou titulo e protocolo; aqui só acrescenta nome do munícipe
-      const term = debouncedSearchTerm.toLowerCase();
-      return demandas.filter(d => d.municipes?.nome?.toLowerCase().includes(term));
-    }
-    // pageSize === "all": filtro completo em memória
-    const term = debouncedSearchTerm.toLowerCase();
-    return demandas.filter(d =>
-      d.titulo?.toLowerCase().includes(term) ||
-      d.protocolo?.toLowerCase().includes(term) ||
-      d.municipes?.nome?.toLowerCase().includes(term)
-    );
-  }, [demandas, debouncedSearchTerm, pageSize]);
+  // Busca já é totalmente server-side (título + protocolo + municipe_id)
+  // filteredDemandas é igual a demandas — mantido por compatibilidade com o restante do código
+  const filteredDemandas = demandas;
 
   // Paginação
   const paginatedDemandas = filteredDemandas;
@@ -356,7 +372,7 @@ export default function Demandas() {
   // Resetar página quando mudar filtros ou pageSize
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusKey, areaKey, municipeFilter, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize]);
+  }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize]);
 
 
   // Mutação para excluir demanda
@@ -430,7 +446,7 @@ export default function Demandas() {
     setDebouncedSearchTerm("");
     setStatusFilter([]);
     setAreaFilter([]);
-    setMunicipeFilter("all");
+    setMunicipeFilter([]);
     setResponsavelFilter([]);
     setCidadeFilter([]);
     setBairroFilter([]);
@@ -443,7 +459,7 @@ export default function Demandas() {
   const activeFilterCount = [
     statusFilter.length > 0,
     areaFilter.length > 0,
-    municipeFilter !== "all",
+    municipeFilter.length > 0,
     responsavelFilter.length > 0,
     cidadeFilter.length > 0,
     bairroFilter.length > 0,
@@ -1492,21 +1508,13 @@ export default function Demandas() {
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Munícipe
                 </label>
-                <Select value={municipeFilter} onValueChange={setMunicipeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os munícipes</SelectItem>
-                    {demandas.map((demanda) => demanda.municipes).filter((municipe, index, self) => 
-                      municipe && self.findIndex(m => m?.nome === municipe.nome) === index
-                    ).map((municipe) => (
-                      <SelectItem key={municipe?.nome} value={demandas.find(d => d.municipes?.nome === municipe?.nome)?.municipe_id || ""}>
-                        {municipe?.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  options={municipesList.map((m) => ({ value: m.id, label: m.nome }))}
+                  selected={municipeFilter}
+                  onChange={setMunicipeFilter}
+                  placeholder="Todos os munícipes"
+                  searchPlaceholder="Buscar munícipe…"
+                />
               </div>
 
               <div>
