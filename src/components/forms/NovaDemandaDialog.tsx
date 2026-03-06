@@ -137,9 +137,8 @@ export function NovaDemandaDialog() {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).filter(file => 
         file.type === 'application/pdf' || 
-        file.type === 'image/jpeg' || 
-        file.type === 'image/png' || 
-        file.type === 'image/jpg'
+        file.type.startsWith('image/') || 
+        file.type.startsWith('video/')
       );
       setFiles(prev => [...prev, ...newFiles]);
     }
@@ -690,13 +689,13 @@ export function NovaDemandaDialog() {
                 <input
                   id="file-upload"
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.ogg,.mov,.avi,.mkv,.m4v"
                   multiple
                   onChange={handleFileChange}
                   className="hidden"
                 />
               </label>
-              <span className="text-xs text-muted-foreground">PDF, JPG, PNG (máx. 10MB cada)</span>
+              <span className="text-xs text-muted-foreground">PDF, imagens e vídeos (máx. 50MB cada)</span>
             </div>
 
             {files.length > 0 && (
