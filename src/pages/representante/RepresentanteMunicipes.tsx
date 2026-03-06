@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,12 @@ import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
 import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
-import { Search, MapPin, Phone, FileText, Users, Eye, Edit, SlidersHorizontal, X } from "lucide-react";
+import { Search, MapPin, Phone, FileText, Users, Eye, Edit, SlidersHorizontal, X, Inbox } from "lucide-react";
 
 export default function RepresentanteMunicipes() {
+  const { user } = useAuth();
+  const uid = user?.id;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [debounced, setDebounced] = useState("");
   const [bairroFilter, setBairroFilter] = useState("todos");
@@ -28,12 +32,17 @@ export default function RepresentanteMunicipes() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
+  // ═══════════════════════════════════════════════════════════
+  // FIX: Filtrar por representante_id = uid (profile.id do representante)
+  // ═══════════════════════════════════════════════════════════
   const { data: municipes = [], isLoading } = useQuery({
-    queryKey: ["rep-municipes", debounced, bairroFilter, cidadeFilter],
+    queryKey: ["rep-municipes", uid, debounced, bairroFilter, cidadeFilter],
+    enabled: !!uid,
     queryFn: async () => {
       let query = supabase
         .from("municipes")
-        .select("id, nome, telefone, email, bairro, cidade, estado, criado_em, categoria_id")
+        .select("id, nome, telefone, email, bairro, cidade, estado, created_at, categoria_id")
+        .eq("representante_id", uid!)
         .order("nome");
 
       if (debounced) {
@@ -47,14 +56,13 @@ export default function RepresentanteMunicipes() {
     },
   });
 
-  // Listas para filtros
   const bairros = [...new Set(municipes.map((m: any) => m.bairro).filter(Boolean))].sort();
   const cidades = [...new Set(municipes.map((m: any) => m.cidade).filter(Boolean))].sort();
-
   const activeFilters = [bairroFilter !== "todos", cidadeFilter !== "todos"].filter(Boolean).length;
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -62,7 +70,7 @@ export default function RepresentanteMunicipes() {
             Meus Munícipes
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {municipes.length} munícipe{municipes.length !== 1 ? "s" : ""}
+            {municipes.length} munícipe{municipes.length !== 1 ? "s" : ""} vinculado{municipes.length !== 1 ? "s" : ""} a você
           </p>
         </div>
         <NovoMunicipeDialog />
@@ -124,19 +132,24 @@ export default function RepresentanteMunicipes() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : municipes.length === 0 ? (
-        <Card>
+        <Card className="border-dashed">
           <CardContent className="py-12 text-center">
-            <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <p className="text-muted-foreground">
+            <Inbox className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+            <h3 className="text-base font-medium mb-1">
               {debounced || activeFilters > 0 ? "Nenhum resultado para esta busca" : "Nenhum munícipe cadastrado ainda"}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {debounced || activeFilters > 0
+                ? "Tente ajustar os filtros ou a busca"
+                : "Comece cadastrando seu primeiro munícipe"}
             </p>
-            {!debounced && activeFilters === 0 && <div className="mt-4"><NovoMunicipeDialog /></div>}
+            {!debounced && activeFilters === 0 && <NovoMunicipeDialog />}
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {municipes.map((m: any) => (
-            <Card key={m.id} className="hover:shadow-md transition-shadow">
+            <Card key={m.id} className="hover:shadow-md transition-all">
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
