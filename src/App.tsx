@@ -39,6 +39,7 @@ import RepresentanteDashboard from "./pages/representante/RepresentanteDashboard
 import RepresentanteMunicipes from "./pages/representante/RepresentanteMunicipes";
 import RepresentanteDemandas from "./pages/representante/RepresentanteDemandas";
 import RepresentanteAgenda from "./pages/representante/RepresentanteAgenda";
+import RepresentanteMapa from "./pages/representante/RepresentanteMapa";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="/rep/municipes" element={<RepresentanteMunicipes />} />
               <Route path="/rep/demandas" element={<RepresentanteDemandas />} />
               <Route path="/rep/agenda" element={<RepresentanteAgenda />} />
+              <Route path="/rep/mapa" element={<RepresentanteMapa />} />
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
