@@ -14,6 +14,7 @@ import { useBrasilAPI } from "@/hooks/useBrasilAPI";
 import { useGeocoding } from "@/hooks/useGeocoding";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CriarDemandaAposCadastroDialogProps {
   open: boolean;
@@ -28,6 +29,9 @@ export function CriarDemandaAposCadastroDialog({
   municipeId, 
   municipeName 
 }: CriarDemandaAposCadastroDialogProps) {
+  const { user: authUser, roleNoTenant } = useAuth();
+  const isRepresentante = roleNoTenant === "representante";
+
   const [files, setFiles] = useState<File[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [formData, setFormData] = useState({
@@ -241,7 +245,8 @@ export function CriarDemandaAposCadastroDialog({
         municipe_id: municipeId,
         area_id: data.area_id || null,
         responsavel_id: data.responsavel_id || null,
-        representante_id: data.representante_id || null,
+        // FIX: Se o usuário é representante, forçar representante_id = user.id
+        representante_id: isRepresentante ? authUser?.id : (data.representante_id || null),
         data_prazo: data.data_prazo || null,
         logradouro: data.logradouro || null,
         numero: data.numero || null,
@@ -280,6 +285,10 @@ export function CriarDemandaAposCadastroDialog({
         description: `Demanda ${demanda.protocolo} vinculada ao munícipe ${municipeName}.`
       });
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
+      // FIX: Invalidar queries do portal do representante
+      queryClient.invalidateQueries({ queryKey: ['rep-demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-recentes'] });
       handleClose();
     },
     onError: (error) => {
@@ -439,6 +448,15 @@ export function CriarDemandaAposCadastroDialog({
                 </Select>
               </div>
 
+              {/* FIX: Representante logado não vê o seletor — é auto-preenchido */}
+              {isRepresentante ? (
+                <div className="space-y-2">
+                  <Label>Representante</Label>
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted/50 text-sm text-muted-foreground">
+                    Vinculada automaticamente a você
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-2">
                 <Label>Representante</Label>
                 <Select
@@ -456,6 +474,7 @@ export function CriarDemandaAposCadastroDialog({
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
