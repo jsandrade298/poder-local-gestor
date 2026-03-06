@@ -191,9 +191,8 @@ export function CriarDemandaAposCadastroDialog({
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).filter(file => 
         file.type === 'application/pdf' || 
-        file.type === 'image/jpeg' || 
-        file.type === 'image/png' || 
-        file.type === 'image/jpg'
+        file.type.startsWith('image/') || 
+        file.type.startsWith('video/')
       );
       setFiles(prev => [...prev, ...newFiles]);
     }
@@ -613,8 +612,8 @@ export function CriarDemandaAposCadastroDialog({
             <h3 className="text-lg font-semibold">Anexos</h3>
 
             <div className="space-y-2">
-              <Label htmlFor="files">Arquivos (PDF, JPG, PNG)</Label>
-              <Input id="files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} className="cursor-pointer" />
+              <Label htmlFor="files">Arquivos (PDF, imagens e vídeos)</Label>
+              <Input id="files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.ogg,.mov,.avi,.mkv,.m4v" onChange={handleFileChange} className="cursor-pointer" />
             </div>
 
             {files.length > 0 && (
