@@ -24,6 +24,11 @@ interface MunicipeComboboxProps {
   /** Nome pré-resolvido para evitar fetch ao abrir (ex: demanda.municipes?.nome) */
   initialDisplayName?: string;
   className?: string;
+  /**
+   * FIX: Se informado, filtra munícipes apenas do representante.
+   * Usado quando o representante está criando demandas.
+   */
+  representanteId?: string | null;
 }
 
 // ─── Debounce hook ───────────────────────────────────────────
@@ -47,6 +52,7 @@ export function MunicipeCombobox({
   disabled = false,
   initialDisplayName,
   className,
+  representanteId,
 }: MunicipeComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -67,17 +73,14 @@ export function MunicipeCombobox({
       return;
     }
 
-    // Se já resolveu este ID, não buscar de novo
     if (resolvedIdRef.current === value && selectedDisplay?.id === value) return;
 
-    // Se temos nome passado como prop, usar direto
     if (initialDisplayName) {
       setSelectedDisplay({ id: value, nome: initialDisplayName });
       resolvedIdRef.current = value;
       return;
     }
 
-    // Buscar no banco
     const resolve = async () => {
       const { data } = await supabase
         .from("municipes")
@@ -108,6 +111,14 @@ export function MunicipeCombobox({
           .order("nome")
           .limit(30);
 
+        // ═══════════════════════════════════════════════════════
+        // FIX: Se representanteId informado, filtrar apenas os
+        // munícipes vinculados a esse representante
+        // ═══════════════════════════════════════════════════════
+        if (representanteId) {
+          query = query.eq("representante_id", representanteId);
+        }
+
         if (debouncedSearch.trim().length > 0) {
           const term = `%${debouncedSearch.trim()}%`;
           query = query.or(`nome.ilike.${term},telefone.ilike.${term},bairro.ilike.${term}`);
@@ -125,7 +136,7 @@ export function MunicipeCombobox({
     };
 
     fetchResults();
-  }, [debouncedSearch, open]);
+  }, [debouncedSearch, open, representanteId]);
 
   // ──────────────────────────────────────────────
   // 3) Handlers
@@ -259,7 +270,6 @@ export function MunicipeCombobox({
               </CommandGroup>
             )}
 
-            {/* Botão "Cadastrar novo" */}
             {onCreateNew && (
               <>
                 <CommandSeparator />
