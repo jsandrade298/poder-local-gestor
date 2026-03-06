@@ -14,8 +14,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function NovaDemandaDialog() {
+  const { user, roleNoTenant } = useAuth();
+  const isRepresentante = roleNoTenant === "representante";
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -218,7 +221,8 @@ export function NovaDemandaDialog() {
         ...data,
         area_id: data.area_id || null,
         responsavel_id: data.responsavel_id || null,
-        representante_id: data.representante_id || null,
+        // FIX: Se o usuário é representante, forçar representante_id = user.id
+        representante_id: isRepresentante ? user?.id : (data.representante_id || null),
         data_prazo: data.data_prazo || null,
         logradouro: data.logradouro || null,
         numero: data.numero || null,
@@ -284,6 +288,11 @@ export function NovaDemandaDialog() {
       });
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
       queryClient.invalidateQueries({ queryKey: ['demandas-mapa-all'] });
+      // FIX: Invalidar queries do portal do representante
+      queryClient.invalidateQueries({ queryKey: ['rep-demandas'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-chart-data'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-recentes'] });
       setOpen(false);
       resetForm();
     },
@@ -384,6 +393,7 @@ export function NovaDemandaDialog() {
                   value={formData.municipe_id}
                   onChange={(id) => setFormData(prev => ({ ...prev, municipe_id: id }))}
                   placeholder="Buscar por nome, telefone ou bairro..."
+                  representanteId={isRepresentante ? user?.id : undefined}
                 />
               </div>
 
@@ -438,6 +448,15 @@ export function NovaDemandaDialog() {
                 </Select>
               </div>
 
+              {/* FIX: Representante logado não vê o seletor — é auto-preenchido */}
+              {isRepresentante ? (
+                <div className="space-y-2">
+                  <Label>Representante</Label>
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted/50 text-sm text-muted-foreground">
+                    Vinculada automaticamente a você
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-2">
                 <Label>Representante</Label>
                 <Select
@@ -457,6 +476,7 @@ export function NovaDemandaDialog() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
