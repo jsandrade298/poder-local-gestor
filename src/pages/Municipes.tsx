@@ -209,21 +209,53 @@ export default function Municipes() {
     return all;
   };
 
-  // Buscar contagem de demandas por munícipe e status (leve: só IDs e status)
+  // Buscar contagem de demandas por munícipe e status via RPC (sem limite de 1000 linhas)
   const { data: demandasData = { countMap: new Map(), statusMap: new Map() } } = useQuery({
     queryKey: ['demandas-count-by-municipe'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select('municipe_id, status');
-      if (error) throw error;
+      // Tentar usar RPC agregada (mais eficiente)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_demandas_count_por_municipe');
+      
       const countMap = new Map<string, number>();
       const statusMap = new Map<string, Set<string>>();
-      (data || []).forEach((d: any) => {
-        countMap.set(d.municipe_id, (countMap.get(d.municipe_id) || 0) + 1);
-        if (!statusMap.has(d.municipe_id)) statusMap.set(d.municipe_id, new Set());
-        statusMap.get(d.municipe_id)!.add(d.status || 'solicitada');
-      });
+
+      if (!rpcError && rpcData) {
+        // RPC retorna { municipe_id, total, statuses[] }
+        (rpcData as any[]).forEach((d: any) => {
+          countMap.set(d.municipe_id, Number(d.total));
+          const statusSet = new Set<string>();
+          (d.statuses || []).forEach((s: string) => statusSet.add(s || 'solicitada'));
+          statusMap.set(d.municipe_id, statusSet);
+        });
+      } else {
+        // Fallback: buscar em lotes caso a RPC não exista ainda
+        console.warn('⚠️ RPC get_demandas_count_por_municipe não disponível, usando fallback em lotes');
+        const BATCH = 1000;
+        let all: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('demandas')
+            .select('municipe_id, status')
+            .range(from, from + BATCH - 1);
+          if (error) throw error;
+          if (data && data.length > 0) {
+            all.push(...data);
+            from += BATCH;
+            hasMore = data.length === BATCH;
+          } else {
+            hasMore = false;
+          }
+        }
+        all.forEach((d: any) => {
+          countMap.set(d.municipe_id, (countMap.get(d.municipe_id) || 0) + 1);
+          if (!statusMap.has(d.municipe_id)) statusMap.set(d.municipe_id, new Set());
+          statusMap.get(d.municipe_id)!.add(d.status || 'solicitada');
+        });
+      }
+      
       return { countMap, statusMap };
     },
     staleTime: 5 * 60 * 1000,
@@ -233,39 +265,79 @@ export default function Municipes() {
   const demandasCountMap = demandasData.countMap;
   const demandasStatusMap = demandasData.statusMap;
 
-  // Buscar cidades únicas para o filtro
+  // Buscar cidades únicas para o filtro via RPC (sem limite de 1000 linhas)
   const { data: cidades = [] } = useQuery({
     queryKey: ['cidades-municipes'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('cidade')
-        .not('cidade', 'is', null)
-        .order('cidade');
+      // Tentar usar RPC (retorna valores distintos sem limite)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_distinct_cidades');
       
-      if (error) throw error;
-      
-      // Extrair cidades únicas
-      const cidadesUnicas = [...new Set(data.map(item => item.cidade))];
-      return cidadesUnicas.filter(Boolean).sort();
+      if (!rpcError && rpcData) {
+        return (rpcData as any[]).map((item: any) => item.cidade).filter(Boolean).sort();
+      }
+
+      // Fallback: buscar em lotes caso a RPC não exista ainda
+      console.warn('⚠️ RPC get_distinct_cidades não disponível, usando fallback em lotes');
+      const BATCH = 1000;
+      const allCidades = new Set<string>();
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('municipes')
+          .select('cidade')
+          .not('cidade', 'is', null)
+          .order('cidade')
+          .range(from, from + BATCH - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          data.forEach(item => { if (item.cidade) allCidades.add(item.cidade); });
+          from += BATCH;
+          hasMore = data.length === BATCH;
+        } else {
+          hasMore = false;
+        }
+      }
+      return Array.from(allCidades).sort();
     }
   });
 
-  // Buscar bairros únicos para o filtro
+  // Buscar bairros únicos para o filtro via RPC (sem limite de 1000 linhas)
   const { data: bairros = [] } = useQuery({
     queryKey: ['bairros-municipes'], 
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('bairro')
-        .not('bairro', 'is', null)
-        .order('bairro');
+      // Tentar usar RPC (retorna valores distintos sem limite)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_distinct_bairros');
       
-      if (error) throw error;
-      
-      // Extrair bairros únicos
-      const bairrosUnicos = [...new Set(data.map(item => item.bairro))];
-      return bairrosUnicos.filter(Boolean).sort();
+      if (!rpcError && rpcData) {
+        return (rpcData as any[]).map((item: any) => item.bairro).filter(Boolean).sort();
+      }
+
+      // Fallback: buscar em lotes caso a RPC não exista ainda
+      console.warn('⚠️ RPC get_distinct_bairros não disponível, usando fallback em lotes');
+      const BATCH = 1000;
+      const allBairros = new Set<string>();
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('municipes')
+          .select('bairro')
+          .not('bairro', 'is', null)
+          .order('bairro')
+          .range(from, from + BATCH - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          data.forEach(item => { if (item.bairro) allBairros.add(item.bairro); });
+          from += BATCH;
+          hasMore = data.length === BATCH;
+        } else {
+          hasMore = false;
+        }
+      }
+      return Array.from(allBairros).sort();
     }
   });
 
