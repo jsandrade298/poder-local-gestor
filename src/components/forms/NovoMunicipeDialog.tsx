@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { CriarDemandaAposCadastroDialog } from "./CriarDemandaAposCadastroDialog";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Mapeamento de ícones de categoria
 const categoriaIcons: Record<string, any> = {
@@ -30,6 +31,9 @@ const categoriaIcons: Record<string, any> = {
 };
 
 export function NovoMunicipeDialog() {
+  const { user, roleNoTenant } = useAuth();
+  const isRepresentante = roleNoTenant === "representante";
+
   const [open, setOpen] = useState(false);
   const [demandaDialogOpen, setDemandaDialogOpen] = useState(false);
   const [createdMunicipe, setCreatedMunicipe] = useState<{ id: string; nome: string } | null>(null);
@@ -234,7 +238,8 @@ export function NovoMunicipeDialog() {
           data_nascimento: data.data_nascimento || null,
           observacoes: data.observacoes || null,
           categoria_id: data.categoria_id || null,
-          representante_id: data.representante_id || null,
+          // FIX: Se o usuário é representante, forçar representante_id = user.id
+          representante_id: isRepresentante ? user?.id : (data.representante_id || null),
           // Coordenadas obtidas pela geocodificação
           latitude,
           longitude,
@@ -268,6 +273,10 @@ export function NovoMunicipeDialog() {
       queryClient.invalidateQueries({ queryKey: ['municipes-complete'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['municipes-select'] });
+      // FIX: Invalidar queries do portal do representante
+      queryClient.invalidateQueries({ queryKey: ['rep-municipes'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['rep-dashboard-aniversarios'] });
       setOpen(false);
       setFormData({
         nome: "",
@@ -529,6 +538,18 @@ export function NovoMunicipeDialog() {
               <h3 className="text-lg font-semibold">Informações Adicionais</h3>
 
               {/* Representante Responsável */}
+              {/* FIX: Representante logado não vê o seletor — é auto-preenchido */}
+              {isRepresentante ? (
+                <div className="space-y-2">
+                  <Label>Representante Responsável</Label>
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted/50 text-sm text-muted-foreground">
+                    Vinculado automaticamente a você
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Este munícipe ficará vinculado ao seu acesso de representante.
+                  </p>
+                </div>
+              ) : (
               <div className="space-y-2">
                 <Label>Representante Responsável</Label>
                 <Select
@@ -551,6 +572,7 @@ export function NovoMunicipeDialog() {
                   O representante designado poderá ver este munícipe e suas demandas vinculadas.
                 </p>
               </div>
+              )}
 
               {/* Categoria */}
               <div className="space-y-2">
