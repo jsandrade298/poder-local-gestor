@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData, type RecentesDias } from "@/hooks/useDashboardData";
+import { useRepresentanteDashboardData, type RecentesDias } from "@/hooks/useRepresentanteDashboardData";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { HumorometroCard } from "@/components/dashboard/HumorometroCard";
 import { FunilStatusChart } from "@/components/dashboard/FunilStatusChart";
@@ -30,7 +30,7 @@ export default function RepresentanteDashboard() {
     kpis, humor, charts, recentes, aniversariantes,
     recentesDias, setRecentesDias,
     isLoading, getStatusLabel, getStatusColor,
-  } = useDashboardData();
+  } = useRepresentanteDashboardData();
 
   if (isLoading) {
     return (
