@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
-import { Download, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Eye, FileText, Image as ImageIcon, Video, Loader2 } from "lucide-react";
+import { Download, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Eye, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────────
@@ -22,11 +23,10 @@ interface AnexoPreviewDialogProps {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-function getFileType(nomeArquivo: string, tipoArquivo?: string): "image" | "pdf" | "video" | "other" {
+function getFileType(nomeArquivo: string, tipoArquivo?: string): "image" | "pdf" | "other" {
   const ext = nomeArquivo?.toLowerCase().split(".").pop() || "";
   if (tipoArquivo?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
   if (tipoArquivo === "application/pdf" || ext === "pdf") return "pdf";
-  if (tipoArquivo?.startsWith("video/") || ["mp4", "webm", "ogg", "mov", "avi", "mkv", "m4v"].includes(ext)) return "video";
   return "other";
 }
 
@@ -34,13 +34,11 @@ export function getFileTypeIcon(nomeArquivo: string, tipoArquivo?: string) {
   const tipo = getFileType(nomeArquivo, tipoArquivo);
   if (tipo === "image") return <ImageIcon className="h-4 w-4 text-blue-500" />;
   if (tipo === "pdf") return <FileText className="h-4 w-4 text-red-500" />;
-  if (tipo === "video") return <Video className="h-4 w-4 text-purple-500" />;
   return <FileText className="h-4 w-4 text-muted-foreground" />;
 }
 
 export function isPreviewable(nomeArquivo: string, tipoArquivo?: string): boolean {
-  const t = getFileType(nomeArquivo, tipoArquivo);
-  return t === "image" || t === "pdf" || t === "video";
+  return getFileType(nomeArquivo, tipoArquivo) !== "other";
 }
 
 // ─── Thumbnail para arquivos locais (File) ──────────────────────────────────────
@@ -81,17 +79,6 @@ export function LocalFileThumbnail({ file, onClick, className = "" }: LocalFileT
         className={`h-10 w-10 rounded bg-red-50 dark:bg-red-950/30 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${className}`}
       >
         <FileText className="h-5 w-5 text-red-500" />
-      </div>
-    );
-  }
-
-  if (tipo === "video") {
-    return (
-      <div
-        onClick={onClick}
-        className={`h-10 w-10 rounded bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${className}`}
-      >
-        <Video className="h-5 w-5 text-purple-500" />
       </div>
     );
   }
@@ -144,17 +131,6 @@ export function StorageAnexoThumbnail({ anexo, onClick, className = "" }: Storag
         className={`h-10 w-10 rounded bg-red-50 dark:bg-red-950/30 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${className}`}
       >
         <FileText className="h-5 w-5 text-red-500" />
-      </div>
-    );
-  }
-
-  if (tipo === "video") {
-    return (
-      <div
-        onClick={onClick}
-        className={`h-10 w-10 rounded bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ${className}`}
-      >
-        <Video className="h-5 w-5 text-purple-500" />
       </div>
     );
   }
@@ -260,6 +236,10 @@ export function AnexoPreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-w-[95vw] max-h-[95vh] p-0 gap-0 overflow-hidden [&>button]:hidden ${tipo === "pdf" ? "w-[95vw] sm:w-[90vw]" : "w-auto"}`}>
+        <VisuallyHidden>
+          <DialogTitle>{nome || "Preview de anexo"}</DialogTitle>
+          <DialogDescription>Visualização do arquivo {nome}</DialogDescription>
+        </VisuallyHidden>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm">
           <div className="flex items-center gap-2 min-w-0">
@@ -311,18 +291,6 @@ export function AnexoPreviewDialog({
               title={nome}
               className="w-full h-[calc(95vh-56px)] border-0"
             />
-          ) : tipo === "video" && previewUrl ? (
-            <div className="flex items-center justify-center w-full h-full p-4">
-              <video
-                src={previewUrl}
-                controls
-                autoPlay={false}
-                className="max-w-full max-h-[calc(95vh-80px)] rounded-md shadow-lg"
-                style={{ maxHeight: "calc(95vh - 80px)" }}
-              >
-                Seu navegador não suporta reprodução de vídeo.
-              </video>
-            </div>
           ) : (
             <div className="flex flex-col items-center gap-4 py-20">
               <FileText className="h-16 w-16 text-muted-foreground/50" />
