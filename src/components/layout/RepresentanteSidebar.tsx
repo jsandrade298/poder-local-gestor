@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, FileText, UserCheck } from "lucide-react";
+import { Home, Users, FileText, Calendar, UserCheck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ const menuItems = [
   { title: "Início",     url: "/rep",          icon: Home },
   { title: "Demandas",   url: "/rep/demandas",  icon: FileText },
   { title: "Munícipes",  url: "/rep/municipes", icon: Users },
+  { title: "Agenda",     url: "/rep/agenda",    icon: Calendar },
 ];
 
 export function RepresentanteSidebar() {
