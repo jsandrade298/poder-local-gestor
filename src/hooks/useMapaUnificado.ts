@@ -216,7 +216,7 @@ export function useMapaUnificado() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Buscar demandas
+  // Buscar demandas — em lotes para ultrapassar limite de 1000 do PostgREST
   const { 
     data: demandasRaw = [], 
     isLoading: isLoadingDemandas,
@@ -224,42 +224,61 @@ export function useMapaUnificado() {
   } = useQuery({
     queryKey: ['mapa-demandas-todas'],
     queryFn: async () => {
-      console.log('🔄 [MAPA] Buscando todas as demandas...');
+      console.log('🔄 [MAPA] Buscando todas as demandas (em lotes)...');
       
-      const { data, error } = await supabase
-        .from('demandas')
-        .select(`
-          id,
-          titulo,
-          descricao,
-          status,
-          prioridade,
-          protocolo,
-          latitude,
-          longitude,
-          bairro,
-          logradouro,
-          numero,
-          cidade,
-          cep,
-          area_id,
-          municipe_id,
-          responsavel_id,
-          data_prazo,
-          created_at,
-          areas (id, nome, cor),
-          municipes (id, nome, telefone, bairro, cidade, latitude, longitude)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('❌ [MAPA] Erro ao buscar demandas:', error);
-        return [];
+      const BATCH_SIZE = 1000;
+      let allData: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('demandas')
+          .select(`
+            id,
+            titulo,
+            descricao,
+            status,
+            prioridade,
+            protocolo,
+            latitude,
+            longitude,
+            bairro,
+            logradouro,
+            numero,
+            cidade,
+            cep,
+            area_id,
+            municipe_id,
+            responsavel_id,
+            data_prazo,
+            created_at,
+            areas (id, nome, cor),
+            municipes (id, nome, telefone, bairro, cidade, latitude, longitude)
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, from + BATCH_SIZE - 1);
+        
+        if (error) {
+          console.error('❌ [MAPA] Erro ao buscar demandas:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allData.push(...data);
+          from += BATCH_SIZE;
+          hasMore = data.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+
+        // Safety limit
+        if (from > 100000) hasMore = false;
       }
       
-      console.log(`📊 [MAPA] Demandas retornadas do banco: ${data?.length || 0}`);
+      console.log(`📊 [MAPA] Demandas retornadas do banco: ${allData.length}`);
       
-      const processadas = (data || []).map(d => {
+      const processadas = allData.map(d => {
         // Tentar usar coordenadas da demanda, senão do munícipe
         let lat = d.latitude;
         let lng = d.longitude;
@@ -320,7 +339,7 @@ export function useMapaUnificado() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Buscar munícipes — com join para tags (query única ao invés de 3 sequenciais)
+  // Buscar munícipes — em lotes com join para tags (ultrapassar limite de 1000)
   const { 
     data: municipesRaw = [], 
     isLoading: isLoadingMunicipes,
@@ -328,46 +347,81 @@ export function useMapaUnificado() {
   } = useQuery({
     queryKey: ['mapa-municipes-todos'],
     queryFn: async () => {
-      console.log('🔄 [MAPA] Buscando munícipes com tags (query única)...');
+      console.log('🔄 [MAPA] Buscando munícipes com tags (em lotes)...');
       
-      // Query única com join — substitui 3 queries sequenciais
-      const { data, error } = await supabase
-        .from('municipes')
-        .select(`
-          id,
-          nome,
-          telefone,
-          email,
-          latitude,
-          longitude,
-          bairro,
-          endereco,
-          cidade,
-          cep,
-          categoria_id,
-          municipe_tags(
-            tags(id, nome, cor)
-          )
-        `);
-      
-      if (error) {
-        console.error('❌ [MAPA] Erro ao buscar munícipes:', error);
-        return [];
+      const BATCH_SIZE = 1000;
+      let allData: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('municipes')
+          .select(`
+            id,
+            nome,
+            telefone,
+            email,
+            latitude,
+            longitude,
+            bairro,
+            endereco,
+            cidade,
+            cep,
+            categoria_id,
+            municipe_tags(
+              tags(id, nome, cor)
+            )
+          `)
+          .range(from, from + BATCH_SIZE - 1);
+        
+        if (error) {
+          console.error('❌ [MAPA] Erro ao buscar munícipes:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allData.push(...data);
+          from += BATCH_SIZE;
+          hasMore = data.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+
+        // Safety limit
+        if (from > 100000) hasMore = false;
       }
       
-      if (!data || data.length === 0) return [];
+      console.log(`📊 [MAPA] Munícipes retornados do banco: ${allData.length}`);
+      
+      if (allData.length === 0) return [];
 
-      // Buscar contagem de demandas — query leve (só municipe_id)
-      const { data: demandasCount } = await supabase
-        .from('demandas')
-        .select('municipe_id');
+      // Buscar contagem de demandas — em lotes também
+      let allDemandasCount: any[] = [];
+      from = 0;
+      hasMore = true;
+      while (hasMore) {
+        const { data: demandasBatch } = await supabase
+          .from('demandas')
+          .select('municipe_id')
+          .range(from, from + BATCH_SIZE - 1);
+        
+        if (demandasBatch && demandasBatch.length > 0) {
+          allDemandasCount.push(...demandasBatch);
+          from += BATCH_SIZE;
+          hasMore = demandasBatch.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+        if (from > 100000) hasMore = false;
+      }
       
       const contagemDemandas: Record<string, number> = {};
-      (demandasCount || []).forEach(d => {
+      allDemandasCount.forEach(d => {
         contagemDemandas[d.municipe_id] = (contagemDemandas[d.municipe_id] || 0) + 1;
       });
       
-      const processados = data.map(m => {
+      const processados = allData.map(m => {
         const latNum = typeof m.latitude === 'string' ? parseFloat(m.latitude) : (m.latitude || null);
         const lngNum = typeof m.longitude === 'string' ? parseFloat(m.longitude) : (m.longitude || null);
         
