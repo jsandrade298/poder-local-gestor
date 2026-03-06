@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, Home, FileText, Users } from "lucide-react";
+import { LogOut, User, Home, FileText, Users, Calendar } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { RepresentanteSidebar } from "@/components/layout/RepresentanteSidebar";
 import { cn } from "@/lib/utils";
