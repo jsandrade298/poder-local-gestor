@@ -87,11 +87,72 @@ export default function Municipes() {
   const tagKey = tagFilter.join(",");
   const demandaStatusKey = demandaStatusFilter.join(",");
 
-  // Buscar munícipes com filtros server-side e paginação
+  // Buscar munícipes com TODOS os filtros server-side e paginação
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['municipes-complete', bairroKey, cidadeKey, itemsPerPage, currentPage, debouncedSearchTerm],
+    queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm],
     queryFn: async () => {
-      // Construir query base com filtros server-side
+
+      // ===== PRÉ-FILTRO: Tags (buscar IDs que possuem as tags selecionadas) =====
+      let tagMunicipeIds: string[] | null = null;
+      if (tagFilter.length > 0) {
+        const BATCH = 1000;
+        const ids = new Set<string>();
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('municipe_tags')
+            .select('municipe_id')
+            .in('tag_id', tagFilter)
+            .range(from, from + BATCH - 1);
+          if (error) throw error;
+          if (data && data.length > 0) {
+            data.forEach(d => ids.add(d.municipe_id));
+            from += BATCH;
+            hasMore = data.length === BATCH;
+          } else {
+            hasMore = false;
+          }
+        }
+        tagMunicipeIds = Array.from(ids);
+        // Se nenhum munícipe tem as tags selecionadas, retornar vazio
+        if (tagMunicipeIds.length === 0) {
+          return { municipes: [], total: 0 };
+        }
+      }
+
+      // ===== PRÉ-FILTRO: Demandas (buscar IDs com/sem demandas) =====
+      let demandaMunicipeIds: string[] | null = null; // IDs que TÊM demanda
+      if (demandaFilter !== "all" || demandaStatusFilter.length > 0) {
+        const BATCH = 1000;
+        const ids = new Set<string>();
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          let q = supabase.from('demandas').select('municipe_id, status').range(from, from + BATCH - 1);
+          const { data, error } = await q;
+          if (error) throw error;
+          if (data && data.length > 0) {
+            data.forEach((d: any) => {
+              // Se filtro de status ativo, só contar munícipes com demandas nesse status
+              if (demandaStatusFilter.length > 0) {
+                if (demandaStatusFilter.includes(d.status || 'solicitada')) {
+                  ids.add(d.municipe_id);
+                }
+              } else {
+                ids.add(d.municipe_id);
+              }
+            });
+            from += BATCH;
+            hasMore = data.length === BATCH;
+          } else {
+            hasMore = false;
+          }
+        }
+        demandaMunicipeIds = Array.from(ids);
+      }
+
+      // ===== CONSTRUIR QUERY PRINCIPAL =====
       const buildQuery = () => {
         let query = supabase
           .from('municipes')
@@ -107,7 +168,7 @@ export default function Municipes() {
           `, { count: 'exact' })
           .order('nome');
 
-        // Filtros server-side (multi-select com ilike para case-insensitive)
+        // Filtros server-side
         if (bairroFilter.length > 0) {
           const conditions = bairroFilter.map(b => `bairro.ilike.${b}`).join(',');
           query = query.or(conditions);
@@ -117,10 +178,40 @@ export default function Municipes() {
           query = query.or(conditions);
         }
 
-        // Busca por nome — server-side para funcionar com qualquer pageSize
+        // Busca por nome/email/telefone
         if (debouncedSearchTerm) {
           const term = `%${debouncedSearchTerm}%`;
           query = query.or(`nome.ilike.${term},email.ilike.${term},telefone.ilike.${term}`);
+        }
+
+        // Filtro de tags (pré-computado)
+        if (tagMunicipeIds !== null) {
+          query = query.in('id', tagMunicipeIds);
+        }
+
+        // Filtro de demandas (pré-computado)
+        if (demandaFilter === "com_demanda" && demandaMunicipeIds !== null) {
+          if (demandaMunicipeIds.length === 0) {
+            // Nenhum munícipe tem demanda → retornar vazio via filtro impossível
+            query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+          } else {
+            query = query.in('id', demandaMunicipeIds);
+          }
+        } else if (demandaFilter === "sem_demanda" && demandaMunicipeIds !== null) {
+          if (demandaMunicipeIds.length > 0) {
+            // Excluir IDs que têm demanda — Supabase não suporta NOT IN direto,
+            // então usamos .not('id', 'in', `(ids)`)
+            const idsStr = `(${demandaMunicipeIds.join(',')})`;
+            query = query.not('id', 'in', idsStr);
+          }
+          // Se nenhum tem demanda, não precisa filtrar — todos são "sem demanda"
+        } else if (demandaStatusFilter.length > 0 && demandaMunicipeIds !== null) {
+          // Filtro por status de demanda sem filtro com/sem
+          if (demandaMunicipeIds.length === 0) {
+            query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+          } else {
+            query = query.in('id', demandaMunicipeIds);
+          }
         }
 
         return query;
@@ -355,46 +446,13 @@ export default function Municipes() {
     }
   });
 
-  // Client-side filters (search, tag, demanda — estes envolvem joins ou dados cruzados)
-  // Bairro e cidade já são filtrados server-side
-  const filteredMunicipes = municipes.filter(municipe => {
-    // Nome/email/telefone já filtrados server-side quando itemsPerPage !== -1
-    // Quando -1 (todos em memória), server-side também já filtrou
-    const matchesSearch = true;
-    
-    const matchesTag = tagFilter.length === 0 || 
-      (municipe.municipe_tags && municipe.municipe_tags.some((mt: any) => tagFilter.includes(mt.tags?.id)));
+  // Todos os filtros agora são server-side — filteredMunicipes = municipes direto
+  const filteredMunicipes = municipes;
 
-    // Filtro de demandas
-    const demandaCount = demandasCountMap.get(municipe.id) || 0;
-    const municipeStatuses = demandasStatusMap.get(municipe.id);
-    let matchesDemanda = true;
-    if (demandaFilter === "com_demanda") {
-      matchesDemanda = demandaCount > 0;
-    } else if (demandaFilter === "sem_demanda") {
-      matchesDemanda = demandaCount === 0;
-    }
-
-    // Sub-filtro por status de demanda (multi-select)
-    let matchesDemandaStatus = true;
-    if (demandaStatusFilter.length > 0) {
-      matchesDemandaStatus = !!municipeStatuses && demandaStatusFilter.some(s => municipeStatuses.has(s));
-    }
-    
-    return matchesSearch && matchesTag && matchesDemanda && matchesDemandaStatus;
-  });
-
-  // Paginação — quando server-side (sem filtros client-side ativos), usar total do server
-  // Quando há filtros client-side, usar o total filtrado
-  const hasClientFilters = debouncedSearchTerm || tagFilter.length > 0 || demandaFilter !== "all" || demandaStatusFilter.length > 0;
-  const totalItems = hasClientFilters ? filteredMunicipes.length : municipesPaginado.total;
+  // Paginação — tudo é server-side, usar total do server
+  const totalItems = municipesPaginado.total;
   const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(totalItems / itemsPerPage);
-  // Quando paginação é server-side e sem filtros client-side, não precisa fatiar
-  const paginatedMunicipes = itemsPerPage === -1 
-    ? filteredMunicipes 
-    : hasClientFilters 
-      ? filteredMunicipes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-      : filteredMunicipes; // Já veio paginado do servidor
+  const paginatedMunicipes = filteredMunicipes; // Já veio paginado/filtrado do servidor
 
   // Reset da página quando filtros mudam
   const resetPage = () => {
@@ -1628,7 +1686,7 @@ export default function Municipes() {
               <div className="flex items-center">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Resultado da Busca</p>
-                  <p className="text-2xl font-bold text-foreground">{filteredMunicipes.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{totalItems}</p>
                 </div>
               </div>
             </CardContent>
@@ -1664,7 +1722,7 @@ export default function Municipes() {
                 <span className="text-sm font-normal text-muted-foreground">
                   {isLoading ? 'Carregando...' : 
                     itemsPerPage === -1 ? 
-                      `${filteredMunicipes.length} munícipes` :
+                      `${totalItems} munícipes` :
                       `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} de ${totalItems} munícipes`
                   }
                 </span>
