@@ -153,6 +153,14 @@ export default function Municipes() {
       }
 
       // ===== CONSTRUIR QUERY PRINCIPAL =====
+      // Helper: escapar valor para uso em .or() do PostgREST (envolver em aspas duplas se tiver caracteres especiais)
+      const escapeFilterValue = (val: string) => {
+        if (/[,().\\"]/.test(val)) {
+          return `"${val.replace(/"/g, '\\"')}"`;
+        }
+        return val;
+      };
+
       const buildQuery = () => {
         let query = supabase
           .from('municipes')
@@ -168,20 +176,24 @@ export default function Municipes() {
           `, { count: 'exact' })
           .order('nome');
 
-        // Filtros server-side
+        // Filtros server-side — bairro (case-insensitive, match por trim)
         if (bairroFilter.length > 0) {
-          const conditions = bairroFilter.map(b => `bairro.ilike.${b}`).join(',');
+          const conditions = bairroFilter.map(b => `bairro.ilike.${escapeFilterValue(b)}`).join(',');
           query = query.or(conditions);
         }
+        // Filtros server-side — cidade (case-insensitive, match por trim)
         if (cidadeFilter.length > 0) {
-          const conditions = cidadeFilter.map(c => `cidade.ilike.${c}`).join(',');
+          const conditions = cidadeFilter.map(c => `cidade.ilike.${escapeFilterValue(c)}`).join(',');
           query = query.or(conditions);
         }
 
-        // Busca por nome/email/telefone
+        // Busca por nome/email/telefone — escapar valor para PostgREST
         if (debouncedSearchTerm) {
-          const term = `%${debouncedSearchTerm}%`;
-          query = query.or(`nome.ilike.${term},email.ilike.${term},telefone.ilike.${term}`);
+          const sanitized = debouncedSearchTerm.replace(/[%_]/g, ''); // remover wildcards
+          if (sanitized.trim()) {
+            const term = escapeFilterValue(`%${sanitized}%`);
+            query = query.or(`nome.ilike.${term},email.ilike.${term},telefone.ilike.${term}`);
+          }
         }
 
         // Filtro de tags (pré-computado)
@@ -360,37 +372,47 @@ export default function Municipes() {
   const { data: cidades = [] } = useQuery({
     queryKey: ['cidades-municipes'],
     queryFn: async () => {
+      let rawCidades: string[] = [];
+
       // Tentar usar RPC (retorna valores distintos sem limite)
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('get_distinct_cidades');
       
       if (!rpcError && rpcData) {
-        return (rpcData as any[]).map((item: any) => item.cidade).filter(Boolean).sort();
-      }
-
-      // Fallback: buscar em lotes caso a RPC não exista ainda
-      console.warn('⚠️ RPC get_distinct_cidades não disponível, usando fallback em lotes');
-      const BATCH = 1000;
-      const allCidades = new Set<string>();
-      let from = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('municipes')
-          .select('cidade')
-          .not('cidade', 'is', null)
-          .order('cidade')
-          .range(from, from + BATCH - 1);
-        if (error) throw error;
-        if (data && data.length > 0) {
-          data.forEach(item => { if (item.cidade) allCidades.add(item.cidade); });
-          from += BATCH;
-          hasMore = data.length === BATCH;
-        } else {
-          hasMore = false;
+        rawCidades = (rpcData as any[]).map((item: any) => item.cidade).filter(Boolean);
+      } else {
+        // Fallback: buscar em lotes caso a RPC não exista ainda
+        console.warn('⚠️ RPC get_distinct_cidades não disponível, usando fallback em lotes');
+        const BATCH = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('municipes')
+            .select('cidade')
+            .not('cidade', 'is', null)
+            .order('cidade')
+            .range(from, from + BATCH - 1);
+          if (error) throw error;
+          if (data && data.length > 0) {
+            data.forEach(item => { if (item.cidade) rawCidades.push(item.cidade); });
+            from += BATCH;
+            hasMore = data.length === BATCH;
+          } else {
+            hasMore = false;
+          }
         }
       }
-      return Array.from(allCidades).sort();
+
+      // Deduplicar: normalizar por trim + lowercase, manter a primeira ocorrência como label
+      const seen = new Map<string, string>();
+      rawCidades.forEach(c => {
+        const key = c.trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.set(key, c.trim());
+        }
+      });
+      return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
   });
 
@@ -398,37 +420,47 @@ export default function Municipes() {
   const { data: bairros = [] } = useQuery({
     queryKey: ['bairros-municipes'], 
     queryFn: async () => {
+      let rawBairros: string[] = [];
+
       // Tentar usar RPC (retorna valores distintos sem limite)
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('get_distinct_bairros');
       
       if (!rpcError && rpcData) {
-        return (rpcData as any[]).map((item: any) => item.bairro).filter(Boolean).sort();
-      }
-
-      // Fallback: buscar em lotes caso a RPC não exista ainda
-      console.warn('⚠️ RPC get_distinct_bairros não disponível, usando fallback em lotes');
-      const BATCH = 1000;
-      const allBairros = new Set<string>();
-      let from = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('municipes')
-          .select('bairro')
-          .not('bairro', 'is', null)
-          .order('bairro')
-          .range(from, from + BATCH - 1);
-        if (error) throw error;
-        if (data && data.length > 0) {
-          data.forEach(item => { if (item.bairro) allBairros.add(item.bairro); });
-          from += BATCH;
-          hasMore = data.length === BATCH;
-        } else {
-          hasMore = false;
+        rawBairros = (rpcData as any[]).map((item: any) => item.bairro).filter(Boolean);
+      } else {
+        // Fallback: buscar em lotes caso a RPC não exista ainda
+        console.warn('⚠️ RPC get_distinct_bairros não disponível, usando fallback em lotes');
+        const BATCH = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('municipes')
+            .select('bairro')
+            .not('bairro', 'is', null)
+            .order('bairro')
+            .range(from, from + BATCH - 1);
+          if (error) throw error;
+          if (data && data.length > 0) {
+            data.forEach(item => { if (item.bairro) rawBairros.push(item.bairro); });
+            from += BATCH;
+            hasMore = data.length === BATCH;
+          } else {
+            hasMore = false;
+          }
         }
       }
-      return Array.from(allBairros).sort();
+
+      // Deduplicar: normalizar por trim + lowercase, manter a primeira ocorrência como label
+      const seen = new Map<string, string>();
+      rawBairros.forEach(b => {
+        const key = b.trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.set(key, b.trim());
+        }
+      });
+      return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     }
   });
 
@@ -1594,7 +1626,7 @@ export default function Municipes() {
                   Bairro
                 </label>
                 <MultiSelectFilter
-                  options={bairros.map((b) => ({ value: b.toLowerCase(), label: b }))}
+                  options={bairros.map((b) => ({ value: b, label: b }))}
                   selected={bairroFilter}
                   onChange={(values) => { setBairroFilter(values); resetPage(); }}
                   placeholder="Todos os bairros"
@@ -1607,7 +1639,7 @@ export default function Municipes() {
                   Cidade
                 </label>
                 <MultiSelectFilter
-                  options={cidades.map((c) => ({ value: c.toLowerCase(), label: c }))}
+                  options={cidades.map((c) => ({ value: c, label: c }))}
                   selected={cidadeFilter}
                   onChange={(values) => { setCidadeFilter(values); resetPage(); }}
                   placeholder="Todas as cidades"
