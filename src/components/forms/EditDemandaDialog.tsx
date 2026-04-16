@@ -191,21 +191,12 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   };
 
-  // Mapeia slugs legados (versões anteriores do sistema) para os slugs atuais.
-  // Se o status da demanda não existir mais na tabela de status, mantém o valor
-  // como está e deixa o Select renderizar o fallback do próprio componente.
-  const mapStatusAntigoParaNovo = (status: string): string => {
-    const mapeamentoLegado: Record<string, string> = {
-      'aberta': 'solicitada',
-      'em_andamento': 'solicitada',
-      'aguardando': 'solicitada',
-      'resolvida': 'atendido',
-      'cancelada': 'devolvido',
-    };
-    return mapeamentoLegado[status] || status || 'solicitada';
-  };
-
-  // Preencher formulário quando demanda mudar
+  // Preencher formulário quando demanda mudar.
+  // IMPORTANTE: o status vem do banco como slug. Não fazemos nenhum mapeamento —
+  // os slugs são 100% customizáveis pelo usuário via ConfigurarStatusDialog.
+  // Se o slug da demanda não existir mais na tabela de status (excluído, por
+  // exemplo), o Select simplesmente mostra o valor cru e o usuário escolhe um
+  // válido na lista.
   useEffect(() => {
     if (demanda) {
       setFormData({
@@ -216,7 +207,7 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         prioridade: demanda.prioridade || "media",
         responsavel_id: demanda.responsavel_id || "",
         representante_id: demanda.representante_id || "",
-        status: mapStatusAntigoParaNovo(demanda.status || "solicitada"),
+        status: demanda.status || "",
         data_prazo: demanda.data_prazo || "",
         logradouro: demanda.logradouro || "",
         numero: demanda.numero || "",
@@ -339,8 +330,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
       const municipeData = demandaAnterior?.municipes as any;
       let whatsappEnviado = false;
 
-      // Garantir que o status seja válido (mapear status antigos se necessário)
-      const statusMapeado = mapStatusAntigoParaNovo(data.status);
+      // Status é usado cru — sem mapeamento legado (slugs são customizáveis)
+      const statusMapeado = data.status;
 
       // Atualizar demanda
       const cleanData = {
@@ -403,8 +394,8 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
         }
       }
 
-      // Mapear status anterior para comparação correta
-      const statusAnteriorMapeado = mapStatusAntigoParaNovo(statusAnterior || 'solicitada');
+      // Comparação de status anterior — usa o valor cru
+      const statusAnteriorMapeado = statusAnterior || '';
 
       // ========== NOTIFICAÇÃO WHATSAPP DIRETA ==========
       // Dispara notificação diretamente, sem depender de Supabase Realtime
