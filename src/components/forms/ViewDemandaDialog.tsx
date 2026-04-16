@@ -21,6 +21,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { MunicipeDetailsDialog } from "./MunicipeDetailsDialog";
 
 interface ViewDemandaDialogProps {
   demanda: any;
@@ -36,6 +37,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [municipeDialogOpen, setMunicipeDialogOpen] = useState(false);
 
   const copyLink = () => {
     const url = `${window.location.origin}/demandas?protocolo=${demanda.protocolo}`;
@@ -46,14 +48,20 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
     });
   };
   
-  // Buscar dados do munícipe se não vier na demanda
+  // Buscar dados completos do munícipe (necessário para abrir o modal de detalhes)
   const { data: municipeData } = useQuery({
-    queryKey: ['municipe-demanda', demanda?.municipe_id],
+    queryKey: ['municipe-demanda-full', demanda?.municipe_id],
     queryFn: async () => {
       if (!demanda?.municipe_id) return null;
       const { data, error } = await supabase
         .from('municipes')
-        .select('id, nome, telefone, email')
+        .select(`
+          *,
+          municipe_tags (
+            tags ( id, nome, cor )
+          ),
+          municipe_categorias ( id, nome, icone, cor )
+        `)
         .eq('id', demanda.municipe_id)
         .single();
       
@@ -302,7 +310,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
         <Tabs defaultValue="detalhes" className="flex-1 overflow-hidden">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-            <TabsTrigger value="atividades">Atividades</TabsTrigger>
+            <TabsTrigger value="atividades">Atividades ({atividades.length})</TabsTrigger>
             <TabsTrigger value="anexos">Anexos ({anexos.length})</TabsTrigger>
           </TabsList>
 
@@ -447,7 +455,19 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <strong>Munícipe:</strong> {municipeNome}
+                        <strong>Munícipe:</strong>{" "}
+                        {demanda.municipe_id ? (
+                          <button
+                            type="button"
+                            onClick={() => setMunicipeDialogOpen(true)}
+                            className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+                            title="Ver detalhes do munícipe"
+                          >
+                            {municipeNome}
+                          </button>
+                        ) : (
+                          municipeNome
+                        )}
                       </span>
                     </div>
 
@@ -586,6 +606,15 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      {/* Modal de detalhes do munícipe — abre sobre a demanda */}
+      {municipeData && (
+        <MunicipeDetailsDialog
+          municipe={municipeData}
+          open={municipeDialogOpen}
+          onOpenChange={setMunicipeDialogOpen}
+        />
+      )}
     </Dialog>
   );
 }
