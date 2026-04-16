@@ -99,11 +99,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTenant(null);
       }
 
-      // Verificar superadmin
-      const { data: superAdminCheck } = await supabase.rpc('is_superadmin');
-      setIsSuperAdmin(superAdminCheck === true);
-      if (superAdminCheck === true) {
-        console.log('🛡️ Superadmin detectado');
+      // Verificar superadmin — RPC com fallback na tabela user_roles
+      let isSuperAdminResult = false;
+      try {
+        const { data: superAdminCheck, error: rpcError } = await supabase.rpc('is_superadmin');
+        if (rpcError) {
+          console.warn('⚠️ RPC is_superadmin falhou, tentando fallback:', rpcError.message);
+        } else {
+          isSuperAdminResult = superAdminCheck === true;
+        }
+      } catch (rpcErr) {
+        console.warn('⚠️ RPC is_superadmin indisponível, tentando fallback');
+      }
+
+      // Fallback: verificar diretamente na tabela user_roles
+      if (!isSuperAdminResult) {
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId);
+          if (roleData && roleData.some((r: any) => String(r.role) === 'superadmin')) {
+            isSuperAdminResult = true;
+            console.log('🛡️ Superadmin detectado via fallback (user_roles)');
+          }
+        } catch {
+          // Ignora — se ambos falharem, isSuperAdmin fica false
+        }
+      }
+
+      setIsSuperAdmin(isSuperAdminResult);
+      if (isSuperAdminResult) {
+        console.log('🛡️ Superadmin confirmado');
       }
     } catch (err) {
       console.error('Erro ao carregar profile/tenant:', err);
