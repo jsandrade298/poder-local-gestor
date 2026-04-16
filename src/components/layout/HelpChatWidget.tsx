@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircleQuestion, Send, X, Loader2, Trash2 } from "lucide-react";
+import { MessageCircleQuestion, Send, X, Loader2, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +37,7 @@ export function HelpChatWidget() {
   // Foco no input ao abrir
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 200);
+      setTimeout(() => inputRef.current?.focus(), 300);
       setHasUnread(false);
     }
   }, [isOpen]);
@@ -201,148 +201,154 @@ export function HelpChatWidget() {
   // ──────────────────────────────────────────────
   return (
     <>
-      {/* ── Janela do Chat ─────────────────────── */}
+      {/* ── Overlay escuro ao abrir (mobile) ─── */}
       {isOpen && (
         <div
-          className={cn(
-            "fixed z-[9980] bg-background border shadow-2xl",
-            "flex flex-col overflow-hidden",
-            // Mobile: tela cheia
-            "inset-0",
-            // Desktop: janela flutuante
-            "md:inset-auto md:bottom-6 md:right-6",
-            "md:w-[380px] md:h-[520px] md:rounded-2xl md:max-h-[80vh]"
-          )}
-        >
-          {/* ── Header ───────────────────────── */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground md:rounded-t-2xl shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg">
-                💬
-              </div>
-              <div>
-                <h3 className="text-sm font-bold leading-none">{ASSISTANT_NAME}</h3>
-                <p className="text-[10px] opacity-80 mt-0.5">{ASSISTANT_SUBTITLE}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
-                onClick={clearChat}
-                title="Limpar conversa"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
-                onClick={() => setIsOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* ── Messages ─────────────────────── */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain min-h-0">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  "flex",
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted text-foreground rounded-bl-sm"
-                  )}
-                >
-                  {formatContent(msg.content)}
-                </div>
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* ── Input (DENTRO do container) ───── */}
-          <div className="shrink-0 border-t bg-background p-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Digite sua dúvida..."
-                rows={1}
-                className={cn(
-                  "flex-1 resize-none rounded-xl border bg-muted/50 px-3.5 py-2.5 text-sm",
-                  "placeholder:text-muted-foreground/60",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30",
-                  "max-h-24"
-                )}
-                style={{ fontSize: "16px", minHeight: "40px" }}
-                disabled={isLoading}
-              />
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-xl shrink-0"
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+          className="fixed inset-0 z-[9970] bg-black/30 md:bg-transparent"
+          onClick={() => setIsOpen(false)}
+        />
       )}
 
-      {/* ── Botão flutuante (FAB) ──────────────── */}
+      {/* ── Painel lateral direito ──────────────── */}
+      <div
+        className={cn(
+          "fixed z-[9980] top-0 right-0 h-full bg-background border-l shadow-2xl",
+          "flex flex-col",
+          "transition-transform duration-300 ease-in-out",
+          // Largura
+          "w-full sm:w-[380px]",
+          // Slide in/out
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        {/* ── Header ───────────────────────── */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-primary text-primary-foreground shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg">
+              💬
+            </div>
+            <div>
+              <h3 className="text-sm font-bold leading-none">{ASSISTANT_NAME}</h3>
+              <p className="text-[10px] opacity-80 mt-0.5">{ASSISTANT_SUBTITLE}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+              onClick={clearChat}
+              title="Limpar conversa"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/20"
+              onClick={() => setIsOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Messages ─────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain min-h-0">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={cn(
+                "flex",
+                msg.role === "user" ? "justify-end" : "justify-start"
+              )}
+            >
+              <div
+                className={cn(
+                  "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground rounded-br-sm"
+                    : "bg-muted text-foreground rounded-bl-sm"
+                )}
+              >
+                {formatContent(msg.content)}
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* ── Input ───────────────────────── */}
+        <div className="shrink-0 border-t bg-background p-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Digite sua dúvida..."
+              rows={1}
+              className={cn(
+                "flex-1 resize-none rounded-xl border bg-muted/50 px-3.5 py-2.5 text-sm",
+                "placeholder:text-muted-foreground/60",
+                "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30",
+                "max-h-24"
+              )}
+              style={{ fontSize: "16px", minHeight: "40px" }}
+              disabled={isLoading}
+            />
+            <Button
+              size="icon"
+              className="h-10 w-10 rounded-xl shrink-0"
+              onClick={sendMessage}
+              disabled={!input.trim() || isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Aba lateral fixa (botão de abrir) ───── */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className={cn(
-            "fixed z-[9980] group",
-            // Mobile: acima do bottom nav
-            "bottom-20 right-4 md:bottom-6 md:right-6",
-            "h-14 rounded-full px-4",
-            "bg-primary text-primary-foreground shadow-lg",
-            "hover:shadow-xl hover:scale-105 active:scale-95",
+            "fixed z-[9970] right-0 top-1/2 -translate-y-1/2",
+            "flex items-center gap-1",
+            "bg-primary text-primary-foreground",
+            "px-1.5 py-3 rounded-l-lg shadow-lg",
+            "hover:px-2.5 hover:shadow-xl",
             "transition-all duration-200",
-            "flex items-center gap-2"
+            "writing-mode-vertical"
           )}
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
           title="Precisa de ajuda?"
         >
-          <MessageCircleQuestion className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-medium pr-0.5">Ajuda</span>
+          <MessageCircleQuestion className="h-4 w-4 rotate-90 mb-1" />
+          <span className="text-xs font-medium tracking-wide">Ajuda</span>
 
           {/* Badge de não lida */}
           {hasUnread && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center animate-pulse">
-              <span className="text-[10px] font-bold text-destructive-foreground">1</span>
+            <span className="absolute -top-1 -left-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center animate-pulse">
+              <span className="text-[9px] font-bold text-destructive-foreground">!</span>
             </span>
           )}
         </button>
