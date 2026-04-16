@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
   Settings, Plus, Trash2, GripVertical, Save, X,
-  Bell, BellOff, Pencil, CheckCircle2,
+  Bell, BellOff, Pencil, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { useDemandaStatus, DemandaStatus } from "@/hooks/useDemandaStatus";
 import {
@@ -45,6 +45,16 @@ const CORES_DISPONIVEIS = [
   { nome: "Laranja", valor: "#f97316" },
   { nome: "Lima",    valor: "#84cc16" },
 ];
+
+// Normaliza texto em slug (sem acentos, espaços viram _)
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 
 // ── Item arrastável ──────────────────────────────────────────
 function SortableStatusItem({
@@ -123,18 +133,22 @@ function StatusForm({
     status || { nome: "", slug: "", cor: "#6b7280", notificar_municipe: false, is_final: false }
   );
   const isEditing = !!status?.id;
+  const slugOriginal = status?.slug || "";
+  const slugMudou = isEditing && formData.slug !== slugOriginal;
 
   const handleNomeChange = (nome: string) => {
     const newData: Partial<DemandaStatus> = { ...formData, nome };
+    // Auto-sync do slug só quando estamos criando (nunca sobrescreve slug editado)
     if (!isEditing) {
-      newData.slug = nome
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_|_$/g, "");
+      newData.slug = slugify(nome);
     }
     setFormData(newData);
+  };
+
+  const handleSlugChange = (slug: string) => {
+    // Sanitiza: só minúsculas, números e _
+    const slugSanitizado = slug.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    setFormData({ ...formData, slug: slugSanitizado });
   };
 
   return (
@@ -156,14 +170,27 @@ function StatusForm({
           <Input
             id="slug"
             value={formData.slug || ""}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            onChange={(e) => handleSlugChange(e.target.value)}
             placeholder="em_analise"
-            disabled={isEditing}
-            className={isEditing ? "bg-gray-100 dark:bg-gray-700" : ""}
           />
-          {isEditing && <p className="text-xs text-gray-500">O identificador não pode ser alterado</p>}
+          <p className="text-xs text-gray-500">
+            Apenas letras minúsculas, números e underscore (_)
+          </p>
         </div>
       </div>
+
+      {/* Aviso quando o slug foi alterado em um status existente */}
+      {slugMudou && (
+        <div className="flex gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-900 dark:text-amber-200">
+            <strong>Atenção:</strong> ao salvar, todas as demandas com o status{" "}
+            <code className="bg-amber-100 dark:bg-amber-900/60 px-1 rounded">{slugOriginal}</code> serão
+            migradas para{" "}
+            <code className="bg-amber-100 dark:bg-amber-900/60 px-1 rounded">{formData.slug}</code>.
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>Cor</Label>
@@ -199,7 +226,7 @@ function StatusForm({
         />
       </div>
 
-      {/* Status de conclusão — o novo campo */}
+      {/* Status de conclusão */}
       <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border">
         <div className="space-y-0.5">
           <Label htmlFor="is_final" className="flex items-center gap-1.5 cursor-pointer">
@@ -221,7 +248,10 @@ function StatusForm({
         <Button variant="outline" onClick={onCancel} disabled={isLoading}>
           <X className="h-4 w-4 mr-2" />Cancelar
         </Button>
-        <Button onClick={() => onSave(formData)} disabled={!formData.nome || isLoading}>
+        <Button
+          onClick={() => onSave({ ...formData, slugOriginal } as any)}
+          disabled={!formData.nome || !formData.slug || isLoading}
+        >
           <Save className="h-4 w-4 mr-2" />
           {isLoading ? "Salvando..." : "Salvar"}
         </Button>
@@ -258,9 +288,13 @@ export function ConfigurarStatusDialog({ open, onOpenChange }: ConfigurarStatusD
     }
   };
 
-  const handleSave = (data: Partial<DemandaStatus>) => {
-    if (editingStatus?.id) updateStatus.mutate({ id: editingStatus.id, ...data });
-    else createStatus.mutate(data);
+  const handleSave = (data: Partial<DemandaStatus> & { slugOriginal?: string }) => {
+    const { slugOriginal, ...payload } = data;
+    if (editingStatus?.id) {
+      updateStatus.mutate({ id: editingStatus.id, slugOriginal, ...payload } as any);
+    } else {
+      createStatus.mutate(payload);
+    }
     setShowForm(false);
     setEditingStatus(null);
   };
