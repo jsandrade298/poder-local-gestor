@@ -15,6 +15,7 @@ import { formatDateOnly } from "@/lib/dateUtils";
 import { CriarDemandaAposCadastroDialog } from "./CriarDemandaAposCadastroDialog";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { useAuth } from "@/contexts/AuthContext";
+import { maskPhoneInput, normalizePhone } from "@/lib/phoneUtils";
 
 // Mapeamento de ícones de categoria
 const categoriaIcons: Record<string, any> = {
@@ -45,7 +46,7 @@ export function NovoMunicipeDialog() {
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "Santo André",
+    cidade: "",
     estado: "SP",
     cep: "",
     complemento: "",
@@ -227,7 +228,7 @@ export function NovoMunicipeDialog() {
         .from('municipes')
         .insert({
           nome: data.nome,
-          telefone: data.telefone,
+          telefone: normalizePhone(data.telefone) || null,
           email: data.email || null,
           instagram: data.instagram || null,
           endereco: `${data.logradouro}${data.numero ? ', ' + data.numero : ''}${data.complemento ? ' - ' + data.complemento : ''}`,
@@ -286,7 +287,7 @@ export function NovoMunicipeDialog() {
         logradouro: "",
         numero: "",
         bairro: "",
-        cidade: "Santo André",
+        cidade: "",
         estado: "SP",
         cep: "",
         complemento: "",
@@ -375,8 +376,9 @@ export function NovoMunicipeDialog() {
                   <Input
                     id="telefone"
                     value={formData.telefone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
-                    placeholder="(11) 99999-9999"
+                    onChange={(e) => setFormData(prev => ({ ...prev, telefone: maskPhoneInput(e.target.value) }))}
+                    placeholder="(11) 99999-1111"
+                    inputMode="tel"
                   />
                 </div>
                 <div className="space-y-2">
@@ -481,7 +483,7 @@ export function NovoMunicipeDialog() {
                     id="cidade"
                     value={formData.cidade}
                     onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                    placeholder="Santo André"
+                    placeholder="Digite a cidade"
                   />
                 </div>
                 <div className="space-y-2">
