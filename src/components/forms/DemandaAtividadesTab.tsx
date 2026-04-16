@@ -98,11 +98,15 @@ import {
   Clock,
   Trash2,
   Edit,
-  ExternalLink
+  ExternalLink,
+  ThumbsUp
 } from "lucide-react";
 import { formatDateTime } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useAtividadeReacoes } from "@/hooks/useAtividadeReacoes";
+import { useAuth } from "@/contexts/AuthContext";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const formSchema = z.object({
   tipo_atividade: z.string().min(1, "Tipo de atividade é obrigatório"),
@@ -158,6 +162,8 @@ export function DemandaAtividadesTab({
   const [editingActivity, setEditingActivity] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { reacoesPorAtividade, toggle: toggleReacao, isToggling } = useAtividadeReacoes(demandaId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -740,15 +746,55 @@ export function DemandaAtividadesTab({
                         )}
                         
                         {/* Informações do usuário */}
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {atividade.created_by_profile?.nome?.charAt(0) || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>
-                            Por {atividade.created_by_profile?.nome || "Usuário"} em {formatDateTime(atividade.created_at)}
-                          </span>
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {atividade.created_by_profile?.nome?.charAt(0) || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>
+                              Por {atividade.created_by_profile?.nome || "Usuário"} em {formatDateTime(atividade.created_at)}
+                            </span>
+                          </div>
+
+                          {/* Reação joinha — "estou ciente" */}
+                          {(() => {
+                            const reacoes = reacoesPorAtividade[atividade.id] || [];
+                            const joinhas = reacoes.filter((r) => r.tipo === 'joinha');
+                            const usuarioReagiu = joinhas.some((r) => r.user_id === user?.id);
+                            const nomesReacao = joinhas
+                              .map((r) => r.user_nome || 'Usuário')
+                              .join(', ');
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant={usuarioReagiu ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-7 gap-1.5 px-2"
+                                      onClick={() => toggleReacao(atividade.id, 'joinha')}
+                                      disabled={isToggling}
+                                    >
+                                      <ThumbsUp className="h-3.5 w-3.5" />
+                                      {joinhas.length > 0 && (
+                                        <span className="text-xs font-medium">{joinhas.length}</span>
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {joinhas.length === 0
+                                      ? 'Marcar como ciente'
+                                      : usuarioReagiu
+                                        ? `Você ${joinhas.length > 1 ? `e ${joinhas.length - 1} outro${joinhas.length > 2 ? 's' : ''} ` : ''}marcou como ciente`
+                                        : `Cientes: ${nomesReacao}`}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
