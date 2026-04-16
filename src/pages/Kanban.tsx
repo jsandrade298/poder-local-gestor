@@ -22,6 +22,10 @@ import { ViewRotaKanbanDialog } from "@/components/forms/ViewRotaKanbanDialog";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { EditTarefaDialog } from "@/components/forms/EditTarefaDialog";
 import { HistoricoView } from "@/components/kanban/HistoricoView";
+import { BoardGallery } from "@/components/kanban/BoardGallery";
+import { BoardView } from "@/components/kanban/BoardView";
+import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
+import { KanbanBoard } from "@/hooks/useKanbanBoards";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -86,6 +90,11 @@ export default function Kanban() {
   const queryClient = useQueryClient();
   const isDraggingRef = useRef(false);
   
+  // ── Estado das abas (Pessoal / Projetos) ──
+  const [activeTab, setActiveTab] = useState<'pessoal' | 'projetos'>('pessoal');
+  const [selectedBoard, setSelectedBoard] = useState<KanbanBoard | null>(null);
+  const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
+
   const processedTaskIdRef = useRef<string | null>(null);
   const isClosingModalRef = useRef(false);
 
@@ -716,10 +725,66 @@ export default function Kanban() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="container mx-auto px-3 py-3 md:p-6">
+        {/* ═══════════════════════════════════════════════════
+            TÍTULO + ABAS (Pessoal / Projetos)
+            ═══════════════════════════════════════════════════ */}
+        <div className="flex items-center gap-4 mb-4 md:mb-6">
+          <h1 className="text-xl md:text-3xl font-bold text-foreground">Kanban</h1>
+          <div className="flex rounded-lg border bg-muted/30 p-0.5">
+            <button
+              className={`px-3 py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                activeTab === 'pessoal'
+                  ? 'bg-background shadow-sm font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setActiveTab('pessoal')}
+            >
+              📋 Pessoal
+            </button>
+            <button
+              className={`px-3 py-1.5 text-xs md:text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                activeTab === 'projetos'
+                  ? 'bg-background shadow-sm font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => { setActiveTab('projetos'); setSelectedBoard(null); }}
+            >
+              📂 Projetos
+            </button>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════
+            ABA PROJETOS
+            ═══════════════════════════════════════════════════ */}
+        {activeTab === 'projetos' && (
+          <>
+            {selectedBoard ? (
+              <BoardView
+                board={selectedBoard}
+                onBack={() => setSelectedBoard(null)}
+              />
+            ) : (
+              <BoardGallery
+                onSelectBoard={(board) => setSelectedBoard(board)}
+                onCreateBoard={() => setIsCreateBoardOpen(true)}
+              />
+            )}
+            <CreateBoardDialog
+              open={isCreateBoardOpen}
+              onOpenChange={setIsCreateBoardOpen}
+            />
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════
+            ABA PESSOAL (conteúdo original do kanban)
+            ═══════════════════════════════════════════════════ */}
+        {activeTab === 'pessoal' && (
+        <>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0 mb-4 md:mb-6">
           <div className="space-y-1 md:space-y-2">
             <div className="flex items-center gap-2 md:gap-4 flex-wrap">
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">Kanban</h1>
               
               <div className="flex items-center gap-2 md:gap-3">
                 {/* Dropdown de usuário */}
@@ -1187,6 +1252,8 @@ export default function Kanban() {
           open={isViewRotaDialogOpen}
           onOpenChange={setIsViewRotaDialogOpen}
         />
+        </>
+        )}
       </div>
     </div>
   );
