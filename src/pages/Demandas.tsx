@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3, ChevronDown, ChevronUp, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
@@ -56,6 +56,11 @@ export default function Demandas() {
   const [pageSize, setPageSize] = useState<number | "all">(50);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Estado para ordenação
+  const [orderBy, setOrderBy] = useState<
+    'mais_recente' | 'mais_antigo' | 'titulo_asc' | 'titulo_desc' | 'prazo_proximo' | 'prioridade'
+  >('mais_recente');
+
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -81,7 +86,7 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm],
+    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm, orderBy],
     queryFn: async () => {
       // Se há termo de busca, resolver IDs de munícipes que correspondem ao nome (em lotes)
       let municipeIdsFromSearch: string[] = [];
@@ -114,8 +119,33 @@ export default function Demandas() {
             *,
             areas(nome),
             municipes(nome)
-          `, { count: 'exact' })
-          .order('created_at', { ascending: false });
+          `, { count: 'exact' });
+
+        // Ordenação dinâmica
+        switch (orderBy) {
+          case 'mais_antigo':
+            query = query.order('created_at', { ascending: true });
+            break;
+          case 'titulo_asc':
+            query = query.order('titulo', { ascending: true });
+            break;
+          case 'titulo_desc':
+            query = query.order('titulo', { ascending: false });
+            break;
+          case 'prazo_proximo':
+            // Prazo mais próximo primeiro (nulls por último)
+            query = query.order('data_prazo', { ascending: true, nullsFirst: false });
+            break;
+          case 'prioridade':
+            // Prioridade é text, então ordenamos por urgente > alta > media > baixa via created_at como fallback
+            // Supabase PostgREST não suporta CASE diretamente, então usamos created_at como secundário
+            query = query.order('prioridade', { ascending: false }).order('created_at', { ascending: false });
+            break;
+          case 'mais_recente':
+          default:
+            query = query.order('created_at', { ascending: false });
+            break;
+        }
 
         // Filtros: delegar ao PostgreSQL
         if (statusFilter.length > 0) query = query.in('status', statusFilter);
@@ -455,7 +485,7 @@ export default function Demandas() {
   // Resetar página quando mudar filtros ou pageSize
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize]);
+  }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize, orderBy]);
 
 
   // Mutação para excluir demanda
@@ -1694,7 +1724,30 @@ export default function Demandas() {
 
             {/* Controles de paginação (sempre visível) */}
             <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-border/30">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Ordenar:</span>
+                  <Select
+                    value={orderBy}
+                    onValueChange={(value) => {
+                      setOrderBy(value as typeof orderBy);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-36 md:w-44 h-8 text-xs md:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mais_recente">Mais recentes</SelectItem>
+                      <SelectItem value="mais_antigo">Mais antigos</SelectItem>
+                      <SelectItem value="titulo_asc">Título (A-Z)</SelectItem>
+                      <SelectItem value="titulo_desc">Título (Z-A)</SelectItem>
+                      <SelectItem value="prazo_proximo">Prazo mais próximo</SelectItem>
+                      <SelectItem value="prioridade">Prioridade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Mostrar:</span>
                   <Select 
