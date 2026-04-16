@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Settings, MoreHorizontal, Calendar, User, AlertTriangle, Pencil, Archive } from "lucide-react";
+import { ArrowLeft, Plus, Settings, MoreHorizontal, Calendar, User, AlertTriangle, Pencil, Archive, CheckSquare, MessageSquare } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useKanbanBoardCards, useKanbanBoardColunas, KanbanBoard, KanbanBoardCard, KanbanBoardColuna } from "@/hooks/useKanbanBoards";
+import { useBoardCardCounts } from "@/hooks/useBoardCardExtras";
 import { BoardColumnConfig } from "./BoardColumnConfig";
 import { BoardCardDialog } from "./BoardCardDialog";
 import { CreateBoardDialog } from "./CreateBoardDialog";
@@ -28,6 +29,7 @@ export function BoardView({ board, onBack }: BoardViewProps) {
   const { colunas, isLoading: isLoadingColunas } = useKanbanBoardColunas(board.id);
   const { cards, moveCard } = useKanbanBoardCards(board.id);
   const { archiveBoard } = useKanbanBoards();
+  const { checklist: checklistCounts, comentarios: comentariosCounts } = useBoardCardCounts(board.id);
 
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
@@ -249,6 +251,27 @@ export function BoardView({ board, onBack }: BoardViewProps) {
                                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                                       <User className="h-3 w-3" />
                                       {getResponsavelNome(card.responsavel_id)}
+                                    </div>
+                                  )}
+
+                                  {/* Indicadores de checklist e comentários */}
+                                  {((checklistCounts[card.id]?.total || 0) > 0 || (comentariosCounts[card.id] || 0) > 0) && (
+                                    <div className="flex items-center gap-3 pt-1 border-t border-border/30">
+                                      {(checklistCounts[card.id]?.total || 0) > 0 && (
+                                        <div className={`flex items-center gap-1 text-[10px] ${
+                                          checklistCounts[card.id]?.done === checklistCounts[card.id]?.total
+                                            ? 'text-green-600' : 'text-muted-foreground'
+                                        }`}>
+                                          <CheckSquare className="h-3 w-3" />
+                                          {checklistCounts[card.id]?.done}/{checklistCounts[card.id]?.total}
+                                        </div>
+                                      )}
+                                      {(comentariosCounts[card.id] || 0) > 0 && (
+                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                          <MessageSquare className="h-3 w-3" />
+                                          {comentariosCounts[card.id]}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </CardContent>
