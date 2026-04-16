@@ -11,7 +11,7 @@ export interface DemandaStatus {
   ordem: number;
   ativo: boolean;
   notificar_municipe: boolean;
-  is_final: boolean;  // ← novo: indica que este status representa conclusão
+  is_final: boolean;  // ← indica que este status representa conclusão
   created_at: string;
   updated_at: string;
 }
@@ -80,8 +80,31 @@ export function useDemandaStatus() {
     },
   });
 
+  /**
+   * updateStatus aceita, além dos campos do DemandaStatus, o slugOriginal.
+   * Se o slug foi alterado, migra em cascata todas as demandas que usam
+   * o slug antigo para o novo — evitando que fiquem com status "órfão".
+   */
   const updateStatus = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<DemandaStatus> & { id: string }) => {
+    mutationFn: async ({
+      id,
+      slugOriginal,
+      ...updates
+    }: Partial<DemandaStatus> & { id: string; slugOriginal?: string }) => {
+      // Se o slug mudou, primeiro migra as demandas existentes
+      const novoSlug = updates.slug;
+      if (slugOriginal && novoSlug && slugOriginal !== novoSlug) {
+        const { error: migrateError } = await supabase
+          .from('demandas')
+          .update({ status: novoSlug })
+          .eq('status', slugOriginal);
+        if (migrateError) {
+          throw new Error(
+            `Erro ao migrar demandas do status antigo "${slugOriginal}" para "${novoSlug}": ${migrateError.message}`
+          );
+        }
+      }
+
       const { data, error } = await supabase
         .from('demanda_status')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -91,12 +114,22 @@ export function useDemandaStatus() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success('Status atualizado com sucesso!');
+    onSuccess: (_data, variables) => {
+      const slugMudou =
+        variables.slugOriginal && variables.slug && variables.slugOriginal !== variables.slug;
+      toast.success(
+        slugMudou
+          ? `Status atualizado e demandas migradas de "${variables.slugOriginal}" para "${variables.slug}"`
+          : 'Status atualizado com sucesso!'
+      );
       queryClient.invalidateQueries({ queryKey: ['demanda-status'] });
       queryClient.invalidateQueries({ queryKey: ['demanda-status-all'] });
+      queryClient.invalidateQueries({ queryKey: ['demandas'] });
     },
-    onError: (error: any) => toast.error('Erro ao atualizar status: ' + error.message),
+    onError: (error: any) => {
+      if (error.code === '23505') toast.error('Já existe um status com este identificador');
+      else toast.error('Erro ao atualizar status: ' + error.message);
+    },
   });
 
   const deleteStatus = useMutation({
