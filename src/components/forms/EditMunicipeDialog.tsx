@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useBrasilAPI, geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { maskPhoneInput, normalizePhone, formatPhoneDisplay } from "@/lib/phoneUtils";
 
 // Mapeamento de ícones de categoria
 const categoriaIcons: Record<string, any> = {
@@ -49,7 +50,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     logradouro: "",
     numero: "",
     bairro: "",
-    cidade: "Santo André",
+    cidade: "",
     estado: "SP",
     cep: "",
     complemento: "",
@@ -71,13 +72,14 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
     if (municipe) {
       setFormData({
         nome: municipe.nome || "",
-        telefone: municipe.telefone || "",
+        // Aplica máscara ao exibir, mas lembra que no banco é só dígitos
+        telefone: formatPhoneDisplay(municipe.telefone) || "",
         email: municipe.email || "",
         instagram: municipe.instagram || "",
         logradouro: "",
         numero: "",
         bairro: municipe.bairro || "",
-        cidade: municipe.cidade || "Santo André",
+        cidade: municipe.cidade || "",
         estado: municipe.estado || "SP",
         cep: municipe.cep || "",
         complemento: "",
@@ -354,7 +356,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
         .from('municipes')
         .update({
           nome: data.nome,
-          telefone: data.telefone || null,
+          telefone: normalizePhone(data.telefone) || null,
           email: data.email || null,
           instagram: data.instagram || null,
           endereco: endereco || null,
@@ -549,8 +551,9 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                 <Input
                   id="telefone"
                   value={formData.telefone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
-                  placeholder="(11) 99999-9999"
+                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: maskPhoneInput(e.target.value) }))}
+                  placeholder="(11) 99999-1111"
+                  inputMode="tel"
                 />
               </div>
 
@@ -663,7 +666,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                   id="cidade"
                   value={formData.cidade}
                   onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                  placeholder="Santo André"
+                  placeholder="Digite a cidade"
                 />
               </div>
 
