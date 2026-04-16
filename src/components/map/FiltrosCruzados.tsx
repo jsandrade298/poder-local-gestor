@@ -21,6 +21,7 @@ import {
 import { CalendarIcon, Filter, X, FileText, Users, BarChart3, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useDemandaStatus } from '@/hooks/useDemandaStatus';
 
 interface Tag {
   id: string;
@@ -76,15 +77,9 @@ export function FiltrosCruzados({
   const [bairroMunicipe, setBairroMunicipe] = useState<string>('');
   const [cidadeMunicipe, setCidadeMunicipe] = useState<string>('');
 
-  // Status disponíveis
-  const statusOptions = [
-    { value: 'solicitada', label: 'Solicitada' },
-    { value: 'em_producao', label: 'Em Produção' },
-    { value: 'encaminhado', label: 'Encaminhado' },
-    { value: 'devolvido', label: 'Devolvido' },
-    { value: 'visitado', label: 'Visitado' },
-    { value: 'atendido', label: 'Atendido' },
-  ];
+  // Status dinâmicos do banco (configuráveis pelo usuário)
+  const { statusOptions: statusDinamicos } = useDemandaStatus();
+  const statusOptions = statusDinamicos.map((s) => ({ value: s.value, label: s.label }));
 
   // Prioridades disponíveis
   const prioridadeOptions = [
