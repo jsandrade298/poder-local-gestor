@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Download, Upload, MoreHorizontal, Mail, Phone, MapPin, FileText, Edit, Trash2, Eye, CheckSquare, Square, Users, RefreshCw, SlidersHorizontal, ChevronDown, ChevronUp, ArrowUpDown, Activity } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NovoMunicipeDialog } from "@/components/forms/NovoMunicipeDialog";
 import { ImportCSVDialog } from "@/components/forms/ImportCSVDialog";
@@ -28,6 +28,7 @@ import { useMunicipeDeletion } from "@/contexts/MunicipeDeletionContext";
 import { geocodificarEndereco } from "@/hooks/useBrasilAPI";
 import { ConfirmarNovasTagsDialog, NewTagData } from "@/components/forms/ConfirmarNovasTagsDialog";
 import { ConfirmarDuplicadosDialog, DuplicateMatch } from "@/components/forms/ConfirmarDuplicadosDialog";
+import { formatPhoneDisplay, normalizePhone } from "@/lib/phoneUtils";
 
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
@@ -42,8 +43,12 @@ export default function Municipes() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [bairroFilter, setBairroFilter] = useState<string[]>([]);
   const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
+  const [categoriaFilter, setCategoriaFilter] = useState<string[]>([]);
   const [demandaFilter, setDemandaFilter] = useState("all");
   const [demandaStatusFilter, setDemandaStatusFilter] = useState<string[]>([]);
+  const [orderBy, setOrderBy] = useState<
+    'nome_asc' | 'nome_desc' | 'mais_recente' | 'mais_antigo' | 'ultima_atividade' | 'mais_demandas'
+  >('nome_asc');
   const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -85,11 +90,12 @@ export default function Municipes() {
   const bairroKey = bairroFilter.join(",");
   const cidadeKey = cidadeFilter.join(",");
   const tagKey = tagFilter.join(",");
+  const categoriaKey = categoriaFilter.join(",");
   const demandaStatusKey = demandaStatusFilter.join(",");
 
   // Buscar munícipes com TODOS os filtros server-side e paginação
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
-    queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm],
+    queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, orderBy],
     queryFn: async () => {
 
       // ===== PRÉ-FILTRO: Tags (buscar IDs que possuem as tags selecionadas) =====
@@ -172,9 +178,37 @@ export default function Municipes() {
                 nome,
                 cor
               )
+            ),
+            municipe_categorias (
+              id,
+              nome,
+              icone,
+              cor
             )
-          `, { count: 'exact' })
-          .order('nome');
+          `, { count: 'exact' });
+
+        // Ordenação dinâmica
+        switch (orderBy) {
+          case 'nome_desc':
+            query = query.order('nome', { ascending: false });
+            break;
+          case 'mais_recente':
+            query = query.order('created_at', { ascending: false });
+            break;
+          case 'mais_antigo':
+            query = query.order('created_at', { ascending: true });
+            break;
+          case 'ultima_atividade':
+          case 'mais_demandas':
+            // Ordem derivada — o ordenamento real é feito no cliente após receber os dados.
+            // Aqui ordenamos por nome só para ter uma ordem estável vinda do servidor.
+            query = query.order('nome', { ascending: true });
+            break;
+          case 'nome_asc':
+          default:
+            query = query.order('nome', { ascending: true });
+            break;
+        }
 
         // Filtros server-side — bairro (case-insensitive, match por trim)
         if (bairroFilter.length > 0) {
@@ -187,12 +221,30 @@ export default function Municipes() {
           query = query.or(conditions);
         }
 
-        // Busca por nome/email/telefone — escapar valor para PostgREST
+        // Filtro de categoria
+        if (categoriaFilter.length > 0) {
+          query = query.in('categoria_id', categoriaFilter);
+        }
+
+        // Busca por nome/email/telefone — inclui versão só-dígitos para casar
+        // tanto "11999991111" quanto "(11) 99999-1111" entrados pelo usuário.
         if (debouncedSearchTerm) {
           const sanitized = debouncedSearchTerm.replace(/[%_]/g, ''); // remover wildcards
           if (sanitized.trim()) {
             const term = escapeFilterValue(`%${sanitized}%`);
-            query = query.or(`nome.ilike.${term},email.ilike.${term},telefone.ilike.${term}`);
+            const digitsOnly = normalizePhone(sanitized);
+            const conditions = [
+              `nome.ilike.${term}`,
+              `email.ilike.${term}`,
+              `telefone.ilike.${term}`,
+            ];
+            // Se o termo tem dígitos, busca também o padrão só-dígitos
+            // (casa com números salvos sem máscara)
+            if (digitsOnly.length >= 3 && digitsOnly !== sanitized) {
+              const digitsTerm = escapeFilterValue(`%${digitsOnly}%`);
+              conditions.push(`telefone.ilike.${digitsTerm}`);
+            }
+            query = query.or(conditions.join(','));
           }
         }
 
@@ -478,8 +530,76 @@ export default function Municipes() {
     }
   });
 
-  // Todos os filtros agora são server-side — filteredMunicipes = municipes direto
-  const filteredMunicipes = municipes;
+  // Buscar categorias para o filtro
+  const { data: categorias = [] } = useQuery({
+    queryKey: ['municipe-categorias-filtro'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('municipe_categorias')
+        .select('id, nome, cor, icone')
+        .order('ordem', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Buscar última atividade de cada munícipe (para coluna na tabela + ordenação)
+  const { data: ultimaAtividadeMap = new Map<string, string>() } = useQuery({
+    queryKey: ['municipe-ultima-atividade'],
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      const BATCH = 1000;
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('municipe_atividades')
+          .select('municipe_id, data_atividade')
+          .order('data_atividade', { ascending: false })
+          .range(from, from + BATCH - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          data.forEach((a: any) => {
+            // Como já vem ordenado DESC, a primeira ocorrência é a mais recente
+            if (!map.has(a.municipe_id)) {
+              map.set(a.municipe_id, a.data_atividade);
+            }
+          });
+          from += BATCH;
+          hasMore = data.length === BATCH;
+        } else {
+          hasMore = false;
+        }
+      }
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Aplicar ordenação derivada (última atividade / mais demandas) no cliente,
+  // pois o Postgres não tem essas colunas agregadas no select principal.
+  const filteredMunicipes = (() => {
+    const list = municipes;
+    if (orderBy === 'ultima_atividade') {
+      return [...list].sort((a, b) => {
+        const da = ultimaAtividadeMap.get(a.id);
+        const db = ultimaAtividadeMap.get(b.id);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return new Date(db).getTime() - new Date(da).getTime();
+      });
+    }
+    if (orderBy === 'mais_demandas') {
+      return [...list].sort((a, b) => {
+        const ca = demandasCountMap.get(a.id) || 0;
+        const cb = demandasCountMap.get(b.id) || 0;
+        return cb - ca;
+      });
+    }
+    return list;
+  })();
 
   // Paginação — tudo é server-side, usar total do server
   const totalItems = municipesPaginado.total;
@@ -496,6 +616,7 @@ export default function Municipes() {
     setTagFilter([]);
     setBairroFilter([]);
     setCidadeFilter([]);
+    setCategoriaFilter([]);
     setDemandaFilter("all");
     setDemandaStatusFilter([]);
     resetPage();
@@ -506,6 +627,7 @@ export default function Municipes() {
     tagFilter.length > 0,
     bairroFilter.length > 0,
     cidadeFilter.length > 0,
+    categoriaFilter.length > 0,
     demandaFilter !== "all",
     demandaStatusFilter.length > 0,
   ].filter(Boolean).length;
@@ -1649,6 +1771,19 @@ export default function Municipes() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
+                  Categoria
+                </label>
+                <MultiSelectFilter
+                  options={categorias.map((c: any) => ({ value: c.id, label: c.nome, color: c.cor }))}
+                  selected={categoriaFilter}
+                  onChange={(values) => { setCategoriaFilter(values); resetPage(); }}
+                  placeholder="Todas as categorias"
+                  searchPlaceholder="Buscar categoria…"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
                   Demandas
                 </label>
                 <Select value={demandaFilter} onValueChange={(value) => {
@@ -1728,9 +1863,32 @@ export default function Municipes() {
         {/* Controles de Paginação e Tabela */}
         <Card className="shadow-sm border-0 bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between flex-wrap gap-3">
               <span>Lista de Munícipes</span>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Ordenar:</span>
+                  <Select
+                    value={orderBy}
+                    onValueChange={(value) => {
+                      setOrderBy(value as typeof orderBy);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
+                      <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
+                      <SelectItem value="mais_recente">Mais recentes</SelectItem>
+                      <SelectItem value="mais_antigo">Mais antigos</SelectItem>
+                      <SelectItem value="ultima_atividade">Última atividade</SelectItem>
+                      <SelectItem value="mais_demandas">Mais demandas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Mostrar:</span>
                   <Select 
@@ -1777,6 +1935,7 @@ export default function Municipes() {
                   <TableHead className="hidden md:table-cell">Contato</TableHead>
                   <TableHead className="hidden lg:table-cell">Endereço</TableHead>
                   <TableHead className="hidden md:table-cell">Tags</TableHead>
+                  <TableHead className="hidden lg:table-cell text-center">Últ. atividade</TableHead>
                   <TableHead className="text-center">Demandas</TableHead>
                   <TableHead className="text-right w-12">Ações</TableHead>
                 </TableRow>
@@ -1784,7 +1943,7 @@ export default function Municipes() {
               <TableBody>
                 {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                         Carregando munícipes...
@@ -1793,7 +1952,7 @@ export default function Municipes() {
                   </TableRow>
                 ) : paginatedMunicipes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhum munícipe encontrado
                     </TableCell>
                   </TableRow>
@@ -1811,7 +1970,7 @@ export default function Municipes() {
                         <div>
                           <p className="font-medium text-foreground">{municipe.nome}</p>
                           <p className="text-xs text-muted-foreground md:hidden">
-                            {municipe.telefone || municipe.email || ''}
+                            {formatPhoneDisplay(municipe.telefone) || municipe.email || ''}
                           </p>
                           <p className="text-xs text-muted-foreground hidden md:block">
                             {municipe.data_nascimento && `Nascimento: ${formatDateOnly(municipe.data_nascimento)}`}
@@ -1826,7 +1985,7 @@ export default function Municipes() {
                           </div>
                           <div className="flex items-center gap-1 text-sm text-foreground">
                             <Phone className="h-3 w-3" />
-                            {municipe.telefone || 'Não informado'}
+                            {formatPhoneDisplay(municipe.telefone) || 'Não informado'}
                           </div>
                         </div>
                       </TableCell>
@@ -1864,6 +2023,20 @@ export default function Municipes() {
                             <span className="text-xs text-muted-foreground">Sem tags</span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-center">
+                        {(() => {
+                          const dataAtv = ultimaAtividadeMap.get(municipe.id);
+                          if (!dataAtv) {
+                            return <span className="text-xs text-muted-foreground">—</span>;
+                          }
+                          return (
+                            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                              <Activity className="h-3 w-3" />
+                              {formatDateOnly(dataAtv)}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">
                         {(() => {
