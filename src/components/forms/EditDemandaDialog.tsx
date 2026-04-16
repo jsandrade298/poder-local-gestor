@@ -191,16 +191,18 @@ export function EditDemandaDialog({ open, onOpenChange, demanda }: EditDemandaDi
     }
   };
 
-  // Função para mapear status antigos para novos (compatibilidade)
+  // Mapeia slugs legados (versões anteriores do sistema) para os slugs atuais.
+  // Se o status da demanda não existir mais na tabela de status, mantém o valor
+  // como está e deixa o Select renderizar o fallback do próprio componente.
   const mapStatusAntigoParaNovo = (status: string): string => {
-    const mapeamento: Record<string, string> = {
+    const mapeamentoLegado: Record<string, string> = {
       'aberta': 'solicitada',
-      'em_andamento': 'em_producao',
-      'aguardando': 'encaminhado',
+      'em_andamento': 'solicitada',
+      'aguardando': 'solicitada',
       'resolvida': 'atendido',
       'cancelada': 'devolvido',
     };
-    return mapeamento[status] || status || 'solicitada';
+    return mapeamentoLegado[status] || status || 'solicitada';
   };
 
   // Preencher formulário quando demanda mudar
