@@ -15,8 +15,10 @@ import {
   Target,
   MapPin,
   Layers,
+  Shield,
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -52,6 +54,7 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const { data: config } = useConfiguracoes();
+  const { isSuperAdmin } = useAuth();
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -114,6 +117,30 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Link para Admin SaaS — só para superadmin */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className={collapsed ? "sr-only" : ""}>
+              Administração
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/admin"
+                      className={`${getNavCls(isActive("/admin"))} border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15`}
+                    >
+                      <Shield className="h-4 w-4 text-amber-600" />
+                      {!collapsed && <span className="text-amber-700 dark:text-amber-400 font-medium">Admin SaaS</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );
