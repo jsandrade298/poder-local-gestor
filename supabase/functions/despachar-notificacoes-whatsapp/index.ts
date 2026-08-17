@@ -340,17 +340,45 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Agrupa por destinatário
+      // Agrupa por destinatário.
+      //
+      // Os jobs lembretes-tarefas-09h/15h/21h rodam três vezes por dia e
+      // criam uma notificação nova a cada passagem, então a mesma tarefa
+      // atrasada apareceria repetida no resumo. Aqui só o primeiro item de
+      // cada (tipo + título) entra na mensagem — os demais continuam sendo
+      // marcados como enviados, para não ficarem presos na fila.
       const porUsuario = new Map<string, ItemFila[]>();
+      const vistos = new Map<string, Set<string>>();
+      const duplicadas: string[] = [];
+
       for (const item of pendentes as ItemFila[]) {
         const lista = porUsuario.get(item.destinatario_id) || [];
-        lista.push(item);
+        const chaves = vistos.get(item.destinatario_id) || new Set<string>();
+        const chave = `${item.tipo}|${(item.titulo || item.mensagem || "").trim()}`;
+
+        if (!chaves.has(chave)) {
+          chaves.add(chave);
+          lista.push(item);
+        } else {
+          duplicadas.push(item.id);
+        }
+
+        vistos.set(item.destinatario_id, chaves);
         porUsuario.set(item.destinatario_id, lista);
       }
 
       console.log(
         `📬 Tenant ${agenda.tenant_id}: ${pendentes.length} pendências para ${porUsuario.size} usuário(s)`,
       );
+
+      // Itens colapsados como repetidos: saem da fila junto com o resumo
+      if (duplicadas.length) {
+        await supabase
+          .from("notificacao_whatsapp_fila")
+          .update({ status: "enviada", enviada_em: new Date().toISOString() })
+          .in("id", duplicadas);
+        console.log(`🔁 ${duplicadas.length} pendência(s) repetida(s) colapsada(s)`);
+      }
 
       let resumosDoTenant = 0;
 

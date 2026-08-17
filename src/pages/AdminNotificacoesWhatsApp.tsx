@@ -347,6 +347,8 @@ export default function AdminNotificacoesWhatsApp() {
           mensagem: "Esta é uma mensagem de teste do sistema de notificações WhatsApp.",
           url_destino: "/demandas",
           tenant_id: "",
+          // O teste tem que chegar agora, sem esperar o horário da agenda
+          forcar_envio_imediato: true,
         },
       });
       if (error) throw error;

@@ -152,26 +152,16 @@ DROP POLICY IF EXISTS agenda_insert ON public.notificacao_whatsapp_agenda;
 CREATE POLICY agenda_insert ON public.notificacao_whatsapp_agenda
   FOR INSERT TO authenticated
   WITH CHECK (
-    public.is_superadmin() OR (
-      tenant_id = public.get_my_tenant_id()
-      AND EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid() AND p.role_no_tenant = 'admin'
-      )
-    )
+    public.is_superadmin()
+    OR (tenant_id = public.get_my_tenant_id() AND public.is_tenant_admin())
   );
 
 DROP POLICY IF EXISTS agenda_update ON public.notificacao_whatsapp_agenda;
 CREATE POLICY agenda_update ON public.notificacao_whatsapp_agenda
   FOR UPDATE TO authenticated
   USING (
-    public.is_superadmin() OR (
-      tenant_id = public.get_my_tenant_id()
-      AND EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid() AND p.role_no_tenant = 'admin'
-      )
-    )
+    public.is_superadmin()
+    OR (tenant_id = public.get_my_tenant_id() AND public.is_tenant_admin())
   );
 
 -- Fila e resumos: leitura dentro do gabinete; escrita só pelo service_role
@@ -192,24 +182,138 @@ CREATE POLICY disparos_select ON public.notificacao_whatsapp_disparos
   USING (tenant_id = public.get_my_tenant_id() OR public.is_superadmin());
 
 -- ------------------------------------------------------------
--- 4b. Fecha a configuração global para o super-admin
+-- 4b. Fecha as três tabelas com policy aberta ao mundo
 --
--- Hoje `notification_whatsapp_config` é legível com a chave anônima,
--- o que expõe token da instância e chave da OpenAI a qualquer visitante.
+-- As policies chamadas "Service role full access ..." foram criadas
+-- SEM a cláusula `TO service_role`. Sem ela o alvo padrão é `public`,
+-- que inclui `anon` — ou seja, qualquer pessoa com a chave anônima do
+-- projeto tem ALL (SELECT/INSERT/UPDATE/DELETE) nestas tabelas:
+--
+--   notification_whatsapp_config  → chave da OpenAI e tokens do WhatsApp
+--   whatsapp_assessor_logs        → histórico de conversas do assessor
+--   whatsapp_assessor_sessoes     → sessões ativas
+--
+-- O service_role ignora RLS por natureza, então nenhuma dessas policies
+-- é necessária para as edge functions continuarem funcionando.
 -- ------------------------------------------------------------
 
-ALTER TABLE public.notification_whatsapp_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access config"   ON public.notification_whatsapp_config;
+DROP POLICY IF EXISTS "Service role full access logs"     ON public.whatsapp_assessor_logs;
+DROP POLICY IF EXISTS "Service role full access sessoes"  ON public.whatsapp_assessor_sessoes;
 
-DROP POLICY IF EXISTS "Permitir leitura para todos" ON public.notification_whatsapp_config;
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.notification_whatsapp_config;
-DROP POLICY IF EXISTS notification_config_all ON public.notification_whatsapp_config;
+-- Leitura por qualquer usuário logado — expunha as credenciais a todos
+-- os gabinetes, não só ao super-admin.
+DROP POLICY IF EXISTS "Authenticated read config" ON public.notification_whatsapp_config;
+
+-- As policies superadmin_* liberavam também para has_role(uid,'admin'),
+-- que é o papel de admin de gabinete: um tenant enxergava a credencial
+-- global usada por todos os outros.
+DROP POLICY IF EXISTS superadmin_select_notification_config ON public.notification_whatsapp_config;
+DROP POLICY IF EXISTS superadmin_insert_notification_config ON public.notification_whatsapp_config;
+DROP POLICY IF EXISTS superadmin_update_notification_config ON public.notification_whatsapp_config;
+DROP POLICY IF EXISTS superadmin_delete_notification_config ON public.notification_whatsapp_config;
 
 CREATE POLICY notification_config_superadmin ON public.notification_whatsapp_config
   FOR ALL TO authenticated
   USING (public.is_superadmin())
   WITH CHECK (public.is_superadmin());
 
-REVOKE ALL ON public.notification_whatsapp_config FROM anon;
+REVOKE ALL ON public.notification_whatsapp_config  FROM anon;
+REVOKE ALL ON public.whatsapp_assessor_logs        FROM anon;
+REVOKE ALL ON public.whatsapp_assessor_sessoes     FROM anon;
+
+-- ------------------------------------------------------------
+-- 4c. Trigger: aceitar credenciais W-API
+--
+-- A versão atual de trigger_notificar_usuario_whatsapp() só dispara se
+-- zapi_instance_id, zapi_token E zapi_client_token estiverem preenchidos.
+-- Sem esta atualização, limpar os campos da Z-API depois da migração faz
+-- o trigger sair silencioso e NENHUMA notificação é enviada.
+--
+-- Mudou apenas o bloco de checagem de credenciais; o resto é idêntico.
+-- ------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.trigger_notificar_usuario_whatsapp()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_config RECORD;
+  v_telefone text;
+  v_nome text;
+  v_func_url text;
+  v_credenciais_ok boolean;
+BEGIN
+  SELECT * INTO v_config
+  FROM public.notification_whatsapp_config
+  WHERE ativo = true
+  LIMIT 1;
+
+  IF v_config IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_config.supabase_url IS NULL OR v_config.supabase_anon_key IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Credenciais do provedor ativo (W-API por padrão, Z-API como rollback)
+  IF COALESCE(v_config.provedor, 'wapi') = 'zapi' THEN
+    v_credenciais_ok := v_config.zapi_instance_id IS NOT NULL
+                    AND v_config.zapi_token IS NOT NULL
+                    AND v_config.zapi_client_token IS NOT NULL;
+  ELSE
+    v_credenciais_ok := v_config.wapi_instance_id IS NOT NULL
+                    AND v_config.wapi_token IS NOT NULL;
+  END IF;
+
+  IF NOT v_credenciais_ok THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT (v_config.tipos_ativos @> to_jsonb(NEW.tipo::text)) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT telefone, nome INTO v_telefone, v_nome
+  FROM public.profiles
+  WHERE id = NEW.destinatario_id;
+
+  IF v_telefone IS NULL OR trim(v_telefone) = '' THEN
+    RETURN NEW;
+  END IF;
+
+  v_func_url := v_config.supabase_url || '/functions/v1/notificar-usuario-whatsapp';
+
+  PERFORM net.http_post(
+    url     := v_func_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_config.supabase_anon_key
+    ),
+    body    := jsonb_build_object(
+      'notificacao_id',         NEW.id,
+      'destinatario_id',        NEW.destinatario_id,
+      'destinatario_nome',      COALESCE(v_nome, 'Usuário'),
+      'destinatario_telefone',  v_telefone,
+      'tipo',                   NEW.tipo,
+      'titulo',                 NEW.titulo,
+      'mensagem',               NEW.mensagem,
+      'url_destino',            COALESCE(NEW.url_destino, ''),
+      'tenant_id',              COALESCE(NEW.tenant_id::text, '')
+    )
+  );
+
+  RETURN NEW;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    -- NUNCA bloquear a criação da notificação interna
+    RAISE WARNING '[notificar-usuario-whatsapp] Erro ao disparar: %', SQLERRM;
+    RETURN NEW;
+END;
+$function$;
 
 -- ------------------------------------------------------------
 -- 5. Agenda padrão para os gabinetes existentes
