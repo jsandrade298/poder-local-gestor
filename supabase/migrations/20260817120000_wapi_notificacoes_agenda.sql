@@ -11,8 +11,17 @@
 -- Esta migração afeta apenas as notificações internas do sistema.
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+-- NÃO usar CREATE EXTENSION aqui.
+--
+-- pg_cron e pg_net já estão instalados neste projeto. Mesmo com
+-- IF NOT EXISTS, o event trigger do Supabase reexecuta o script
+-- after-create.sql do pg_cron, que faz
+--   revoke all on table cron.job from postgres;
+-- e falha com "2BP01: dependent privileges exist" sempre que algum
+-- outro role tiver recebido privilégios em cron.job.
+--
+-- Se um dia for preciso instalar, faça pelo Dashboard:
+--   Database → Extensions.
 
 -- ------------------------------------------------------------
 -- 1. Credenciais W-API (globais, painel super-admin)
