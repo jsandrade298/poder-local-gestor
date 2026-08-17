@@ -12,11 +12,164 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
-import {
-  normalizeBrPhone,
-  sendTextWithButtons,
-  type WApiCredentials,
-} from "../_shared/wapi.ts";
+
+// ============================================================
+// Cliente W-API (https://docs.w-api.app)
+//
+// Embutido de propósito: as funções deste projeto são publicadas
+// pelo editor do Dashboard, que não resolve imports de pastas
+// acima da própria função. Manter tudo em um arquivo faz o que
+// está no repositório ser idêntico ao que roda em produção.
+// ============================================================
+
+const WAPI_BASE_URL = "https://api.w-api.app";
+
+interface WApiCredentials {
+  instanceId: string;
+  token: string;
+}
+
+interface WApiResult<T = any> {
+  ok: boolean;
+  status: number;
+  body: T | null;
+  error?: string;
+}
+
+interface WApiSendResponse {
+  instanceId: string;
+  messageId: string;
+  insertedId: string;
+}
+
+/** Normaliza telefone BR para o formato da W-API: dígitos com DDI 55. */
+function normalizeBrPhone(raw: string): string | null {
+  if (!raw) return null;
+
+  let digits = String(raw).replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
+
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const rest = digits.slice(2);
+    if (/^[987]\d{7}$/.test(rest)) digits = ddd + "9" + rest;
+  }
+
+  if (digits.length !== 10 && digits.length !== 11) return null;
+  return "55" + digits;
+}
+
+async function wapiRequest<T = any>(
+  creds: WApiCredentials,
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<WApiResult<T>> {
+  const { method = "POST", body } = init;
+
+  const url = new URL(`${WAPI_BASE_URL}${path}`);
+  url.searchParams.set("instanceId", creds.instanceId);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${creds.token}`,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    const raw = await res.text();
+    let parsed: any = raw;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // algumas respostas de erro vêm em texto puro
+    }
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        body: parsed,
+        error: parsed?.message || parsed?.error || `HTTP ${res.status}`,
+      };
+    }
+
+    // A W-API responde 200 com { error: true, message } em algumas falhas
+    if (parsed && typeof parsed === "object" && parsed.error === true) {
+      return { ok: false, status: res.status, body: parsed, error: parsed.message || "Erro W-API" };
+    }
+
+    return { ok: true, status: res.status, body: parsed };
+  } catch (err: any) {
+    return { ok: false, status: 0, body: null, error: err?.message || String(err) };
+  }
+}
+
+/** POST /v1/message/send-text — disponível em todos os planos. */
+function sendText(
+  creds: WApiCredentials,
+  params: { phone: string; message: string; delayMessage?: number },
+): Promise<WApiResult<WApiSendResponse>> {
+  return wapiRequest(creds, "/v1/message/send-text", {
+    body: {
+      phone: params.phone,
+      message: params.message,
+      delayMessage: params.delayMessage ?? 3,
+    },
+  });
+}
+
+/** POST /v1/message/send-button-list — botões de resposta rápida (exige plano PRO). */
+function sendButtonList(
+  creds: WApiCredentials,
+  params: { phone: string; message: string; buttons: { buttonId: string; label: string }[] },
+): Promise<WApiResult<WApiSendResponse>> {
+  return wapiRequest(creds, "/v1/message/send-button-list", {
+    body: { phone: params.phone, message: params.message, buttons: params.buttons },
+  });
+}
+
+/**
+ * Tenta enviar com botões e, se a instância não suportar (plano inferior
+ * ao PRO), reenvia como texto pedindo a confirmação por escrito.
+ */
+async function sendTextWithButtons(
+  creds: WApiCredentials,
+  params: {
+    phone: string;
+    message: string;
+    buttons: { buttonId: string; label: string }[];
+    fallbackSuffix?: string;
+    delayMessage?: number;
+    /** Pula direto para o texto quando já se sabe que não há plano PRO. */
+    pularBotoes?: boolean;
+  },
+): Promise<WApiResult<WApiSendResponse> & { usouBotoes: boolean }> {
+  if (!params.pularBotoes) {
+    const comBotoes = await sendButtonList(creds, {
+      phone: params.phone,
+      message: params.message,
+      buttons: params.buttons,
+    });
+
+    if (comBotoes.ok) return { ...comBotoes, usouBotoes: true };
+
+    console.warn(`⚠️ send-button-list falhou (${comBotoes.error}) — caindo para send-text`);
+  }
+
+  const sufixo = params.fallbackSuffix ?? "\n\n✅ Responda *OK* para confirmar o recebimento.";
+  const texto = await sendText(creds, {
+    phone: params.phone,
+    message: params.message + sufixo,
+    delayMessage: params.delayMessage,
+  });
+
+  return { ...texto, usouBotoes: false };
+}
+
+// ============================================================
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

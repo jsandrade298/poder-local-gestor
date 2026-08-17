@@ -13,7 +13,68 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
-import { parseIncoming } from "../_shared/wapi.ts";
+
+// ============================================================
+// Parser do webhook "Ao receber" da W-API (event: webhookReceived)
+//
+// Embutido de propósito: as funções deste projeto são publicadas
+// pelo editor do Dashboard, que não resolve imports de pastas
+// acima da própria função.
+// ============================================================
+
+interface WApiIncomingMessage {
+  instanceId: string | null;
+  messageId: string | null;
+  fromMe: boolean;
+  isGroup: boolean;
+  /** Telefone do remetente, só dígitos. */
+  senderPhone: string | null;
+  /** Texto digitado, quando a mensagem for de texto. */
+  text: string | null;
+  /** buttonId do botão clicado, quando a resposta vier de send-button-list. */
+  selectedButtonId: string | null;
+}
+
+/**
+ * Extrai os campos que nos interessam, tolerando as várias formas
+ * que `msgContent` pode assumir.
+ */
+function parseIncoming(payload: any): WApiIncomingMessage {
+  const content = payload?.msgContent ?? {};
+
+  const buttonsResponse =
+    content.buttonsResponseMessage ??
+    content.templateButtonReplyMessage ??
+    content.listResponseMessage ??
+    null;
+
+  const text: string | null =
+    content.conversation ??
+    content.extendedTextMessage?.text ??
+    buttonsResponse?.selectedDisplayText ??
+    buttonsResponse?.title ??
+    null;
+
+  const selectedButtonId: string | null =
+    buttonsResponse?.selectedButtonId ??
+    buttonsResponse?.selectedId ??
+    buttonsResponse?.singleSelectReply?.selectedRowId ??
+    null;
+
+  const rawSender = payload?.sender?.id ?? payload?.chat?.id ?? null;
+
+  return {
+    instanceId: payload?.instanceId ?? null,
+    messageId: payload?.messageId ?? null,
+    fromMe: payload?.fromMe === true,
+    isGroup: payload?.isGroup === true,
+    senderPhone: rawSender ? String(rawSender).replace(/\D/g, "") : null,
+    text: typeof text === "string" ? text : null,
+    selectedButtonId,
+  };
+}
+
+// ============================================================
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

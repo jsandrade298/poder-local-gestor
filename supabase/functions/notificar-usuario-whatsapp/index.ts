@@ -1,7 +1,169 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
-import { normalizeBrPhone, sendText } from "../_shared/wapi.ts";
-import { enfileirarNotificacao } from "../_shared/fila-notificacoes.ts";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
+
+// ============================================================
+// Cliente W-API (https://docs.w-api.app)
+//
+// Embutido de propósito: as funções deste projeto são publicadas
+// pelo editor do Dashboard, que não resolve imports de pastas
+// acima da própria função.
+// ============================================================
+
+const WAPI_BASE_URL = "https://api.w-api.app";
+
+interface WApiCredentials {
+  instanceId: string;
+  token: string;
+}
+
+interface WApiSendResponse {
+  instanceId: string;
+  messageId: string;
+  insertedId: string;
+}
+
+/** Normaliza telefone BR para o formato da W-API: dígitos com DDI 55. */
+function normalizeBrPhone(raw: string): string | null {
+  if (!raw) return null;
+
+  let digits = String(raw).replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
+
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const rest = digits.slice(2);
+    if (/^[987]\d{7}$/.test(rest)) digits = ddd + "9" + rest;
+  }
+
+  if (digits.length !== 10 && digits.length !== 11) return null;
+  return "55" + digits;
+}
+
+/** POST /v1/message/send-text — disponível em todos os planos. */
+async function sendText(
+  creds: WApiCredentials,
+  params: { phone: string; message: string; delayMessage?: number },
+): Promise<{ ok: boolean; status: number; body: WApiSendResponse | null; error?: string }> {
+  const url = new URL(`${WAPI_BASE_URL}/v1/message/send-text`);
+  url.searchParams.set("instanceId", creds.instanceId);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${creds.token}`,
+      },
+      body: JSON.stringify({
+        phone: params.phone,
+        message: params.message,
+        delayMessage: params.delayMessage ?? 3,
+      }),
+    });
+
+    const raw = await res.text();
+    let parsed: any = raw;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // algumas respostas de erro vêm em texto puro
+    }
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        body: parsed,
+        error: parsed?.message || parsed?.error || `HTTP ${res.status}`,
+      };
+    }
+
+    if (parsed && typeof parsed === "object" && parsed.error === true) {
+      return { ok: false, status: res.status, body: parsed, error: parsed.message || "Erro W-API" };
+    }
+
+    return { ok: true, status: res.status, body: parsed };
+  } catch (err: any) {
+    return { ok: false, status: 0, body: null, error: err?.message || String(err) };
+  }
+}
+
+// ============================================================
+// Enfileiramento
+//
+// Em vez de enviar na hora, a notificação entra na fila do gabinete
+// e sai no próximo horário configurado, junto com as outras, em um
+// resumo só — ver despachar-notificacoes-whatsapp.
+// ============================================================
+
+interface NotificacaoParaFila {
+  tenant_id: string;
+  notificacao_id?: string | null;
+  destinatario_id: string;
+  destinatario_nome?: string | null;
+  destinatario_telefone: string;
+  tipo: string;
+  titulo?: string | null;
+  mensagem?: string | null;
+  url_destino?: string | null;
+}
+
+interface ResultadoFila {
+  enfileirada: boolean;
+  /** Preenchido quando entrou na fila. */
+  fila_id?: string;
+  /** Preenchido quando o envio deve ser imediato. */
+  motivo?: "urgente" | "sem_agenda" | "agenda_inativa" | "duplicada";
+}
+
+/**
+ * Decide entre enfileirar ou deixar o chamador enviar na hora.
+ * Retorna `enfileirada: false` quando o envio deve ser imediato.
+ */
+async function enfileirarNotificacao(
+  supabase: SupabaseClient,
+  notificacao: NotificacaoParaFila,
+): Promise<ResultadoFila> {
+  const { data: agenda } = await supabase
+    .from("notificacao_whatsapp_agenda")
+    .select("ativo, tipos_urgentes")
+    .eq("tenant_id", notificacao.tenant_id)
+    .maybeSingle();
+
+  // Gabinete ainda sem agenda: mantém o comportamento imediato
+  if (!agenda) return { enfileirada: false, motivo: "sem_agenda" };
+  if (!agenda.ativo) return { enfileirada: false, motivo: "agenda_inativa" };
+
+  if ((agenda.tipos_urgentes || []).includes(notificacao.tipo)) {
+    return { enfileirada: false, motivo: "urgente" };
+  }
+
+  const { data, error } = await supabase
+    .from("notificacao_whatsapp_fila")
+    .insert({
+      tenant_id: notificacao.tenant_id,
+      notificacao_id: notificacao.notificacao_id ?? null,
+      destinatario_id: notificacao.destinatario_id,
+      destinatario_nome: notificacao.destinatario_nome ?? null,
+      destinatario_telefone: notificacao.destinatario_telefone,
+      tipo: notificacao.tipo,
+      titulo: notificacao.titulo ?? null,
+      mensagem: notificacao.mensagem ?? null,
+      url_destino: notificacao.url_destino ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    // 23505 = a mesma notificação já está na fila (índice único)
+    if (error.code === "23505") return { enfileirada: false, motivo: "duplicada" };
+    throw error;
+  }
+
+  return { enfileirada: true, fila_id: data.id };
+}
+
+// ============================================================
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
