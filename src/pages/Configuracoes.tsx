@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import { ConfigurarEvolutionDialog } from "@/components/forms/ConfigurarEvolutionDialog";
+import { NotificacaoAgendaCard } from "@/components/configuracoes/NotificacaoAgendaCard";
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -352,6 +353,9 @@ export default function Configuracoes() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Agenda de notificações por WhatsApp */}
+      <NotificacaoAgendaCard />
 
       {/* Integrações WhatsApp */}
       <Card className="shadow-sm border-0 bg-card">

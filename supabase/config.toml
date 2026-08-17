@@ -16,3 +16,11 @@ verify_jwt = false
 
 [functions.create-user-custom]
 verify_jwt = false
+
+# Chamada pelo pg_cron
+[functions.despachar-notificacoes-whatsapp]
+verify_jwt = false
+
+# Chamada pela W-API (webhook "Ao receber")
+[functions.wapi-webhook-notificacoes]
+verify_jwt = false

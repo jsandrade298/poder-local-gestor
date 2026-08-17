@@ -47,11 +47,11 @@ import {
 
 interface NotificationConfig {
   id?: string;
-  // Z-API
-  zapi_instance_id: string;
-  zapi_token: string;
-  zapi_client_token: string;
-  zapi_phone_number: string;
+  // W-API — instância dedicada às notificações do sistema.
+  // Os disparos em massa para munícipes seguem na Z-API/Evolution.
+  wapi_instance_id: string;
+  wapi_token: string;
+  wapi_phone_number: string;
   // IA Notificações
   openai_api_key: string;
   usar_ia: boolean;
@@ -74,10 +74,9 @@ interface NotificationConfig {
 }
 
 const EMPTY_CONFIG: NotificationConfig = {
-  zapi_instance_id: "",
-  zapi_token: "",
-  zapi_client_token: "",
-  zapi_phone_number: "",
+  wapi_instance_id: "",
+  wapi_token: "",
+  wapi_phone_number: "",
   openai_api_key: "",
   usar_ia: true,
   tom_mensagem: "profissional_leve",
@@ -226,10 +225,9 @@ export default function AdminNotificacoesWhatsApp() {
     if (savedConfig) {
       setConfig({
         id: savedConfig.id,
-        zapi_instance_id: savedConfig.zapi_instance_id || "",
-        zapi_token: savedConfig.zapi_token || "",
-        zapi_client_token: savedConfig.zapi_client_token || "",
-        zapi_phone_number: savedConfig.zapi_phone_number || "",
+        wapi_instance_id: savedConfig.wapi_instance_id || "",
+        wapi_token: savedConfig.wapi_token || "",
+        wapi_phone_number: savedConfig.wapi_phone_number || "",
         openai_api_key: savedConfig.openai_api_key || "",
         usar_ia: savedConfig.usar_ia ?? true,
         tom_mensagem: savedConfig.tom_mensagem || "profissional_leve",
@@ -280,10 +278,10 @@ export default function AdminNotificacoesWhatsApp() {
   const salvarMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        zapi_instance_id: config.zapi_instance_id || null,
-        zapi_token: config.zapi_token || null,
-        zapi_client_token: config.zapi_client_token || null,
-        zapi_phone_number: config.zapi_phone_number || null,
+        wapi_instance_id: config.wapi_instance_id || null,
+        wapi_token: config.wapi_token || null,
+        wapi_phone_number: config.wapi_phone_number || null,
+        provedor: "wapi",
         openai_api_key: config.openai_api_key || null,
         usar_ia: config.usar_ia,
         tom_mensagem: config.tom_mensagem,
@@ -366,8 +364,8 @@ export default function AdminNotificacoesWhatsApp() {
   };
 
   const configCompleta =
-    config.zapi_instance_id && config.zapi_token &&
-    config.zapi_client_token && config.supabase_url && config.supabase_anon_key;
+    config.wapi_instance_id && config.wapi_token &&
+    config.supabase_url && config.supabase_anon_key;
 
   const assessorPronto =
     configCompleta && config.openai_api_key && config.ativo;
@@ -468,7 +466,9 @@ export default function AdminNotificacoesWhatsApp() {
                 <div className="space-y-1">
                   <Label className="text-base font-semibold">Sistema de Notificações WhatsApp</Label>
                   <p className="text-sm text-muted-foreground">
-                    Quando ativado, toda notificação interna (sino) também será enviada via WhatsApp
+                    Quando ativado, as notificações internas (sino) entram na fila de WhatsApp e são
+                    entregues em um resumo, nos dias e horários que cada gabinete define em
+                    Configurações
                   </p>
                 </div>
                 <Switch
@@ -480,41 +480,48 @@ export default function AdminNotificacoesWhatsApp() {
               {!configCompleta && !config.ativo && (
                 <div className="flex items-center gap-2 mt-3 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <span>Preencha as credenciais Z-API e a conexão Supabase antes de ativar.</span>
+                  <span>Preencha as credenciais W-API e a conexão Supabase antes de ativar.</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Z-API */}
+          {/* W-API */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />Instância Z-API
+                <Smartphone className="h-4 w-4" />Instância W-API
               </CardTitle>
               <CardDescription>
-                Instância dedicada para enviar as notificações do sistema.
+                Instância dedicada às notificações do sistema. Os disparos em massa para munícipes
+                continuam na Z-API/Evolution, configurada por gabinete.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Instance ID</Label>
-                  <Input placeholder="Ex: 3C4A7E8B..." value={config.zapi_instance_id} onChange={(e) => updateField("zapi_instance_id", e.target.value)} />
+                  <Input placeholder="Ex: T34398-VYR3QD-MS29SL" value={config.wapi_instance_id} onChange={(e) => updateField("wapi_instance_id", e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Painel W-API → sua instância → ID</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Token</Label>
-                  <Input type="password" placeholder="Token da instância" value={config.zapi_token} onChange={(e) => updateField("zapi_token", e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Client Token</Label>
-                  <Input type="password" placeholder="Client Token da conta Z-API" value={config.zapi_client_token} onChange={(e) => updateField("zapi_client_token", e.target.value)} />
+                  <Label>Token da instância</Label>
+                  <Input type="password" placeholder="Token usado no Authorization: Bearer" value={config.wapi_token} onChange={(e) => updateField("wapi_token", e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Número do WhatsApp</Label>
-                  <Input placeholder="Ex: 11999999999" value={config.zapi_phone_number} onChange={(e) => updateField("zapi_phone_number", e.target.value)} />
+                  <Input placeholder="Ex: 11999999999" value={config.wapi_phone_number} onChange={(e) => updateField("wapi_phone_number", e.target.value)} />
                   <p className="text-xs text-muted-foreground">Apenas para referência visual</p>
                 </div>
+              </div>
+              <div className="flex items-start gap-2 text-sm bg-amber-50 text-amber-700 rounded-lg p-3">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <p className="text-xs">
+                  O botão de confirmação nos resumos usa o endpoint <code>send-button-list</code>,
+                  que exige <strong>plano PRO</strong> na W-API. Em planos menores o resumo é
+                  enviado como texto pedindo a resposta <strong>OK</strong> — a confirmação continua
+                  sendo registrada.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -593,7 +600,7 @@ export default function AdminNotificacoesWhatsApp() {
               <CardTitle className="text-base flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />Tipos de Notificação
               </CardTitle>
-              <CardDescription>Quais notificações internas também serão enviadas por WhatsApp.</CardDescription>
+              <CardDescription>Quais notificações internas entram no resumo enviado por WhatsApp.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -666,18 +673,21 @@ export default function AdminNotificacoesWhatsApp() {
           <Card className="border-amber-200">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-amber-700">
-                <AlertTriangle className="h-4 w-4" />Configuração do Webhook Z-API
+                <AlertTriangle className="h-4 w-4" />Configuração do Webhook W-API
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <p>Configure o webhook da instância Z-API para apontar para:</p>
+              <p>
+                No painel W-API, em <strong>Webhooks → Ao receber</strong>, aponte para:
+              </p>
               <div className="bg-muted rounded-lg p-3 font-mono text-xs break-all">
                 {config.supabase_url
-                  ? `${config.supabase_url}/functions/v1/whatsapp-webhook`
-                  : "https://SEU_PROJETO.supabase.co/functions/v1/whatsapp-webhook"}
+                  ? `${config.supabase_url}/functions/v1/wapi-webhook-notificacoes`
+                  : "https://SEU_PROJETO.supabase.co/functions/v1/wapi-webhook-notificacoes"}
               </div>
               <p className="text-muted-foreground text-xs">
-                Habilite os eventos <strong>ReceivedCallback</strong> e <strong>MessageStatusCallback</strong>.
+                É esse webhook que registra a confirmação de recebimento dos resumos. A W-API só
+                aceita URLs <strong>HTTPS</strong>.
               </p>
             </CardContent>
           </Card>
@@ -713,7 +723,7 @@ export default function AdminNotificacoesWhatsApp() {
                     <p className="font-medium">Pré-requisitos para ativar o Assessor</p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline" className={configCompleta ? "border-green-500 text-green-700" : "border-red-400 text-red-700"}>
-                        {configCompleta ? "✅" : "❌"} Z-API configurada
+                        {configCompleta ? "✅" : "❌"} W-API configurada
                       </Badge>
                       <Badge variant="outline" className={config.ativo ? "border-green-500 text-green-700" : "border-red-400 text-red-700"}>
                         {config.ativo ? "✅" : "❌"} Canal de notificações ativo
@@ -779,7 +789,7 @@ export default function AdminNotificacoesWhatsApp() {
               {config.assessor_ativo && (
                 <div className="flex items-center gap-2 mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3">
                   <Wifi className="h-4 w-4 flex-shrink-0" />
-                  <span>Assessor ativo — aguardando mensagens no número <strong>{config.zapi_phone_number || "configurado"}</strong></span>
+                  <span>Assessor ativo — aguardando mensagens no número <strong>{config.wapi_phone_number || "configurado"}</strong></span>
                 </div>
               )}
             </CardContent>
