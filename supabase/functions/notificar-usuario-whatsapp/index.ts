@@ -465,7 +465,16 @@ serve(async (req: Request) => {
     //
     // A notificação sai no próximo horário configurado, junto com as
     // outras, em um resumo só — ver despachar-notificacoes-whatsapp.
-    if (!payload.forcar_envio_imediato && payload.tenant_id) {
+    //
+    // Em modo rollback (provedor = 'zapi') NÃO se enfileira: o
+    // despachante só opera com W-API, então uma notificação enfileirada
+    // ali ficaria presa na fila para sempre. Com 'zapi' o comportamento
+    // volta a ser o antigo — uma mensagem por notificação, na hora.
+    if (
+      !payload.forcar_envio_imediato &&
+      payload.tenant_id &&
+      config.provedor !== "zapi"
+    ) {
       const fila = await enfileirarNotificacao(supabase, {
         tenant_id: payload.tenant_id,
         notificacao_id: payload.notificacao_id,
