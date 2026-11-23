@@ -1,88 +1,118 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0'
+// ============================================================
+// reset-password — usado pela página Usuários do gabinete.
+//
+// Antes: verify_jwt desligado e nenhuma checagem do chamador —
+// qualquer pessoa trocava a senha de qualquer usuário.
+// Agora: token verificado no servidor de Auth, chamador precisa
+// ser admin do gabinete (ou super admin) e o usuário-alvo precisa
+// ser do mesmo gabinete.
+// ============================================================
+
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
 }
 
-interface ResetPasswordRequest {
+interface Chamador {
   userId: string;
-  newPassword: string;
+  tenantId: string | null;
+  superAdmin: boolean;
+}
+
+/** Valida o token no servidor de Auth e exige admin do gabinete ou super admin. */
+async function identificarChamador(req: Request, admin: SupabaseClient): Promise<Chamador> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) throw new HttpError(401, "Não autenticado");
+
+  const { data, error } = await admin.auth.getUser(token);
+  if (error || !data?.user) throw new HttpError(401, "Sessão inválida — faça login novamente");
+
+  const userId = data.user.id;
+  const [{ data: perfil }, { data: papeis }] = await Promise.all([
+    admin.from("profiles").select("tenant_id, role_no_tenant").eq("id", userId).maybeSingle(),
+    admin.from("user_roles").select("role").eq("user_id", userId),
+  ]);
+
+  const superAdmin = (papeis ?? []).some((p: { role: string }) => p.role === "super_admin");
+  if (!superAdmin && perfil?.role_no_tenant !== "admin") {
+    throw new HttpError(403, "Apenas administradores do gabinete podem fazer isto");
+  }
+  if (!superAdmin && !perfil?.tenant_id) {
+    throw new HttpError(403, "Usuário sem gabinete");
+  }
+
+  return { userId, tenantId: perfil?.tenant_id ?? null, superAdmin };
+}
+
+/** Impede agir sobre usuário de outro gabinete ou sobre um super admin. */
+async function garantirAlvoNoMesmoGabinete(admin: SupabaseClient, chamador: Chamador, alvoId: string) {
+  if (chamador.superAdmin) return;
+
+  const [{ data: alvo }, { data: papeis }] = await Promise.all([
+    admin.from("profiles").select("tenant_id").eq("id", alvoId).maybeSingle(),
+    admin.from("user_roles").select("role").eq("user_id", alvoId),
+  ]);
+
+  if (!alvo || alvo.tenant_id !== chamador.tenantId) {
+    throw new HttpError(403, "Usuário não pertence ao seu gabinete");
+  }
+  if ((papeis ?? []).some((p: { role: string }) => p.role === "super_admin")) {
+    throw new HttpError(403, "Não é permitido alterar um super admin");
+  }
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 Deno.serve(async (req: Request) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('🔑 Iniciando reset de senha...');
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    // Usar service role para ter privilégios administrativos
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
 
-    const { userId, newPassword }: ResetPasswordRequest = await req.json();
+    const chamador = await identificarChamador(req, admin);
 
-    if (!userId || !newPassword) {
-      throw new Error('User ID e nova senha são obrigatórios');
-    }
+    const { userId, newPassword } = await req.json();
+    if (!userId || !newPassword) throw new HttpError(400, "userId e newPassword são obrigatórios");
+    if (String(newPassword).length < 6) throw new HttpError(400, "A senha deve ter pelo menos 6 caracteres");
 
-    if (newPassword.length < 6) {
-      throw new Error('A nova senha deve ter pelo menos 6 caracteres');
-    }
+    await garantirAlvoNoMesmoGabinete(admin, chamador, userId);
 
-    console.log('👤 Atualizando senha para usuário:', userId);
-
-    // Usar Admin API para atualizar senha diretamente
-    const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+    const { data, error } = await admin.auth.admin.updateUserById(userId, {
       password: newPassword,
-      email_confirm: true, // Garante que o email está confirmado
-      email_confirmed_at: new Date().toISOString() // Força confirmação do email
+      email_confirm: true,
     });
+    if (error) throw new HttpError(400, `Erro ao alterar senha: ${error.message}`);
 
-    if (error) {
-      console.error('❌ Erro ao atualizar senha:', error);
-      throw error;
-    }
+    console.log(`🔑 Senha redefinida para ${userId} por ${chamador.userId}`);
 
-    console.log('✅ Senha atualizada com sucesso para:', data.user.email);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Senha atualizada com sucesso',
-        user: {
-          id: data.user.id,
-          email: data.user.email
-        }
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
-    );
-
-  } catch (error) {
-    console.error('❌ Erro no reset de senha:', error);
-    
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Erro interno do servidor'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    );
+    return json({
+      success: true,
+      message: "Senha atualizada com sucesso",
+      user: { id: data.user.id, email: data.user.email },
+    });
+  } catch (error: any) {
+    const status = error instanceof HttpError ? error.status : 500;
+    console.error("❌ reset-password:", error?.message);
+    return json({ success: false, error: error?.message || "Erro interno" }, status);
   }
 });
