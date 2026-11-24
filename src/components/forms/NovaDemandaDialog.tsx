@@ -16,7 +16,12 @@ import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
 import { useAuth } from "@/contexts/AuthContext";
 
-export function NovaDemandaDialog() {
+interface NovaDemandaDialogProps {
+  /** Botão que abre o diálogo. Sem ele, usa o botão padrão "Nova Demanda". */
+  trigger?: React.ReactNode;
+}
+
+export function NovaDemandaDialog({ trigger }: NovaDemandaDialogProps = {}) {
   const { user, roleNoTenant } = useAuth();
   const isRepresentante = roleNoTenant === "representante";
   const [open, setOpen] = useState(false);
@@ -348,10 +353,12 @@ export function NovaDemandaDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Demanda
-        </Button>
+        {trigger ?? (
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Demanda
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>

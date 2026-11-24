@@ -11,35 +11,75 @@ import { EnvioWhatsAppProgress } from "@/components/forms/EnvioWhatsAppProgress"
 import { MunicipeDeletionProgress } from "@/components/forms/MunicipeDeletionProgress";
 import { DemandaNotificationProgress } from "@/components/forms/DemandaNotificationProgress";
 import { AuthLayout } from "@/components/layout/AuthLayout";
-import Dashboard from "./pages/Dashboard";
-import Demandas from "./pages/Demandas";
-import Municipes from "./pages/Municipes";
-import Kanban from "./pages/Kanban";
-import PlanoAcao from "./pages/PlanoAcao";
-import PlanoAcaoDetalhe from "./pages/PlanoAcaoDetalhe";
-import SolicitarAgenda from "./pages/SolicitarAgenda";
-import WhatsApp from "./pages/WhatsApp";
-import ConfiguracoesWhatsApp from "./pages/ConfiguracoesWhatsApp";
-import AssessorIA from "./pages/AssessorIA";
-import Tags from "./pages/Tags";
-import Categorias from "./pages/Categorias";
-import Areas from "./pages/Areas";
-import Usuarios from "./pages/Usuarios";
-import Configuracoes from "./pages/Configuracoes";
-import MapaUnificado from "./pages/MapaUnificado";
-import BalancoDemandas from "./pages/BalancoDemandas";
+import { lazy as reactLazy, Suspense, type ComponentType } from "react";
 import Login from "./pages/Login";
-import EscolherDestino from "./pages/EscolherDestino";
-import AdminSaaS from "./pages/AdminSaaS";
-import AdminNotificacoesWhatsApp from "./pages/AdminNotificacoesWhatsApp";
-import LandingPage from "./pages/LandingPage";
-import NotFound from "./pages/NotFound";
-import ConviteRepresentante from "./pages/ConviteRepresentante";
-import RepresentanteDashboard from "./pages/representante/RepresentanteDashboard";
-import RepresentanteMunicipes from "./pages/representante/RepresentanteMunicipes";
-import RepresentanteDemandas from "./pages/representante/RepresentanteDemandas";
-import RepresentanteAgenda from "./pages/representante/RepresentanteAgenda";
-import RepresentanteMapa from "./pages/representante/RepresentanteMapa";
+
+/**
+ * Como React.lazy, mas se o arquivo da tela não existir mais (o app foi
+ * publicado de novo enquanto a aba estava aberta), recarrega a página uma
+ * vez para buscar a versão nova em vez de quebrar.
+ */
+function lazy<T extends ComponentType<any>>(importar: () => Promise<{ default: T }>) {
+  return reactLazy(async () => {
+    const CHAVE = "recarregou-por-versao-nova";
+    try {
+      const modulo = await importar();
+      try { sessionStorage.removeItem(CHAVE); } catch { /* sem storage */ }
+      return modulo;
+    } catch (erro) {
+      let jaRecarregou = false;
+      try { jaRecarregou = sessionStorage.getItem(CHAVE) === "1"; } catch { /* sem storage */ }
+      if (!jaRecarregou) {
+        try { sessionStorage.setItem(CHAVE, "1"); } catch { /* sem storage */ }
+        window.location.reload();
+        return new Promise<{ default: T }>(() => {}); // aguarda o reload
+      }
+      throw erro;
+    }
+  });
+}
+
+// Cada tela é baixada só quando aberta (antes: um único arquivo de ~3 MB).
+const Inicio = lazy(() => import("./pages/Inicio"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Demandas = lazy(() => import("./pages/Demandas"));
+const Municipes = lazy(() => import("./pages/Municipes"));
+const Kanban = lazy(() => import("./pages/Kanban"));
+const PlanoAcao = lazy(() => import("./pages/PlanoAcao"));
+const PlanoAcaoDetalhe = lazy(() => import("./pages/PlanoAcaoDetalhe"));
+const SolicitarAgenda = lazy(() => import("./pages/SolicitarAgenda"));
+const WhatsApp = lazy(() => import("./pages/WhatsApp"));
+const ConfiguracoesWhatsApp = lazy(() => import("./pages/ConfiguracoesWhatsApp"));
+const AssessorIA = lazy(() => import("./pages/AssessorIA"));
+const Tags = lazy(() => import("./pages/Tags"));
+const Categorias = lazy(() => import("./pages/Categorias"));
+const Areas = lazy(() => import("./pages/Areas"));
+const Usuarios = lazy(() => import("./pages/Usuarios"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const MapaUnificado = lazy(() => import("./pages/MapaUnificado"));
+const BalancoDemandas = lazy(() => import("./pages/BalancoDemandas"));
+const EscolherDestino = lazy(() => import("./pages/EscolherDestino"));
+const AdminSaaS = lazy(() => import("./pages/AdminSaaS"));
+const AdminNotificacoesWhatsApp = lazy(() => import("./pages/AdminNotificacoesWhatsApp"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const ConviteRepresentante = lazy(() => import("./pages/ConviteRepresentante"));
+const RepresentanteDashboard = lazy(() => import("./pages/representante/RepresentanteDashboard"));
+const RepresentanteMunicipes = lazy(() => import("./pages/representante/RepresentanteMunicipes"));
+const RepresentanteDemandas = lazy(() => import("./pages/representante/RepresentanteDemandas"));
+const RepresentanteAgenda = lazy(() => import("./pages/representante/RepresentanteAgenda"));
+const RepresentanteMapa = lazy(() => import("./pages/representante/RepresentanteMapa"));
+
+function CarregandoTela() {
+  return (
+    <div className="flex items-center justify-center py-20" role="status" aria-live="polite">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +106,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
           <AuthLayout>
+            <Suspense fallback={<CarregandoTela />}>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/site" element={<LandingPage />} />
@@ -78,7 +119,8 @@ const App = () => (
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Inicio />} />
+              <Route path="/visao-geral" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />
               <Route path="/kanban" element={<Kanban />} />
@@ -98,6 +140,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
             </AuthLayout>
           </BrowserRouter>
           <EnvioWhatsAppProgress />

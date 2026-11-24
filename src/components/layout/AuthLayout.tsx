@@ -11,9 +11,20 @@ import { useDemandaStatusMonitor } from "@/hooks/useDemandaStatusMonitor";
 import { useDemandaNotificationSender } from "@/hooks/useDemandaNotificationSender";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { LogOut, User } from "lucide-react";
+import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
+}
+
+/** Nome do gabinete no cabeçalho. Componente próprio para só consultar após o login. */
+function NomeGabinete() {
+  const { data: config } = useConfiguracoes();
+  return (
+    <h1 className="text-sm md:text-base font-semibold text-foreground truncate">
+      {config?.gabinete?.nome || "Gabinete"}
+    </h1>
+  );
 }
 
 export function AuthLayout({ children }: AuthLayoutProps) {
@@ -145,13 +156,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b bg-card px-4 safe-area-top">
-            <div className="flex items-center gap-2 min-w-0">
-              {/* No mobile, esconder o trigger pois temos o BottomNav */}
-              <SidebarTrigger className="hidden md:flex" />
-              <h1 className="text-sm md:text-lg font-semibold text-foreground truncate hidden md:block">
-                Sistema de Gestão do Gabinete
-              </h1>
+          <header className="h-14 flex items-center justify-between gap-2 border-b bg-card px-2 md:px-4 safe-area-top sticky top-0 z-40">
+            <div className="flex items-center gap-1 md:gap-2 min-w-0">
+              {/* Menu completo: no celular é o único acesso às telas fora da barra inferior */}
+              <SidebarTrigger className="h-9 w-9" aria-label="Abrir menu" />
+              <NomeGabinete />
             </div>
             
             <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">

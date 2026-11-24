@@ -16,6 +16,7 @@ import {
   MapPin,
   Layers,
   Shield,
+  PieChart,
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,29 +34,57 @@ import {
 } from "@/components/ui/sidebar";
 
 type MenuItem = { title: string; url: string; icon: typeof Home; enabled?: boolean };
+type MenuGroup = { label: string | null; items: MenuItem[] };
 
-const allMenuItems: MenuItem[] = [
-  { title: "Visão Geral", url: "/", icon: Home },
-  { title: "Demandas", url: "/demandas", icon: FileText },
-  { title: "Mapa", url: "/mapa", icon: MapPin },
-  { title: "Munícipes", url: "/municipes", icon: Users },
-  { title: "Kanban", url: "/kanban", icon: Columns },
-  { title: "Plano de Ação", url: "/plano-acao", icon: Target, enabled: FEATURES.planoAcao },
-  { title: "Solicitar Agenda", url: "/solicitar-agenda", icon: Calendar },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, enabled: FEATURES.disparosWhatsApp },
-  { title: "Assessor IA", url: "/assessor-ia", icon: Bot, enabled: FEATURES.assessorIA },
-  { title: "Tags", url: "/tags", icon: Tags },
-  { title: "Categorias", url: "/categorias", icon: Layers },
-  { title: "Áreas", url: "/areas", icon: Building2 },
-  { title: "Usuários", url: "/usuarios", icon: UserCheck },
-  { title: "Configurações", url: "/config", icon: Settings },
+/**
+ * Menu em grupos (revisão de navegação, Fase 2):
+ *   Início · Atendimento · Análises · Gabinete
+ * Itens com `enabled: false` ficam ocultos (ver src/lib/featureFlags.ts).
+ */
+const allGroups: MenuGroup[] = [
+  {
+    label: null,
+    items: [{ title: "Início", url: "/", icon: Home }],
+  },
+  {
+    label: "Atendimento",
+    items: [
+      { title: "Demandas", url: "/demandas", icon: FileText },
+      { title: "Munícipes", url: "/municipes", icon: Users },
+      { title: "Kanban", url: "/kanban", icon: Columns },
+      { title: "Agenda", url: "/solicitar-agenda", icon: Calendar },
+      { title: "Mapa", url: "/mapa", icon: MapPin },
+      { title: "Plano de Ação", url: "/plano-acao", icon: Target, enabled: FEATURES.planoAcao },
+      { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, enabled: FEATURES.disparosWhatsApp },
+      { title: "Assessor IA", url: "/assessor-ia", icon: Bot, enabled: FEATURES.assessorIA },
+    ],
+  },
+  {
+    label: "Análises",
+    items: [
+      { title: "Visão geral", url: "/visao-geral", icon: BarChart3 },
+      { title: "Balanço de Demandas", url: "/balanco-demandas", icon: PieChart },
+    ],
+  },
+  {
+    label: "Gabinete",
+    items: [
+      { title: "Usuários", url: "/usuarios", icon: UserCheck },
+      { title: "Tags", url: "/tags", icon: Tags },
+      { title: "Categorias", url: "/categorias", icon: Layers },
+      { title: "Áreas", url: "/areas", icon: Building2 },
+      { title: "Configurações", url: "/config", icon: Settings },
+    ],
+  },
 ];
 
-const menuItems = allMenuItems.filter((item) => item.enabled !== false);
+const menuGroups = allGroups
+  .map((g) => ({ ...g, items: g.items.filter((i) => i.enabled !== false) }))
+  .filter((g) => g.items.length > 0);
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
   const location = useLocation();
   const currentPath = location.pathname;
   const { data: config } = useConfiguracoes();
@@ -69,9 +98,14 @@ export function AppSidebar() {
   };
 
   const getNavCls = (active: boolean) =>
-    active 
-      ? "bg-primary text-primary-foreground font-medium" 
+    active
+      ? "bg-primary text-primary-foreground font-medium"
       : "hover:bg-accent text-foreground";
+
+  // No celular, fechar o menu ao escolher uma tela
+  const aoNavegar = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
@@ -79,14 +113,14 @@ export function AppSidebar() {
         <div className="p-4 border-b">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shrink-0">
                 <BarChart3 className="h-4 w-4 text-white" />
               </div>
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-foreground truncate">
                   {config?.gabinete?.nome || "Gabinete"}
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground truncate">
                   {config?.gabinete?.descricao || "Sistema de Gestão"}
                 </p>
               </div>
@@ -99,34 +133,39 @@ export function AppSidebar() {
           )}
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className={collapsed ? "sr-only" : ""}>
-            Navegação Principal
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      end={item.url === "/"}
-                      className={getNavCls(isActive(item.url))}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuGroups.map((group, gi) => (
+          <SidebarGroup key={group.label ?? `grupo-${gi}`} className={group.label ? "py-1" : "pt-2 pb-0"}>
+            {group.label && (
+              <SidebarGroupLabel className={collapsed ? "sr-only" : "uppercase tracking-wide text-[11px]"}>
+                {group.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
+                      <NavLink
+                        to={item.url}
+                        end={item.url === "/"}
+                        className={getNavCls(isActive(item.url))}
+                        onClick={aoNavegar}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
 
         {/* Link para Admin SaaS — só para superadmin */}
         {isSuperAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel className={collapsed ? "sr-only" : ""}>
+            <SidebarGroupLabel className={collapsed ? "sr-only" : "uppercase tracking-wide text-[11px]"}>
               Administração
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -135,6 +174,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to="/admin"
+                      onClick={aoNavegar}
                       className={`${getNavCls(isActive("/admin"))} border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15`}
                     >
                       <Shield className="h-4 w-4 text-amber-600" />

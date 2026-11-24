@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -46,12 +46,14 @@ export function CamposBuscaSelect({ opcoes, value, onChange, padrao, dica, class
         <Button
           variant="outline"
           size="sm"
-          className={cn("h-10 shrink-0 gap-1.5 px-2.5 md:px-3 font-normal", className)}
+          className={cn("h-10 w-10 sm:w-auto shrink-0 gap-1.5 px-0 sm:px-3 font-normal", className)}
           aria-label={`Buscar em: ${rotulo}`}
         >
+          {/* Celular: só o ícone, para não espremer o campo de busca */}
+          <ListChecks className="h-4 w-4 sm:hidden" />
           <span className="hidden sm:inline text-muted-foreground">Em:</span>
-          <span className="max-w-[90px] sm:max-w-[150px] truncate">{rotulo}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          <span className="hidden sm:inline max-w-[150px] truncate">{rotulo}</span>
+          <ChevronDown className="hidden sm:inline h-3.5 w-3.5 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-60 p-3">
