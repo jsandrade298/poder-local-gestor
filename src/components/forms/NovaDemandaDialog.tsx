@@ -227,7 +227,9 @@ export function NovaDemandaDialog({ trigger }: NovaDemandaDialogProps = {}) {
         area_id: data.area_id || null,
         responsavel_id: data.responsavel_id || null,
         // FIX: Se o usuário é representante, forçar representante_id = user.id
-        representante_id: isRepresentante ? user?.id : (data.representante_id || null),
+        // (o `user` aqui é a resposta de getUser(): o id fica em user.user.id —
+        //  antes lia user.id, que não existe, e gravava vazio)
+        representante_id: isRepresentante ? user.user.id : (data.representante_id || null),
         data_prazo: data.data_prazo || null,
         logradouro: data.logradouro || null,
         numero: data.numero || null,

@@ -915,7 +915,7 @@ const AssessorIA = () => {
     if (trocas < 2) return;
     const historico = msgs.filter((m) => m.id !== "welcome").map((m) => ({ role: m.role, content: m.content }));
     try {
-      await supabase.functions.invoke("extrair-memorias", { body: { historico, modoId } });
+      await supabase.functions.invoke("extrair-memorias", { body: { historico, modoId: modeId } });
     } catch { /* silencioso */ }
   }, []);
 

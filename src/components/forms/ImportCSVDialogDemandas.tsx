@@ -252,7 +252,7 @@ export function ImportCSVDialogDemandas({
                             </Badge>
                           )}
                           {result.geocodificado && (
-                            <MapPin className="h-3 w-3 text-blue-600 flex-shrink-0" title="Geocodificado" />
+                            <span title="Geocodificado" className="flex-shrink-0"><MapPin className="h-3 w-3 text-blue-600" aria-label="Geocodificado" /></span>
                           )}
                         </>
                       ) : (

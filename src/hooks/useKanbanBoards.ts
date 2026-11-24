@@ -166,10 +166,36 @@ export function useKanbanBoards() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Board atualizado!');
+      toast.success('Projeto atualizado!');
       queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+      queryClient.invalidateQueries({ queryKey: ['inicio-meus-projetos'] });
     },
-    onError: (err: any) => toast.error('Erro ao atualizar board: ' + err.message),
+    onError: (err: any) => toast.error('Erro ao atualizar o projeto: ' + err.message),
+  });
+
+  /**
+   * Exclui de vez o projeto: etapas, cartões, checklist, comentários e
+   * histórico vão junto (cascata no banco). Demandas vinculadas NÃO são
+   * apagadas — só deixam de estar vinculadas ao cartão.
+   */
+  const deleteBoard = useMutation({
+    mutationFn: async (id: string) => {
+      const { error, count } = await supabase
+        .from('kanban_boards')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) throw error;
+      if (!count) throw new Error('Você não tem permissão para excluir este projeto');
+    },
+    onSuccess: () => {
+      toast.success('Projeto excluído');
+      queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+      queryClient.invalidateQueries({ queryKey: ['quadros-resumos'] });
+      queryClient.invalidateQueries({ queryKey: ['quadros-membros-todos'] });
+      queryClient.invalidateQueries({ queryKey: ['inicio-meus-projetos'] });
+      queryClient.invalidateQueries({ queryKey: ['inicio-minhas-tarefas'] });
+    },
+    onError: (err: any) => toast.error('Erro ao excluir o projeto: ' + err.message),
   });
 
   const archiveBoard = useMutation({
@@ -187,7 +213,7 @@ export function useKanbanBoards() {
     onError: (err: any) => toast.error('Erro ao arquivar board: ' + err.message),
   });
 
-  return { boards, isLoading, createBoard, updateBoard, archiveBoard };
+  return { boards, isLoading, createBoard, updateBoard, archiveBoard, deleteBoard };
 }
 
 // ── Hook: colunas de um board ──────────────────────────────────

@@ -522,7 +522,7 @@ export default function Kanban() {
           kanban_type: selectedUser,
           posicao_anterior: item.kanban_position,
           acao: 'removido',
-          snapshot,
+          snapshot: snapshot as unknown as Record<string, unknown>,
         });
       }
 

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
 import { Avatar } from "@/components/quadros/CartaoProjetoDrawer";
+import { AcoesProjeto } from "@/components/quadros/AcoesProjeto";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useKanbanBoards } from "@/hooks/useKanbanBoards";
@@ -36,13 +37,17 @@ function Progresso({ r }: { r: Resumo }) {
   );
 }
 
-function CartaoQuadro({ para, icone, cor, tipo, nome, descricao, resumo, membros, rotulo }: {
+function CartaoQuadro({ para, icone, cor, tipo, nome, descricao, resumo, membros, rotulo, acoes }: {
   para: string; icone: string; cor: string; tipo: string; nome: string; descricao?: string | null;
   resumo: Resumo; membros?: { id: string; nome?: string }[]; rotulo?: React.ReactNode;
+  /** Menu ⋯ (fica fora do link, para o clique não abrir o quadro) */
+  acoes?: React.ReactNode;
 }) {
   return (
-    <Link to={para} className="group rounded-xl border bg-card p-4 shadow-sm hover:border-primary transition-colors flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="relative flex">
+    {acoes && <div className="absolute right-2 top-2 z-10">{acoes}</div>}
+    <Link to={para} className="group flex-1 rounded-xl border bg-card p-4 shadow-sm hover:border-primary transition-colors flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <div className={cn("flex items-center gap-3 min-w-0", acoes && "pr-8")}>
         <span className="h-10 w-10 rounded-lg grid place-items-center text-xl shrink-0" style={{ background: `${cor}22` }}>{icone}</span>
         <div className="min-w-0">
           <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold">{tipo}</div>
@@ -61,6 +66,7 @@ function CartaoQuadro({ para, icone, cor, tipo, nome, descricao, resumo, membros
         </div>
       </div>
     </Link>
+    </div>
   );
 }
 
@@ -129,7 +135,7 @@ export default function Quadros() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-bold">Quadros</h1>
-          <p className="text-sm text-muted-foreground">O trabalho do gabinete em um lugar: o quadro da equipe, o seu e os projetos.</p>
+          <p className="text-sm text-muted-foreground">O trabalho do gabinete em um lugar: o seu quadro e os projetos.</p>
         </div>
         <Button className="gap-1.5 self-start" onClick={() => setCriando(true)}><Plus className="h-4 w-4" /> Novo projeto</Button>
       </div>
@@ -140,7 +146,7 @@ export default function Quadros() {
         <>
           {/* Dia a dia: equipe + meu quadro */}
           <section className="space-y-2" aria-labelledby="sec-dia">
-            <h2 id="sec-dia" className="text-sm font-semibold text-muted-foreground">Do dia a dia</h2>
+            <h2 id="sec-dia" className="text-sm font-semibold text-muted-foreground">Seu quadro</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {equipe.map((b: any) => (
                 <CartaoQuadro key={b.id} para={`/quadros/${b.id}`} icone={b.icone} cor={b.cor} tipo="Equipe" nome={b.nome}
@@ -150,7 +156,8 @@ export default function Quadros() {
               {meu ? (
                 <CartaoQuadro para={`/quadros/${meu.id}`} icone={meu.icone} cor={meu.cor} tipo="Pessoal" nome="Meu quadro"
                   descricao="Suas tarefas. O gabinete acompanha; só você edita." resumo={resumo(meu.id)}
-                  membros={[{ id: uid, nome: porId.get(uid)?.nome }]} />
+                  membros={[{ id: uid, nome: porId.get(uid)?.nome }]}
+                  acoes={<AcoesProjeto board={meu} podeEditar />} />
               ) : (
                 <button type="button" onClick={abrirMeuQuadro} disabled={abrindoMeu}
                   className="rounded-xl border bg-card p-4 shadow-sm hover:border-primary transition-colors text-left flex flex-col gap-2">
@@ -177,6 +184,7 @@ export default function Quadros() {
               {projetos.map((p: any) => (
                 <CartaoQuadro key={p.id} para={`/quadros/${p.id}`} icone={p.icone} cor={p.cor} tipo="Projeto" nome={p.nome}
                   descricao={p.descricao} resumo={resumo(p.id)} membros={p.membros}
+                  acoes={<AcoesProjeto board={p} podeEditar={p.souMembro} />}
                   rotulo={p.souMembro
                     ? <span className="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Você participa</span>
                     : <span className="rounded-full bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 text-[11px] font-semibold px-2 py-0.5 flex items-center gap-1"><Lock className="h-3 w-3" /> Só leitura</span>} />

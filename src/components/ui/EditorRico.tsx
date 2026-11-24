@@ -17,8 +17,8 @@ import type { Pessoa } from "@/hooks/useQuadros";
  * Textos antigos (texto puro, com menções "@[Nome](id)" e links soltos)
  * continuam sendo exibidos e editados normalmente.
  *
- * Obs.: o DOMPurify chega ao projeto como dependência do jspdf (já usado).
- * Ao trocar ou remover o jspdf, adicione "dompurify" ao package.json.
+ * O DOMPurify é dependência direta (package.json), na mesma versão usada
+ * pelo jspdf, para não haver duas cópias.
  */
 
 const PERMITIDO = {

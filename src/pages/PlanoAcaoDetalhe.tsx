@@ -485,7 +485,7 @@ export default function PlanoAcaoDetalhe() {
 
       const linhasToInsert = importPreview.map((row, idx) => {
         const dados: Record<string, any> = {};
-        Object.entries(row).forEach(([header, value]) => {
+        Object.entries(row as Record<string, string>).forEach(([header, value]) => {
           const col = colMap[header.toLowerCase().trim()];
           if (!col) return;
           if (col.tipo === "checkbox") {

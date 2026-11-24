@@ -54,7 +54,10 @@ export function CreateBoardDialog({ open, onOpenChange, editingBoard }: CreateBo
     } else {
       setForm({ nome: "", descricao: "", icone: "📋", cor: "#3b82f6" });
     }
-  }, [editingBoard, open]);
+    // Só ao abrir ou trocar de projeto: a lista recarrega e cria um objeto
+    // novo a cada vez, o que apagaria o que a pessoa está digitando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingBoard?.id, open]);
 
   const handleSave = () => {
     if (!form.nome.trim()) return;
@@ -71,10 +74,10 @@ export function CreateBoardDialog({ open, onOpenChange, editingBoard }: CreateBo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Editar Board" : "Novo Board de Projeto"}
+            {isEditing ? "Editar projeto" : "Novo projeto"}
           </DialogTitle>
         </DialogHeader>
 
@@ -143,7 +146,7 @@ export function CreateBoardDialog({ open, onOpenChange, editingBoard }: CreateBo
               id="board-descricao"
               value={form.descricao}
               onChange={(e) => setForm(f => ({ ...f, descricao: e.target.value }))}
-              placeholder="Descreva o objetivo deste board..."
+              placeholder="Para que serve este projeto…"
               rows={2}
             />
           </div>
@@ -157,7 +160,7 @@ export function CreateBoardDialog({ open, onOpenChange, editingBoard }: CreateBo
               {form.icone}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{form.nome || "Nome do board"}</p>
+              <p className="font-medium truncate">{form.nome || "Nome do projeto"}</p>
               <div className="w-10 h-1 rounded-full mt-1" style={{ backgroundColor: form.cor }} />
             </div>
           </div>
@@ -169,7 +172,7 @@ export function CreateBoardDialog({ open, onOpenChange, editingBoard }: CreateBo
             </Button>
             <Button onClick={handleSave} disabled={!form.nome.trim() || isPending}>
               <Save className="h-4 w-4 mr-2" />
-              {isPending ? "Salvando..." : isEditing ? "Salvar" : "Criar Board"}
+              {isPending ? "Salvando..." : isEditing ? "Salvar" : "Criar projeto"}
             </Button>
           </div>
         </div>

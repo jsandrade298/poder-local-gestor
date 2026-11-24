@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoardColumnConfig } from "@/components/kanban/BoardColumnConfig";
 import { CartaoProjetoDrawer, Avatar } from "@/components/quadros/CartaoProjetoDrawer";
+import { AcoesProjeto } from "@/components/quadros/AcoesProjeto";
 import { ConfirmarStatusDemandaDialog, MovimentoDemandaKanban, sugerirStatusParaColuna } from "@/components/kanban/ConfirmarStatusDemandaDialog";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,10 +64,10 @@ export default function QuadroProjeto() {
   const [movimentos, setMovimentos] = useState<MovimentoDemandaKanban[]>([]);
   const { statusList } = useDemandaStatus();
 
-  // Quem edita: equipe = todo o gabinete; pessoal e projeto = membros
-  // (no pessoal, o dono). Responsável e colaboradores editam o próprio cartão.
+  // Quem edita o quadro: pessoal = só o dono; projeto = membros.
+  // (O banco garante o mesmo.) Responsável e colaboradores editam o próprio cartão.
   const tipo = board?.tipo ?? "projeto";
-  const editavel = tipo === "equipe" || souMembro;
+  const editavel = tipo === "pessoal" ? board?.dono_id === uid : tipo === "equipe" || souMembro;
   const podeEditar = (c: KanbanBoardCard) =>
     editavel || c.responsavel_id === uid || (extras.colab.get(c.id) || []).includes(uid);
   const dono = board?.dono_id ? porId.get(board.dono_id) : undefined;
@@ -208,6 +209,7 @@ export default function QuadroProjeto() {
           {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)}><Settings2 className="h-4 w-4" /> Etapas</Button>}
           {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)}><Link2 className="h-4 w-4" /> Demanda</Button>}
           {editavel && colunas[0] && <Button size="sm" className="gap-1.5" onClick={() => { setNovoNaColuna(colunas[0].id); setAgrupar("etapa"); }}><Plus className="h-4 w-4" /> Cartão</Button>}
+          <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} className="border" />
         </div>
       </div>
 

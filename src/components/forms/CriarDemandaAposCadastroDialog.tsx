@@ -57,7 +57,7 @@ export function CriarDemandaAposCadastroDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { buscarCep, isLoading: isBuscandoCep } = useBrasilAPI();
-  const { geocodificarEndereco, isLoading: isGeocodificando } = useGeocoding();
+  const { geocode, isLoading: isGeocodificando } = useGeocoding();
   const { statusList } = useDemandaStatus();
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null }>({
     lat: null,
@@ -136,7 +136,8 @@ export function CriarDemandaAposCadastroDialog({
       return;
     }
 
-    const resultado = await geocodificarEndereco(enderecoCompleto);
+    const achado = await geocode(enderecoCompleto);
+    const resultado = achado ? { lat: achado.latitude, lng: achado.longitude } : null;
     if (resultado) {
       setCoordenadas({ lat: resultado.lat, lng: resultado.lng });
       toast({

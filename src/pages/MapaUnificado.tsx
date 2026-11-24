@@ -3006,6 +3006,7 @@ export default function MapaUnificado() {
                 cep: null,
                 endereco_completo: p.endereco || null,
                 tags: [],
+                categoria_id: null,
                 demandas_count: 0,
                 geocodificado: true,
                 tipo: 'municipe'

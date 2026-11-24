@@ -33,7 +33,9 @@ export default function KanbanRedirect() {
         return ir(data ? urlDoCartao(data.board_id, data.id) : "/quadros");
       }
       if (quadro === "producao-legislativa") {
-        const { data } = await (supabase.from("kanban_boards") as any).select("id").eq("tipo", "equipe").maybeSingle();
+        // Não há mais quadro fixo: procura o projeto com esse nome (pode ter sido renomeado ou excluído)
+        const { data } = await (supabase.from("kanban_boards") as any).select("id")
+          .is("arquivado_em", null).ilike("nome", "produção legislativa").limit(1).maybeSingle();
         return ir(data ? `/quadros/${data.id}` : "/quadros");
       }
       if (quadro) {

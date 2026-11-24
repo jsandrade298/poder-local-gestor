@@ -264,7 +264,7 @@ export function useMapaRepresentante() {
       
       console.log(`📊 [MAPA] Demandas retornadas do banco: ${data?.length || 0}`);
       
-      const processadas = (data || []).map(d => {
+      const processadas = (data || []).map((d: any) => { // juntas 1-para-1 (municipes, areas) chegam como objeto, não lista
         // Tentar usar coordenadas da demanda, senão do munícipe
         let lat = d.latitude;
         let lng = d.longitude;
