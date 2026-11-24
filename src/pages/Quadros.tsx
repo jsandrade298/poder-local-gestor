@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Users, Lock, CheckCircle2 } from "lucide-react";
+import { Plus, Users, Lock, CheckCircle2, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -11,7 +11,7 @@ import { AcoesProjeto } from "@/components/quadros/AcoesProjeto";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useKanbanBoards } from "@/hooks/useKanbanBoards";
-import { useMembrosDeTodosQuadros, usePessoasGabinete, colunaEhFinal, garantirQuadroPessoal } from "@/hooks/useQuadros";
+import { useMembrosDeTodosQuadros, usePessoasGabinete, colunaEhFinal, garantirQuadroPessoal, useProjetosArquivados } from "@/hooks/useQuadros";
 import { fetchAll } from "@/lib/fetchAll";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +83,7 @@ export default function Quadros() {
   const escolher = (f: Filtro) => { setFiltro(f); try { localStorage.setItem("quadros-filtro", f); } catch { /* sem storage */ } };
   const [criando, setCriando] = useState(false);
   const [abrindoMeu, setAbrindoMeu] = useState(false);
+  const arquivados = useProjetosArquivados();
 
   // Resumo de todos os quadros (cartões por etapa), sem o limite de mil
   const resumos = useQuery({
@@ -222,6 +223,33 @@ export default function Quadros() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground px-4 py-2 border-t">Para acompanhar. Só o dono edita o próprio quadro; quem estiver incluído num cartão edita aquele cartão.</p>
+            </details>
+          )}
+          {/* Projetos arquivados (para desarquivar) */}
+          {(arquivados.data?.length ?? 0) > 0 && (
+            <details className="group rounded-xl border bg-card">
+              <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">Projetos arquivados <span className="text-muted-foreground font-normal">({arquivados.data!.length})</span></span>
+                <span className="text-xs text-muted-foreground group-open:hidden">Mostrar</span>
+                <span className="text-xs text-muted-foreground hidden group-open:inline">Esconder</span>
+              </summary>
+              <div className="divide-y border-t">
+                {arquivados.data!.map((b: any) => (
+                  <div key={b.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: b.cor || "hsl(var(--muted-foreground))" }} />
+                    <span className="text-sm flex-1 min-w-0 truncate">{b.nome}</span>
+                    <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">arquivado em {new Date(b.arquivado_em).toLocaleDateString("pt-BR")}</span>
+                    {b.membros.includes(uid) ? (
+                      <Button size="sm" variant="outline" className="h-8 gap-1 shrink-0" disabled={arquivados.desarquivar.isPending}
+                        onClick={() => arquivados.desarquivar.mutate(b.id)}>
+                        <ArchiveRestore className="h-3.5 w-3.5" /> Desarquivar
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground shrink-0">só membros desarquivam</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </details>
           )}
         </>

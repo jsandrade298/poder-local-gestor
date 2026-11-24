@@ -200,17 +200,33 @@ export function useKanbanBoards() {
 
   const archiveBoard = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('kanban_boards')
+      const { data, error } = await (supabase
+        .from('kanban_boards') as any)
         .update({ arquivado_em: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('só os membros do projeto podem arquivá-lo');
+      return id;
     },
-    onSuccess: () => {
-      toast.success('Board arquivado!');
-      queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+    onSuccess: (id: string) => {
+      const atualizar = () => {
+        queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+        queryClient.invalidateQueries({ queryKey: ['projetos-arquivados'] });
+      };
+      atualizar();
+      toast.success('Projeto arquivado', {
+        description: 'Fica em "Projetos arquivados", no fim da página Quadros.',
+        action: {
+          label: 'Desfazer',
+          onClick: async () => {
+            await (supabase.from('kanban_boards') as any).update({ arquivado_em: null }).eq('id', id);
+            atualizar();
+          },
+        },
+      });
     },
-    onError: (err: any) => toast.error('Erro ao arquivar board: ' + err.message),
+    onError: (err: any) => toast.error('Erro ao arquivar: ' + err.message),
   });
 
   return { boards, isLoading, createBoard, updateBoard, archiveBoard, deleteBoard };
@@ -442,34 +458,53 @@ export function useKanbanBoardCards(boardId: string | undefined) {
 
   const archiveCard = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('kanban_board_cards')
+      const { data, error } = await (supabase
+        .from('kanban_board_cards') as any)
         .update({ arquivado_em: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('sem permissão neste cartão');
+      return id;
     },
-    onSuccess: () => {
-      toast.success('Card arquivado!');
-      queryClient.invalidateQueries({ queryKey: ['kanban-board-cards', boardId] });
-      queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+    onSuccess: (id: string) => {
+      const atualizar = () => {
+        queryClient.invalidateQueries({ queryKey: ['kanban-board-cards', boardId] });
+        queryClient.invalidateQueries({ queryKey: ['cartoes-arquivados', boardId] });
+        queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+      };
+      atualizar();
+      toast.success('Cartão arquivado', {
+        description: 'Fica em "Arquivados", no topo do quadro.',
+        action: {
+          label: 'Desfazer',
+          onClick: async () => {
+            await (supabase.from('kanban_board_cards') as any).update({ arquivado_em: null }).eq('id', id);
+            atualizar();
+          },
+        },
+      });
     },
-    onError: (err: any) => toast.error('Erro ao arquivar card: ' + err.message),
+    onError: (err: any) => toast.error('Erro ao arquivar: ' + err.message),
   });
 
   const deleteCard = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('kanban_board_cards')
+      const { data, error } = await (supabase
+        .from('kanban_board_cards') as any)
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('sem permissão para excluir este cartão');
     },
     onSuccess: () => {
-      toast.success('Card excluído!');
+      toast.success('Cartão excluído');
       queryClient.invalidateQueries({ queryKey: ['kanban-board-cards', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['cartoes-arquivados', boardId] });
       queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
     },
-    onError: (err: any) => toast.error('Erro ao excluir card: ' + err.message),
+    onError: (err: any) => toast.error('Erro ao excluir: ' + err.message),
   });
 
   return { cards, isLoading, createCard, updateCard, moveCard, archiveCard, deleteCard };

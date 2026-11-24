@@ -74,8 +74,8 @@ interface TenantRow {
   max_municipes: number;
   max_demandas: number;
   created_at: string;
-  /** Identidade visual do gabinete (manual Jorgeus): "brasil" | "jovem" */
-  perfil_visual?: "brasil" | "jovem";
+  /** Identidade visual do gabinete (manual Jorgeus): "brasil" | "tech" */
+  perfil_visual?: "brasil" | "tech";
   total_usuarios: number;
   total_municipes: number;
   total_demandas: number;
@@ -272,7 +272,7 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
   const [maxUsuarios, setMaxUsuarios] = useState(tenant.max_usuarios);
   const [maxMunicipes, setMaxMunicipes] = useState(tenant.max_municipes);
   const [maxDemandas, setMaxDemandas] = useState(tenant.max_demandas);
-  const [perfil, setPerfil] = useState<"brasil" | "jovem">(tenant.perfil_visual === "jovem" ? "jovem" : "brasil");
+  const [perfil, setPerfil] = useState<"brasil" | "tech">(tenant.perfil_visual === "tech" ? "tech" : "brasil");
   const { toast } = useToast();
 
   const editarMutation = useMutation({
@@ -318,7 +318,7 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
             <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Identidade visual do gabinete">
               {([
                 { v: "brasil", nome: "Brasil!", desc: "Institucional, cívico, municipalista", cores: ["#1D4ED8", "#10B981", "#EAB308"] },
-                { v: "jovem", nome: "Jovem", desc: "Digital, inovação, comunicação", cores: ["#7E22CE", "#EC4899", "#2563EB", "#84CC16"] },
+                { v: "tech", nome: "Tech", desc: "Digital, inovação, comunicação", cores: ["#7E22CE", "#EC4899", "#2563EB", "#84CC16"] },
               ] as const).map((o) => (
                 <button
                   key={o.v} type="button" role="radio" aria-checked={perfil === o.v} onClick={() => setPerfil(o.v)}
@@ -1176,8 +1176,8 @@ export default function AdminSaaS() {
                         <Badge variant={t.ativo ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">{t.ativo ? "Ativo" : "Inativo"}</Badge>
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t.plano}</Badge>
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
-                          <img src={`/brand/${t.perfil_visual === "jovem" ? "jovem" : "brasil"}-icone.png`} alt="" className="h-3 w-3" />
-                          {t.perfil_visual === "jovem" ? "Jovem" : "Brasil!"}
+                          <img src={`/brand/${t.perfil_visual === "tech" ? "tech" : "brasil"}-icone.png`} alt="" className="h-3 w-3" />
+                          {t.perfil_visual === "tech" ? "Tech" : "Brasil!"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">

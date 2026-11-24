@@ -3,10 +3,10 @@
 Uso: python scripts/gerar-marca.py design/marca/originais public   (precisa de pillow e numpy)
 
 Entradas (pasta IMG):
-  1 Brasil logo claro · 3 Brasil ícone claro · 5 Jovem ícone claro · 8 Jovem logo claro
+  1 Brasil logo claro · 3 Brasil ícone claro · 5 Tech (ex-Jovem) ícone claro · 8 Tech logo claro
   2 Brasil ícone escuro (fundo navy, para ícone do app)
 Saídas (pasta OUT = public/brand e public/icons):
-  brasil|jovem -icone.png, -logo-claro.png, -logo-escuro.png
+  brasil|tech -icone.png (o perfil "Tech" se chamava "Jovem"; os originais mantêm o nome), -logo-claro.png, -logo-escuro.png
   favicon, apple-touch, ícones do PWA (Brasil!).
 """
 import sys
@@ -83,12 +83,12 @@ import os
 os.makedirs(marca, exist_ok=True)
 
 # Ícones (monograma J)
-icone = {"brasil": aparar(cor_para_alfa(abrir("brasil-icone-claro"))), "jovem": aparar(cor_para_alfa(abrir("jovem-icone-claro")))}
+icone = {"brasil": aparar(cor_para_alfa(abrir("brasil-icone-claro"))), "tech": aparar(cor_para_alfa(abrir("jovem-icone-claro")))}
 for p, im in icone.items():
     quadrado(im, 512, folga=0.02).save(f"{marca}/{p}-icone.png", optimize=True)
 
 # Logos completos
-for p, n in (("brasil", "brasil-logo-claro"), ("jovem", "jovem-logo-claro")):
+for p, n in (("brasil", "brasil-logo-claro"), ("tech", "jovem-logo-claro")):
     claro = aparar(cor_para_alfa(abrir(n)), margem=0.01)
     claro.thumbnail((1400, 1400), Image.LANCZOS)
     claro.save(f"{marca}/{p}-logo-claro.png", optimize=True)

@@ -5,13 +5,13 @@
 /* ═══════════════════════════════════════════════════════════════
    JORGEUS — Design tokens (Manual de Identidade Visual, 24/11/2026)
 
-   Dois perfis por gabinete (Super Admin): data-perfil="brasil" | "jovem"
+   Dois perfis por gabinete (Super Admin): data-perfil="brasil" | "tech"
    no <html>. Claro/escuro por usuário: classe .dark no <html>.
    Os componentes usam só os tokens (hsl(var(--primary)) etc.); trocar
    de perfil ou de modo recolore o app inteiro.
 
    Brasil!  azul #1D4ED8 · esmeralda #10B981 · ouro #EAB308 · fundo escuro #08182B
-   Jovem    roxo #7E22CE · azul #2563EB · magenta #EC4899 · lima #84CC16 · fundo escuro #100B28
+   Tech     roxo #7E22CE · azul #2563EB · magenta #EC4899 · lima #84CC16 · fundo escuro #100B28
    Texto (claro) navy #0A192F
    ═══════════════════════════════════════════════════════════════ */
 
@@ -96,8 +96,8 @@
     --sidebar-ring: 224 76% 48%;
   }
 
-  /* ── Jovem · Claro ────────────────────────────────────────── */
-  [data-perfil="jovem"] {
+  /* ── Tech · Claro ────────────────────────────────────────── */
+  [data-perfil="tech"] {
     --background: 265 40% 97.8%;
     --foreground: 216 65% 11%;
     --card-foreground: 216 65% 11%;
@@ -205,8 +205,8 @@
     --sidebar-ring: 221 83% 60%;
   }
 
-  /* ── Jovem · Escuro ───────────────────────────────────────── */
-  .dark[data-perfil="jovem"], .dark [data-perfil="jovem"] {
+  /* ── Tech · Escuro ───────────────────────────────────────── */
+  .dark[data-perfil="tech"], .dark [data-perfil="tech"] {
     --background: 250 57% 10%;
     --card: 252 45% 14%;
     --popover: 252 42% 16%;
@@ -246,8 +246,8 @@
   }
 }
 
-/* Fundo do Jovem escuro: degradê sutil roxo→azul, como no manual */
-.dark[data-perfil="jovem"] body {
+/* Fundo do Tech escuro: degradê sutil roxo→azul, como no manual */
+.dark[data-perfil="tech"] body {
   background-image: linear-gradient(160deg, #100B28 0%, #08172E 100%);
   background-attachment: fixed;
 }

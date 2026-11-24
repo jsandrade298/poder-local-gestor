@@ -21,14 +21,16 @@ export function usePessoasGabinete() {
   const { data = [] } = useQuery({
     queryKey: ["pessoas-gabinete"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, nome").order("nome");
+      const { data, error } = await (supabase.from("profiles") as any).select("id, nome, ativo").order("nome");
       if (error) throw error;
-      return (data ?? []) as Pessoa[];
+      return (data ?? []) as (Pessoa & { ativo?: boolean })[];
     },
     staleTime: 10 * 60_000,
   });
+  // Quem foi desativado some das listas de escolha, mas o nome continua no histórico
+  const pessoas = useMemo(() => data.filter((p) => p.ativo !== false), [data]);
   const porId = useMemo(() => new Map(data.map((p) => [p.id, p])), [data]);
-  return { pessoas: data, porId };
+  return { pessoas, porId };
 }
 
 // ── Avisos (notificações internas) ──────────────────────────────
@@ -248,6 +250,76 @@ export function useBuscaDemandas(termo: string) {
     },
     staleTime: 30_000,
   });
+}
+
+// ── Projetos arquivados ─────────────────────────────────────────
+
+export function useProjetosArquivados() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["projetos-arquivados"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("kanban_boards") as any)
+        .select("id, nome, cor, icone, tipo, arquivado_em, kanban_board_membros(usuario_id)")
+        .eq("tipo", "projeto")
+        .not("arquivado_em", "is", null)
+        .order("arquivado_em", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((b: any) => ({ ...b, membros: (b.kanban_board_membros ?? []).map((m: any) => m.usuario_id) as string[] }));
+    },
+    staleTime: 60_000,
+  });
+  const desarquivar = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await (supabase.from("kanban_boards") as any)
+        .update({ arquivado_em: null }).eq("id", id).select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Só os membros do projeto podem desarquivá-lo");
+    },
+    onSuccess: () => {
+      toast.success("Projeto de volta aos Quadros");
+      qc.invalidateQueries({ queryKey: ["projetos-arquivados"] });
+      qc.invalidateQueries({ queryKey: ["kanban-boards"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return { ...query, desarquivar };
+}
+
+// ── Cartões arquivados de um quadro ─────────────────────────────
+
+export function useCartoesArquivados(boardId: string | undefined) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["cartoes-arquivados", boardId],
+    enabled: !!boardId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("kanban_board_cards") as any)
+        .select("id, titulo, coluna_id, responsavel_id, created_by, arquivado_em, board_id")
+        .eq("board_id", boardId!)
+        .not("arquivado_em", "is", null)
+        .order("arquivado_em", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const desarquivar = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await (supabase.from("kanban_board_cards") as any)
+        .update({ arquivado_em: null }).eq("id", id).select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Sem permissão para desarquivar este cartão");
+    },
+    onSuccess: () => {
+      toast.success("Cartão de volta ao quadro");
+      qc.invalidateQueries({ queryKey: ["cartoes-arquivados", boardId] });
+      qc.invalidateQueries({ queryKey: ["kanban-board-cards", boardId] });
+      qc.invalidateQueries({ queryKey: ["kanban-boards"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return { ...query, desarquivar };
 }
 
 // ── Histórico de um cartão ──────────────────────────────────────

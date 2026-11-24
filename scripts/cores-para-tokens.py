@@ -1,7 +1,7 @@
 """Troca cores fixas do Tailwind por tokens do tema (Jorgeus, 24/11/2026).
 
 1) Neutros (branco/cinzas) -> tokens que mudam com claro/escuro.
-2) Azul usado como "cor principal" -> primary (segue o perfil Brasil!/Jovem).
+2) Azul usado como "cor principal" -> primary (segue o perfil Brasil!/Tech).
 3) Cores de status (verde, vermelho, âmbar...) ganham variante dark:
    quando a lista de classes ainda não tem nenhuma.
 

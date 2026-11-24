@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Search, Filter, Eye, Edit, Trash2, Download, Upload, FileText, Activity, Settings, BarChart3, ChevronDown, ChevronUp, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
@@ -533,35 +533,26 @@ export default function Demandas() {
 
 
   // Mutação para excluir demanda
+  const [demandaExcluir, setDemandaExcluir] = useState<any | null>(null);
   const deleteMutation = useMutation({
     mutationFn: async (demandaId: string) => {
-      // Primeiro, deletar os anexos relacionados
       const { data: anexos } = await supabase
         .from('anexos')
         .select('url_arquivo')
         .eq('demanda_id', demandaId);
 
-      if (anexos && anexos.length > 0) {
-        // Deletar arquivos do storage
-        const filePaths = anexos.map(anexo => anexo.url_arquivo);
-        await supabase.storage
-          .from('demanda-anexos')
-          .remove(filePaths);
-
-        // Deletar registros da tabela anexos
-        await supabase
-          .from('anexos')
-          .delete()
-          .eq('demanda_id', demandaId);
-      }
-
-      // Depois deletar a demanda
-      const { error } = await supabase
-        .from('demandas')
+      // Anexos, atividades, etiquetas e vínculos com cartões saem em cascata
+      const { data: apagadas, error } = await (supabase
+        .from('demandas') as any)
         .delete()
-        .eq('id', demandaId);
-      
+        .eq('id', demandaId)
+        .select('id');
       if (error) throw error;
+      if (!apagadas?.length) throw new Error('sem permissão para excluir esta demanda');
+
+      // Só depois de a demanda sair, os arquivos
+      const caminhos = (anexos || []).map((a: any) => a.url_arquivo).filter(Boolean);
+      if (caminhos.length > 0) await supabase.storage.from('demanda-anexos').remove(caminhos);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas'] });
@@ -1917,12 +1908,13 @@ export default function Demandas() {
                         </div>
                       </div>
                       
+                      <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
-                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Ações da demanda ${demanda.protocolo ?? ""}`}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
@@ -1946,40 +1938,16 @@ export default function Demandas() {
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                               <DropdownMenuItem 
-                                 onSelect={(e) => e.preventDefault()} 
-                                 onClick={(e) => e.stopPropagation()}
-                                 className="text-destructive focus:text-destructive"
-                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza que deseja excluir a demanda "{demanda.titulo}"? Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                 <AlertDialogAction 
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     handleDeleteDemanda(demanda.id);
-                                   }}
-                                   className="bg-destructive hover:bg-destructive/90"
-                                 >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <DropdownMenuItem
+                            onSelect={() => setDemandaExcluir(demanda)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir…
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -2063,7 +2031,28 @@ export default function Demandas() {
           </Card>
         )}
 
-        {/* Dialog de Visualização */}
+        {/* Confirmar exclusão (fora do menu, senão o menu fica por cima) */}
+      <AlertDialog open={!!demandaExcluir} onOpenChange={(v) => !v && setDemandaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir a demanda #{demandaExcluir?.protocolo}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{demandaExcluir?.titulo}" sai do sistema junto com as atividades, os anexos e os vínculos com cartões dos quadros.
+              Isso não pode ser desfeito. Se ela só foi resolvida, mude o status em vez de excluir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (demandaExcluir) handleDeleteDemanda(demandaExcluir.id); setDemandaExcluir(null); }}
+            >
+              Excluir de vez
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
         {selectedDemanda && (
           <ViewDemandaDialog
             demanda={selectedDemanda}

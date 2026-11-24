@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDateTime } from '@/lib/dateUtils';
+import { SaidaUsuarioDialog, reativarUsuario } from '@/components/forms/SaidaUsuarioDialog';
 
 export default function Usuarios() {
   const { user } = useAuth();
@@ -91,7 +92,7 @@ export default function Usuarios() {
         ...profile,
         total_demandas: demandasCount[profile.id] || 0,
         role: rolesMap[profile.id] || 'usuario',
-        ativo: true // Por enquanto consideramos todos ativos, pode ser ajustado conforme necessário
+        ativo: (profile as any).ativo !== false
       }));
     }
   });
@@ -261,44 +262,6 @@ export default function Usuarios() {
     }
   });
 
-  // Delete user mutation
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      console.log('🔄 DELETE - Iniciando exclusão para userId:', userId);
-      
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { userId }
-      });
-
-      if (error) {
-        console.error('❌ DELETE - Erro na função:', error);
-        throw error;
-      }
-
-      if (!data.success) {
-        console.error('❌ DELETE - Falha na resposta:', data);
-        throw new Error(data.error || 'Erro ao excluir usuário');
-      }
-
-      console.log('✅ DELETE - Sucesso:', data);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
-      toast({
-        title: "Usuário excluído",
-        description: "O usuário foi excluído com sucesso do sistema.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Erro ao excluir usuário",
-        description: error.message || "Erro ao excluir usuário.",
-        variant: "destructive",
-      });
-    }
-  });
-
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
       return usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -361,9 +324,13 @@ export default function Usuarios() {
     });
   };
 
-  const handleDeleteUser = (userId: string) => {
-    deleteUserMutation.mutate(userId);
-  };
+  // Saída de usuário (desativar ou transferir e excluir) — modal próprio
+  const [usuarioSaindo, setUsuarioSaindo] = useState<any>(null);
+  const reativar = useMutation({
+    mutationFn: (id: string) => reativarUsuario(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['usuarios'] }); toast({ title: "Acesso reativado" }); },
+    onError: (e: any) => toast({ title: "Não foi possível reativar", description: e.message, variant: "destructive" }),
+  });
 
 
   if (isErrorUsuarios) {
@@ -763,34 +730,18 @@ export default function Usuarios() {
                            <DropdownMenuItem onClick={() => handleResetPassword(usuario)}>
                              Reset Senha
                            </DropdownMenuItem>
-                           <AlertDialog>
-                             <AlertDialogTrigger asChild>
-                               <DropdownMenuItem 
-                                 onSelect={(e) => e.preventDefault()}
-                                 className="text-destructive"
-                               >
-                                 Excluir
-                               </DropdownMenuItem>
-                             </AlertDialogTrigger>
-                             <AlertDialogContent>
-                               <AlertDialogHeader>
-                                 <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
-                                 <AlertDialogDescription>
-                                   Tem certeza que deseja excluir o usuário "{usuario.nome}"? 
-                                   Esta ação não pode ser desfeita e todos os dados do usuário serão removidos permanentemente.
-                                 </AlertDialogDescription>
-                               </AlertDialogHeader>
-                               <AlertDialogFooter>
-                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                 <AlertDialogAction
-                                   onClick={() => handleDeleteUser(usuario.id)}
-                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                 >
-                                   Excluir
-                                 </AlertDialogAction>
-                               </AlertDialogFooter>
-                             </AlertDialogContent>
-                           </AlertDialog>
+                          {usuario.ativo ? (
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
+                              Desativar ou excluir…
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onSelect={() => reativar.mutate(usuario.id)}>Reativar acesso</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
+                                Excluir…
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -807,6 +758,12 @@ export default function Usuarios() {
           )}
         </CardContent>
       </Card>
+
+      <SaidaUsuarioDialog
+        usuario={usuarioSaindo}
+        pessoas={usuarios.map((u: any) => ({ id: u.id, nome: u.nome, ativo: u.ativo }))}
+        onOpenChange={(v) => !v && setUsuarioSaindo(null)}
+      />
     </div>
   );
 }

@@ -5,11 +5,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarcaIcone, MarcaLogo, MarcaPalavra } from "@/components/marca/Marca";
+import { aplicarPerfil, useTema, type Perfil } from "@/lib/tema";
+import { cn } from "@/lib/utils";
 
 /**
  * Apresentação pública do Jorgeus (raiz "/").
  * Sem cadastro: o acesso é criado pelo Super Admin no Admin SaaS.
- * Sempre no perfil "Brasil!" (marca do produto), em claro ou escuro.
+ * O visitante alterna entre as duas identidades (Brasil! e Tech); a escolha
+ * fica guardada e vale também para a tela de login. Depois de entrar, vale a
+ * identidade do gabinete (definida pelo Super Admin).
  */
 
 const RECURSOS = [
@@ -27,22 +31,45 @@ const PASSOS = [
   { n: "03", titulo: "Mostre resultado", texto: "Análises por período e por território mostram o que o mandato entregou, com números de verdade." },
 ];
 
-export default function LandingPage() {
+const PERFIS: { v: Perfil; nome: string; desc: string }[] = [
+  { v: "brasil", nome: "Brasil!", desc: "Institucional" },
+  { v: "tech", nome: "Tech", desc: "Digital" },
+];
+
+/** Alternar a identidade visual (Brasil! / Tech). */
+function TrocaPerfil({ perfil, className }: { perfil: Perfil; className?: string }) {
   return (
-    <div data-perfil="brasil" className="min-h-screen bg-background text-foreground">
+    <div role="radiogroup" aria-label="Identidade visual" className={cn("inline-flex rounded-full border border-white/15 bg-white/5 p-1", className)}>
+      {PERFIS.map((p) => (
+        <button key={p.v} type="button" role="radio" aria-checked={perfil === p.v} onClick={() => aplicarPerfil(p.v)}
+          className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-xs transition-colors",
+            perfil === p.v ? "bg-white text-[color:var(--marca-fundo-escuro)] font-semibold" : "text-white/70 hover:text-white")}>
+          <MarcaIcone perfil={p.v} className="h-4 w-4" />
+          {p.nome}
+          <span className={cn("hidden sm:inline", perfil === p.v ? "opacity-60 font-normal" : "opacity-50")}>· {p.desc}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function LandingPage() {
+  const { perfil } = useTema();
+  return (
+    <div data-perfil={perfil} className="min-h-screen bg-background text-foreground">
       {/* Cabeçalho */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#08182B]/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-white/10 backdrop-blur-md" style={{ background: "color-mix(in srgb, var(--marca-fundo-escuro) 90%, transparent)" }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Link to="/" aria-label="Jorgeus — início" className="flex items-center gap-2.5">
-            <MarcaIcone perfil="brasil" className="h-8 w-8" />
-            <MarcaPalavra perfil="brasil" modo="escuro" className="h-[15px]" />
+            <MarcaIcone perfil={perfil} className="h-8 w-8" />
+            <MarcaPalavra perfil={perfil} modo="escuro" className="h-[15px]" />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-white/75">
             <a href="#recursos" className="hover:text-white transition-colors">Recursos</a>
             <a href="#como-funciona" className="hover:text-white transition-colors">Como funciona</a>
             <a href="#seguranca" className="hover:text-white transition-colors">Segurança</a>
           </nav>
-          <Button asChild size="sm" className="gap-2 h-9 px-4 bg-white text-[#0A192F] hover:bg-white/90">
+          <Button asChild size="sm" className="gap-2 h-9 px-4 bg-white text-[color:var(--marca-fundo-escuro)] hover:bg-white/90">
             <Link to="/login"><LogIn className="h-4 w-4" /> Entrar</Link>
           </Button>
         </div>
@@ -64,12 +91,16 @@ export default function LandingPage() {
               e o mandato mostrar o que entrega.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="h-12 px-6 gap-2 text-[15px] bg-white text-[#0A192F] hover:bg-white/90">
+              <Button asChild size="lg" className="h-12 px-6 gap-2 text-[15px] bg-white text-[color:var(--marca-fundo-escuro)] hover:bg-white/90">
                 <Link to="/login"><LogIn className="h-4 w-4" /> Entrar no Jorgeus</Link>
               </Button>
               <Button asChild size="lg" variant="ghost" className="h-12 px-6 gap-2 text-[15px] text-white hover:bg-white/10 hover:text-white">
                 <a href="#recursos">Conhecer os recursos <ArrowRight className="h-4 w-4" /></a>
               </Button>
+            </div>
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              <span className="text-xs text-white/55">Duas identidades, o gabinete escolhe:</span>
+              <TrocaPerfil perfil={perfil} />
             </div>
           </div>
 
@@ -78,10 +109,10 @@ export default function LandingPage() {
             <div className="absolute inset-0 rounded-full border border-white/10" />
             <div className="absolute inset-10 rounded-full border border-white/10" />
             <div className="absolute inset-20 rounded-full border border-white/[0.07]" />
-            <span className="absolute left-[12%] top-[18%] h-2.5 w-2.5 rounded-full bg-[#EAB308] shadow-[0_0_18px_#EAB308]" />
-            <span className="absolute right-[8%] top-[52%] h-2 w-2 rounded-full bg-[#10B981] shadow-[0_0_16px_#10B981]" />
-            <span className="absolute left-[30%] bottom-[6%] h-2 w-2 rounded-full bg-[#60A5FA] shadow-[0_0_16px_#60A5FA]" />
-            <MarcaIcone perfil="brasil" className="absolute left-[18%] top-[18%] h-[64%] w-[64%] drop-shadow-[0_20px_60px_rgba(16,185,129,0.25)]" />
+            <span className="absolute left-[12%] top-[18%] h-2.5 w-2.5 rounded-full" style={{ background: "var(--marca-3)", boxShadow: "0 0 18px var(--marca-3)" }} />
+            <span className="absolute right-[8%] top-[52%] h-2 w-2 rounded-full" style={{ background: "var(--marca-2)", boxShadow: "0 0 16px var(--marca-2)" }} />
+            <span className="absolute left-[30%] bottom-[6%] h-2 w-2 rounded-full bg-[#60A5FA]" style={{ boxShadow: "0 0 16px #60A5FA" }} />
+            <MarcaIcone perfil={perfil} className="absolute left-[18%] top-[18%] h-[64%] w-[64%] drop-shadow-[0_20px_60px_rgba(255,255,255,0.12)]" />
           </div>
         </div>
       </section>
@@ -162,10 +193,10 @@ export default function LandingPage() {
       <section className="px-5 pb-20 md:pb-28">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl px-8 py-14 text-center text-white md:px-16" style={{ background: "var(--marca-fundo-escuro)" }}>
           <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-32 mx-auto h-72 w-[42rem] rounded-full opacity-30 blur-3xl fundo-marca" />
-          <Sparkles className="relative mx-auto h-7 w-7 text-[#EAB308]" />
+          <Sparkles className="relative mx-auto h-7 w-7" style={{ color: "var(--marca-3)" }} />
           <h2 className="relative mt-4 text-3xl md:text-4xl font-extrabold tracking-tight">Pronto para começar o dia?</h2>
           <p className="relative mx-auto mt-3 max-w-xl text-white/75">Entre com o acesso que o administrador do seu gabinete criou para você.</p>
-          <Button asChild size="lg" className="relative mt-8 h-12 px-7 gap-2 text-[15px] bg-white text-[#0A192F] hover:bg-white/90">
+          <Button asChild size="lg" className="relative mt-8 h-12 px-7 gap-2 text-[15px] bg-white text-[color:var(--marca-fundo-escuro)] hover:bg-white/90">
             <Link to="/login"><LogIn className="h-4 w-4" /> Entrar no Jorgeus</Link>
           </Button>
         </div>
@@ -174,7 +205,7 @@ export default function LandingPage() {
       {/* Rodapé */}
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
-          <MarcaLogo perfil="brasil" className="h-8 w-auto" />
+          <MarcaLogo perfil={perfil} className="h-8 w-auto" />
           <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Jorgeus · Gestão e Inteligência Parlamentar</p>
         </div>
       </footer>

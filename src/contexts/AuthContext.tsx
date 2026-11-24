@@ -92,8 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (tenantData && !tenantError) {
           setTenant(tenantData as TenantInfo);
-          // Identidade visual do gabinete (Brasil! ou Jovem), definida pelo Super Admin
-          aplicarPerfil((tenantData as any).perfil_visual === 'jovem' ? 'jovem' : 'brasil');
+          // Identidade visual do gabinete (Brasil! ou Tech), definida pelo Super Admin
+          aplicarPerfil((tenantData as any).perfil_visual === 'tech' ? 'tech' : 'brasil');
           console.log('🏢 Tenant carregado:', tenantData.nome);
         } else {
           setTenant(null);

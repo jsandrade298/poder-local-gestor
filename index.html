@@ -14,7 +14,7 @@
           var d = document.documentElement;
           if (localStorage.getItem("jorgeus-modo") === "escuro") d.classList.add("dark");
           var p = localStorage.getItem("jorgeus-perfil");
-          if (p === "jovem" || p === "brasil") d.setAttribute("data-perfil", p);
+          if (p === "jovem") p = "tech"; if (p === "tech" || p === "brasil") d.setAttribute("data-perfil", p);
         } catch (e) { /* sem storage: claro + Brasil! */ }
       })();
     </script>

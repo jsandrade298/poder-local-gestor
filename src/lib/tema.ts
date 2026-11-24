@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Tema do Jorgeus (Manual de Identidade Visual):
- *  - Perfil do gabinete ("brasil" | "jovem"): definido pelo Super Admin
+ *  - Perfil do gabinete ("brasil" | "tech"): definido pelo Super Admin
  *    (tenants.perfil_visual). Fica no <html data-perfil="...">.
  *  - Modo ("claro" | "escuro"): escolha de cada pessoa. Classe .dark no <html>.
  *    Padrão: sempre claro (decisão do gabinete, 24/11/2026).
@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
  * certo (o index.html aplica antes da primeira pintura).
  */
 
-export type Perfil = "brasil" | "jovem";
+export type Perfil = "brasil" | "tech";
 export type Modo = "claro" | "escuro";
 
 const CHAVE_MODO = "jorgeus-modo";
@@ -19,14 +19,14 @@ const EVENTO = "jorgeus-tema";
 
 const COR_BARRA: Record<Perfil, Record<Modo, string>> = {
   brasil: { claro: "#FFFFFF", escuro: "#08182B" },
-  jovem: { claro: "#FFFFFF", escuro: "#100B28" },
+  tech: { claro: "#FFFFFF", escuro: "#100B28" },
 };
 
 function lerModo(): Modo {
   return typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "escuro" : "claro";
 }
 function lerPerfil(): Perfil {
-  return typeof document !== "undefined" && document.documentElement.getAttribute("data-perfil") === "jovem" ? "jovem" : "brasil";
+  return typeof document !== "undefined" && document.documentElement.getAttribute("data-perfil") === "tech" ? "tech" : "brasil";
 }
 
 function avisar() {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Archive, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,19 +18,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 /**
- * Menu "⋯" de um quadro: Editar (nome, ícone, cor, descrição) e Excluir.
+ * Menu "⋯" de um quadro: Editar (nome, ícone, cor, descrição), Arquivar
+ * (só projetos; volta pela página Quadros) e Excluir.
  * Quem pode: membros do projeto; no quadro pessoal, só o dono (o banco
  * também garante isso). A exclusão mostra o que vai junto e pede o nome.
  */
 export function AcoesProjeto({
-  board, podeEditar, onExcluido, className,
+  board, podeEditar, onExcluido, onArquivado, className,
 }: {
   board: KanbanBoard;
   podeEditar: boolean;
   onExcluido?: () => void;
+  onArquivado?: () => void;
   className?: string;
 }) {
   const { user } = useAuth();
+  const { archiveBoard } = useKanbanBoards();
   const [editando, setEditando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const pessoal = board.tipo === "pessoal";
@@ -51,6 +54,11 @@ export function AcoesProjeto({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuItem onClick={() => setEditando(true)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+          {!pessoal && (
+            <DropdownMenuItem onClick={() => archiveBoard.mutate(board.id, { onSuccess: () => onArquivado?.() })}>
+              <Archive className="h-4 w-4 mr-2" /> Arquivar
+            </DropdownMenuItem>
+          )}
           {podeExcluir && (
             <>
               <DropdownMenuSeparator />

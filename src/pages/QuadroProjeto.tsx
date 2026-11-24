@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
   ArrowLeft, Users, Plus, Lock, AlertTriangle, CheckSquare, MessageSquare, Link2,
-  MoreHorizontal, Settings2, UserPlus, Eye, Pencil,
+  MoreHorizontal, Settings2, UserPlus, Eye, Pencil, Archive, ArchiveRestore, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BoardColumnConfig } from "@/components/kanban/BoardColumnConfig";
 import { CartaoProjetoDrawer, Avatar } from "@/components/quadros/CartaoProjetoDrawer";
 import { AcoesProjeto } from "@/components/quadros/AcoesProjeto";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ConfirmarStatusDemandaDialog, MovimentoDemandaKanban, sugerirStatusParaColuna } from "@/components/kanban/ConfirmarStatusDemandaDialog";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import { useKanbanBoards, useKanbanBoardColunas, useKanbanBoardCards, KanbanBoardCard } from "@/hooks/useKanbanBoards";
 import { useBoardCardCounts } from "@/hooks/useBoardCardExtras";
 import {
-  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal,
+  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal, useCartoesArquivados,
   etapaComoKanban, nomeDoQuadro,
 } from "@/hooks/useQuadros";
 import { normalizarBusca } from "@/lib/busca";
@@ -43,7 +48,10 @@ export default function QuadroProjeto() {
   const { boards, isLoading: carregandoQuadros } = useKanbanBoards();
   const board = boards.find((b) => b.id === boardId);
   const { colunas, isLoading: carregandoColunas } = useKanbanBoardColunas(boardId);
-  const { cards, isLoading: carregandoCards, createCard, moveCard, archiveCard } = useKanbanBoardCards(boardId);
+  const { cards, isLoading: carregandoCards, createCard, moveCard, archiveCard, deleteCard } = useKanbanBoardCards(boardId);
+  const arquivados = useCartoesArquivados(boardId);
+  const [arquivadosAberto, setArquivadosAberto] = useState(false);
+  const [cartaoExcluir, setCartaoExcluir] = useState<KanbanBoardCard | null>(null);
   const contagens = useBoardCardCounts(boardId) as any;
   const extras = useExtrasDoQuadro(boardId);
   const { membros, souMembro, incluir, remover } = useMembrosQuadro(boardId);
@@ -209,7 +217,7 @@ export default function QuadroProjeto() {
           {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)}><Settings2 className="h-4 w-4" /> Etapas</Button>}
           {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)}><Link2 className="h-4 w-4" /> Demanda</Button>}
           {editavel && colunas[0] && <Button size="sm" className="gap-1.5" onClick={() => { setNovoNaColuna(colunas[0].id); setAgrupar("etapa"); }}><Plus className="h-4 w-4" /> Cartão</Button>}
-          <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} className="border" />
+          <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} onArquivado={() => navigate("/quadros")} className="border" />
         </div>
       </div>
 
@@ -218,7 +226,7 @@ export default function QuadroProjeto() {
         <span className="flex items-center gap-1"><Pencil className="h-3.5 w-3.5" />
           {tipo === "equipe" ? "Todo o gabinete edita" : tipo === "pessoal" ? (board.dono_id === uid ? "Só você edita" : `Só ${dono?.nome?.split(" ")[0] || "o dono"} edita`) : "Só membros editam"}
         </span>
-        <span>{cards.length} cartões · {totalFinal} concluídos{totalAtrasados ? ` · ${totalAtrasados} atrasados` : ""}</span>
+        <span>{cards.length} {cards.length === 1 ? "cartão" : "cartões"} · {totalFinal} {totalFinal === 1 ? "concluído" : "concluídos"}{totalAtrasados ? ` · ${totalAtrasados} ${totalAtrasados === 1 ? "atrasado" : "atrasados"}` : ""}</span>
         {board.descricao && tipo === "projeto" && <span className="truncate max-w-full">· {board.descricao}</span>}
       </div>
 
@@ -238,25 +246,52 @@ export default function QuadroProjeto() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no projeto…" className="h-9 flex-1 min-w-[160px] max-w-xs" aria-label="Buscar no projeto" />
-        <Select value={pessoa} onValueChange={setPessoa}>
-          <SelectTrigger className="h-9 w-[170px]" aria-label="Filtrar por pessoa"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as pessoas</SelectItem>
-            {pessoas.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={tipo === "projeto" ? "Buscar no projeto…" : "Buscar no quadro…"} className="h-9 flex-1 min-w-[160px] max-w-xs" aria-label="Buscar cartões" />
+        {tipo === "pessoal" ? (
+          // Ver o quadro pessoal de outra pessoa (como no Kanban antigo): só acompanhar
+          <Select value={board.dono_id || ""} onValueChange={(dono) => {
+            const alvo = boards.find((b) => b.tipo === "pessoal" && b.dono_id === dono);
+            if (alvo) navigate(`/quadros/${alvo.id}`);
+          }}>
+            <SelectTrigger className="h-9 w-auto min-w-[170px] max-w-[260px] gap-1" aria-label="Ver o quadro pessoal de outra pessoa">
+              <span className="text-muted-foreground shrink-0">Quadro de:</span><span className="truncate"><SelectValue /></span>
+            </SelectTrigger>
+            <SelectContent>
+              {boards.filter((b) => b.tipo === "pessoal" && b.dono_id)
+                .map((b) => ({ b, nome: b.dono_id === uid ? "Você" : (porId.get(b.dono_id!)?.nome || b.nome) }))
+                .sort((x, y) => (x.b.dono_id === uid ? -1 : y.b.dono_id === uid ? 1 : x.nome.localeCompare(y.nome, "pt-BR")))
+                .map(({ b, nome }) => <SelectItem key={b.id} value={b.dono_id!}>{nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Select value={pessoa} onValueChange={setPessoa}>
+            <SelectTrigger className="h-9 w-[190px]" aria-label="Filtrar por pessoa"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Filtrar: todas as pessoas</SelectItem>
+              {pessoas.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Button variant={soAtrasados ? "default" : "outline"} size="sm" className="h-9 gap-1.5" onClick={() => setSoAtrasados(!soAtrasados)} aria-pressed={soAtrasados}>
           <AlertTriangle className="h-3.5 w-3.5" /> Só atrasados
         </Button>
         <span className="flex-1" />
-        <span className="text-xs text-muted-foreground">Agrupar por</span>
-        <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Agrupar por">
-          {([["etapa", "Etapa"], ["pessoa", "Pessoa"]] as const).map(([v, r]) => (
-            <button key={v} type="button" role="radio" aria-checked={agrupar === v} onClick={() => setAgrupar(v)}
-              className={cn("px-3 py-1 text-xs rounded-md", agrupar === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
-          ))}
-        </div>
+        {(arquivados.data?.length ?? 0) > 0 && (
+          <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={() => setArquivadosAberto(true)}>
+            <Archive className="h-3.5 w-3.5" /> Arquivados ({arquivados.data!.length})
+          </Button>
+        )}
+        {tipo !== "pessoal" && (
+          <>
+            <span className="text-xs text-muted-foreground">Agrupar por</span>
+            <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Agrupar por">
+              {([["etapa", "Etapa"], ["pessoa", "Pessoa"]] as const).map(([v, r]) => (
+                <button key={v} type="button" role="radio" aria-checked={agrupar === v} onClick={() => setAgrupar(v)}
+                  className={cn("px-3 py-1 text-xs rounded-md", agrupar === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Colunas */}
@@ -304,7 +339,12 @@ export default function QuadroProjeto() {
                                       </DropdownMenuItem>
                                     ))}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => archiveCard.mutate(c.id)}>Arquivar</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => archiveCard.mutate(c.id)}>
+                                      <Archive className="h-4 w-4 mr-2" /> Arquivar
+                                    </DropdownMenuItem>
+                                    {editavel && <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setCartaoExcluir(c)}>
+                                      <Trash2 className="h-4 w-4 mr-2" /> Excluir…
+                                    </DropdownMenuItem>}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -441,6 +481,61 @@ export default function QuadroProjeto() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Excluir cartão */}
+      <AlertDialog open={!!cartaoExcluir} onOpenChange={(v) => !v && setCartaoExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir o cartão "{cartaoExcluir?.titulo}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vão junto o checklist, os comentários e o histórico. As demandas vinculadas continuam existindo.
+              Para só tirar do caminho, use "Arquivar".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (cartaoExcluir) deleteCard.mutate(cartaoExcluir.id); setCartaoExcluir(null); }}>
+              Excluir de vez
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Arquivados */}
+      <Sheet open={arquivadosAberto} onOpenChange={setArquivadosAberto}>
+        <SheetContent className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+          <SheetHeader className="px-5 pt-5 pb-3 border-b text-left">
+            <SheetTitle>Arquivados em {nome}</SheetTitle>
+            <SheetDescription>Cartões tirados do quadro. Desarquive para voltarem à etapa em que estavam.</SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto divide-y">
+            {(arquivados.data || []).length === 0 && <p className="p-5 text-sm text-muted-foreground">Nenhum cartão arquivado.</p>}
+            {(arquivados.data || []).map((c: any) => (
+              <div key={c.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{c.titulo}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {colunas.find((col) => col.id === c.coluna_id)?.nome || "Etapa"} · arquivado em {new Date(c.arquivado_em).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                {podeEditar(c) && (
+                  <>
+                    <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => arquivados.desarquivar.mutate(c.id)}>
+                      <ArchiveRestore className="h-3.5 w-3.5" /> Desarquivar
+                    </Button>
+                    {editavel && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label={`Excluir ${c.titulo}`} onClick={() => setCartaoExcluir(c)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmarStatusDemandaDialog movimento={movimentos[0] ?? null} onClose={() => setMovimentos((m) => m.slice(1))} />
     </div>
