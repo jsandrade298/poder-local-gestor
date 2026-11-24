@@ -29,9 +29,11 @@ interface MunicipeDetailsDialogProps {
   municipe: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Aba ao abrir (ex.: link de menção abre direto no prontuário) */
+  abaInicial?: "dados" | "prontuario";
 }
 
-export function MunicipeDetailsDialog({ municipe, open, onOpenChange }: MunicipeDetailsDialogProps) {
+export function MunicipeDetailsDialog({ municipe, open, onOpenChange, abaInicial = "dados" }: MunicipeDetailsDialogProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [demandasDialogOpen, setDemandasDialogOpen] = useState(false);
 
@@ -84,7 +86,7 @@ export function MunicipeDetailsDialog({ municipe, open, onOpenChange }: Municipe
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs defaultValue="dados" className="flex-1 overflow-hidden">
+          <Tabs key={`${municipe.id}-${abaInicial}`} defaultValue={abaInicial} className="flex-1 overflow-hidden">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="prontuario">

@@ -15,4 +15,8 @@ export const FEATURES = {
   // Substituídos pela tela Análises (Fase 2)
   visaoGeral: false,
   balancoDemandas: false,
+  // Kanban antigo: tarefas e demandas foram trazidas para os Quadros em
+  // 24/11/2026. As tabelas antigas não recebem mais nada; se reativar,
+  // o que for feito lá NÃO aparece nos Quadros. Abre em /kanban-antigo.
+  kanbanAntigo: false,
 } as const;

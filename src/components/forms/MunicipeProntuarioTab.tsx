@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { EditorRico, ConteudoRico, mencoesDe } from "@/components/ui/EditorRico";
+import { usePessoasGabinete } from "@/hooks/useQuadros";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -57,6 +58,34 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
   const [editingActivity, setEditingActivity] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { pessoas } = usePessoasGabinete();
+  // O editor lê o valor só ao montar: muda a chave a cada formulário aberto
+  const [versaoEditor, setVersaoEditor] = useState(0);
+
+  /** Quem foi mencionado com @ recebe um aviso que abre este prontuário. */
+  const avisarMencionados = async (descricao: string | undefined, titulo: string, autorId: string) => {
+    const ids = mencoesDe(descricao).filter((id) => id !== autorId);
+    if (ids.length === 0) return;
+    try {
+      const { data: municipe } = await supabase.from('municipes').select('nome').eq('id', municipeId).single();
+      await supabase.from('notificacoes').insert(ids.map((id) => ({
+        destinatario_id: id,
+        remetente_id: autorId,
+        tipo: 'mencao',
+        titulo: 'Você foi mencionado(a) num prontuário',
+        mensagem: `Você foi mencionado(a) em "${titulo}", no prontuário de ${municipe?.nome || 'um munícipe'}.`,
+        url_destino: `/municipes?abrir=${municipeId}&aba=prontuario`,
+        lida: false,
+      })));
+    } catch (e) {
+      console.error('Erro ao avisar menções do prontuário:', e);
+    }
+  };
+
+  const recarregar = () => {
+    queryClient.invalidateQueries({ queryKey: ['municipe-atividades', municipeId] });
+    queryClient.invalidateQueries({ queryKey: ['municipe-atividades-count', municipeId] });
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,8 +138,9 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
         })
         .select()
         .single();
-      
+
       if (error) throw error;
+      await avisarMencionados(values.descricao, values.titulo, user.user.id);
       return data;
     },
     onSuccess: () => {
@@ -128,7 +158,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
         })(),
       });
       setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['municipe-atividades', municipeId] });
+      recarregar();
     },
     onError: (error) => {
       toast({
@@ -150,8 +180,10 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
-      
+
       if (error) throw error;
+      const { data: user } = await supabase.auth.getUser();
+      if (user.user) await avisarMencionados(values.descricao, values.titulo, user.user.id);
     },
     onSuccess: () => {
       toast({
@@ -161,7 +193,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
       setEditingActivity(null);
       setShowForm(false);
       form.reset();
-      queryClient.invalidateQueries({ queryKey: ['municipe-atividades', municipeId] });
+      recarregar();
     },
     onError: (error) => {
       toast({
@@ -187,7 +219,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
         title: "Registro excluído!",
         description: "O registro foi removido do prontuário.",
       });
-      queryClient.invalidateQueries({ queryKey: ['municipe-atividades', municipeId] });
+      recarregar();
     },
     onError: (error) => {
       toast({
@@ -208,6 +240,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
 
   const handleEdit = (atividade: any) => {
     setEditingActivity(atividade);
+    setVersaoEditor((v) => v + 1);
     const dataAtividade = new Date(atividade.data_atividade);
     form.reset({
       tipo_atividade: atividade.tipo_atividade,
@@ -240,7 +273,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
     <div className="space-y-4">
       {/* Botão para adicionar nova atividade */}
       {!showForm && (
-        <Button onClick={() => setShowForm(true)} className="w-full">
+        <Button onClick={() => { setEditingActivity(null); setVersaoEditor((v) => v + 1); setShowForm(true); }} className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Novo Registro
         </Button>
@@ -320,10 +353,13 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
                     <FormItem>
                       <FormLabel>Descrição / Anotações</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Descreva os detalhes da interação, acordos, próximos passos..."
-                          className="min-h-[100px]"
-                          {...field} 
+                        <EditorRico
+                          key={`${editingActivity?.id ?? "novo"}-${versaoEditor}`}
+                          pessoas={pessoas}
+                          valorInicial={field.value}
+                          onChange={field.onChange}
+                          rotulo="Descrição do registro"
+                          placeholder="Detalhes da interação, acordos, próximos passos… digite @ para mencionar"
                         />
                       </FormControl>
                       <FormMessage />
@@ -439,9 +475,7 @@ export function MunicipeProntuarioTab({ municipeId }: MunicipeProntuarioTabProps
                         <h4 className="font-medium text-sm mb-1">{atividade.titulo}</h4>
                         
                         {atividade.descricao && (
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-2">
-                            {atividade.descricao}
-                          </p>
+                          <ConteudoRico html={atividade.descricao} className="text-muted-foreground mb-2" />
                         )}
                         
                         {/* Informações do usuário */}

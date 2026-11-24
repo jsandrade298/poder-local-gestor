@@ -69,7 +69,7 @@ export default function Municipes() {
   }, [buscaNaUrl]);
 
   // Volta pelo menu com os últimos filtros usados nesta aba
-  useLembrarFiltros("municipes");
+  useLembrarFiltros("municipes", ["abrir", "aba"]);
   const [tagFilter, setTagFilter] = useParamLista("tag");
   const [bairroFilter, setBairroFilter] = useParamLista("bairro");
   const [cidadeFilter, setCidadeFilter] = useParamLista("cidade");
@@ -1592,7 +1592,31 @@ export default function Municipes() {
 
   const handleViewDetails = (municipe: any) => {
     setSelectedMunicipe(municipe);
+    setAbaDetalhes("dados");
     setShowDetails(true);
+  };
+
+  // Link direto: /municipes?abrir=<id>&aba=prontuario (ex.: aviso de menção)
+  const [abrirNaUrl, setAbrirNaUrl] = useParamTexto("abrir");
+  const [abaNaUrl, setAbaNaUrl] = useParamTexto("aba");
+  const [abaDetalhes, setAbaDetalhes] = useState<"dados" | "prontuario">("dados");
+  useEffect(() => {
+    if (!abrirNaUrl) return;
+    let cancelado = false;
+    supabase.from("municipes")
+      .select("*, municipe_tags(tags(id, nome, cor))")
+      .eq("id", abrirNaUrl).maybeSingle()
+      .then(({ data }) => {
+        if (cancelado || !data) return;
+        setSelectedMunicipe(data);
+        setAbaDetalhes(abaNaUrl === "prontuario" ? "prontuario" : "dados");
+        setShowDetails(true);
+      });
+    return () => { cancelado = true; };
+  }, [abrirNaUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fecharDetalhes = (aberto: boolean) => {
+    setShowDetails(aberto);
+    if (!aberto && abrirNaUrl) { setAbrirNaUrl(""); setAbaNaUrl(""); }
   };
 
   return (
@@ -2159,7 +2183,8 @@ export default function Municipes() {
         <MunicipeDetailsDialog
           municipe={selectedMunicipe}
           open={showDetails}
-          onOpenChange={setShowDetails}
+          onOpenChange={fecharDetalhes}
+          abaInicial={abaDetalhes}
         />
 
         {/* Dialog de Edição */}

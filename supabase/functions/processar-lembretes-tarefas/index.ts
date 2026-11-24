@@ -10,6 +10,10 @@
 //   Agora: aviso de atraso só no turno da manhã, no 1º dia de atraso e
 //   depois a cada 7 dias (dias 1, 8, 15, 22...). Lembretes antes do prazo
 //   continuam como estavam.
+//
+// Revisão 24/11/2026 (2) — cartões de projeto (Quadros) também avisam:
+//   véspera do prazo e atraso (1º dia, depois semanal), só de manhã,
+//   para o responsável e os colaboradores do cartão. Só aviso interno.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -121,7 +125,23 @@ function getMensagemAtraso(titulo: string, diasAtraso: number, dataPrazo: string
 // ============================================================
 // Processar lembretes de um tenant
 // ============================================================
+/**
+ * Desde 24/11/2026 as tarefas do Kanban antigo foram trazidas para os
+ * Quadros (cartões) e a tabela `tarefas` não é mais editada. Ler as duas
+ * avisaria em dobro — e a antiga lembraria de tarefas já concluídas nos
+ * Quadros. Por isso só os cartões geram aviso. (Código antigo mantido.)
+ */
+const LEMBRAR_TAREFAS_ANTIGAS = false;
+
 async function processarTenant(supabase: any, tenantId: string, tenantNome: string, hoje: string, turno: Turno) {
+  console.log(`\n🏢 ${tenantNome} (turno: ${turno})`);
+  const cartoes = await processarCartoes(supabase, tenantId, hoje, turno);
+  if (!LEMBRAR_TAREFAS_ANTIGAS) return { ...cartoes, erros: 0 };
+  const r = await processarTarefas(supabase, tenantId, tenantNome, hoje, turno);
+  return { ...r, lembretes: r.lembretes + cartoes.lembretes, atrasos: r.atrasos + cartoes.atrasos };
+}
+
+async function processarTarefas(supabase: any, tenantId: string, tenantNome: string, hoje: string, turno: Turno) {
   console.log(`\n🏢 Processando tenant: ${tenantNome} (turno: ${turno})`);
 
   const { data: tarefas, error: tarefasErr } = await supabase
@@ -249,6 +269,111 @@ async function processarTenant(supabase: any, tenantId: string, tenantNome: stri
 
   console.log(`  ✅ Concluído: ${totalLembretes} lembretes, ${totalAtrasos} atrasos`);
   return { lembretes: totalLembretes, atrasos: totalAtrasos, erros: 0 };
+}
+
+// ============================================================
+// Cartões de projeto (Quadros) — só aviso interno, só de manhã
+//   • véspera do prazo
+//   • 1º dia de atraso e depois a cada 7 dias
+// Destinatários: responsável + colaboradores do cartão.
+// Sem tabela de controle: antes de criar, confere se o aviso de hoje
+// para aquele cartão/pessoa já existe em `notificacoes`.
+// ============================================================
+const COLUNA_FINAL = /conclu|feito|finaliz|entregue|done/i;
+
+async function processarCartoes(supabase: any, tenantId: string, hoje: string, turno: Turno) {
+  if (turno !== "manha") return { lembretes: 0, atrasos: 0 };
+
+  const { data: cartoes, error } = await supabase
+    .from("kanban_board_cards")
+    .select("id, titulo, data_prazo, responsavel_id, board_id, kanban_boards!inner(nome, arquivado_em), kanban_board_colunas(nome, slug)")
+    .eq("tenant_id", tenantId)
+    .is("arquivado_em", null)
+    .is("kanban_boards.arquivado_em", null)
+    .not("data_prazo", "is", null);
+
+  if (error) {
+    console.error("❌ Erro ao buscar cartões:", error.message);
+    return { lembretes: 0, atrasos: 0 };
+  }
+
+  const pendentes = (cartoes || []).filter((c: any) => {
+    const col = c.kanban_board_colunas || {};
+    return !COLUNA_FINAL.test(`${col.slug ?? ""} ${col.nome ?? ""}`);
+  });
+
+  const aAvisar = pendentes
+    .map((c: any) => {
+      const dias = diasEntre(c.data_prazo, hoje); // >0 faltam, <0 atrasado
+      if (dias === 1) return { c, tipo: "cartao_lembrete", dias };
+      if (dias < 0 && deveAvisarAtraso(turno, -dias)) return { c, tipo: "cartao_atrasado", dias };
+      return null;
+    })
+    .filter(Boolean) as { c: any; tipo: string; dias: number }[];
+
+  if (aAvisar.length === 0) return { lembretes: 0, atrasos: 0 };
+
+  // Avisos de cartão já criados hoje (evita duplicar se a função rodar 2x)
+  const inicioHoje = new Date(`${hoje}T00:00:00-03:00`).toISOString();
+  const { data: jaHoje } = await supabase
+    .from("notificacoes")
+    .select("destinatario_id, url_destino")
+    .eq("tenant_id", tenantId)
+    .in("tipo", ["cartao_lembrete", "cartao_atrasado"])
+    .gte("created_at", inicioHoje);
+  const feitos = new Set((jaHoje || []).map((n: any) => `${n.destinatario_id}|${n.url_destino}`));
+
+  const ids = aAvisar.map((a) => a.c.id);
+  const { data: colabs } = await supabase
+    .from("kanban_board_card_colaboradores")
+    .select("card_id, usuario_id")
+    .in("card_id", ids);
+
+  let lembretes = 0;
+  let atrasos = 0;
+  const linhas: any[] = [];
+
+  for (const { c, tipo, dias } of aAvisar) {
+    const dest = new Set<string>();
+    if (c.responsavel_id) dest.add(c.responsavel_id);
+    (colabs || []).filter((x: any) => x.card_id === c.id).forEach((x: any) => dest.add(x.usuario_id));
+    if (dest.size === 0) continue;
+
+    const url = `/quadros/${c.board_id}?cartao=${c.id}`;
+    const projeto = c.kanban_boards?.nome || "projeto";
+    const data = formatDate(c.data_prazo);
+    const atraso = -dias;
+    const titulo = tipo === "cartao_lembrete"
+      ? "Cartão vence amanhã"
+      : atraso === 1 ? "Cartão passou do prazo" : `Cartão atrasado há ${atraso} dias`;
+    const mensagem = tipo === "cartao_lembrete"
+      ? `"${c.titulo}" (${projeto}) vence amanhã, ${data}.`
+      : atraso === 1
+        ? `"${c.titulo}" (${projeto}) passou do prazo (${data}). Atualize a etapa ou ajuste o prazo.`
+        : `Resumo semanal: "${c.titulo}" (${projeto}) segue aberto há ${atraso} dias do prazo (${data}). Se não for mais necessário, mova para a etapa final ou arquive.`;
+
+    let algum = false;
+    for (const d of dest) {
+      if (feitos.has(`${d}|${url}`)) continue;
+      feitos.add(`${d}|${url}`);
+      algum = true;
+      linhas.push({
+        destinatario_id: d, remetente_id: d, tipo, titulo, mensagem,
+        url_destino: url, lida: false, tenant_id: tenantId,
+      });
+    }
+    if (algum) tipo === "cartao_lembrete" ? lembretes++ : atrasos++;
+  }
+
+  if (linhas.length > 0) {
+    const { error: insErr } = await supabase.from("notificacoes").insert(linhas);
+    if (insErr) {
+      console.error("❌ Erro ao criar avisos de cartões:", insErr.message);
+      return { lembretes: 0, atrasos: 0 };
+    }
+  }
+  console.log(`  🗂️ Cartões: ${lembretes} lembretes, ${atrasos} atrasos (${linhas.length} avisos)`);
+  return { lembretes, atrasos };
 }
 
 // ============================================================

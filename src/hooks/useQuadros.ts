@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { aplicarBusca, CAMPOS_PADRAO_DEMANDA, CAMPOS_NUMERICOS_DEMANDA } from "@/lib/busca";
+import { fetchAll } from "@/lib/fetchAll";
 
 /**
  * Quadros de projeto: membros, colaboradores, demandas vinculadas, histórico.
@@ -126,21 +127,30 @@ export function useMembrosQuadro(boardId: string | undefined) {
 
 // ── Colaboradores e demandas de todos os cartões de um projeto ──
 
+export interface DemandaNoCartao {
+  id: string;
+  protocolo: string;
+  titulo: string;
+  status: string;
+  municipe_id: string | null;
+}
+
 export function useExtrasDoQuadro(boardId: string | undefined) {
-  const { data = { colab: new Map<string, string[]>(), dems: new Map<string, { id: string; protocolo: string }[]>() } } = useQuery({
+  const { data = { colab: new Map<string, string[]>(), dems: new Map<string, DemandaNoCartao[]>() } } = useQuery({
     queryKey: ["quadro-extras", boardId],
     enabled: !!boardId,
     queryFn: async () => {
       const [c, d] = await Promise.all([
-        supabase.from("kanban_board_card_colaboradores").select("card_id, usuario_id, kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!),
-        supabase.from("kanban_board_card_demandas").select("card_id, demanda_id, demandas(protocolo), kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!),
+        fetchAll((f, t) => supabase.from("kanban_board_card_colaboradores").select("id, card_id, usuario_id, kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!).order("id").range(f, t) as any),
+        fetchAll((f, t) => supabase.from("kanban_board_card_demandas").select("id, card_id, demanda_id, demandas(protocolo, titulo, status, municipe_id), kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!).order("id").range(f, t) as any),
       ]);
-      if (c.error) throw c.error;
-      if (d.error) throw d.error;
       const colab = new Map<string, string[]>();
-      (c.data ?? []).forEach((r: any) => colab.set(r.card_id, [...(colab.get(r.card_id) || []), r.usuario_id]));
-      const dems = new Map<string, { id: string; protocolo: string }[]>();
-      (d.data ?? []).forEach((r: any) => dems.set(r.card_id, [...(dems.get(r.card_id) || []), { id: r.demanda_id, protocolo: r.demandas?.protocolo }]));
+      (c as any[]).forEach((r) => colab.set(r.card_id, [...(colab.get(r.card_id) || []), r.usuario_id]));
+      const dems = new Map<string, DemandaNoCartao[]>();
+      (d as any[]).forEach((r) => dems.set(r.card_id, [...(dems.get(r.card_id) || []), {
+        id: r.demanda_id, protocolo: r.demandas?.protocolo, titulo: r.demandas?.titulo,
+        status: r.demandas?.status, municipe_id: r.demandas?.municipe_id ?? null,
+      }]));
       return { colab, dems };
     },
     staleTime: 30_000,
@@ -230,7 +240,7 @@ export function useBuscaDemandas(termo: string) {
     queryKey: ["busca-demandas-vincular", termo],
     enabled: termo.trim().length >= 2,
     queryFn: async () => {
-      let q = supabase.from("demandas").select("id, protocolo, titulo, status").order("created_at", { ascending: false }).limit(8);
+      let q = supabase.from("demandas").select("id, protocolo, titulo, status, responsavel_id").order("created_at", { ascending: false }).limit(8);
       q = aplicarBusca(q, termo, { campos: CAMPOS_PADRAO_DEMANDA, camposNumericos: CAMPOS_NUMERICOS_DEMANDA });
       const { data, error } = await q;
       if (error) throw error;
@@ -278,8 +288,52 @@ export function descreverHistorico(acao: string, d: any): string {
     case "colaborador_removeu": return `removeu ${d?.pessoa ?? "alguém"} dos colaboradores`;
     case "demanda_vinculou": return `vinculou a demanda #${d?.protocolo ?? ""}`;
     case "demanda_desvinculou": return `desvinculou a demanda #${d?.protocolo ?? ""}`;
+    case "importou": return `criou (${d?.de ?? "Kanban antigo"}; trazido para os Quadros em 24/11/2026)`;
     default: return acao;
   }
+}
+
+// ── Quadro pessoal ("Meu quadro") ───────────────────────────────
+
+const ETAPAS_PADRAO = [
+  { nome: "A Fazer", slug: "a_fazer", cor: "#3b82f6", ordem: 1 },
+  { nome: "Em Progresso", slug: "em_progresso", cor: "#f59e0b", ordem: 2 },
+  { nome: "Feito", slug: "feito", cor: "#22c55e", ordem: 3 },
+];
+
+/** Devolve o id do quadro pessoal da pessoa, criando na primeira vez. */
+export async function garantirQuadroPessoal(uid: string, nome?: string | null): Promise<string> {
+  // (colunas novas ainda não estão nos tipos gerados do Supabase)
+  const quadros = supabase.from("kanban_boards") as any;
+  const { data: existente, error: e1 } = await quadros
+    .select("id").eq("tipo", "pessoal").eq("dono_id", uid).maybeSingle();
+  if (e1) throw e1;
+  if (existente?.id) return existente.id;
+
+  const { data: novo, error: e2 } = await supabase.from("kanban_boards").insert({
+    nome: `Quadro de ${nome || "sem nome"}`,
+    descricao: "Quadro pessoal: o gabinete vê, só o dono edita.",
+    cor: "#475569", icone: "🗂️", tipo: "pessoal", dono_id: uid, criado_por: uid,
+  } as any).select("id").single();
+  if (e2) throw e2;
+
+  const { error: e3 } = await supabase.from("kanban_board_colunas")
+    .insert(ETAPAS_PADRAO.map((c) => ({ ...c, board_id: novo.id })));
+  if (e3) throw e3;
+  return novo.id;
+}
+
+/** Nome para mostrar: o quadro pessoal de quem está vendo vira "Meu quadro". */
+export function nomeDoQuadro(b: { nome: string; tipo?: string; dono_id?: string | null }, uid: string) {
+  return b.tipo === "pessoal" && b.dono_id === uid ? "Meu quadro" : b.nome;
+}
+
+/** Slug "de Kanban" da etapa, para sugerir o status da demanda. */
+export function etapaComoKanban(c: { slug?: string | null; nome?: string | null }) {
+  if (colunaEhFinal(c)) return "feito";
+  const t = `${c.slug ?? ""} ${c.nome ?? ""}`.toLowerCase();
+  if (/progress|andamento|produ|execu|fazendo/.test(t)) return "em_progresso";
+  return "a_fazer";
 }
 
 /** Coluna que representa "concluído" (não há marcação no banco; usa o nome). */

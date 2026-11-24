@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { paraTexto } from "@/components/ui/EditorRico";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -272,7 +273,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       atividadesData = atividades.map((atv: any) => ({
         tipo: getTipoAtividadeLabel(atv.tipo_atividade),
         titulo: atv.titulo,
-        descricao: atv.descricao,
+        descricao: paraTexto(atv.descricao),
         data: atv.data_atividade,
         autor: atv.created_by_profile?.nome || 'Usuário',
         propositura: atv.propositura ? getProposituraLabel(atv.propositura) : null,

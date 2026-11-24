@@ -15,7 +15,20 @@ import { normalizarBusca } from "@/lib/busca";
  *    usamos a última alteração (updated_at) como estimativa — a tela avisa.
  */
 
-export type Periodo = 3 | 6 | 12;
+/**
+ * Período escolhido, como texto (guardado no navegador):
+ *   "3" | "6" | "12"   últimos N meses
+ *   "ano-2026"         o ano inteiro (até hoje, se for o ano atual)
+ *   "tudo"             desde a primeira demanda registrada (mandato todo no sistema)
+ */
+export type Periodo = string;
+
+export function periodoValido(p: string | null | undefined): p is Periodo {
+  return !!p && (/^(3|6|12)$/.test(p) || /^ano-\d{4}$/.test(p) || p === "tudo");
+}
+
+const NOMES_MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const mesAno = (d: Date) => `${NOMES_MES[d.getMonth()]}/${d.getFullYear()}`;
 
 /** Abaixo disto (fração das demandas com o campo preenchido) o gráfico some. */
 export const COBERTURA_MINIMA = 0.2;
@@ -163,18 +176,53 @@ export function useAnalisesData(periodo: Periodo) {
     const ehFinal = (s: string | null) => finais.has(s || "");
     const hoje = hojeLocal();
     const hojeIso = isoDia(hoje);
-    const inicio = new Date(hoje);
-    inicio.setMonth(inicio.getMonth() - periodo);
-    const mensal = periodo === 12;
     const nomes = new Map((pessoasQ.data ?? []).map((p) => [p.id, p.nome as string]));
 
-    const noPeriodo = (iso: string) => new Date(iso) >= inicio;
+    // ── Janela do período ──
+    const primeira = demandas.reduce<Date | null>((min, d) => {
+      const x = new Date(d.created_at);
+      return !min || x < min ? x : min;
+    }, null) ?? hoje;
+    const anoAtual = hoje.getFullYear();
+    const anosDisponiveis: number[] = [];
+    for (let a = primeira.getFullYear(); a <= anoAtual; a++) anosDisponiveis.push(a);
+
+    let inicio: Date;
+    let fim: Date = hoje;
+    let rotulo: string;      // "nos últimos 6 meses", "em 2026", "desde fev/2026"
+    let rotuloCurto: string; // "6m", "2026", "total"
+    if (periodo.startsWith("ano-")) {
+      const ano = Number(periodo.slice(4));
+      inicio = new Date(ano, 0, 1);
+      fim = ano < anoAtual ? new Date(ano, 11, 31) : hoje;
+      rotulo = ano < anoAtual ? `em ${ano}` : `em ${ano} (até hoje)`;
+      rotuloCurto = String(ano);
+    } else if (periodo === "tudo") {
+      inicio = inicioMes(primeira);
+      rotulo = `desde ${mesAno(primeira)}`;
+      rotuloCurto = "total";
+    } else {
+      const meses = Number(periodo) || 6;
+      inicio = new Date(hoje);
+      inicio.setMonth(inicio.getMonth() - meses);
+      rotulo = `nos últimos ${meses} meses`;
+      rotuloCurto = `${meses}m`;
+    }
+    const fimDoDia = new Date(fim);
+    fimDoDia.setHours(23, 59, 59, 999);
+    // Semanas até ~6 meses; acima disso, meses
+    const mensal = (fim.getTime() - inicio.getTime()) / 86400000 > 190;
+
+    const noPeriodo = (iso: string) => {
+      const d = new Date(iso);
+      return d >= inicio && d <= fimDoDia;
+    };
     const entraram = demandas.filter((d) => noPeriodo(d.created_at));
     const concluidas = demandas.filter((d) => ehFinal(d.status) && noPeriodo(d.updated_at));
     const abertas = demandas.filter((d) => !ehFinal(d.status));
 
     // ── Entrada × conclusão por semana/mês ──
-    const chaves = gerarBaldes(inicio, hoje, mensal);
+    const chaves = gerarBaldes(inicio, fim, mensal);
     const entradaPor = new Map<string, number>();
     const conclusaoPor = new Map<string, number>();
     entraram.forEach((d) => {
@@ -191,6 +239,19 @@ export function useAnalisesData(periodo: Periodo) {
       entrada: entradaPor.get(k) || 0,
       conclusao: conclusaoPor.get(k) || 0,
     }));
+
+    // Primeiro mês/semana muito acima dos outros = cadastro em massa ao começar
+    // a usar o sistema (importação). Avisamos para não ler como "pico de pedidos".
+    let picoInicial: { rotulo: string; valor: number } | null = null;
+    const primeiroBalde = chaveBalde(primeira, mensal);
+    const idxPico = fluxo.findIndex((f) => f.chave === primeiroBalde);
+    if (idxPico >= 0 && fluxo.length >= 4) {
+      const outros = fluxo.filter((_, i) => i !== idxPico).map((f) => f.entrada).filter((v) => v > 0).sort((a, b) => a - b);
+      const med = outros.length ? outros[Math.floor(outros.length / 2)] : 0;
+      if (med > 0 && fluxo[idxPico].entrada > med * 3) {
+        picoInicial = { rotulo: fluxo[idxPico].rotulo, valor: fluxo[idxPico].entrada };
+      }
+    }
 
     // ── Tempo até concluir (dias, estimado) ──
     const tempos = concluidas
@@ -280,15 +341,29 @@ export function useAnalisesData(periodo: Periodo) {
       base = {
         total: municipes.length,
         novosNoPeriodo: novos.length,
-        novosPor: chaves.map((k) => ({ rotulo: rotuloBalde(k, mensal), valor: novosMap.get(k) || 0 })),
+        novosPor: chaves.map((k) => ({ rotulo: rotuloBalde(k, mensal), chave: k, valor: novosMap.get(k) || 0 })),
         telefone: cobertura(telValido, municipes.length),
         bairro: cobertura(municipes.filter((m) => m.bairro && m.bairro.trim()).length, municipes.length),
         nascimento: cobertura(municipes.filter((m) => m.data_nascimento).length, municipes.length),
       };
     }
 
+    // ── Totais gerais (tudo o que já foi registrado, sem período) ──
+    const concluidasTotal = demandas.filter((d) => ehFinal(d.status)).length;
+    const geral = {
+      desde: mesAno(primeira),
+      demandas: demandas.length,
+      concluidas: concluidasTotal,
+      abertas: abertas.length,
+      pctConcluidas: demandas.length ? concluidasTotal / demandas.length : 0,
+      municipes: municipes?.length ?? null,
+    };
+
     return {
       mensal,
+      periodo: { rotulo, rotuloCurto, anosDisponiveis, ehPassado: fim < hoje },
+      geral,
+      picoInicial,
       totais: {
         entraram: entraram.length,
         concluidas: concluidas.length,

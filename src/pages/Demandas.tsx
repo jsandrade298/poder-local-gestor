@@ -24,6 +24,7 @@ import {
 import { CamposBuscaSelect } from "@/components/ui/CamposBuscaSelect";
 import { useParamTexto, useParamLista, useParamNumero, useDefinirParams, useLembrarFiltros } from "@/hooks/useParamUrl";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { descreverSituacao, hojeLocalISO, somarDiasISO, diasAtrasISO } from "@/lib/situacaoDemanda";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
 import { ImportCSVDialogDemandas } from "@/components/forms/ImportCSVDialogDemandas";
@@ -52,6 +53,9 @@ export default function Demandas() {
   const [atrasoFilter, setAtrasoFilter] = useParamTexto("atraso", "all");
   const [dateFrom, setDateFrom] = useParamTexto("de");
   const [dateTo, setDateTo] = useParamTexto("ate");
+  // Atalhos vindos do Início ("sem-responsavel", "vence-3", "parada-30", "parada-90-180"...)
+  const [situacaoFilter, setSituacaoFilter] = useParamTexto("situacao");
+  const situacao = descreverSituacao(situacaoFilter);
   const definirParams = useDefinirParams();
   // Links antigos traziam o nome da área/responsável só para exibição;
   // ao mudar o filtro, o nome deixa de valer.
@@ -83,7 +87,7 @@ export default function Demandas() {
   const [currentPage, setCurrentPage] = useParamNumero("pagina", 1);
 
   // Estado para ordenação
-  type Ordem = 'mais_recente' | 'mais_antigo' | 'titulo_asc' | 'titulo_desc' | 'prazo_proximo' | 'prioridade';
+  type Ordem = 'mais_recente' | 'mais_antigo' | 'titulo_asc' | 'titulo_desc' | 'prazo_proximo' | 'prioridade' | 'sem_alteracao';
   const [ordemUrl, setOrdemUrl] = useParamTexto("ordem", "mais_recente");
   const orderBy = ordemUrl as Ordem;
   const setOrderBy = (v: Ordem) => setOrdemUrl(v);
@@ -94,7 +98,9 @@ export default function Demandas() {
   const [isConfigStatusOpen, setIsConfigStatusOpen] = useState(false);
   
   // Hook de status dinâmicos
-  const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
+  const { statusList, finalSlugs, getStatusLabel, getStatusColor } = useDemandaStatus();
+  // "Abertas" = qualquer status que não seja final (configurado em Status)
+  const filtroFinais = `(${(finalSlugs.length > 0 ? finalSlugs : ["__nenhum__"]).join(",")})`;
 
   // Debounce do termo de busca — 600ms para não disparar query a cada tecla
   useEffect(() => {
@@ -139,7 +145,9 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading, isError: isErrorDemandas, refetch: refetchDemandas, isFetching: isFetchingDemandas } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm, camposBusca.join(","), orderBy],
+    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, situacaoFilter, filtroFinais, dateFrom, dateTo, debouncedSearchTerm, camposBusca.join(","), orderBy],
+    // Atraso e "situação" dependem de saber quais status são finais
+    enabled: (atrasoFilter === "all" && !situacao) || statusList.length > 0,
     queryFn: async () => {
       // Construir query com filtros server-side
       const buildQuery = () => {
@@ -155,6 +163,10 @@ export default function Demandas() {
         switch (orderBy) {
           case 'mais_antigo':
             query = query.order('created_at', { ascending: true });
+            break;
+          case 'sem_alteracao':
+            // Última alteração mais antiga primeiro
+            query = query.order('updated_at', { ascending: true });
             break;
           case 'titulo_asc':
             query = query.order('titulo', { ascending: true });
@@ -186,11 +198,12 @@ export default function Demandas() {
         if (bairroFilter.length > 0) query = query.in('bairro', bairroFilter);
 
         // Filtro de atraso
+        // (antes usava uma lista fixa de status que não incluía "concluida"
+        //  e incluía "devolvido": concluídas apareciam como atrasadas)
         if (atrasoFilter !== "all") {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const closedSlugs = ['atendido', 'devolvido', 'concluido', 'arquivado'];
+          const todayStr = hojeLocalISO();
           query = query
-            .not('status', 'in', `(${closedSlugs.join(',')})`)
+            .not('status', 'in', filtroFinais)
             .not('data_prazo', 'is', null);
           
           if (atrasoFilter === "overdue") {
@@ -200,6 +213,20 @@ export default function Demandas() {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - minDays);
             query = query.lt('data_prazo', cutoffDate.toISOString().split('T')[0]);
+          }
+        }
+
+        // Atalho do Início (sempre só demandas abertas)
+        if (situacao) {
+          query = query.not('status', 'in', filtroFinais);
+          if (situacao.tipo === "sem-responsavel") {
+            query = query.is('responsavel_id', null);
+          } else if (situacao.tipo === "vence") {
+            const hojeStr = hojeLocalISO();
+            query = query.gte('data_prazo', hojeStr).lte('data_prazo', somarDiasISO(hojeStr, situacao.min));
+          } else if (situacao.tipo === "parada") {
+            query = query.lt('updated_at', diasAtrasISO(situacao.min));
+            if (situacao.max) query = query.gte('updated_at', diasAtrasISO(situacao.max));
           }
         }
 
@@ -502,7 +529,7 @@ export default function Demandas() {
     if (!filtrosMontados.current) { filtrosMontados.current = true; return; }
     setCurrentPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize, orderBy]);
+  }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, situacaoFilter, dateFrom, dateTo, pageSize, orderBy]);
 
 
   // Mutação para excluir demanda
@@ -582,6 +609,7 @@ export default function Demandas() {
     setCidadeFilter([]);
     setBairroFilter([]);
     setAtrasoFilter("all");
+    setSituacaoFilter("");
     setDateFrom("");
     setDateTo("");
     setBuscaNaUrl("");
@@ -597,6 +625,7 @@ export default function Demandas() {
     cidadeFilter.length > 0,
     bairroFilter.length > 0,
     atrasoFilter !== "all",
+    !!situacao,
     dateFrom !== "",
     dateTo !== "",
   ].filter(Boolean).length;
@@ -1772,6 +1801,7 @@ export default function Demandas() {
                       <SelectItem value="titulo_desc">Título (Z-A)</SelectItem>
                       <SelectItem value="prazo_proximo">Prazo mais próximo</SelectItem>
                       <SelectItem value="prioridade">Prioridade</SelectItem>
+                      <SelectItem value="sem_alteracao">Sem alteração há mais tempo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1806,6 +1836,18 @@ export default function Demandas() {
             </div>
           </CardContent>
         </Card>
+
+        {situacao && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm dark:border-amber-800/60 dark:bg-amber-950/40">
+            <span className="min-w-0">
+              <span className="font-medium">Mostrando:</span> {situacao.texto}
+              {!isLoading && <span className="text-muted-foreground"> · {totalDemandas.toLocaleString("pt-BR")} demandas</span>}
+            </span>
+            <Button variant="ghost" size="sm" className="h-7 shrink-0 text-xs" onClick={() => setSituacaoFilter("")}>
+              Tirar este filtro
+            </Button>
+          </div>
+        )}
 
         {/* Lista de Demandas */}
         <div className="space-y-4">

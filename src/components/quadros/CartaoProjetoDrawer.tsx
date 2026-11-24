@@ -16,7 +16,7 @@ import {
   usePessoasGabinete, useColaboradoresCartao, useDemandasCartao, useBuscaDemandas,
   useHistoricoCartao, descreverHistorico, avisar, urlDoCartao, colunaEhFinal,
 } from "@/hooks/useQuadros";
-import { EditorRico, EditorRicoRef, ConteudoRico } from "./EditorRico";
+import { EditorRico, EditorRicoRef, ConteudoRico } from "@/components/ui/EditorRico";
 import { cn } from "@/lib/utils";
 
 export function iniciais(nome?: string | null) {
@@ -149,7 +149,7 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
           </TabsList>
 
           {/* ── Detalhes ── */}
-          <TabsContent value="detalhes" className="flex-1 overflow-y-auto px-5 py-4 space-y-5 mt-0">
+          <TabsContent value="detalhes" className="data-[state=inactive]:hidden flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5 mt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Etapa</label>
@@ -275,7 +275,7 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
           </TabsContent>
 
           {/* ── Comentários ── */}
-          <TabsContent value="comentarios" className="flex-1 flex flex-col min-h-0 mt-0">
+          <TabsContent value="comentarios" className="data-[state=inactive]:hidden flex-1 flex flex-col min-h-0 mt-0">
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
               {comentarios.length === 0 && <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>}
               {comentarios.map((c) => (
@@ -308,7 +308,7 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
           </TabsContent>
 
           {/* ── Histórico ── */}
-          <TabsContent value="historico" className="flex-1 overflow-y-auto px-5 py-4 mt-0">
+          <TabsContent value="historico" className="data-[state=inactive]:hidden flex-1 min-h-0 overflow-y-auto px-5 py-4 mt-0">
             {historico.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> :
               (historico.data || []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem registros ainda. As mudanças passam a ficar registradas aqui.</p>

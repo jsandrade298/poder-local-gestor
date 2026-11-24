@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle, CalendarClock, CalendarDays, Cake, CheckSquare, ChevronRight,
-  Clock, FileText, Inbox, MessageCircle, UserPlus, Activity,
+  Clock, FileText, FolderKanban, Inbox, MessageCircle, UserPlus, Activity,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { MinhaSemana } from "@/components/inicio/MinhaSemana";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInicioData, DemandaResumo } from "@/hooks/useInicioData";
 import { formatDateOnly, formatDateTime } from "@/lib/dateUtils";
@@ -124,7 +125,7 @@ function linkWhatsApp(telefone: string | null, nome: string) {
 export default function Inicio() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const { uid, hoje, minhas, atencao, tarefas, agendas, aniversariantes, hojeNoGabinete } = useInicioData();
+  const { uid, hoje, minhas, atencao, tarefas, projetos, agendas, aniversariantes, hojeNoGabinete } = useInicioData();
   const primeiroNome = (profile?.nome || "").split(" ")[0];
   const dataExtenso = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -149,6 +150,11 @@ export default function Inicio() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         {/* Coluna principal */}
         <div className="lg:col-span-2 space-y-4 md:space-y-5">
+          {/* Minha semana: tarefas de todos os quadros + agendas, por dia */}
+          {uid && (
+            <MinhaSemana uid={uid} nome={profile?.nome} hoje={hoje} tarefas={tarefas} agendas={agendas} />
+          )}
+
           {/* Minhas demandas */}
           <Bloco
             titulo="Minhas demandas"
@@ -180,30 +186,79 @@ export default function Inicio() {
           </Bloco>
 
           {/* Precisa de atenção */}
-          <Bloco titulo="Precisa de atenção no gabinete" icone={AlertTriangle}>
+          <Bloco
+            titulo="Precisa de atenção no gabinete"
+            icone={AlertTriangle}
+            acao={atencao.data && (
+              <span className="text-xs text-muted-foreground">{atencao.data.abertas.toLocaleString("pt-BR")} demandas abertas</span>
+            )}
+          >
             {atencao.isError ? (
               <ErrorState what="os alertas do gabinete" onRetry={() => atencao.refetch()} className="py-6" />
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3">
-                  <Numero valor={atencao.data?.semResponsavel} rotulo="sem responsável" tom={atencao.data?.semResponsavel ? "alerta" : "neutro"} />
-                  <Numero valor={atencao.data?.paradas} rotulo={`paradas há ${atencao.data?.diasParada ?? 30}+ dias`} tom={atencao.data?.paradas ? "alerta" : "neutro"} />
-                  <Numero valor={atencao.data?.vencendo3dias} rotulo="vencem em 3 dias" />
+                <p className="text-xs text-muted-foreground mb-2">
+                  Contamos só demandas abertas (status que não é de conclusão). Toque num número para ver a lista completa.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-4">
+                  <Numero valor={atencao.data?.semResponsavel} rotulo="sem responsável" tom={atencao.data?.semResponsavel ? "alerta" : "neutro"} para="/demandas?situacao=sem-responsavel" />
+                  <Numero valor={atencao.data?.atrasadas} rotulo="com prazo vencido" tom={atencao.data?.atrasadas ? "perigo" : "neutro"} para="/demandas?atraso=overdue" />
+                  <Numero valor={atencao.data?.vencendo3dias} rotulo="vencem em 3 dias" para="/demandas?situacao=vence-3" />
+                  <Numero valor={atencao.data?.paradas} rotulo={`sem alteração há ${atencao.data?.diasParada ?? 30}+ dias`} tom={atencao.data?.paradas ? "alerta" : "neutro"} para="/demandas?situacao=parada-30" />
                 </div>
-                {atencao.isLoading ? <Carregando /> : (atencao.data?.maisParadas.length ?? 0) === 0 ? (
-                  <Vazio texto="Nenhuma demanda aberta parada há mais de 30 dias." />
+
+                {atencao.isLoading ? <Carregando /> : (atencao.data?.paradas ?? 0) === 0 ? (
+                  <Vazio texto="Nenhuma demanda aberta sem alteração há mais de 30 dias." />
                 ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground mb-1">Paradas há mais tempo (sem nenhuma alteração):</p>
-                    <div className="divide-y">
-                      {atencao.data!.maisParadas.map((d) => (
-                        <LinhaDemanda
-                          key={d.id} d={d} hoje={hoje}
-                          extra={d.updated_at ? `sem mudança desde ${formatDateOnly(d.updated_at)}` : undefined}
-                        />
-                      ))}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* Há quanto tempo estão paradas */}
+                    <div>
+                      <p className="text-xs font-medium mb-2">Há quanto tempo estão sem alteração</p>
+                      <div className="space-y-1">
+                        {atencao.data!.faixas.map((f) => {
+                          const max = Math.max(...atencao.data!.faixas.map((x) => x.valor), 1);
+                          return (
+                            <Link
+                              key={f.situacao}
+                              to={`/demandas?situacao=${f.situacao}`}
+                              className="group grid grid-cols-[7.5rem_1fr_auto] items-center gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/60 transition-colors"
+                              aria-label={`${f.valor} demandas sem alteração há ${f.rotulo}`}
+                            >
+                              <span className="text-xs text-muted-foreground">{f.rotulo}</span>
+                              <span className="h-2 rounded-full bg-muted overflow-hidden">
+                                <span className="block h-full rounded-full" style={{ width: `${(f.valor / max) * 100}%`, minWidth: f.valor ? 4 : 0, background: "var(--viz-seq)" }} />
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums w-10 text-right">{f.valor.toLocaleString("pt-BR")}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                      {atencao.data!.abertas > 0 && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          {Math.round((atencao.data!.paradas / atencao.data!.abertas) * 100)}% das demandas abertas não tiveram nenhuma alteração no último mês.
+                          Vale revisar: concluir as já resolvidas ou atualizar o andamento.
+                        </p>
+                      )}
                     </div>
-                  </>
+
+                    {/* As mais antigas */}
+                    <div>
+                      <p className="text-xs font-medium mb-1">Sem alteração há mais tempo</p>
+                      <div className="divide-y">
+                        {atencao.data!.maisParadas.map((d) => (
+                          <LinhaDemanda
+                            key={d.id} d={d} hoje={hoje}
+                            extra={d.updated_at ? `desde ${formatDateOnly(d.updated_at)}` : undefined}
+                          />
+                        ))}
+                      </div>
+                      <Button asChild variant="outline" size="sm" className="w-full mt-2 h-8 text-xs gap-1">
+                        <Link to="/demandas?situacao=parada-30&ordem=sem_alteracao">
+                          Ver todas as {atencao.data!.paradas.toLocaleString("pt-BR")} <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </>
             )}
@@ -290,66 +345,33 @@ export default function Inicio() {
             )}
           </Bloco>
 
-          {/* Minhas tarefas */}
-          <Bloco
-            titulo="Minhas tarefas"
-            icone={CheckSquare}
-            acao={<Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => navigate("/kanban")}>Kanban <ChevronRight className="h-3.5 w-3.5" /></Button>}
-          >
-            {tarefas.isError ? (
-              <ErrorState what="suas tarefas" onRetry={() => tarefas.refetch()} className="py-6" />
-            ) : tarefas.isLoading ? <Carregando linhas={2} /> : (tarefas.data?.length ?? 0) === 0 ? (
-              <Vazio texto="Nenhuma tarefa aberta com você." />
-            ) : (
+          {/* Meus quadros */}
+          {(projetos.data?.length ?? 0) > 0 && (
+            <Bloco
+              titulo="Meus quadros"
+              icone={FolderKanban}
+              acao={<Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => navigate("/quadros")}>Todos <ChevronRight className="h-3.5 w-3.5" /></Button>}
+            >
               <div className="divide-y">
-                {tarefas.data!.map((t: any) => {
-                  const prazo = prazoRelativo(t.data_prazo, hoje);
-                  return (
-                    <Link key={t.id} to={`/kanban?tarefa=${t.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 -mx-2 hover:bg-muted/60 transition-colors">
-                      <p className="text-sm min-w-0 flex-1 truncate">{t.titulo}</p>
-                      {prazo ? (
-                        <span className={cn("text-[11px] shrink-0",
-                          prazo.tom === "perigo" ? "text-destructive" : prazo.tom === "alerta" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
-                          {prazo.texto}
-                        </span>
-                      ) : <span className="text-[11px] text-muted-foreground shrink-0">sem prazo</span>}
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </Bloco>
-
-          {/* Minhas agendas */}
-          <Bloco
-            titulo="Minhas próximas agendas"
-            icone={CalendarDays}
-            acao={<Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => navigate("/solicitar-agenda")}>Agenda <ChevronRight className="h-3.5 w-3.5" /></Button>}
-          >
-            {agendas.isError ? (
-              <ErrorState what="suas agendas" onRetry={() => agendas.refetch()} className="py-6" />
-            ) : agendas.isLoading ? <Carregando linhas={2} /> : (agendas.data?.length ?? 0) === 0 ? (
-              <Vazio texto="Nenhuma agenda futura em que você esteja." />
-            ) : (
-              <div className="divide-y">
-                {agendas.data!.map((a: any) => (
-                  <Link key={a.id} to="/solicitar-agenda" className="flex items-start gap-3 rounded-md px-2 py-2 -mx-2 hover:bg-muted/60 transition-colors">
-                    <CalendarClock className="h-3.5 w-3.5 mt-1 text-muted-foreground shrink-0" />
+                {projetos.data!.map((p) => (
+                  <Link key={p.id} to={`/quadros/${p.id}`} className="flex items-center gap-3 rounded-md px-2 py-2 -mx-2 hover:bg-muted/60 transition-colors">
+                    <span className="h-7 w-7 rounded-md grid place-items-center text-sm shrink-0" style={{ background: `${p.cor || "#64748b"}22` }} aria-hidden>{p.icone || "📋"}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{a.titulo || a.descricao_objetivo || "Agenda"}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDateTime(a.data_hora_proposta)}{a.local_endereco ? ` · ${a.local_endereco}` : ""}
+                      <p className="text-sm font-medium truncate">{p.nome}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {p.abertos} em aberto{p.comigo > 0 ? ` · ${p.comigo} com você` : ""}
                       </p>
                     </div>
-                    <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",
-                      a.status === "confirmado" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}>
-                      {a.status === "confirmado" ? "confirmada" : "pendente"}
-                    </span>
+                    {p.atrasados > 0 && (
+                      <span className="text-[11px] text-destructive shrink-0 inline-flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" aria-hidden /> {p.atrasados}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
-            )}
-          </Bloco>
+            </Bloco>
+          )}
         </div>
       </div>
 

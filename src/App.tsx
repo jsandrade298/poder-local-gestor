@@ -13,6 +13,7 @@ import { DemandaNotificationProgress } from "@/components/forms/DemandaNotificat
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { lazy as reactLazy, Suspense, type ComponentType } from "react";
 import Login from "./pages/Login";
+import { FEATURES } from "@/lib/featureFlags";
 
 /**
  * Como React.lazy, mas se o arquivo da tela não existir mais (o app foi
@@ -45,7 +46,9 @@ const Analises = lazy(() => import("./pages/Analises"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Demandas = lazy(() => import("./pages/Demandas"));
 const Municipes = lazy(() => import("./pages/Municipes"));
+// Kanban antigo: aposentado (o código fica; os dados foram para os Quadros).
 const Kanban = lazy(() => import("./pages/Kanban"));
+const KanbanRedirect = lazy(() => import("./pages/KanbanRedirect"));
 const Quadros = lazy(() => import("./pages/Quadros"));
 const QuadroProjeto = lazy(() => import("./pages/QuadroProjeto"));
 const PlanoAcao = lazy(() => import("./pages/PlanoAcao"));
@@ -127,7 +130,8 @@ const App = () => (
               <Route path="/visao-geral" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />
-              <Route path="/kanban" element={<Kanban />} />
+              <Route path="/kanban" element={<KanbanRedirect />} />
+              {FEATURES.kanbanAntigo && <Route path="/kanban-antigo" element={<Kanban />} />}
               <Route path="/quadros" element={<Quadros />} />
               <Route path="/quadros/:id" element={<QuadroProjeto />} />
               <Route path="/plano-acao" element={<PlanoAcao />} />

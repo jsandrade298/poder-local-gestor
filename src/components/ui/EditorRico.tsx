@@ -7,11 +7,15 @@ import { normalizarBusca } from "@/lib/busca";
 import type { Pessoa } from "@/hooks/useQuadros";
 
 /**
- * Editor de texto dos comentários: negrito, itálico, sublinhado, tamanho,
- * listas, links e menção com @ (avisa a pessoa mencionada).
+ * Editor de texto do app: negrito, itálico, sublinhado, tamanho, listas,
+ * links e menção com @ (avisa a pessoa mencionada).
+ * Usado em: comentários dos cartões (Quadros), atividades das demandas e
+ * prontuário dos munícipes.
  *
  * O conteúdo é guardado como HTML e SEMPRE passa pelo DOMPurify, ao salvar
  * e ao exibir, com uma lista curta de tags e atributos permitidos.
+ * Textos antigos (texto puro, com menções "@[Nome](id)" e links soltos)
+ * continuam sendo exibidos e editados normalmente.
  *
  * Obs.: o DOMPurify chega ao projeto como dependência do jspdf (já usado).
  * Ao trocar ou remover o jspdf, adicione "dompurify" ao package.json.
@@ -27,15 +31,57 @@ export function limparHtml(html: string): string {
   return DOMPurify.sanitize(html, PERMITIDO) as unknown as string;
 }
 
-/** Comentários antigos eram texto puro: mantém quebras de linha e escapa o resto. */
+const ehHtml = (t: string) => /<[a-z][\s\S]*>/i.test(t);
+const escapar = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+/**
+ * Texto antigo (puro) → HTML: escapa, mantém quebras de linha, transforma
+ * menções "@[Nome](id)" em menções do editor e endereços em links.
+ */
 function textoParaHtml(texto: string) {
-  const esc = texto.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-  return esc.replace(/\n/g, "<br>");
+  const partes: string[] = [];
+  const re = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  let ultimo = 0;
+  let m: RegExpExecArray | null;
+  // Links soltos mostram só o domínio, como antes ("youtube.com")
+  const dominio = (u: string) => { try { return new URL(u.replace(/&amp;/g, "&")).hostname.replace(/^www\./, ""); } catch { return u; } };
+  const comLinks = (t: string) =>
+    escapar(t).replace(/(https?:\/\/[^\s<]+)/g, (u) => `<a href="${u}">${dominio(u)}</a>`);
+  while ((m = re.exec(texto)) !== null) {
+    partes.push(comLinks(texto.slice(ultimo, m.index)));
+    partes.push(`<span class="mencao" data-mencao="${escapar(m[2])}">@${escapar(m[1])}</span>`);
+    ultimo = m.index + m[0].length;
+  }
+  partes.push(comLinks(texto.slice(ultimo)));
+  return partes.join("").replace(/\n/g, "<br>");
+}
+
+/** Qualquer conteúdo (HTML novo ou texto antigo) → HTML limpo. */
+export function paraHtml(conteudo: string | null | undefined): string {
+  if (!conteudo) return "";
+  return limparHtml(ehHtml(conteudo) ? conteudo : textoParaHtml(conteudo));
+}
+
+/** Conteúdo → texto puro (para PDF, IA, WhatsApp, exportações). */
+export function paraTexto(conteudo: string | null | undefined): string {
+  if (!conteudo) return "";
+  if (!ehHtml(conteudo)) return conteudo.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1");
+  const div = document.createElement("div");
+  div.innerHTML = limparHtml(conteudo.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li)>/gi, "$&\n"));
+  return (div.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Ids das pessoas mencionadas (HTML novo ou texto antigo). */
+export function mencoesDe(conteudo: string | null | undefined): string[] {
+  if (!conteudo) return [];
+  const ids = ehHtml(conteudo)
+    ? [...conteudo.matchAll(/data-mencao="([^"]+)"/g)].map((m) => m[1])
+    : [...conteudo.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)].map((m) => m[1]);
+  return [...new Set(ids)];
 }
 
 export function ConteudoRico({ html, className }: { html: string; className?: string }) {
-  const temTag = /<[a-z][\s\S]*>/i.test(html);
-  const seguro = limparHtml(temTag ? html : textoParaHtml(html))
+  const seguro = paraHtml(html)
     // links sempre abrem fora e sem acesso à página de origem
     .replace(/<a /g, '<a target="_blank" rel="noopener noreferrer nofollow" ');
   return (
@@ -58,6 +104,12 @@ interface Props {
   placeholder?: string;
   onEnviar?: () => void;
   disabled?: boolean;
+  /** Conteúdo ao abrir (HTML ou texto antigo). Lido na montagem; para trocar, mude a `key`. */
+  valorInicial?: string | null;
+  /** Avisado a cada mudança, com o HTML limpo ("" quando vazio) — para formulários. */
+  onChange?: (html: string) => void;
+  /** Nome acessível da área de texto */
+  rotulo?: string;
 }
 
 const TAMANHOS = [
@@ -67,11 +119,28 @@ const TAMANHOS = [
 ];
 
 export const EditorRico = forwardRef<EditorRicoRef, Props>(function EditorRico(
-  { pessoas, placeholder = "Escrever um comentário…", onEnviar, disabled },
+  { pessoas, placeholder = "Escrever um comentário…", onEnviar, disabled, valorInicial, onChange, rotulo = "Comentário" },
   ref
 ) {
   const area = useRef<HTMLDivElement>(null);
-  const [vazio, setVazio] = useState(true);
+  const [vazio, setVazio] = useState(!valorInicial);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Valor inicial (edição): converte texto antigo e menções para o editor
+  useEffect(() => {
+    if (area.current && valorInicial) {
+      area.current.innerHTML = paraHtml(valorInicial);
+      setVazio(!area.current.textContent?.trim());
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const emitir = useCallback(() => {
+    const el = area.current;
+    if (!el || !onChangeRef.current) return;
+    const temAlgo = !!el.textContent?.trim() || !!el.querySelector("[data-mencao]");
+    onChangeRef.current(temAlgo ? limparHtml(el.innerHTML) : "");
+  }, []);
   const [menuTamanho, setMenuTamanho] = useState(false);
   const [link, setLink] = useState<{ aberto: boolean; url: string }>({ aberto: false, url: "" });
   const selecaoSalva = useRef<Range | null>(null);
@@ -83,6 +152,7 @@ export const EditorRico = forwardRef<EditorRicoRef, Props>(function EditorRico(
     const el = area.current;
     if (!el) return;
     setVazio(!el.textContent?.trim() && !el.querySelector("[data-mencao]"));
+    emitir();
     try {
       setAtivos({
         b: document.queryCommandState("bold"),
@@ -90,7 +160,7 @@ export const EditorRico = forwardRef<EditorRicoRef, Props>(function EditorRico(
         u: document.queryCommandState("underline"),
       });
     } catch { /* navegador sem queryCommandState */ }
-  }, []);
+  }, [emitir]);
 
   const salvarSelecao = () => {
     const s = window.getSelection();
@@ -183,7 +253,7 @@ export const EditorRico = forwardRef<EditorRicoRef, Props>(function EditorRico(
       const mencoes = Array.from(el?.querySelectorAll("[data-mencao]") || []).map((n) => n.getAttribute("data-mencao")!).filter(Boolean);
       return { html, mencoes: [...new Set(mencoes)], vazio: !el?.textContent?.trim() };
     },
-    limpar: () => { if (area.current) area.current.innerHTML = ""; setVazio(true); setMencao(null); },
+    limpar: () => { if (area.current) area.current.innerHTML = ""; setVazio(true); setMencao(null); emitir(); },
     focar: () => area.current?.focus(),
   }));
 
@@ -251,7 +321,7 @@ export const EditorRico = forwardRef<EditorRicoRef, Props>(function EditorRico(
         {vazio && <div className="absolute left-3 top-2 text-sm text-muted-foreground pointer-events-none">{placeholder}</div>}
         <div
           ref={area}
-          role="textbox" aria-multiline="true" aria-label="Comentário"
+          role="textbox" aria-multiline="true" aria-label={rotulo}
           contentEditable={!disabled}
           suppressContentEditableWarning
           className="min-h-[84px] max-h-[260px] overflow-y-auto px-3 py-2 text-sm outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-primary [&_a]:underline [&_.mencao]:text-primary [&_.mencao]:font-medium [&_.mencao]:bg-primary/10 [&_.mencao]:rounded [&_.mencao]:px-1"

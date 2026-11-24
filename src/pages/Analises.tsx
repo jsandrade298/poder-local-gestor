@@ -7,8 +7,9 @@ import { AlertTriangle, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  useAnalisesData, Periodo, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
+  useAnalisesData, Periodo, periodoValido, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
 } from "@/hooks/useAnalisesData";
 import { cn } from "@/lib/utils";
 
@@ -142,25 +143,28 @@ function Medidor({ rotulo, cob }: { rotulo: string; cob: Cobertura }) {
 // ─── Tela ───────────────────────────────────────────────────────
 
 const PERIODOS: { v: Periodo; rotulo: string }[] = [
-  { v: 3, rotulo: "3 meses" },
-  { v: 6, rotulo: "6 meses" },
-  { v: 12, rotulo: "12 meses" },
+  { v: "3", rotulo: "3 meses" },
+  { v: "6", rotulo: "6 meses" },
+  { v: "12", rotulo: "12 meses" },
+  { v: "tudo", rotulo: "Desde o início" },
 ];
 
 export default function Analises() {
   const [periodo, setPeriodo] = useState<Periodo>(() => {
     try {
-      const v = Number(localStorage.getItem("analises-periodo"));
-      return v === 3 || v === 6 || v === 12 ? v : 6;
-    } catch { return 6; }
+      const v = localStorage.getItem("analises-periodo");
+      return periodoValido(v) ? v : "6";
+    } catch { return "6"; }
   });
   const escolherPeriodo = (p: Periodo) => {
     setPeriodo(p);
-    try { localStorage.setItem("analises-periodo", String(p)); } catch { /* sem storage */ }
+    try { localStorage.setItem("analises-periodo", p); } catch { /* sem storage */ }
   };
 
   const { dados, carregando, carregandoBase, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo);
   const unidadeTempo = dados?.mensal ? "mês" : "semana";
+  const anos = dados?.periodo.anosDisponiveis ?? [new Date().getFullYear()];
+  const anoEscolhido = periodo.startsWith("ano-") ? periodo : "";
 
   return (
     <div className="md:container md:mx-auto md:px-4 max-w-[1400px] space-y-4 md:space-y-5">
@@ -170,17 +174,29 @@ export default function Analises() {
           <h1 className="text-xl md:text-2xl font-bold">Análises</h1>
           <p className="text-sm text-muted-foreground">O gabinete em números: entrada, saldo, andamento, prazos, território e equipe.</p>
         </div>
-        <div className="inline-flex rounded-lg border bg-muted/30 p-0.5 self-start" role="radiogroup" aria-label="Período">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.v} type="button" role="radio" aria-checked={periodo === p.v}
-              onClick={() => escolherPeriodo(p.v)}
-              className={cn("px-3 py-1.5 text-sm rounded-md transition-colors",
-                periodo === p.v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
-            >
-              {p.rotulo}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <div className="inline-flex flex-wrap rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Período">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.v} type="button" role="radio" aria-checked={periodo === p.v}
+                onClick={() => escolherPeriodo(p.v)}
+                className={cn("px-3 py-1.5 text-sm rounded-md transition-colors",
+                  periodo === p.v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
+              >
+                {p.rotulo}
+              </button>
+            ))}
+          </div>
+          <Select value={anoEscolhido} onValueChange={(v) => escolherPeriodo(v)}>
+            <SelectTrigger className={cn("h-9 w-[120px] text-sm", anoEscolhido && "font-medium ring-1 ring-primary/40")} aria-label="Balanço de um ano">
+              <SelectValue placeholder="Por ano" />
+            </SelectTrigger>
+            <SelectContent>
+              {[...anos].reverse().map((a) => (
+                <SelectItem key={a} value={`ano-${a}`}>Ano {a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -193,9 +209,41 @@ export default function Analises() {
         </div>
       ) : (
         <>
-          {/* Indicadores */}
+          {/* Totais gerais: tudo o que o gabinete já registrou */}
+          <div className="rounded-lg border bg-muted/30 px-4 py-3">
+            <p className="text-xs text-muted-foreground mb-2">
+              No total, desde {dados.geral.desde} (todo o período registrado no sistema)
+            </p>
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
+              <div>
+                <dt className="text-xs text-muted-foreground">Demandas registradas</dt>
+                <dd className="text-xl font-bold tabular-nums">{num(dados.geral.demandas)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Concluídas</dt>
+                <dd className="text-xl font-bold tabular-nums">
+                  {num(dados.geral.concluidas)}{" "}
+                  <span className="text-sm font-normal text-muted-foreground">({pct(dados.geral.pctConcluidas)})</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Abertas hoje</dt>
+                <dd className="text-xl font-bold tabular-nums">{num(dados.geral.abertas)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Munícipes cadastrados</dt>
+                <dd className="text-xl font-bold tabular-nums">{dados.geral.municipes === null ? "…" : num(dados.geral.municipes)}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <h2 className="text-sm font-semibold text-muted-foreground pt-1 first-letter:uppercase">
+            {dados.periodo.rotulo}
+          </h2>
+
+          {/* Indicadores do período */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Indicador rotulo="Entraram" valor={num(dados.totais.entraram)} detalhe={`demandas novas em ${periodo} meses`} />
+            <Indicador rotulo="Entraram" valor={num(dados.totais.entraram)} detalhe={`demandas novas ${dados.periodo.rotulo}`} />
             <Indicador rotulo="Concluídas" valor={num(dados.totais.concluidas)} detalhe="estimado pela última alteração" />
             <Indicador
               rotulo="Saldo da fila"
@@ -220,6 +268,15 @@ export default function Analises() {
             titulo={`Entrada e conclusão por ${unidadeTempo}`}
             subtitulo={<>Se a linha de entrada fica acima da de conclusão, a fila está crescendo. Conclusão estimada pela última alteração das demandas em status final.</>}
           >
+            {dados.picoInicial && (
+              <p className="text-[11px] text-muted-foreground mb-2 flex items-start gap-1">
+                <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                <span>
+                  {dados.picoInicial.rotulo} tem {num(dados.picoInicial.valor)} entradas porque inclui o cadastro inicial
+                  (demandas trazidas de uma vez ao começar a usar o sistema), não um pico de pedidos.
+                </span>
+              </p>
+            )}
             <div className="flex items-center gap-4 text-xs mb-2" aria-hidden>
               <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ background: COR.serie1 }} /> Entraram</span>
               <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ background: COR.serie2 }} /> Concluídas</span>
@@ -239,7 +296,7 @@ export default function Analises() {
           </Painel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-            <Painel titulo="Por onde as demandas chegam" subtitulo={`Demandas que entraram nos últimos ${periodo} meses, por canal.`}>
+            <Painel titulo="Por onde as demandas chegam" subtitulo={`Demandas que entraram ${dados.periodo.rotulo}, por canal.`}>
               <ComCobertura cob={dados.coberturaCanal} oQue="o canal de entrada registrado">
                 <BarrasHorizontais dados={dados.canais} nomeSerie="Demandas" />
               </ComCobertura>
@@ -264,7 +321,7 @@ export default function Analises() {
 
             <Painel
               titulo="Bairros com mais demandas"
-              subtitulo={`Últimos ${periodo} meses. Grafias diferentes do mesmo bairro (acento, maiúsculas, pontuação) são somadas.`}
+              subtitulo={`Demandas que entraram ${dados.periodo.rotulo}. Grafias diferentes do mesmo bairro (acento, maiúsculas, pontuação) são somadas.`}
             >
               <ComCobertura cob={dados.coberturaBairro} oQue="bairro preenchido">
                 <BarrasHorizontais dados={dados.bairros} nomeSerie="Demandas" />
@@ -287,7 +344,7 @@ export default function Analises() {
                       <th className="text-left font-medium py-2 px-2">Pessoa</th>
                       <th className="text-left font-medium py-2 px-2 w-[40%]">Abertas</th>
                       <th className="text-right font-medium py-2 px-2">Atrasadas</th>
-                      <th className="text-right font-medium py-2 px-2 whitespace-nowrap">Concluídas ({periodo}m)</th>
+                      <th className="text-right font-medium py-2 px-2 whitespace-nowrap">Concluídas ({dados.periodo.rotuloCurto})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -329,7 +386,7 @@ export default function Analises() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <div className="lg:col-span-2">
                   <p className="text-xs text-muted-foreground mb-2">
-                    {num(dados.base.novosNoPeriodo)} cadastros novos em {periodo} meses · {num(dados.base.total)} no total
+                    {num(dados.base.novosNoPeriodo)} cadastros novos {dados.periodo.rotulo} · {num(dados.base.total)} no total
                   </p>
                   <div className="h-44" role="img" aria-label={`Cadastros novos por ${unidadeTempo}`}>
                     <ResponsiveContainer width="100%" height="100%">

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { fetchAll } from "@/lib/fetchAll";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -15,6 +16,9 @@ export interface KanbanBoard {
   created_at: string;
   updated_at: string;
   arquivado_em: string | null;
+  /** projeto (membros editam) · equipe (todo o gabinete edita) · pessoal (só o dono edita) */
+  tipo: "projeto" | "equipe" | "pessoal";
+  dono_id: string | null;
   // Agregados (calculados no front)
   colunas_count?: number;
   cards_count?: number;
@@ -49,6 +53,9 @@ export interface KanbanBoardCard {
   created_at: string;
   updated_at: string;
   arquivado_em: string | null;
+  /** De onde veio (migração do Kanban antigo): "tarefa" | "demanda_kanban" */
+  origem?: string | null;
+  origem_id?: string | null;
   // Joins
   responsavel?: { id: string; nome: string } | null;
   criador?: { id: string; nome: string } | null;
@@ -288,17 +295,21 @@ export function useKanbanBoardCards(boardId: string | undefined) {
     queryKey: ['kanban-board-cards', boardId],
     queryFn: async () => {
       if (!boardId) return [];
-      const { data, error } = await supabase
-        .from('kanban_board_cards')
-        .select(`
-          *,
-          responsavel:profiles!kanban_board_cards_responsavel_id_fkey(id, nome),
-          criador:profiles!kanban_board_cards_created_by_fkey(id, nome)
-        `)
-        .eq('board_id', boardId)
-        .is('arquivado_em', null)
-        .order('ordem', { ascending: true });
-      if (error) throw error;
+      // Paginado: o quadro da equipe passa de mil cartões com o tempo
+      const data = await fetchAll((from, to) =>
+        supabase
+          .from('kanban_board_cards')
+          .select(`
+            *,
+            responsavel:profiles!kanban_board_cards_responsavel_id_fkey(id, nome),
+            criador:profiles!kanban_board_cards_created_by_fkey(id, nome)
+          `)
+          .eq('board_id', boardId)
+          .is('arquivado_em', null)
+          .order('ordem', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to) as any
+      );
       return (data || []) as KanbanBoardCard[];
     },
     enabled: !!boardId,
@@ -314,6 +325,8 @@ export function useKanbanBoardCards(boardId: string | undefined) {
       prioridade?: string;
       cor?: string;
       data_prazo?: string;
+      /** Vincula a demanda ao cartão logo após criar */
+      demanda_id?: string;
     }) => {
       if (!boardId) throw new Error('Board não selecionado');
       const { data: user } = await supabase.auth.getUser();
@@ -325,7 +338,7 @@ export function useKanbanBoardCards(boardId: string | undefined) {
         0
       );
 
-      const { error } = await supabase
+      const { data: criado, error } = await supabase
         .from('kanban_board_cards')
         .insert({
           board_id: boardId,
@@ -338,16 +351,28 @@ export function useKanbanBoardCards(boardId: string | undefined) {
           data_prazo: card.data_prazo || null,
           ordem: maxOrdem + 1,
           created_by: user.user.id,
-        });
+        })
+        .select('id')
+        .single();
       if (error) throw error;
+
+      if (card.demanda_id && criado?.id) {
+        const { error: eDem } = await supabase
+          .from('kanban_board_card_demandas' as any)
+          .insert({ card_id: criado.id, demanda_id: card.demanda_id });
+        if (eDem) throw eDem;
+      }
 
       // Atualizar updated_at do board
       await supabase.from('kanban_boards').update({ updated_at: new Date().toISOString() }).eq('id', boardId);
+      return criado as { id: string };
     },
     onSuccess: () => {
-      toast.success('Card criado!');
+      toast.success('Cartão criado!');
       queryClient.invalidateQueries({ queryKey: ['kanban-board-cards', boardId] });
       queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+      queryClient.invalidateQueries({ queryKey: ['quadro-extras', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['inicio-minhas-tarefas'] });
     },
     onError: (err: any) => toast.error('Erro ao criar card: ' + err.message),
   });

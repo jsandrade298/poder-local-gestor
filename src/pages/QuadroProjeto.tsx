@@ -16,10 +16,15 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoardColumnConfig } from "@/components/kanban/BoardColumnConfig";
 import { CartaoProjetoDrawer, Avatar } from "@/components/quadros/CartaoProjetoDrawer";
+import { ConfirmarStatusDemandaDialog, MovimentoDemandaKanban, sugerirStatusParaColuna } from "@/components/kanban/ConfirmarStatusDemandaDialog";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import { useKanbanBoards, useKanbanBoardColunas, useKanbanBoardCards, KanbanBoardCard } from "@/hooks/useKanbanBoards";
 import { useBoardCardCounts } from "@/hooks/useBoardCardExtras";
-import { useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, avisar, colunaEhFinal } from "@/hooks/useQuadros";
+import {
+  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal,
+  etapaComoKanban, nomeDoQuadro,
+} from "@/hooks/useQuadros";
 import { normalizarBusca } from "@/lib/busca";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +47,6 @@ export default function QuadroProjeto() {
   const extras = useExtrasDoQuadro(boardId);
   const { membros, souMembro, incluir, remover } = useMembrosQuadro(boardId);
   const { pessoas, porId } = usePessoasGabinete();
-  const editavel = souMembro;
 
   const [agrupar, setAgrupar] = useState<"etapa" | "pessoa">("etapa");
   const [busca, setBusca] = useState("");
@@ -53,6 +57,20 @@ export default function QuadroProjeto() {
   const [novoTitulo, setNovoTitulo] = useState("");
   const [membrosAberto, setMembrosAberto] = useState(false);
   const [colunasAberto, setColunasAberto] = useState(false);
+  const [demandaAberto, setDemandaAberto] = useState(false);
+  const [buscaDemanda, setBuscaDemanda] = useState("");
+  const resultadosDemanda = useBuscaDemandas(buscaDemanda);
+  const [movimentos, setMovimentos] = useState<MovimentoDemandaKanban[]>([]);
+  const { statusList } = useDemandaStatus();
+
+  // Quem edita: equipe = todo o gabinete; pessoal e projeto = membros
+  // (no pessoal, o dono). Responsável e colaboradores editam o próprio cartão.
+  const tipo = board?.tipo ?? "projeto";
+  const editavel = tipo === "equipe" || souMembro;
+  const podeEditar = (c: KanbanBoardCard) =>
+    editavel || c.responsavel_id === uid || (extras.colab.get(c.id) || []).includes(uid);
+  const dono = board?.dono_id ? porId.get(board.dono_id) : undefined;
+  const nome = board ? nomeDoQuadro(board, uid) : "";
 
   const cartaoAberto = params.get("cartao");
   const card = cards.find((c) => c.id === cartaoAberto) || null;
@@ -105,11 +123,36 @@ export default function QuadroProjeto() {
   const totalFinal = cards.filter((c) => finais.has(c.coluna_id)).length;
   const totalAtrasados = cards.filter(atrasado).length;
 
+  /** Move o cartão e, se tiver demanda vinculada, pergunta se muda o status. */
+  const mover = (c: KanbanBoardCard, colunaId: string, ordem: number) => {
+    if (c.coluna_id === colunaId && c.ordem === ordem) return;
+    const mudouDeEtapa = c.coluna_id !== colunaId;
+    moveCard.mutate({ cardId: c.id, colunaId, ordem });
+    if (!mudouDeEtapa) return;
+    const col = colunas.find((x) => x.id === colunaId);
+    if (!col) return;
+    const destinoKanban = etapaComoKanban(col);
+    const sugerido = sugerirStatusParaColuna(destinoKanban, statusList);
+    const fila = (extras.dems.get(c.id) || [])
+      .filter((d) => d.status && sugerido && d.status !== sugerido)
+      .map((d) => ({ demanda: d, colunaDestino: destinoKanban, colunaDestinoTitulo: col.nome }));
+    if (fila.length) setMovimentos((m) => [...m, ...fila]);
+  };
+
   const onDragEnd = (r: DropResult) => {
-    if (!editavel || !r.destination || agrupar !== "etapa") return;
-    const destino = r.destination.droppableId;
-    if (destino === r.source.droppableId && r.destination.index === r.source.index) return;
-    moveCard.mutate({ cardId: r.draggableId, colunaId: destino, ordem: r.destination.index });
+    if (!r.destination || agrupar !== "etapa") return;
+    const c = cards.find((x) => x.id === r.draggableId);
+    if (!c || !podeEditar(c)) return;
+    mover(c, r.destination.droppableId, r.destination.index);
+  };
+
+  const criarDeDemanda = (d: { id: string; titulo: string; responsavel_id?: string | null }) => {
+    const primeira = colunas[0];
+    if (!primeira) return;
+    createCard.mutate(
+      { coluna_id: primeira.id, titulo: d.titulo, responsavel_id: d.responsavel_id || undefined, demanda_id: d.id, cor: "#0f766e" },
+      { onSuccess: () => { setDemandaAberto(false); setBuscaDemanda(""); } },
+    );
   };
 
   const criar = (colunaId: string) => {
@@ -146,32 +189,48 @@ export default function QuadroProjeto() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/quadros")} aria-label="Voltar aos quadros"><ArrowLeft className="h-4 w-4" /></Button>
           <span className="h-10 w-10 rounded-lg grid place-items-center text-xl shrink-0" style={{ background: `${board.cor}22` }}>{board.icone}</span>
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Projeto</div>
-            <h1 className="text-lg md:text-xl font-bold truncate">{board.nome}</h1>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+              {tipo === "equipe" ? "Quadro da equipe" : tipo === "pessoal" ? (board.dono_id === uid ? "Quadro pessoal" : `Quadro pessoal de ${dono?.nome?.split(" ")[0] || "colega"}`) : "Projeto"}
+            </div>
+            <h1 className="text-lg md:text-xl font-bold truncate">{nome}</h1>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setMembrosAberto(true)} className="flex items-center -space-x-1.5 hover:opacity-80" aria-label="Ver membros">
-            {membros.slice(0, 6).map((m) => <Avatar key={m.usuario_id} id={m.usuario_id} nome={m.pessoa?.nome} size={28} />)}
-          </button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMembrosAberto(true)}><Users className="h-4 w-4" /> Membros ({membros.length})</Button>
+          {tipo === "projeto" && (
+            <>
+              <button type="button" onClick={() => setMembrosAberto(true)} className="flex items-center -space-x-1.5 hover:opacity-80" aria-label="Ver membros">
+                {membros.slice(0, 6).map((m) => <Avatar key={m.usuario_id} id={m.usuario_id} nome={m.pessoa?.nome} size={28} />)}
+              </button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMembrosAberto(true)}><Users className="h-4 w-4" /> Membros ({membros.length})</Button>
+            </>
+          )}
+          {tipo === "pessoal" && board.dono_id !== uid && <Avatar id={board.dono_id} nome={dono?.nome} size={28} />}
           {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)}><Settings2 className="h-4 w-4" /> Etapas</Button>}
+          {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)}><Link2 className="h-4 w-4" /> Demanda</Button>}
           {editavel && colunas[0] && <Button size="sm" className="gap-1.5" onClick={() => { setNovoNaColuna(colunas[0].id); setAgrupar("etapa"); }}><Plus className="h-4 w-4" /> Cartão</Button>}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Todo o gabinete vê</span>
-        <span className="flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Só membros editam</span>
+        <span className="flex items-center gap-1"><Pencil className="h-3.5 w-3.5" />
+          {tipo === "equipe" ? "Todo o gabinete edita" : tipo === "pessoal" ? (board.dono_id === uid ? "Só você edita" : `Só ${dono?.nome?.split(" ")[0] || "o dono"} edita`) : "Só membros editam"}
+        </span>
         <span>{cards.length} cartões · {totalFinal} concluídos{totalAtrasados ? ` · ${totalAtrasados} atrasados` : ""}</span>
-        {board.descricao && <span className="truncate max-w-full">· {board.descricao}</span>}
+        {board.descricao && tipo === "projeto" && <span className="truncate max-w-full">· {board.descricao}</span>}
       </div>
 
       {!editavel && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-violet-50 dark:bg-violet-950/30 px-4 py-3">
           <Lock className="h-4 w-4 text-violet-700 dark:text-violet-300" />
-          <span className="text-sm flex-1 min-w-[220px]">Você pode acompanhar tudo neste projeto. Para mover cartões, comentar ou criar tarefas, peça para participar.</span>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={pedirParaParticipar}><UserPlus className="h-4 w-4" /> Pedir para participar</Button>
+          {tipo === "pessoal" ? (
+            <span className="text-sm flex-1 min-w-[220px]">Quadro pessoal de {dono?.nome || "um colega"}: você acompanha, mas só o dono edita. Nos cartões em que você está incluído, você também edita.</span>
+          ) : (
+            <>
+              <span className="text-sm flex-1 min-w-[220px]">Você pode acompanhar tudo neste projeto. Nos cartões em que você está incluído, você edita. Para o resto, peça para participar.</span>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={pedirParaParticipar}><UserPlus className="h-4 w-4" /> Pedir para participar</Button>
+            </>
+          )}
         </div>
       )}
 
@@ -202,7 +261,7 @@ export default function QuadroProjeto() {
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-3 items-start -mx-1 px-1">
           {grupos.map((g: any) => (
-            <Droppable key={g.id} droppableId={g.id} isDropDisabled={!editavel || agrupar !== "etapa"}>
+            <Droppable key={g.id} droppableId={g.id} isDropDisabled={agrupar !== "etapa"}>
               {(prov, snap) => (
                 <section
                   ref={prov.innerRef} {...prov.droppableProps}
@@ -220,7 +279,7 @@ export default function QuadroProjeto() {
                   </div>
 
                   {g.cards.map((c: KanbanBoardCard, i: number) => (
-                    <Draggable key={c.id} draggableId={c.id} index={i} isDragDisabled={!editavel || agrupar !== "etapa"}>
+                    <Draggable key={c.id} draggableId={c.id} index={i} isDragDisabled={!podeEditar(c) || agrupar !== "etapa"}>
                       {(dp, ds) => (
                         <div ref={dp.innerRef} {...dp.draggableProps} {...dp.dragHandleProps}
                           className={cn("group relative rounded-lg border bg-card p-2.5 shadow-sm hover:border-primary/60 transition-colors cursor-pointer", ds.isDragging && "shadow-lg rotate-1")}
@@ -231,14 +290,14 @@ export default function QuadroProjeto() {
                           {c.cor && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r" style={{ background: c.cor }} aria-hidden />}
                           <div className="flex items-start gap-1 pl-1.5">
                             <h3 className="text-[13px] font-medium leading-snug flex-1 min-w-0 break-words">{c.titulo}</h3>
-                            {editavel && agrupar === "etapa" && (
+                            {podeEditar(c) && agrupar === "etapa" && (
                               <div onClick={(e) => e.stopPropagation()} className="md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 -mr-1 -mt-1">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Ações do cartão"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-48">
                                     <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Mover para</DropdownMenuLabel>
                                     {colunas.filter((col) => col.id !== c.coluna_id).map((col) => (
-                                      <DropdownMenuItem key={col.id} onClick={() => moveCard.mutate({ cardId: c.id, colunaId: col.id, ordem: 0 })}>
+                                      <DropdownMenuItem key={col.id} onClick={() => mover(c, col.id, 0)}>
                                         <span className="h-2 w-2 rounded-full mr-2" style={{ background: col.cor }} />{col.nome}
                                       </DropdownMenuItem>
                                     ))}
@@ -345,13 +404,43 @@ export default function QuadroProjeto() {
       {editavel && <BoardColumnConfig open={colunasAberto} onOpenChange={setColunasAberto} boardId={board.id} />}
 
       <CartaoProjetoDrawer
-        boardId={board.id} boardNome={board.nome} card={card} colunas={colunas} editavel={editavel}
+        boardId={board.id} boardNome={nome} card={card} colunas={colunas} editavel={!!card && podeEditar(card)}
         onOpenChange={(open) => !open && abrir(null)}
       />
 
       {aviso && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-50 rounded-md bg-foreground text-background px-4 py-2 text-sm shadow-lg">{aviso}</div>}
 
-      <p className="text-xs text-muted-foreground"><Link to="/kanban" className="underline underline-offset-2">Voltar ao Kanban antigo</Link></p>
+      {/* Trazer uma demanda para o quadro */}
+      <Dialog open={demandaAberto} onOpenChange={(o) => { setDemandaAberto(o); if (!o) setBuscaDemanda(""); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Trazer demanda para {nome}</DialogTitle>
+            <DialogDescription>Vira um cartão em "{colunas[0]?.nome}", já vinculado à demanda. Ao mudar de etapa, você escolhe se atualiza o status.</DialogDescription>
+          </DialogHeader>
+          <Input autoFocus value={buscaDemanda} onChange={(e) => setBuscaDemanda(e.target.value)} placeholder="Protocolo, título ou munícipe…" />
+          <div className="max-h-72 overflow-y-auto divide-y rounded-md border">
+            {buscaDemanda.trim().length < 2 ? (
+              <p className="px-3 py-4 text-sm text-muted-foreground">Digite ao menos 2 letras.</p>
+            ) : resultadosDemanda.isLoading ? (
+              <p className="px-3 py-4 text-sm text-muted-foreground">Buscando…</p>
+            ) : (resultadosDemanda.data || []).length === 0 ? (
+              <p className="px-3 py-4 text-sm text-muted-foreground">Nenhuma demanda encontrada.</p>
+            ) : (resultadosDemanda.data || []).map((d: any) => {
+              const jaEsta = cards.some((c) => (extras.dems.get(c.id) || []).some((x) => x.id === d.id));
+              return (
+                <button key={d.id} type="button" disabled={jaEsta || createCard.isPending} onClick={() => criarDeDemanda(d)}
+                  className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <span className="text-xs font-mono text-primary shrink-0">#{d.protocolo}</span>
+                  <span className="text-sm truncate flex-1">{d.titulo}</span>
+                  {jaEsta && <span className="text-[11px] text-muted-foreground shrink-0">já está no quadro</span>}
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmarStatusDemandaDialog movimento={movimentos[0] ?? null} onClose={() => setMovimentos((m) => m.slice(1))} />
     </div>
   );
 }

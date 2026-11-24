@@ -141,6 +141,9 @@ export function ConfirmarStatusDemandaDialog({ movimento, onClose }: Props) {
       );
       queryClient.invalidateQueries({ queryKey: ["demandas"] });
       queryClient.invalidateQueries({ queryKey: ["demandas-kanban"] });
+      // Quadros: o selo de status das demandas vinculadas aos cartões
+      queryClient.invalidateQueries({ queryKey: ["quadro-extras"] });
+      queryClient.invalidateQueries({ queryKey: ["cartao-demandas"] });
       if (result.municipeId) {
         queryClient.invalidateQueries({ queryKey: ["municipe-atividades", result.municipeId] });
       }
@@ -164,7 +167,7 @@ export function ConfirmarStatusDemandaDialog({ movimento, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>Atualizar o status da demanda?</DialogTitle>
           <DialogDescription>
-            O cartão <strong>{demanda.protocolo}</strong> — {demanda.titulo} foi movido para{" "}
+            O cartão da demanda <strong>#{demanda.protocolo}</strong> ({demanda.titulo}) foi movido para{" "}
             <strong>{colunaDestinoTitulo}</strong>. O status atual é{" "}
             <strong>{getStatusLabel(demanda.status)}</strong>.
           </DialogDescription>

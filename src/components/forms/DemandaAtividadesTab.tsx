@@ -5,79 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MentionTextarea, extractMentionsFromText, renderMentionText } from "@/components/ui/MentionTextarea";
+import { EditorRico, ConteudoRico, mencoesDe } from "@/components/ui/EditorRico";
+import { usePessoasGabinete } from "@/hooks/useQuadros";
 
-// Helper: transforma URLs em texto em links clicáveis
-function linkifyText(text: string): (string | JSX.Element)[] {
-  const urlRegex = /(https?:\/\/[^\s<]+)/g;
-  const parts: (string | JSX.Element)[] = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = urlRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
-    }
-    const url = match[1];
-    // Extrair domínio para exibição amigável
-    let displayText: string;
-    try {
-      const domain = new URL(url).hostname.replace('www.', '');
-      displayText = domain;
-    } catch {
-      displayText = url.length > 40 ? url.substring(0, 37) + '...' : url;
-    }
-    parts.push(
-      <a
-        key={`link-${match.index}`}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
-      >
-        {displayText}
-        <ExternalLink className="h-3 w-3 inline" />
-      </a>
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  return parts.length > 0 ? parts : [text];
-}
-
-// Combina renderização de menções + links clicáveis
-function renderMentionAndLinks(text: string): JSX.Element {
-  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
-  const parts: (string | JSX.Element)[] = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = mentionRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      // Texto entre menções — pode conter URLs
-      parts.push(...linkifyText(text.slice(lastIndex, match.index)));
-    }
-    parts.push(
-      <span 
-        key={`mention-${match.index}`}
-        className="bg-primary text-primary-foreground px-1 rounded font-medium"
-      >
-        @{match[1]}
-      </span>
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(...linkifyText(text.slice(lastIndex)));
-  }
-
-  return <>{parts}</>;
-}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -164,6 +94,9 @@ export function DemandaAtividadesTab({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { reacoesPorAtividade, toggle: toggleReacao, isToggling } = useAtividadeReacoes(demandaId);
+  const { pessoas } = usePessoasGabinete();
+  // O editor lê o valor só ao montar: muda a chave a cada formulário aberto
+  const [versaoEditor, setVersaoEditor] = useState(0);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -224,7 +157,7 @@ export function DemandaAtividadesTab({
       if (error) throw error;
 
       // Extrair menções e criar notificações
-      const mentions = extractMentionsFromText(values.descricao || '');
+      const mentions = mencoesDe(values.descricao || '');
       if (mentions.length > 0) {
         await createNotifications(mentions, atividade, user.user.id);
       }
@@ -264,7 +197,7 @@ export function DemandaAtividadesTab({
       if (error) throw error;
 
       // Para atualizações, também verificar novas menções
-      const mentions = extractMentionsFromText(values.descricao || '');
+      const mentions = mencoesDe(values.descricao || '');
       if (mentions.length > 0) {
         const { data: user } = await supabase.auth.getUser();
         if (user.user) {
@@ -363,6 +296,7 @@ export function DemandaAtividadesTab({
 
   const handleEdit = (atividade: any) => {
     setEditingActivity(atividade);
+    setVersaoEditor((v) => v + 1);
     form.reset({
       tipo_atividade: atividade.tipo_atividade,
       titulo: atividade.titulo,
@@ -420,6 +354,8 @@ export function DemandaAtividadesTab({
         <Button 
           onClick={() => {
             setShowForm(true);
+            setEditingActivity(null);
+            setVersaoEditor((v) => v + 1);
             const now = new Date();
             const localDateTime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
             form.reset({
@@ -516,11 +452,13 @@ export function DemandaAtividadesTab({
                     <FormItem>
                       <FormLabel>Descrição</FormLabel>
                       <FormControl>
-                        <MentionTextarea 
-                          value={field.value || ''} 
+                        <EditorRico
+                          key={`${editingActivity?.id ?? "nova"}-${versaoEditor}`}
+                          pessoas={pessoas}
+                          valorInicial={field.value}
                           onChange={field.onChange}
-                          placeholder="Detalhes da atividade... (Use @nome para mencionar usuários)" 
-                          className="min-h-[100px]" 
+                          rotulo="Descrição da atividade"
+                          placeholder="Detalhes da atividade… digite @ para mencionar (a pessoa recebe um aviso)"
                         />
                       </FormControl>
                       <FormMessage />
@@ -706,9 +644,7 @@ export function DemandaAtividadesTab({
                         <h4 className="font-medium text-sm mb-2">{atividade.titulo}</h4>
                         
                         {atividade.descricao && (
-                          <div className="text-sm text-foreground mb-3 whitespace-pre-wrap">
-                            {renderMentionAndLinks(atividade.descricao)}
-                          </div>
+                          <ConteudoRico html={atividade.descricao} className="text-foreground mb-3" />
                         )}
                         
                         {(atividade.propositura || atividade.status_propositura || atividade.link_propositura) && (
