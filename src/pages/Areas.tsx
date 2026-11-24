@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,8 @@ import { toast } from "@/hooks/use-toast";
 
 export default function Areas() {
   const [searchTerm, setSearchTerm] = useState("");
+  // Confirmação de exclusão fora do menu ⋯ (senão o menu fica por cima do modal)
+  const [excluindo, setExcluindo] = useState<any | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
   // Estados de Criação
@@ -578,30 +580,9 @@ export default function Areas() {
                       <DropdownMenuItem onClick={() => handleEditArea(area)}>
                         Editar
                       </DropdownMenuItem>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            <span className="text-destructive">Excluir</span>
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteArea(area.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <DropdownMenuItem onSelect={() => setExcluindo(area)}>
+                        <span className="text-destructive">Excluir…</span>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -783,30 +764,9 @@ export default function Areas() {
                               <DropdownMenuItem onClick={() => handleEditArea(area)}>
                                 Editar
                               </DropdownMenuItem>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                    <span className="text-destructive">Excluir</span>
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tem certeza que deseja excluir a área "{area.nome}"? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteArea(area.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <DropdownMenuItem onSelect={() => setExcluindo(area)}>
+                                <span className="text-destructive">Excluir…</span>
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -825,6 +785,34 @@ export default function Areas() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={!!excluindo} onOpenChange={(v) => !v && setExcluindo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir a área "{excluindo?.nome}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(excluindo?.total_demandas ?? 0) > 0
+                ? `Esta área tem ${excluindo.total_demandas} demanda${excluindo.total_demandas > 1 ? "s" : ""}. Para excluir, mude a área dessas demandas antes.`
+                : "Isso não pode ser desfeito."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{(excluindo?.total_demandas ?? 0) > 0 ? "Fechar" : "Cancelar"}</AlertDialogCancel>
+            {(excluindo?.total_demandas ?? 0) > 0 ? (
+              <AlertDialogAction onClick={() => { const a = excluindo; setExcluindo(null); handleViewDemandas(a.id, a.nome); }}>
+                Ver as demandas
+              </AlertDialogAction>
+            ) : (
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (excluindo) handleDeleteArea(excluindo.id); setExcluindo(null); }}
+            >
+              Excluir
+            </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
