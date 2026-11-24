@@ -311,7 +311,7 @@ export function CriarRotaDialog({
 
             {/* Configurações de Horário */}
             {agendarHorarios && (
-              <div className="space-y-4 p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20">
+              <div className="space-y-4 p-4 rounded-lg border bg-primary/10/50 dark:bg-blue-950/20">
                 <div className="grid grid-cols-3 gap-3">
                   {/* Horário Inicial */}
                   <div className="space-y-1">
@@ -470,7 +470,7 @@ export function CriarRotaDialog({
                 </Badge>
               )}
               {agendarHorarios && (
-                <Badge variant="default" className="text-xs bg-blue-600">
+                <Badge variant="default" className="text-xs bg-primary">
                   <CalendarIconOutline className="h-3 w-3 mr-1" />
                   Com agendamento
                 </Badge>

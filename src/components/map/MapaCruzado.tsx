@@ -115,20 +115,20 @@ export default function MapaCruzado() {
         <div className="lg:col-span-2">
           <Card className="h-full overflow-hidden border-none shadow-md">
             {isLoadingDados ? (
-              <div className="w-full h-full flex items-center justify-center bg-gray-50">
+              <div className="w-full h-full flex items-center justify-center bg-muted/60">
                 <div className="animate-pulse text-center">
                   <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                   <p className="text-muted-foreground">Carregando mapa...</p>
                 </div>
               </div>
             ) : markers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-muted/60">
                 <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium">Nenhum dado encontrado</h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   {dadosMapa ? 'Aplique filtros diferentes para visualizar os dados' : 'Carregando dados...'}
                 </p>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-muted-foreground">
                   {dadosMapa?.demandas?.length || 0} demandas • {dadosMapa?.municipes?.length || 0} munícipes
                 </div>
               </div>
@@ -168,11 +168,11 @@ export default function MapaCruzado() {
                       </div>
                       <div className="text-sm text-blue-600">Demandas</div>
                     </div>
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <div className="text-2xl font-bold text-green-700">
+                    <div className="bg-green-50 p-3 rounded-lg dark:bg-green-950/40">
+                      <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                         {dadosMapa?.municipes?.length || 0}
                       </div>
-                      <div className="text-sm text-green-600">Munícipes</div>
+                      <div className="text-sm text-green-600 dark:text-green-400">Munícipes</div>
                     </div>
                   </div>
 

@@ -103,7 +103,7 @@ export function DemandasMap({
   );
 
   return (
-    <div className="w-full relative rounded-lg overflow-hidden border border-gray-200 shadow-sm z-0" style={{ height }}>
+    <div className="w-full relative rounded-lg overflow-hidden border border-border shadow-sm z-0" style={{ height }}>
       <MapContainer
         center={[config.centerLat, config.centerLng]}
         zoom={config.zoom}
@@ -149,9 +149,9 @@ export function DemandasMap({
                 </div>
                 <h3 className="font-bold text-sm leading-tight mb-1">{marker.title}</h3>
                 {marker.description && (
-                  <p className="text-xs text-gray-600 line-clamp-3">{marker.description}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-3">{marker.description}</p>
                 )}
-                <div className="mt-2 text-[10px] text-gray-400 text-right">
+                <div className="mt-2 text-[10px] text-muted-foreground text-right">
                   Clique para ações
                 </div>
               </div>

@@ -69,8 +69,8 @@ export function ConfirmarDuplicadosDialog({
           )}
           {(isDifferent || isNew) && (
             <>
-              {isDifferent && <ArrowRight className="h-3 w-3 text-blue-500 flex-shrink-0" />}
-              <span className="text-blue-600 dark:text-blue-400 font-medium">{novo}</span>
+              {isDifferent && <ArrowRight className="h-3 w-3 text-primary flex-shrink-0" />}
+              <span className="text-primary dark:text-blue-400 font-medium">{novo}</span>
             </>
           )}
         </div>
@@ -115,7 +115,7 @@ export function ConfirmarDuplicadosDialog({
               Marcar todos como "Criar Novo"
             </Button>
             <div className="ml-auto flex gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+              <Badge variant="secondary" className="bg-primary/15 text-primary dark:bg-blue-900/30 dark:text-blue-300">
                 <RefreshCw className="h-3 w-3 mr-1" />
                 {updateCount} atualizar
               </Badge>
@@ -137,7 +137,7 @@ export function ConfirmarDuplicadosDialog({
                 key={index} 
                 className={`border rounded-lg p-4 transition-all ${
                   dup.action === 'atualizar' 
-                    ? 'border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20' 
+                    ? 'border-primary/30 bg-primary/10/50 dark:bg-blue-950/20' 
                     : 'border-green-500/30 bg-green-50/50 dark:bg-green-950/20'
                 }`}
               >
@@ -157,7 +157,7 @@ export function ConfirmarDuplicadosDialog({
                     onClick={() => setAction(index, 'atualizar')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-all ${
                       dup.action === 'atualizar'
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-background text-muted-foreground hover:bg-muted'
                     }`}
                   >
@@ -223,7 +223,7 @@ export function ConfirmarDuplicadosDialog({
                       existing={dup.existingMunicipe.observacoes} 
                       novo={dup.csvData.observacoes} 
                     />
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
+                    <p className="text-xs text-primary dark:text-blue-400 mt-2 italic">
                       Apenas campos com dados novos na planilha serão atualizados. Campos vazios não apagam os existentes.
                     </p>
                   </div>

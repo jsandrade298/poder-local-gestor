@@ -34,13 +34,13 @@ export function KPICard({
         return {
           card: "border-orange-500/30 bg-orange-500/5",
           icon: "bg-orange-500/10",
-          iconColor: "text-orange-600",
+          iconColor: "text-orange-600 dark:text-orange-400",
         };
       case "caution":
         return {
           card: "border-yellow-500/30 bg-yellow-500/5",
           icon: "bg-yellow-500/10",
-          iconColor: "text-yellow-600",
+          iconColor: "text-yellow-600 dark:text-yellow-400",
         };
       default:
         return {
@@ -72,7 +72,7 @@ export function KPICard({
             <span
               className={`font-medium ${
                 trend.isPositive ? "text-emerald-600" : "text-destructive"
-              }`}
+              } dark:text-emerald-400`}
             >
               {trend.value}
             </span>

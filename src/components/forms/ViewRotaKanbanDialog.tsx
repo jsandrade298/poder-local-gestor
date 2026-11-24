@@ -105,7 +105,7 @@ export function ViewRotaKanbanDialog({
       <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Route className="h-5 w-5 text-emerald-600" />
+            <Route className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             Detalhes da Rota
           </DialogTitle>
         </DialogHeader>
@@ -176,7 +176,7 @@ export function ViewRotaKanbanDialog({
               <p className="text-sm text-muted-foreground">
                 {pontos.length} ponto(s)
                 {pontosVisitados > 0 && (
-                  <span className="text-emerald-600 ml-1">
+                  <span className="text-emerald-600 ml-1 dark:text-emerald-400">
                     ({pontosVisitados} visitado{pontosVisitados !== 1 ? "s" : ""})
                   </span>
                 )}
@@ -211,7 +211,7 @@ export function ViewRotaKanbanDialog({
           {rota.observacoes_conclusao && (
             <div className="space-y-1.5">
               <h3 className="text-sm font-medium flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 Observações de Conclusão
               </h3>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-emerald-50 dark:bg-emerald-950/20 rounded-lg p-3">

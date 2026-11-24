@@ -203,7 +203,7 @@ export function HistoricoView({ selectedUser, responsaveis }: HistoricoViewProps
 
   const getTipoBadge = (tipo: string) => {
     const styles: Record<string, string> = {
-      demanda: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+      demanda: "bg-primary/15 text-primary dark:bg-blue-900/40 dark:text-blue-300",
       tarefa: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
       rota: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
     };
@@ -222,7 +222,7 @@ export function HistoricoView({ selectedUser, responsaveis }: HistoricoViewProps
 
   const getAcaoIcon = (acao: string) => {
     if (acao === "adicionado") return <Plus className="h-3 w-3 text-green-500 mt-0.5 shrink-0" />;
-    if (acao === "movido") return <MoveHorizontal className="h-3 w-3 text-blue-500 mt-0.5 shrink-0" />;
+    if (acao === "movido") return <MoveHorizontal className="h-3 w-3 text-primary mt-0.5 shrink-0" />;
     if (acao === "removido") return <Minus className="h-3 w-3 text-orange-500 mt-0.5 shrink-0" />;
     return null;
   };
@@ -408,7 +408,7 @@ function ArquivadoCard({ item, getTipoBadge, getAcaoIcon, getMovidoPorNome }: {
                     </span>
                   )}
                   {snap.completed && (
-                    <span className="flex items-center gap-1 text-green-600"><CheckSquare className="h-3 w-3" />Concluída</span>
+                    <span className="flex items-center gap-1 text-green-600 dark:text-green-400"><CheckSquare className="h-3 w-3" />Concluída</span>
                   )}
                 </div>
                 {snap.colaboradores?.length > 0 && (

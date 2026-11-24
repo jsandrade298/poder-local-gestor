@@ -301,7 +301,7 @@ export function GeoJSONLayer({
            const pct = total > 0 ? Math.round((resolvidas/total)*100) : 0;
            
            tooltipContent += `<div>Eficiência: <strong>${pct}%</strong></div>`;
-           tooltipContent += `<div class="text-[10px] text-gray-600">Resolvidas: ${resolvidas}/${total}</div>`;
+           tooltipContent += `<div class="text-[10px] text-muted-foreground">Resolvidas: ${resolvidas}/${total}</div>`;
         
         } else if (modoEfetivo === 'predominancia') {
            const demandasRegiao = demandas.filter(d => 
@@ -319,7 +319,7 @@ export function GeoJSONLayer({
            const topAreaCount = sortedAreas.length > 0 ? sortedAreas[0][1] : 0;
            
            tooltipContent += `<div>Dominante: <strong>${topAreaNome}</strong></div>`;
-           tooltipContent += `<div class="text-[10px] text-gray-600">${topAreaCount} demandas</div>`;
+           tooltipContent += `<div class="text-[10px] text-muted-foreground">${topAreaCount} demandas</div>`;
            
         } else {
            // Modos numéricos padrão (Votos ou Padrão)
@@ -329,14 +329,14 @@ export function GeoJSONLayer({
            }
         }
         
-        tooltipContent += `<div class="mt-1 text-[10px] text-gray-500 italic border-t pt-1">Clique para detalhes</div>`;
+        tooltipContent += `<div class="mt-1 text-[10px] text-muted-foreground italic border-t pt-1">Clique para detalhes</div>`;
         tooltipContent += `</div>`;
 
         // Vincular tooltip
         featureLayer.bindTooltip(tooltipContent, {
           permanent: mostrarLabels,
           direction: 'auto',
-          className: 'custom-leaflet-tooltip bg-white border border-gray-200 shadow-md rounded px-2 py-1',
+          className: 'custom-leaflet-tooltip bg-card border border-border shadow-md rounded px-2 py-1',
           sticky: true
         });
 

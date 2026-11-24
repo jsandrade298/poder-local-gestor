@@ -140,7 +140,7 @@ export function NotificationsDropdown() {
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
       case 'mencao':
-        return 'bg-blue-500';
+        return 'bg-primary';
       case 'comentario':
         return 'bg-green-500';
       case 'atribuicao':

@@ -150,7 +150,7 @@ export function BoardView({ board, onBack }: BoardViewProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => archiveBoard.mutate(board.id, { onSuccess: onBack })}
-                className="text-red-600"
+                className="text-red-600 dark:text-red-400"
               >
                 <Archive className="h-4 w-4 mr-2" />
                 Arquivar board
@@ -239,7 +239,7 @@ export function BoardView({ board, onBack }: BoardViewProps) {
                                     {card.data_prazo && (
                                       <span className={`flex items-center gap-1 text-[10px] ${
                                         isOverdue(card.data_prazo) ? 'text-red-600 font-medium' : 'text-muted-foreground'
-                                      }`}>
+                                      } dark:text-red-400`}>
                                         {isOverdue(card.data_prazo) && <AlertTriangle className="h-3 w-3" />}
                                         <Calendar className="h-3 w-3" />
                                         {formatDateOnly(card.data_prazo)}
@@ -261,7 +261,7 @@ export function BoardView({ board, onBack }: BoardViewProps) {
                                         <div className={`flex items-center gap-1 text-[10px] ${
                                           checklistCounts[card.id]?.done === checklistCounts[card.id]?.total
                                             ? 'text-green-600' : 'text-muted-foreground'
-                                        }`}>
+                                        } dark:text-green-400`}>
                                           <CheckSquare className="h-3 w-3" />
                                           {checklistCounts[card.id]?.done}/{checklistCounts[card.id]?.total}
                                         </div>

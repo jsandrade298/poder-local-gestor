@@ -35,9 +35,9 @@ function SortableColunaItem({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
-      className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-900 border rounded-lg ${isDragging ? "shadow-lg" : ""}`}
+      className={`flex items-center gap-3 p-3 bg-card border rounded-lg ${isDragging ? "shadow-lg" : ""}`}
     >
-      <button className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" {...attributes} {...listeners}>
+      <button className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-muted-foreground" {...attributes} {...listeners}>
         <GripVertical className="h-5 w-5" />
       </button>
       <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: coluna.cor }} />

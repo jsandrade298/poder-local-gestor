@@ -103,7 +103,7 @@ export function MunicipeDeletionProgress() {
       case 'deleting':
         return <Trash2 className="h-4 w-4 text-red-500 animate-pulse" />;
       default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -218,11 +218,11 @@ export function MunicipeDeletionProgress() {
                         key={municipe.id}
                          className={cn(
                            "flex items-center gap-3 p-3 rounded border text-xs transition-all duration-300",
-                           municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse",
-                           municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75",
-                           municipe.status === 'error' && "bg-red-50 border-red-200",
-                           municipe.status === 'pending' && state.isCancelled && "bg-orange-50 border-orange-300 ring-1 ring-orange-200",
-                           municipe.status === 'pending' && !state.isCancelled && "bg-gray-50 border-gray-200 opacity-60"
+                           municipe.status === 'deleting' && "bg-red-50 border-red-200 ring-2 ring-red-300 ring-opacity-50 scale-105 animate-pulse dark:bg-red-950/40 dark:border-red-800",
+                           municipe.status === 'deleted' && "bg-green-50 border-green-200 opacity-75 dark:bg-green-950/40 dark:border-green-800",
+                           municipe.status === 'error' && "bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800",
+                           municipe.status === 'pending' && state.isCancelled && "bg-orange-50 border-orange-300 ring-1 ring-orange-200 dark:bg-orange-950/40 dark:border-orange-800",
+                           municipe.status === 'pending' && !state.isCancelled && "bg-muted/60 border-border opacity-60"
                          )}
                         data-municipe-id={municipe.id}
                         data-municipe-status={municipe.status}
@@ -230,7 +230,7 @@ export function MunicipeDeletionProgress() {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{municipe.nome}</div>
                           {municipe.error && (
-                            <div className="text-red-600 text-xs truncate mt-1" title={municipe.error}>
+                            <div className="text-red-600 text-xs truncate mt-1 dark:text-red-400" title={municipe.error}>
                               {municipe.error}
                             </div>
                           )}
@@ -254,20 +254,20 @@ export function MunicipeDeletionProgress() {
 
             {/* Status Summary - fixo no final */}
             <div className="mt-3 flex justify-between items-center text-xs bg-muted p-2 rounded flex-shrink-0">
-              <span className="flex items-center gap-1 text-green-600">
+              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                 <CheckCircle className="h-3 w-3" />
                 {state.municipes.filter(m => m.status === 'deleted').length} excluídos
               </span>
-              <span className="flex items-center gap-1 text-red-600">
+              <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
                 <XCircle className="h-3 w-3" />
                 {state.municipes.filter(m => m.status === 'error').length} erros
               </span>
-              <span className="flex items-center gap-1 text-gray-600">
+              <span className="flex items-center gap-1 text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {state.municipes.filter(m => m.status === 'pending').length} não processados
               </span>
               {state.isCancelled && (
-                <span className="text-orange-600 font-medium">
+                <span className="text-orange-600 font-medium dark:text-orange-400">
                   ⚠️ Cancelado
                 </span>
               )}

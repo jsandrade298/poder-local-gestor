@@ -746,7 +746,7 @@ const SolicitarAgenda = () => {
             <Button
               size="sm"
               variant="outline"
-              className="border-blue-500 text-blue-500 hover:bg-blue-50 hover:text-blue-600"
+              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
               onClick={() => {
                 onUpdateStatus('confirmado');
                 setIsEditing(false);
@@ -770,7 +770,7 @@ const SolicitarAgenda = () => {
             <Button
               size="sm"
               variant="outline"
-              className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 hover:text-yellow-700"
+              className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 hover:text-yellow-700 dark:text-yellow-400"
               onClick={() => {
                 onUpdateStatus('remarcar');
                 setIsEditing(false);
@@ -809,7 +809,7 @@ const SolicitarAgenda = () => {
     <div>
       <div className="px-3 py-3 md:container md:mx-auto md:p-6 space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-lg md:text-3xl font-bold">Sistema de Agendas</h1>
+          <h1 className="text-lg md:text-3xl font-bold">Agenda</h1>
           <p className="text-xs md:text-base text-muted-foreground mt-1 hidden md:block">
             Gerencie solicitações de agenda e valide compromissos do mandato
           </p>

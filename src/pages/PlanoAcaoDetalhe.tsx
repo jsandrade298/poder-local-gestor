@@ -841,7 +841,7 @@ export default function PlanoAcaoDetalhe() {
                                 {t.data_inicio && format(parseISO(t.data_inicio), "dd/MM")} → {t.data_fim && format(parseISO(t.data_fim), "dd/MM/yy")}
                               </p>
                             </div>
-                            <span className={cn("text-xs font-semibold flex-shrink-0 tabular-nums", ov && !cp ? "text-red-500" : cp ? "text-green-600" : "text-muted-foreground")}>
+                            <span className={cn("text-xs font-semibold flex-shrink-0 tabular-nums", ov && !cp ? "text-red-500" : cp ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
                               {t.percentual || 0}%
                             </span>
                           </div>
@@ -1003,7 +1003,7 @@ export default function PlanoAcaoDetalhe() {
                               <div className="flex items-center gap-1.5 flex-1 max-w-[160px]">
                                 <Progress value={t.percentual || 0} className="h-1.5 flex-1" />
                                 <span className={cn("text-xs font-semibold tabular-nums flex-shrink-0 w-8 text-right",
-                                  cp ? "text-green-600" : ov ? "text-red-500" : "text-muted-foreground"
+                                  cp ? "text-green-600 dark:text-green-400" : ov ? "text-red-500" : "text-muted-foreground"
                                 )}>
                                   {t.percentual || 0}%
                                 </span>

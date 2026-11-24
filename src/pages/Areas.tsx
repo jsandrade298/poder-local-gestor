@@ -617,7 +617,7 @@ export default function Areas() {
                       <p className="text-xs text-muted-foreground">Total</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-sm md:text-lg font-bold text-blue-600">{area.demandas_solicitadas}</div>
+                      <div className="text-sm md:text-lg font-bold text-primary">{area.demandas_solicitadas}</div>
                       <p className="text-xs text-muted-foreground">Solicitadas</p>
                     </div>
                     <div className="text-center">
@@ -742,27 +742,27 @@ export default function Areas() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          <Badge variant="secondary" className="bg-primary/15 text-primary">
                             {area.demandas_solicitadas}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300">
                             {area.demandas_em_andamento}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300">
                             {area.demandas_aguardando}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300">
                             {area.demandas_atendidas}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary" className="bg-red-100 text-red-800">
+                          <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300">
                             {area.demandas_devolvidas}
                           </Badge>
                         </TableCell>

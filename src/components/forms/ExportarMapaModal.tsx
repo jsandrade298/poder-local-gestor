@@ -598,7 +598,7 @@ export function ExportarMapaModal({
 
       pdf.setFontSize(7);
       pdf.setTextColor(150, 150, 150);
-      pdf.text('Poder Local Gestor - Gestão Territorial', pw / 2, ph - 3, { align: 'center' });
+      pdf.text('Jorgeus · Gestão e Inteligência Parlamentar', pw / 2, ph - 3, { align: 'center' });
 
       pdf.save(`mapa_${tamanhoPapel}_${new Date().toISOString().slice(0, 10)}.pdf`);
       toast.success('PDF exportado com sucesso!');

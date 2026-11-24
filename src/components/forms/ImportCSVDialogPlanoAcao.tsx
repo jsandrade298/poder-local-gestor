@@ -137,10 +137,10 @@ export function ImportCSVDialogPlanoAcao({ onFileSelect, isImporting, fileInputR
         <div className="space-y-6">
           {/* Mostrar progresso de importação */}
           {isImporting && (
-            <Card className="border-blue-500/20 bg-blue-500/5">
+            <Card className="border-primary/20 bg-primary/5">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   <div>
                     <h3 className="font-semibold text-lg">Processando arquivo...</h3>
                     <p className="text-sm text-muted-foreground">
@@ -181,11 +181,11 @@ export function ImportCSVDialogPlanoAcao({ onFileSelect, isImporting, fileInputR
                     <div className="text-sm text-muted-foreground">Total</div>
                   </div>
                   <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{successCount}</div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{successCount}</div>
                     <div className="text-sm text-muted-foreground">Sucesso</div>
                   </div>
                   <div className="text-center p-3 bg-background rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">{errorCount}</div>
                     <div className="text-sm text-muted-foreground">Erros</div>
                   </div>
                 </div>
@@ -193,7 +193,7 @@ export function ImportCSVDialogPlanoAcao({ onFileSelect, isImporting, fileInputR
                 {/* Lista de erros se houver */}
                 {errorCount > 0 && (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-red-600">Erros encontrados:</h4>
+                    <h4 className="font-medium text-red-600 dark:text-red-400">Erros encontrados:</h4>
                     <div className="max-h-32 overflow-y-auto space-y-1">
                       {importResults
                         .filter(r => !r.success)
@@ -299,10 +299,10 @@ export function ImportCSVDialogPlanoAcao({ onFileSelect, isImporting, fileInputR
                     </CardContent>
                   </Card>
 
-                  <Card className="border-blue-500/20 bg-blue-500/5">
+                  <Card className="border-primary/20 bg-primary/5">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                        <div className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
                           4
                         </div>
                         <div>

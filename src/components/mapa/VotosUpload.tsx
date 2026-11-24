@@ -460,7 +460,7 @@ export function VotosUpload({
             {camadaSelecionada && regioesDisponiveis.length > 0 && (
               <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                 <div className="flex items-start gap-3">
-                  <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
+                  <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0 dark:text-green-400" />
                   <div className="flex-1">
                     <h4 className="font-medium text-sm">Template para Preenchimento</h4>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -537,13 +537,13 @@ export function VotosUpload({
                   border-2 border-dashed rounded-lg cursor-pointer
                   ${isLoading ? 'bg-muted' : 'hover:bg-muted/50'}
                   ${fileName ? 'border-green-500 bg-green-50' : 'border-muted-foreground/25'}
-                `}
+                 dark:bg-green-950/40`}
               >
                 {isLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 ) : fileName ? (
                   <>
-                    <CheckCircle2 className="h-6 w-6 text-green-600 mb-1" />
+                    <CheckCircle2 className="h-6 w-6 text-green-600 mb-1 dark:text-green-400" />
                     <span className="text-sm font-medium">{fileName}</span>
                     <span className="text-xs text-muted-foreground">
                       Clique para trocar
@@ -571,7 +571,7 @@ export function VotosUpload({
                   {estatisticas.encontrados} encontrados
                 </Badge>
                 {estatisticas.sugestoes > 0 && (
-                  <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800">
+                  <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300">
                     <AlertTriangle className="h-3 w-3" />
                     {estatisticas.sugestoes} sugestões
                   </Badge>
@@ -609,19 +609,19 @@ export function VotosUpload({
                   <TableBody>
                     {dadosPreview.map((item, index) => (
                       <TableRow key={index} className={
-                        item.status === 'nao_encontrado' ? 'bg-red-50' :
-                        item.status === 'sugestao' ? 'bg-yellow-50' : ''
+                        item.status === 'nao_encontrado' ? 'bg-red-50 dark:bg-red-950/40' :
+                        item.status === 'sugestao' ? 'bg-yellow-50 dark:bg-yellow-950/40' : ''
                       }>
                         <TableCell className="font-medium">{item.nome}</TableCell>
                         <TableCell>
                           {item.status === 'encontrado' && (
-                            <span className="text-green-600 flex items-center gap-1">
+                            <span className="text-green-600 flex items-center gap-1 dark:text-green-400">
                               <CheckCircle2 className="h-3 w-3" />
                               {item.sugestao}
                             </span>
                           )}
                           {item.status === 'sugestao' && (
-                            <span className="text-yellow-700 flex items-center gap-1">
+                            <span className="text-yellow-700 flex items-center gap-1 dark:text-yellow-300">
                               <AlertTriangle className="h-3 w-3" />
                               {item.sugestao}
                               <span className="text-xs text-muted-foreground">
@@ -630,7 +630,7 @@ export function VotosUpload({
                             </span>
                           )}
                           {item.status === 'nao_encontrado' && (
-                            <span className="text-red-600 flex items-center gap-1">
+                            <span className="text-red-600 flex items-center gap-1 dark:text-red-400">
                               <AlertCircle className="h-3 w-3" />
                               Não encontrado
                             </span>
@@ -648,7 +648,7 @@ export function VotosUpload({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6 text-green-600"
+                                className="h-6 w-6 text-green-600 dark:text-green-400"
                                 onClick={() => aceitarSugestao(index)}
                                 title="Aceitar sugestão"
                               >
@@ -658,7 +658,7 @@ export function VotosUpload({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-red-600"
+                              className="h-6 w-6 text-red-600 dark:text-red-400"
                               onClick={() => rejeitarItem(index)}
                               title="Remover"
                             >

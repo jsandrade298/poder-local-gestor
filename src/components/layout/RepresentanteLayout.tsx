@@ -1,7 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { LogOut, User, Home, FileText, Users, Calendar, MapPin } from "lucide-react";
+import { Home, FileText, Users, Calendar, MapPin } from "lucide-react";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
+import { MarcaIcone } from "@/components/marca/Marca";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { RepresentanteSidebar } from "@/components/layout/RepresentanteSidebar";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ function BottomNavRep() {
   const navigate = useNavigate();
   const location = useLocation();
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t flex items-center justify-around px-2 z-50 safe-area-bottom">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/95 backdrop-blur-md border-t flex items-center justify-around px-2 z-50 safe-area-bottom">
       {repNavItems.map((item) => {
         const isActive = item.path === "/rep"
           ? location.pathname === "/rep"
@@ -46,12 +47,7 @@ function BottomNavRep() {
 }
 
 export function RepresentanteLayout({ children }: RepresentanteLayoutProps) {
-  const { user, profile, tenant, signOut } = useAuth();
-
-  const handleSignOut = async () => {
-    await signOut();
-    window.location.href = "/login";
-  };
+  const { profile, tenant } = useAuth();
 
   return (
     <SidebarProvider>
@@ -59,7 +55,7 @@ export function RepresentanteLayout({ children }: RepresentanteLayoutProps) {
         <RepresentanteSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header melhorado — agora com visual do app principal */}
-          <header className="h-14 flex items-center justify-between border-b bg-card px-4 safe-area-top">
+          <header className="h-14 flex items-center justify-between border-b bg-card/85 backdrop-blur-md px-3 md:px-5 safe-area-top sticky top-0 z-40">
             <div className="flex items-center gap-2 min-w-0">
               <SidebarTrigger className="hidden md:flex" />
               <div className="hidden md:flex items-center gap-2 min-w-0">
@@ -74,30 +70,17 @@ export function RepresentanteLayout({ children }: RepresentanteLayoutProps) {
               </div>
               {/* Mobile: logo compacto */}
               <div className="flex md:hidden items-center gap-2">
-                <div className="w-7 h-7 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center">
-                  <User className="h-3.5 w-3.5 text-white" />
-                </div>
+                <MarcaIcone className="h-7 w-7" />
                 <span className="text-sm font-semibold truncate max-w-[180px]">
                   {profile?.nome?.split(" ")[0] || "Representante"}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-              <div className="hidden md:flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span className="text-sm text-muted-foreground truncate max-w-[180px]">
-                  {profile?.nome || user?.email}
-                </span>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleSignOut} className="hidden md:flex">
-                <LogOut className="h-4 w-4 mr-2" />Sair
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleSignOut} className="md:hidden h-9 w-9">
-                <LogOut className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <MenuUsuario />
             </div>
           </header>
-          <main className="flex-1 p-3 md:p-6 bg-muted/20 pb-20 md:pb-6">
+          <main className="flex-1 p-3 md:p-6 lg:p-8 pb-24 md:pb-8">
             {children}
           </main>
         </div>

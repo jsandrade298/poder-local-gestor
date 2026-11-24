@@ -93,10 +93,10 @@ interface PontoEditavel {
 
 // Configuração dos status
 const STATUS_CONFIG = {
-  pendente: { label: 'Pendente', cor: '#eab308', bgClass: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  em_andamento: { label: 'Em Andamento', cor: '#3b82f6', bgClass: 'bg-blue-100 text-blue-800 border-blue-300' },
-  concluida: { label: 'Concluída', cor: '#22c55e', bgClass: 'bg-green-100 text-green-800 border-green-300' },
-  cancelada: { label: 'Cancelada', cor: '#6b7280', bgClass: 'bg-gray-100 text-gray-800 border-gray-300' }
+  pendente: { label: 'Pendente', cor: '#eab308', bgClass: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800' },
+  em_andamento: { label: 'Em Andamento', cor: '#3b82f6', bgClass: 'bg-primary/15 text-primary border-primary/30' },
+  concluida: { label: 'Concluída', cor: '#22c55e', bgClass: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' },
+  cancelada: { label: 'Cancelada', cor: '#6b7280', bgClass: 'bg-muted text-foreground border-border' }
 };
 
 // Transições de status permitidas
@@ -630,7 +630,7 @@ export function GerenciarRotasModal({
                                 {statusConfig?.label}
                               </Badge>
                               {temHorarios && (
-                                <Badge variant="secondary" className="text-xs shrink-0 bg-blue-100 text-blue-700">
+                                <Badge variant="secondary" className="text-xs shrink-0 bg-primary/15 text-primary">
                                   <Clock className="h-3 w-3 mr-1" />
                                   Agendada
                                 </Badge>
@@ -732,7 +732,7 @@ export function GerenciarRotasModal({
                                 
                                 <DropdownMenuItem 
                                   onClick={() => setRotaParaExcluir(rota)}
-                                  className="text-red-600"
+                                  className="text-red-600 dark:text-red-400"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Excluir
@@ -777,14 +777,14 @@ export function GerenciarRotasModal({
                     <span className="text-2xl font-bold">{rotaDetalhes.rota_pontos?.length || 0}</span>
                     <span className="text-xs text-muted-foreground block">Total de Paradas</span>
                 </div>
-                <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <span className="text-2xl font-bold text-red-700">
+                <div className="bg-red-50 rounded-lg p-3 text-center dark:bg-red-950/40">
+                    <span className="text-2xl font-bold text-red-700 dark:text-red-300">
                         {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'demanda').length || 0}
                     </span>
                     <span className="text-xs text-red-600/80 uppercase font-medium">Demandas</span>
                 </div>
-                <div className="bg-purple-50 rounded-lg p-3 text-center">
-                    <span className="text-2xl font-bold text-purple-700">
+                <div className="bg-purple-50 rounded-lg p-3 text-center dark:bg-purple-950/40">
+                    <span className="text-2xl font-bold text-purple-700 dark:text-purple-300">
                         {rotaDetalhes.rota_pontos?.filter(p => p.tipo === 'municipe').length || 0}
                     </span>
                     <span className="text-xs text-purple-600/80 uppercase font-medium">Munícipes</span>
@@ -812,7 +812,7 @@ export function GerenciarRotasModal({
                                 variant="outline" 
                                 className={cn(
                                     "w-6 h-6 p-0 flex items-center justify-center text-xs rounded-full border-2 bg-background z-10 relative",
-                                    ponto.tipo === 'demanda' ? "border-red-200 text-red-700" : "border-purple-200 text-purple-700"
+                                    ponto.tipo === 'demanda' ? "border-red-200 text-red-700 dark:text-red-300 dark:border-red-800" : "border-purple-200 text-purple-700 dark:text-purple-300 dark:border-purple-800"
                                 )}
                             >
                                 {index + 1}
@@ -830,7 +830,7 @@ export function GerenciarRotasModal({
                                         </Badge>
                                         {/* Mostrar horário agendado */}
                                         {ponto.horario_agendado && (
-                                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 border-blue-200 text-blue-700">
+                                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-primary/10 border-primary/30 text-primary">
                                             <Clock className="h-3 w-3 mr-1" />
                                             {ponto.horario_agendado}
                                           </Badge>
@@ -1136,7 +1136,7 @@ export function GerenciarRotasModal({
 
               {/* Configurações de Horário */}
               {agendarHorariosCopia && (
-                <div className="space-y-4 p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20">
+                <div className="space-y-4 p-4 rounded-lg border bg-primary/10/50 dark:bg-blue-950/20">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Horário Inicial</Label>

@@ -4,14 +4,17 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { HelpChatWidget } from "@/components/layout/HelpChatWidget";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { RepresentanteLayout } from "@/components/layout/RepresentanteLayout";
-import { Button } from "@/components/ui/button";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemandaStatusMonitor } from "@/hooks/useDemandaStatusMonitor";
 import { useDemandaNotificationSender } from "@/hooks/useDemandaNotificationSender";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { LogOut, User } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
+import { MarcaIcone } from "@/components/marca/Marca";
+
+/** Tela inicial do app depois do login (a raiz "/" é a apresentação). */
+export const INICIO_APP = "/inicio";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -21,9 +24,24 @@ interface AuthLayoutProps {
 function NomeGabinete() {
   const { data: config } = useConfiguracoes();
   return (
-    <h1 className="text-sm md:text-base font-semibold text-foreground truncate">
-      {config?.gabinete?.nome || "Gabinete"}
-    </h1>
+    <div className="min-w-0 leading-tight">
+      <p className="texto-etiqueta text-[9.5px] text-muted-foreground hidden sm:block">Gabinete</p>
+      <h1 className="text-sm md:text-[15px] font-semibold text-foreground truncate">
+        {config?.gabinete?.nome || "Gabinete"}
+      </h1>
+    </div>
+  );
+}
+
+/** Carregamento entre telas de acesso, com o símbolo da marca. */
+function TelaCarregando({ texto }: { texto: string }) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
+      <div className="text-center">
+        <MarcaIcone className="h-14 w-14 mx-auto mb-4 animate-pulse" />
+        <p className="text-sm text-muted-foreground">{texto}</p>
+      </div>
+    </div>
   );
 }
 
@@ -32,10 +50,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const isLoginPage = location.pathname === "/login";
   const isChooserPage = location.pathname === "/escolher";
   const isAdminArea = location.pathname.startsWith("/admin");
-  const isPublicPage = location.pathname === "/site";
+  const isLandingPage = location.pathname === "/";
+  const isSiteAntigo = location.pathname === "/site";
   const isConvitePage = location.pathname === "/convite";
   const isRepArea = location.pathname.startsWith("/rep");
-  const { user, loading, profileLoading, isSuperAdmin, roleNoTenant, signOut } = useAuth();
+  const { user, loading, profileLoading, isSuperAdmin, roleNoTenant } = useAuth();
   
   // Ativar monitor de status de demandas apenas se autenticado e no gabinete
   useDemandaStatusMonitor();
@@ -44,17 +63,22 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   // Loading de autenticação
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Verificando autenticação...</p>
-        </div>
-      </div>
+      <TelaCarregando texto="Abrindo o Jorgeus…" />
     );
   }
 
-  // ========== PÁGINA PÚBLICA (landing page) ==========
-  if (isPublicPage) {
+  // ========== APRESENTAÇÃO (raiz "/") ==========
+  // Quem já entrou vai direto para o app; os demais veem a apresentação.
+  if (isSiteAntigo) {
+    return <Navigate to="/" replace />;
+  }
+  if (isLandingPage) {
+    if (user) {
+      if (profileLoading) return <TelaCarregando texto="Abrindo o Jorgeus…" />;
+      if (isSuperAdmin) return <Navigate to="/escolher" replace />;
+      if (roleNoTenant === "representante") return <Navigate to="/rep" replace />;
+      return <Navigate to={INICIO_APP} replace />;
+    }
     return <>{children}</>;
   }
 
@@ -69,12 +93,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       // Logado → aguardar profile carregar para decidir destino
       if (profileLoading) {
         return (
-          <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando perfil...</p>
-            </div>
-          </div>
+          <TelaCarregando texto="Carregando perfil…" />
         );
       }
       // Superadmin → tela de escolha
@@ -86,7 +105,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         return <Navigate to="/rep" replace />;
       }
       // Usuário normal → gabinete
-      return <Navigate to="/" replace />;
+      return <Navigate to={INICIO_APP} replace />;
     }
     // Não logado → mostrar formulário de login
     return <>{children}</>;
@@ -101,7 +120,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   if (isChooserPage) {
     // Só superadmin pode acessar
     if (!profileLoading && !isSuperAdmin) {
-      return <Navigate to="/" replace />;
+      return <Navigate to={INICIO_APP} replace />;
     }
     return <>{children}</>;
   }
@@ -110,17 +129,12 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   if (isRepArea) {
     if (profileLoading) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando...</p>
-          </div>
-        </div>
+        <TelaCarregando texto="Carregando…" />
       );
     }
     // Apenas representantes podem acessar /rep
     if (roleNoTenant !== "representante") {
-      return <Navigate to="/" replace />;
+      return <Navigate to={INICIO_APP} replace />;
     }
     return <RepresentanteLayout>{children}</RepresentanteLayout>;
   }
@@ -130,16 +144,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     // Só superadmin pode acessar
     if (profileLoading) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Verificando permissões...</p>
-          </div>
-        </div>
+        <TelaCarregando texto="Verificando permissões…" />
       );
     }
     if (!isSuperAdmin) {
-      return <Navigate to="/" replace />;
+      return <Navigate to={INICIO_APP} replace />;
     }
     return <AdminLayout>{children}</AdminLayout>;
   }
@@ -156,51 +165,23 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between gap-2 border-b bg-card px-2 md:px-4 safe-area-top sticky top-0 z-40">
-            <div className="flex items-center gap-1 md:gap-2 min-w-0">
+          <header className="h-14 flex items-center justify-between gap-2 border-b bg-card/85 backdrop-blur-md px-2 md:px-5 safe-area-top sticky top-0 z-40">
+            <div className="flex items-center gap-1.5 md:gap-3 min-w-0">
               {/* Menu completo: no celular é o único acesso às telas fora da barra inferior */}
-              <SidebarTrigger className="h-9 w-9" aria-label="Abrir menu" />
+              <SidebarTrigger className="h-9 w-9 text-muted-foreground hover:text-foreground" aria-label="Abrir menu" />
+              <MarcaIcone className="h-7 w-7 md:hidden" />
+              <span className="hidden md:block h-6 w-px bg-border" aria-hidden />
               <NomeGabinete />
             </div>
-            
-            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+
+            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
               <NotificationsDropdown />
-              {/* No mobile, ocultar nome e email para economizar espaço */}
-              <div className="hidden md:flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span className="text-sm text-muted-foreground">
-                  {user?.user_metadata?.full_name || user?.email}
-                </span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={async () => {
-                  await signOut();
-                  window.location.href = '/login';
-                }}
-                className="hidden md:flex"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
-              {/* No mobile, botão compacto de logout */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={async () => {
-                  await signOut();
-                  window.location.href = '/login';
-                }}
-                className="md:hidden h-9 w-9"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+              <MenuUsuario />
             </div>
           </header>
 
           {/* pb-16 no mobile para não ficar atrás do BottomNav */}
-          <main className="flex-1 p-3 md:p-6 bg-muted/20 pb-20 md:pb-6">
+          <main className="flex-1 p-3 md:p-6 lg:p-8 pb-24 md:pb-8">
             {children}
           </main>
         </div>

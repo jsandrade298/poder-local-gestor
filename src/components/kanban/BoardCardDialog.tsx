@@ -307,7 +307,7 @@ export function BoardCardDialog({ open, onOpenChange, boardId, card, defaultColu
                   {card?.data_prazo && (
                     <div className="space-y-1.5">
                       <h3 className="text-sm font-medium flex items-center gap-1.5"><Calendar className="h-4 w-4" />Prazo</h3>
-                      <p className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>{formatDateOnly(card.data_prazo)}</p>
+                      <p className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'} dark:text-red-400`}>{formatDateOnly(card.data_prazo)}</p>
                     </div>
                   )}
                 </div>

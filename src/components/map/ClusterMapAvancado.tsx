@@ -292,7 +292,7 @@ export function ClusterMapAvancado({
                       {marker.type === 'demanda' ? 'DEMANDA' : 'MUNÍCIPE'}
                     </div>
                     {marker.type === 'demanda' && marker.status && (
-                      <div className="text-xs px-2 py-1 rounded bg-gray-100">
+                      <div className="text-xs px-2 py-1 rounded bg-muted">
                         {marker.status}
                       </div>
                     )}
@@ -312,7 +312,7 @@ export function ClusterMapAvancado({
                   
                   {marker.type === 'municipe' && marker.tags && marker.tags.length > 0 && (
                     <div className="mb-2">
-                      <p className="text-xs text-gray-500 mb-1">Grupos:</p>
+                      <p className="text-xs text-muted-foreground mb-1">Grupos:</p>
                       <div className="flex flex-wrap gap-1">
                         {marker.tags.slice(0, 3).map((tag, idx) => (
                           <div 
@@ -331,12 +331,12 @@ export function ClusterMapAvancado({
                   )}
                   
                   {marker.description && (
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       {marker.description}
                     </p>
                   )}
                   
-                  <div className="text-xs text-gray-400 mt-3 pt-2 border-t">
+                  <div className="text-xs text-muted-foreground mt-3 pt-2 border-t">
                     Clique para ver análise detalhada
                   </div>
                 </div>

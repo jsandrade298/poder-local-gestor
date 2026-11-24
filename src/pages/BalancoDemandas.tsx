@@ -257,10 +257,10 @@ export default function BalancoDemandas() {
         {/* ===== KPIs (always visible) ===== */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { icon: <BarChart3 className="h-4 w-4 text-blue-500" />, label: "Total", value: kpis.total, sub: "" },
-            { icon: <Target className="h-4 w-4 text-green-500" />, label: "Conclusão", value: `${kpis.taxaConclusao}%`, sub: `${kpis.atendidas} atendidas`, color: "text-green-600" },
+            { icon: <BarChart3 className="h-4 w-4 text-primary" />, label: "Total", value: kpis.total, sub: "" },
+            { icon: <Target className="h-4 w-4 text-green-500" />, label: "Conclusão", value: `${kpis.taxaConclusao}%`, sub: `${kpis.atendidas} atendidas`, color: "text-green-600 dark:text-green-400" },
             { icon: <Clock className="h-4 w-4 text-cyan-500" />, label: "Tempo Médio", value: `${kpis.tempoMedio}d`, sub: "resolução" },
-            { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, label: "Em Atraso", value: kpis.emAtraso, sub: `${kpis.percAtraso}% do total`, color: "text-red-600" },
+            { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, label: "Em Atraso", value: kpis.emAtraso, sub: `${kpis.percAtraso}% do total`, color: "text-red-600 dark:text-red-400" },
             { icon: <Smile className="h-4 w-4 text-yellow-500" />, label: "Humor", value: `${kpis.humorEmoji} ${kpis.humorMedio || "—"}`, sub: `${kpis.totalComHumor} avaliações` },
             { icon: <TrendingUp className="h-4 w-4 text-purple-500" />, label: "Top Origem", value: kpis.origemMaisFreq, sub: "", isText: true },
           ].map((kpi, i) => (
@@ -345,9 +345,9 @@ export default function BalancoDemandas() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
-                    <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">Volume</p>
-                    <p className="text-blue-700 dark:text-blue-400">
+                  <div className="p-4 bg-primary/10 dark:bg-blue-950/30 rounded-xl">
+                    <p className="font-semibold text-primary dark:text-blue-300 mb-1">Volume</p>
+                    <p className="text-primary dark:text-blue-400">
                       {kpis.total} demandas no período, com {kpis.atendidas} atendidas ({kpis.taxaConclusao}% de conclusão).
                     </p>
                   </div>
@@ -581,7 +581,7 @@ export default function BalancoDemandas() {
                           <span className="font-semibold text-base">{r.name}</span>
                           <div className="flex items-center gap-4 text-sm">
                             <span><strong>{r.total}</strong> total</span>
-                            <span className="text-green-600"><strong>{r.atendidas}</strong> atendidas</span>
+                            <span className="text-green-600 dark:text-green-400"><strong>{r.atendidas}</strong> atendidas</span>
                             <span><strong>{r.pendentes}</strong> pendentes</span>
                             {r.tempoMedio > 0 && <span className="text-muted-foreground">{r.tempoMedio}d médio</span>}
                           </div>

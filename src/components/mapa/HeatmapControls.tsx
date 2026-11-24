@@ -43,7 +43,7 @@ export function HeatmapControls({
     <div className="space-y-4">
       {/* Card Agrupamento de Pontos */}
       {setClusterEnabled && (
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:border-emerald-800">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Layers className="h-5 w-5 text-emerald-500" />
@@ -150,7 +150,7 @@ export function HeatmapControls({
       )}
 
       {/* Card Mapa de Calor */}
-      <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-red-50">
+      <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-red-50 dark:border-orange-800">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Flame className="h-5 w-5 text-orange-500" />

@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
+import { MenuUsuario } from "@/components/layout/MenuUsuario";
+import { MarcaIcone, MarcaPalavra } from "@/components/marca/Marca";
 import {
   BarChart3,
   Building2,
@@ -29,7 +29,6 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { user, signOut } = useAuth();
 
   const isActive = (path: string, exact?: boolean) => {
     if (exact) return currentPath === path;
@@ -39,20 +38,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen flex w-full">
       {/* Sidebar Admin */}
-      <aside className="w-60 border-r bg-card flex flex-col">
+      <aside className="w-60 border-r border-sidebar-border bg-sidebar flex flex-col">
         {/* Header */}
         <div className="p-4 border-b">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">
-                Poder Local
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Painel Administrativo
-              </p>
+            <MarcaIcone className="h-8 w-8" />
+            <div className="min-w-0">
+              <MarcaPalavra className="h-[13px]" />
+              <p className="texto-etiqueta text-[9.5px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1"><Shield className="h-3 w-3" /> Admin SaaS</p>
             </div>
           </div>
         </div>
@@ -82,7 +75,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="p-3 border-t space-y-2">
           {/* Voltar ao Gabinete */}
           <NavLink
-            to="/"
+            to="/inicio"
             className="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-accent text-foreground transition-colors"
           >
             <Home className="h-4 w-4" />
@@ -93,33 +86,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <header className="h-14 flex items-center justify-between border-b bg-card px-4">
+        <header className="h-14 flex items-center justify-between border-b bg-card/85 backdrop-blur-md px-5 sticky top-0 z-40">
           <h1 className="text-lg font-semibold text-foreground">
             Administração SaaS
           </h1>
           
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className="text-sm text-muted-foreground">
-                {user?.user_metadata?.full_name || user?.email}
-              </span>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={async () => {
-                await signOut();
-                window.location.href = '/login';
-              }}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
-          </div>
+          <MenuUsuario />
         </header>
 
-        <main className="flex-1 p-6 bg-muted/20">
+        <main className="flex-1 p-6 lg:p-8">
           {children}
         </main>
       </div>

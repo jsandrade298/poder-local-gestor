@@ -56,9 +56,9 @@ interface RelatorioRow {
 const SINAL_CONFIG = {
   anomalia:    { icon: BarChart2,  label: "Anomalia",    color: "text-red-500",    bg: "bg-red-50 dark:bg-red-950/20"      },
   aceleracao:  { icon: TrendingUp, label: "Aceleração",  color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-950/20"},
-  cronica:     { icon: Clock,      label: "Crônica",     color: "text-amber-600",  bg: "bg-amber-50 dark:bg-amber-950/20"  },
+  cronica:     { icon: Clock,      label: "Crônica",     color: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-950/20"  },
   reincidencia:{ icon: Repeat2,    label: "Reincidência",color: "text-violet-500", bg: "bg-violet-50 dark:bg-violet-950/20"},
-  semantico:   { icon: Sparkles,   label: "Semântico",   color: "text-blue-500",   bg: "bg-blue-50 dark:bg-blue-950/20"    },
+  semantico:   { icon: Sparkles,   label: "Semântico",   color: "text-primary",   bg: "bg-primary/10 dark:bg-blue-950/20"    },
 };
 const ALERTA_BORDER = {
   surto: "border-l-red-400", cronicidade: "border-l-amber-400",

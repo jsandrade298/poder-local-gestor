@@ -19,9 +19,10 @@ import {
   PieChart,
   LineChart as LineChartIcon,
 } from "lucide-react";
-import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { useAuth } from "@/contexts/AuthContext";
 import { FEATURES } from "@/lib/featureFlags";
+import { cn } from "@/lib/utils";
+import { MarcaIcone, MarcaPalavra } from "@/components/marca/Marca";
 import {
   Sidebar,
   SidebarContent,
@@ -45,7 +46,7 @@ type MenuGroup = { label: string | null; items: MenuItem[] };
 const allGroups: MenuGroup[] = [
   {
     label: null,
-    items: [{ title: "Início", url: "/", icon: Home }],
+    items: [{ title: "Início", url: "/inicio", icon: Home }],
   },
   {
     label: "Atendimento",
@@ -89,22 +90,21 @@ export function AppSidebar() {
   const collapsed = state === "collapsed" && !isMobile;
   const location = useLocation();
   const currentPath = location.pathname;
-  const { data: config } = useConfiguracoes();
   const { isSuperAdmin } = useAuth();
 
   const isActive = (path: string) => {
-    if (path === "/") {
-      return currentPath === "/";
-    }
     // Os quadros de equipe e pessoal ainda abrem na tela /kanban
     if (path === "/quadros" && currentPath.startsWith("/kanban")) return true;
     return currentPath.startsWith(path);
   };
 
   const getNavCls = (active: boolean) =>
-    active
-      ? "bg-primary text-primary-foreground font-medium"
-      : "hover:bg-accent text-foreground";
+    cn(
+      "relative transition-colors",
+      active
+        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-sidebar-primary"
+        : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+    );
 
   // No celular, fechar o menu ao escolher uma tela
   const aoNavegar = () => {
@@ -113,34 +113,17 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
-      <SidebarContent className="bg-card border-r">
-        <div className="p-4 border-b">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center shrink-0">
-                <BarChart3 className="h-4 w-4 text-white" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-foreground truncate">
-                  {config?.gabinete?.nome || "Gabinete"}
-                </h2>
-                <p className="text-xs text-muted-foreground truncate">
-                  {config?.gabinete?.descricao || "Sistema de Gestão"}
-                </p>
-              </div>
-            </div>
-          )}
-          {collapsed && (
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center mx-auto">
-              <BarChart3 className="h-4 w-4 text-white" />
-            </div>
-          )}
+      <SidebarContent className="bg-sidebar border-r border-sidebar-border">
+        {/* Marca Jorgeus (o nome do gabinete fica no cabeçalho) */}
+        <div className={cn("flex items-center h-14 border-b border-sidebar-border", collapsed ? "justify-center px-2" : "gap-2.5 px-4")}>
+          <MarcaIcone className={collapsed ? "h-8 w-8" : "h-8 w-8 shrink-0"} />
+          {!collapsed && <MarcaPalavra className="h-[15px]" />}
         </div>
 
         {menuGroups.map((group, gi) => (
           <SidebarGroup key={group.label ?? `grupo-${gi}`} className={group.label ? "py-1" : "pt-2 pb-0"}>
             {group.label && (
-              <SidebarGroupLabel className={collapsed ? "sr-only" : "uppercase tracking-wide text-[11px]"}>
+              <SidebarGroupLabel className={collapsed ? "sr-only" : "texto-etiqueta text-[10px] text-sidebar-foreground/55"}>
                 {group.label}
               </SidebarGroupLabel>
             )}
@@ -148,10 +131,10 @@ export function AppSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
+                    <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined} className="h-9 rounded-lg">
                       <NavLink
                         to={item.url}
-                        end={item.url === "/"}
+                        end={item.url === "/inicio"}
                         className={getNavCls(isActive(item.url))}
                         onClick={aoNavegar}
                       >
@@ -169,19 +152,19 @@ export function AppSidebar() {
         {/* Link para Admin SaaS — só para superadmin */}
         {isSuperAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel className={collapsed ? "sr-only" : "uppercase tracking-wide text-[11px]"}>
+            <SidebarGroupLabel className={collapsed ? "sr-only" : "texto-etiqueta text-[10px] text-sidebar-foreground/55"}>
               Administração
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className="h-9 rounded-lg">
                     <NavLink
                       to="/admin"
                       onClick={aoNavegar}
-                      className={`${getNavCls(isActive("/admin"))} border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15`}
+                      className={cn(getNavCls(isActive("/admin")), "border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15")}
                     >
-                      <Shield className="h-4 w-4 text-amber-600" />
+                      <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       {!collapsed && <span className="text-amber-700 dark:text-amber-400 font-medium">Admin SaaS</span>}
                     </NavLink>
                   </SidebarMenuButton>

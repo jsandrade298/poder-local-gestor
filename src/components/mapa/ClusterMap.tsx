@@ -1285,8 +1285,8 @@ export function ClusterMap({
 
         {/* Indicador de graus - só aparece quando rotacionado */}
         {displayAngle !== 0 && (
-          <div className="px-2 py-0.5 rounded bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 shadow-md">
-            <span className="text-[11px] font-mono font-semibold text-gray-700 dark:text-gray-300">
+          <div className="px-2 py-0.5 rounded bg-white/90 border border-border shadow-md">
+            <span className="text-[11px] font-mono font-semibold text-muted-foreground">
               {displayAngle}°
             </span>
           </div>

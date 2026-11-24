@@ -9,7 +9,7 @@ import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
  * As demais telas ficam no menu (botão ☰ no cabeçalho).
  */
 const navItems = [
-  { title: "Início", url: "/", icon: Home, exact: true },
+  { title: "Início", url: "/inicio", icon: Home, exact: true },
   { title: "Demandas", url: "/demandas", icon: FileText },
   // posição 2: botão "Nova demanda"
   { title: "Munícipes", url: "/municipes", icon: Users },

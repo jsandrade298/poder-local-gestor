@@ -164,7 +164,7 @@ export default function RepresentanteDashboard() {
               <Cake className="h-4 w-4 text-pink-500" />
               Aniversariantes de Hoje
               {aniversariantes.length > 0 && (
-                <Badge className="bg-pink-100 text-pink-700 border-0 text-xs">
+                <Badge className="bg-pink-100 text-pink-700 border-0 text-xs dark:bg-pink-950/40 dark:text-pink-300">
                   {aniversariantes.length}
                 </Badge>
               )}
@@ -184,8 +184,8 @@ export default function RepresentanteDashboard() {
                     const idade = nascimento ? new Date().getFullYear() - nascimento.getFullYear() : null;
                     return (
                       <div key={m.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-pink-600">
+                        <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0 dark:bg-pink-950/40">
+                          <span className="text-sm font-semibold text-pink-600 dark:text-pink-400">
                             {m.nome?.charAt(0)?.toUpperCase()}
                           </span>
                         </div>

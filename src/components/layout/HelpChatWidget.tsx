@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 // ─── Configuração ────────────────────────────────────────────
 
 const ASSISTANT_NAME = "Navi";
-const ASSISTANT_SUBTITLE = "Sua guia no Poder Local";
+const ASSISTANT_SUBTITLE = "Sua guia no Jorgeus";
 
 // ─── Tipos ───────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ export function HelpChatWidget() {
         {
           id: "welcome",
           role: "assistant",
-          content: `Olá! 👋 Eu sou a **${ASSISTANT_NAME}**, sua guia no Poder Local.\n\nPosso te ajudar com:\n• Como usar cada funcionalidade\n• Onde encontrar coisas no sistema\n• Dicas e fluxos de trabalho\n\nÉ só perguntar!`,
+          content: `Olá! 👋 Eu sou a **${ASSISTANT_NAME}**, sua guia no Jorgeus.\n\nPosso te ajudar com:\n• Como usar cada funcionalidade\n• Onde encontrar coisas no sistema\n• Dicas e fluxos de trabalho\n\nÉ só perguntar!`,
         },
       ]);
     }

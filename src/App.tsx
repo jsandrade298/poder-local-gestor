@@ -125,7 +125,9 @@ const App = () => (
               <Route path="/escolher" element={<EscolherDestino />} />
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
-              <Route path="/" element={<Inicio />} />
+              {/* "/" = apresentação pública; o app começa em /inicio */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/inicio" element={<Inicio />} />
               <Route path="/analises" element={<Analises />} />
               <Route path="/visao-geral" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />

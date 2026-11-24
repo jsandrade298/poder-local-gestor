@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { MarcaIcone } from "@/components/marca/Marca";
 import { Home, Users, FileText, Calendar, MapPin, UserCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -30,24 +31,22 @@ export function RepresentanteSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent>
+      <SidebarContent className="bg-sidebar border-r border-sidebar-border">
         {/* Logo / Branding */}
         <div className={`flex items-center gap-2.5 px-4 py-4 border-b ${collapsed ? "justify-center px-2" : ""}`}>
-          <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/60 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-            <UserCheck className="h-4.5 w-4.5 text-white" />
-          </div>
+          <MarcaIcone className="h-9 w-9 shrink-0" />
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-bold truncate leading-tight">
                 {tenant?.nome || "Portal"}
               </p>
-              <p className="text-xs text-muted-foreground truncate">Representante</p>
+              <p className="texto-etiqueta text-[9.5px] text-muted-foreground truncate mt-0.5">Portal do representante</p>
             </div>
           )}
         </div>
 
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel>Menu</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="texto-etiqueta text-[10px] text-sidebar-foreground/55">Menu</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {

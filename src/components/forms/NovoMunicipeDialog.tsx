@@ -524,7 +524,7 @@ export function NovoMunicipeDialog() {
                   </Button>
                 </div>
                 {coordenadas.lat && coordenadas.lng ? (
-                  <p className="text-xs text-green-600">
+                  <p className="text-xs text-green-600 dark:text-green-400">
                     📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
                   </p>
                 ) : (

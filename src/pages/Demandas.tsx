@@ -1532,22 +1532,17 @@ export default function Demandas() {
   return (
     <div>
       <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-3 md:space-y-8">
-        {/* Header */}
-        <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
-          <CardHeader className="pb-3 md:pb-4 px-3 py-3 md:px-6 md:py-6">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center min-w-0">
-                <span className="text-base md:text-xl truncate">Lista de Demandas</span>
-                {searchParams.get('areaNome') && (
-                  <span className="text-xs md:text-lg text-muted-foreground ml-2 truncate hidden md:inline">
-                    - Área: {decodeURIComponent(searchParams.get('areaNome') || '')}
-                  </span>
-                )}
-                {searchParams.get('responsavelNome') && (
-                  <span className="text-xs md:text-lg text-muted-foreground ml-2 truncate hidden md:inline">
-                    - Responsável: {decodeURIComponent(searchParams.get('responsavelNome') || '')}
-                  </span>
-                )}
+        {/* Cabeçalho da página (padrão Jorgeus: título + descrição + ações) */}
+        <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="font-bold text-foreground truncate">Demandas</h1>
+                <p className="text-sm text-muted-foreground hidden md:block truncate">
+                  {searchParams.get('areaNome')
+                    ? `Área: ${decodeURIComponent(searchParams.get('areaNome') || '')}`
+                    : searchParams.get('responsavelNome')
+                      ? `Responsável: ${decodeURIComponent(searchParams.get('responsavelNome') || '')}`
+                      : "Pedidos dos munícipes, com protocolo, responsável e prazo"}
+                </p>
               </div>
 
               {/* Mobile: overflow menu */}
@@ -1600,13 +1595,11 @@ export default function Demandas() {
 
                 <NovaDemandaDialog />
               </div>
-            </CardTitle>
-          </CardHeader>
-        </Card>
+        </div>
 
 
         {/* Filtros */}
-        <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+        <Card className="shadow-suave">
           <CardContent className="px-3 py-3 md:px-6 md:py-4 space-y-3">
             {/* Busca (sempre visível) + Toggle filtros mobile */}
             <div className="flex items-center gap-2">
@@ -1858,7 +1851,7 @@ export default function Demandas() {
               retrying={isFetchingDemandas}
             />
           ) : paginatedDemandas.length === 0 ? (
-            <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+            <Card className="shadow-suave">
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground">Nenhuma demanda encontrada.</p>
               </CardContent>
@@ -1867,7 +1860,7 @@ export default function Demandas() {
             paginatedDemandas.map((demanda) => (
               <Card 
                 key={demanda.id} 
-                className="backdrop-blur-sm bg-card/95 border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+                className="shadow-suave hover:shadow-media hover:border-primary/30 transition-all cursor-pointer"
                 onClick={() => handleViewDemanda(demanda)}
               >
                 <CardContent className="p-3 md:p-6">
@@ -1997,7 +1990,7 @@ export default function Demandas() {
 
         {/* Paginação e Contador */}
         {pageSize !== "all" && totalDemandas > 0 && (
-          <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+          <Card className="shadow-suave">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 {/* Contador */}
@@ -2061,7 +2054,7 @@ export default function Demandas() {
 
         {/* Total quando mostrar todas */}
         {pageSize === "all" && (
-          <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
+          <Card className="shadow-suave">
             <CardContent className="p-4">
               <div className="text-center text-sm text-muted-foreground">
                 Total: {paginatedDemandas.length} demandas

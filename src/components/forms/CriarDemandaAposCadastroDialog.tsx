@@ -352,7 +352,7 @@ export function CriarDemandaAposCadastroDialog({
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5 text-green-600" />
+            <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
             Munícipe cadastrado com sucesso!
           </DialogTitle>
           <div className="text-sm text-muted-foreground">
@@ -564,7 +564,7 @@ export function CriarDemandaAposCadastroDialog({
                 </Button>
               </div>
               {coordenadas.lat && coordenadas.lng ? (
-                <p className="text-xs text-green-600">📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}</p>
+                <p className="text-xs text-green-600 dark:text-green-400">📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">Preencha o endereço e clique em "Obter Coordenadas" para localizar no mapa.</p>
               )}

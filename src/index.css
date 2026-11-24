@@ -2,100 +2,301 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Sistema de Design - Gestão de Gabinetes Políticos */
+/* ═══════════════════════════════════════════════════════════════
+   JORGEUS — Design tokens (Manual de Identidade Visual, 24/11/2026)
+
+   Dois perfis por gabinete (Super Admin): data-perfil="brasil" | "jovem"
+   no <html>. Claro/escuro por usuário: classe .dark no <html>.
+   Os componentes usam só os tokens (hsl(var(--primary)) etc.); trocar
+   de perfil ou de modo recolore o app inteiro.
+
+   Brasil!  azul #1D4ED8 · esmeralda #10B981 · ouro #EAB308 · fundo escuro #08182B
+   Jovem    roxo #7E22CE · azul #2563EB · magenta #EC4899 · lima #84CC16 · fundo escuro #100B28
+   Texto (claro) navy #0A192F
+   ═══════════════════════════════════════════════════════════════ */
 
 @layer base {
-  :root {
-    /* Cores do Gabinete */
-    --background: 0 0% 100%;
-    --foreground: 210 15% 12%;
+  /* ── Brasil! · Claro (padrão) ─────────────────────────────── */
+  :root, [data-perfil="brasil"] {
+    --background: 214 40% 97.5%;
+    --foreground: 216 65% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 210 15% 12%;
-
+    --card-foreground: 216 65% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 210 15% 12%;
+    --popover-foreground: 216 65% 11%;
 
-    /* Cor Primária - Azul Institucional */
-    --primary: 213 94% 45%;
-    --primary-foreground: 210 40% 98%;
-    --primary-light: 213 94% 55%;
-    --primary-dark: 213 94% 35%;
+    --primary: 224 76% 48%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 221 83% 60%;
+    --primary-dark: 224 76% 38%;
 
-    /* Cor Secundária - Verde Progresso */
-    --secondary: 158 64% 45%;
-    --secondary-foreground: 210 40% 98%;
-    --secondary-light: 158 64% 55%;
-    --secondary-dark: 158 64% 35%;
+    --secondary: 160 84% 39%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 158 64% 52%;
+    --secondary-dark: 161 94% 30%;
 
-    /* Tons Neutros */
-    --muted: 210 40% 98%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 214 35% 94.5%;
+    --muted-foreground: 215 19% 40%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 210 15% 12%;
+    --accent: 220 80% 95.5%;
+    --accent-foreground: 224 70% 30%;
 
-    /* Status Colors */
-    --success: 158 64% 45%;
-    --success-foreground: 210 40% 98%;
-    
-    --warning: 43 96% 56%;
-    --warning-foreground: 210 15% 12%;
-    
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 160 84% 33%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 216 65% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 224 76% 48%;
+    --info-foreground: 0 0% 100%;
 
-    --info: 213 94% 45%;
-    --info-foreground: 210 40% 98%;
+    --border: 214 28% 88%;
+    --input: 214 28% 85%;
+    --ring: 224 76% 48%;
+    --radius: 0.75rem;
 
-    /* Chart Colors - Para consistência nos gráficos */
-    --chart-1: 214 100% 57%; /* #3b82f6 - Azul para "Aberta" */
-    --chart-2: 43 96% 56%; /* #f59e0b - Laranja para "Em Andamento" */
-    --chart-3: 262 83% 58%; /* #8b5cf6 - Roxo para "Aguardando" */
-    --chart-4: 158 64% 52%; /* #10b981 - Verde para "Resolvida" */
-    --chart-5: 0 84% 60%; /* #ef4444 - Vermelho para "Cancelada" */
+    /* cores da marca (degradês, detalhes) */
+    --marca-1: #1D4ED8;
+    --marca-2: #10B981;
+    --marca-3: #EAB308;
+    --marca-4: #1D4ED8;
+    --marca-degrade: linear-gradient(120deg, #1D4ED8 0%, #10B981 55%, #EAB308 100%);
+    --marca-fundo-escuro: #08182B;
 
-    /* Gráficos de Análises — paleta validada (daltonismo e contraste) */
-    --viz-1: #2a78d6;        /* série 1: azul */
-    --viz-2: #eb6834;        /* série 2: laranja */
-    --viz-seq: #2a78d6;      /* magnitude (um tom só) */
-    --viz-seq-fraco: #86b6ef;
-    --viz-grid: #e1e0d9;
-    --viz-eixo: #c3c2b7;
-    --viz-texto: #898781;
+    /* gráficos (paletas validadas: daltonismo e contraste) */
+    --chart-1: 224 76% 48%;
+    --chart-2: 32 95% 44%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 45 93% 47%;
+    --chart-5: 0 72% 51%;
+    --viz-1: #1D4ED8;
+    --viz-2: #D97706;
+    --viz-seq: #1D4ED8;
+    --viz-seq-fraco: #93B4F5;
+    --viz-grid: #e3e8ef;
+    --viz-eixo: #c5cdd8;
+    --viz-texto: #5b6577;
 
-    /* Bordas e Inputs */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 213 94% 45%;
-
-    /* Gradientes */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+    --gradient-hero: var(--marca-degrade);
 
-    /* Sombras */
-    --shadow-soft: 0 2px 8px -2px hsl(var(--primary) / 0.1);
-    --shadow-medium: 0 4px 16px -4px hsl(var(--primary) / 0.15);
-    --shadow-strong: 0 8px 32px -8px hsl(var(--primary) / 0.2);
+    --shadow-soft: 0 1px 2px hsl(216 65% 11% / 0.04), 0 2px 8px -2px hsl(216 65% 11% / 0.06);
+    --shadow-medium: 0 2px 4px hsl(216 65% 11% / 0.04), 0 8px 24px -6px hsl(216 65% 11% / 0.10);
+    --shadow-strong: 0 4px 8px hsl(216 65% 11% / 0.06), 0 16px 40px -8px hsl(216 65% 11% / 0.16);
 
-    --radius: 0.5rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 216 40% 22%;
+    --sidebar-primary: 224 76% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 80% 95.5%;
+    --sidebar-accent-foreground: 224 70% 30%;
+    --sidebar-border: 214 28% 90%;
+    --sidebar-ring: 224 76% 48%;
+  }
 
-    --sidebar-background: 0 0% 98%;
+  /* ── Jovem · Claro ────────────────────────────────────────── */
+  [data-perfil="jovem"] {
+    --background: 265 40% 97.8%;
+    --foreground: 216 65% 11%;
+    --card-foreground: 216 65% 11%;
+    --popover-foreground: 216 65% 11%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --primary: 272 72% 47%;
+    --primary-light: 271 81% 62%;
+    --primary-dark: 272 72% 37%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --secondary: 221 83% 53%;
+    --secondary-light: 213 94% 62%;
+    --secondary-dark: 224 76% 43%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --muted: 262 35% 95%;
+    --muted-foreground: 250 12% 40%;
+    --accent: 270 85% 96%;
+    --accent-foreground: 272 65% 32%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    --success: 85 85% 30%;
+    --warning: 38 92% 50%;
+    --info: 221 83% 53%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --border: 262 25% 89%;
+    --input: 262 25% 86%;
+    --ring: 272 72% 47%;
 
-    --sidebar-border: 220 13% 91%;
+    --marca-1: #7E22CE;
+    --marca-2: #EC4899;
+    --marca-3: #84CC16;
+    --marca-4: #2563EB;
+    --marca-degrade: linear-gradient(120deg, #7E22CE 0%, #EC4899 45%, #2563EB 75%, #84CC16 100%);
+    --marca-fundo-escuro: #100B28;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --chart-1: 272 72% 47%;
+    --chart-3: 330 81% 60%;
+    --chart-4: 84 81% 44%;
+    --viz-1: #7E22CE;
+    --viz-2: #D97706;
+    --viz-seq: #7E22CE;
+    --viz-seq-fraco: #C9A3EE;
+    --viz-grid: #e7e3f0;
+    --viz-eixo: #cbc4da;
+    --viz-texto: #625b74;
+
+    --sidebar-foreground: 255 30% 22%;
+    --sidebar-primary: 272 72% 47%;
+    --sidebar-accent: 270 85% 96%;
+    --sidebar-accent-foreground: 272 65% 32%;
+    --sidebar-border: 262 25% 91%;
+    --sidebar-ring: 272 72% 47%;
+  }
+
+  /* ── Brasil! · Escuro ─────────────────────────────────────── */
+  .dark, .dark [data-perfil="brasil"] {
+    --background: 213 69% 10%;
+    --foreground: 210 40% 96%;
+
+    --card: 213 52% 13.5%;
+    --card-foreground: 210 40% 96%;
+    --popover: 213 50% 15%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 221 83% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 213 94% 68%;
+    --primary-dark: 224 76% 48%;
+
+    --secondary: 160 84% 39%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 213 42% 18%;
+    --muted-foreground: 214 22% 70%;
+    --accent: 214 45% 20%;
+    --accent-foreground: 210 40% 96%;
+
+    --success: 158 64% 45%;
+    --warning: 45 93% 52%;
+    --warning-foreground: 216 65% 11%;
+    --destructive: 0 72% 56%;
+    --info: 221 83% 60%;
+
+    --border: 213 38% 21%;
+    --input: 213 38% 24%;
+    --ring: 221 83% 60%;
+
+    --viz-1: #3B82F6;
+    --viz-2: #D97014;
+    --viz-seq: #3B82F6;
+    --viz-seq-fraco: #1E3A8A;
+    --viz-grid: #1c3047;
+    --viz-eixo: #2b4560;
+    --viz-texto: #93a3b8;
+
+    --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.45);
+    --shadow-strong: 0 12px 32px -8px hsl(0 0% 0% / 0.55);
+
+    --sidebar-background: 214 72% 8%;
+    --sidebar-foreground: 214 25% 82%;
+    --sidebar-primary: 221 83% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 45% 16%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 213 40% 16%;
+    --sidebar-ring: 221 83% 60%;
+  }
+
+  /* ── Jovem · Escuro ───────────────────────────────────────── */
+  .dark[data-perfil="jovem"], .dark [data-perfil="jovem"] {
+    --background: 250 57% 10%;
+    --card: 252 45% 14%;
+    --popover: 252 42% 16%;
+
+    --primary: 271 81% 66%;
+    --primary-light: 270 95% 75%;
+    --primary-dark: 272 72% 47%;
+    --secondary: 217 91% 60%;
+
+    --muted: 252 35% 19%;
+    --muted-foreground: 250 20% 74%;
+    --accent: 260 40% 21%;
+    --accent-foreground: 250 40% 96%;
+
+    --success: 84 70% 50%;
+    --warning: 38 92% 56%;
+    --info: 217 91% 60%;
+
+    --border: 252 30% 23%;
+    --input: 252 30% 26%;
+    --ring: 271 81% 66%;
+
+    --viz-1: #A855F7;
+    --viz-2: #D97014;
+    --viz-seq: #A855F7;
+    --viz-seq-fraco: #4C1D95;
+    --viz-grid: #2a2350;
+    --viz-eixo: #3b3266;
+    --viz-texto: #a59fc0;
+
+    --sidebar-background: 252 60% 7.5%;
+    --sidebar-foreground: 250 25% 82%;
+    --sidebar-primary: 271 81% 66%;
+    --sidebar-accent: 256 40% 16%;
+    --sidebar-border: 252 35% 15%;
+    --sidebar-ring: 271 81% 66%;
+  }
+}
+
+/* Fundo do Jovem escuro: degradê sutil roxo→azul, como no manual */
+.dark[data-perfil="jovem"] body {
+  background-image: linear-gradient(160deg, #100B28 0%, #08172E 100%);
+  background-attachment: fixed;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Hierarquia do manual: títulos em Plus Jakarta Sans */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: theme("fontFamily.display");
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+}
+
+@layer utilities {
+  /* Assinatura da marca: texto em Michroma (logo, login, títulos institucionais) */
+  .texto-marca {
+    font-family: theme("fontFamily.marca");
+    letter-spacing: 0.06em;
+  }
+  /* Etiquetas/tagline: caixa alta com respiro */
+  .texto-etiqueta {
+    font-family: theme("fontFamily.display");
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .fundo-marca {
+    background-image: var(--marca-degrade);
+  }
+  .texto-degrade {
+    background-image: var(--marca-degrade);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .sombra-suave { box-shadow: var(--shadow-soft); }
+  .sombra-media { box-shadow: var(--shadow-medium); }
+  .sombra-forte { box-shadow: var(--shadow-strong); }
 }
 
 /* Plano de Ação - Scroll sempre visível com performance otimizada */
@@ -183,52 +384,6 @@
   background: #f3f4f6 !important;
 }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --viz-1: #3987e5;
-    --viz-2: #d95926;
-    --viz-seq: #3987e5;
-    --viz-seq-fraco: #184f95;
-    --viz-grid: #2c2c2a;
-    --viz-eixo: #383835;
-    --viz-texto: #898781;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-}
 
 @layer base {
   * {
@@ -487,4 +642,24 @@ table {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Títulos de página — Manual Jorgeus: H1 24px, Plus Jakarta Sans 700,
+   -0.02em. Vale para toda tela do app (dentro de <main>), para elas
+   terem o mesmo peso visual. ".titulo-compacto" fica de fora (ex.: mapa).
+   ═══════════════════════════════════════════════════════════════ */
+main h1:not(.titulo-compacto)[class],
+main h1:not(.titulo-compacto) {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 767px) {
+  main h1:not(.titulo-compacto)[class],
+  main h1:not(.titulo-compacto) {
+    font-size: 1.25rem !important;
+    line-height: 1.6rem !important;
+  }
 }

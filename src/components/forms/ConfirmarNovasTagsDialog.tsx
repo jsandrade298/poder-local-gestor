@@ -79,7 +79,7 @@ export function ConfirmarNovasTagsDialog({
       <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5 text-blue-500" />
+            <Tag className="h-5 w-5 text-primary" />
             Novas Tags Encontradas
           </DialogTitle>
         </DialogHeader>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { aplicarPerfil } from '@/lib/tema';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -85,12 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileData.tenant_id) {
         const { data: tenantData, error: tenantError } = await supabase
           .from('tenants')
-          .select('id, nome, slug, plano, ativo')
+          .select('id, nome, slug, plano, ativo, perfil_visual')
           .eq('id', profileData.tenant_id)
           .single();
 
         if (tenantData && !tenantError) {
           setTenant(tenantData as TenantInfo);
+          // Identidade visual do gabinete (Brasil! ou Jovem), definida pelo Super Admin
+          aplicarPerfil((tenantData as any).perfil_visual === 'jovem' ? 'jovem' : 'brasil');
           console.log('🏢 Tenant carregado:', tenantData.nome);
         } else {
           setTenant(null);

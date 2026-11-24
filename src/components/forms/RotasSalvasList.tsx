@@ -61,10 +61,10 @@ interface RotasSalvasListProps {
 
 // Configuração dos status
 const STATUS_CONFIG = {
-  pendente: { label: 'Pendente', cor: '#eab308', bgClass: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  em_andamento: { label: 'Em Andamento', cor: '#3b82f6', bgClass: 'bg-blue-100 text-blue-800 border-blue-300' },
-  concluida: { label: 'Concluída', cor: '#22c55e', bgClass: 'bg-green-100 text-green-800 border-green-300' },
-  cancelada: { label: 'Cancelada', cor: '#6b7280', bgClass: 'bg-gray-100 text-gray-800 border-gray-300' }
+  pendente: { label: 'Pendente', cor: '#eab308', bgClass: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800' },
+  em_andamento: { label: 'Em Andamento', cor: '#3b82f6', bgClass: 'bg-primary/15 text-primary border-primary/30' },
+  concluida: { label: 'Concluída', cor: '#22c55e', bgClass: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' },
+  cancelada: { label: 'Cancelada', cor: '#6b7280', bgClass: 'bg-muted text-foreground border-border' }
 };
 
 export function RotasSalvasList({
@@ -193,8 +193,8 @@ export function RotasSalvasList({
     return (
       <Card key={rota.id} className={cn(
         "transition-all hover:shadow-md",
-        isPast && "border-red-200 bg-red-50/50",
-        isHoje && rota.status === 'pendente' && "border-blue-200 bg-blue-50/50"
+        isPast && "border-red-200 bg-red-50/50 dark:border-red-800",
+        isHoje && rota.status === 'pendente' && "border-primary/30 bg-primary/10/50"
       )}>
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
@@ -260,7 +260,7 @@ export function RotasSalvasList({
                 <Button 
                   variant="outline" 
                   size="sm"
-                  className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                  className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-800"
                   onClick={() => onConcluirRota?.(rota)}
                 >
                   <CheckCircle className="h-3 w-3 mr-1" />
@@ -323,7 +323,7 @@ export function RotasSalvasList({
 
                       <DropdownMenuItem 
                         onClick={() => handleCancelarRota(rota)}
-                        className="text-orange-600"
+                        className="text-orange-600 dark:text-orange-400"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Cancelar Rota
@@ -331,7 +331,7 @@ export function RotasSalvasList({
 
                       <DropdownMenuItem 
                         onClick={() => setRotaParaExcluir(rota)}
-                        className="text-red-600"
+                        className="text-red-600 dark:text-red-400"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Excluir Rota

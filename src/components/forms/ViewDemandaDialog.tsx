@@ -357,7 +357,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       onClick={copyLink}
                       className="gap-2"
                     >
-                      {linkCopied ? <Check className="h-4 w-4 text-green-600" /> : <Link2 className="h-4 w-4" />}
+                      {linkCopied ? <Check className="h-4 w-4 text-green-600 dark:text-green-400" /> : <Link2 className="h-4 w-4" />}
                       {linkCopied ? "Copiado!" : "Copiar link"}
                     </Button>
                     {FEATURES.assessorIA && (

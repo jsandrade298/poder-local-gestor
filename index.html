@@ -1,20 +1,37 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-perfil="brasil">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Poder Local - Gestão de Gabinete</title>
-    <meta name="description" content="Sistema de gestão de gabinetes legislativos" />
-    <meta name="author" content="Poder Local" />
+    <title>Jorgeus · Gestão e Inteligência Parlamentar</title>
+    <meta name="description" content="Jorgeus: gestão e inteligência parlamentar para gabinetes legislativos. Demandas, munícipes, agenda, quadros de trabalho e análises em um só lugar." />
+    <meta name="author" content="Jorgeus" />
+
+    <!-- Tema salvo (claro/escuro e perfil do gabinete) antes da primeira pintura -->
+    <script>
+      (function () {
+        try {
+          var d = document.documentElement;
+          if (localStorage.getItem("jorgeus-modo") === "escuro") d.classList.add("dark");
+          var p = localStorage.getItem("jorgeus-perfil");
+          if (p === "jovem" || p === "brasil") d.setAttribute("data-perfil", p);
+        } catch (e) { /* sem storage: claro + Brasil! */ }
+      })();
+    </script>
+
+    <!-- Fontes do manual: Inter (corpo), Plus Jakarta Sans (títulos), Michroma (marca) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Michroma&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#1570EF" />
+    <meta name="theme-color" content="#08182B" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Poder Local" />
-    <meta name="application-name" content="Poder Local" />
-    <meta name="msapplication-TileColor" content="#1570EF" />
+    <meta name="apple-mobile-web-app-title" content="Jorgeus" />
+    <meta name="application-name" content="Jorgeus" />
+    <meta name="msapplication-TileColor" content="#08182B" />
 
     <!-- Icons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -25,14 +42,14 @@
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Poder Local - Gestão de Gabinete" />
-    <meta property="og:description" content="Sistema de gestão de gabinetes legislativos" />
+    <meta property="og:title" content="Jorgeus · Gestão e Inteligência Parlamentar" />
+    <meta property="og:description" content="Gestão e inteligência parlamentar para gabinetes legislativos." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/icons/icon-512x512.png" />
+    <meta property="og:image" content="/brand/og-imagem.png" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Poder Local" />
-    <meta name="twitter:image" content="/icons/icon-192x192.png" />
+    <meta name="twitter:title" content="Jorgeus" />
+    <meta name="twitter:image" content="/brand/og-imagem.png" />
   </head>
 
   <body>

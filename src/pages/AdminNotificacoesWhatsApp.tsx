@@ -82,7 +82,7 @@ const EMPTY_CONFIG: NotificationConfig = {
   usar_ia: true,
   tom_mensagem: "profissional_leve",
   mensagem_fallback:
-    "🔔 Olá {primeiro_nome}!\n\n📋 {tipo}: {mensagem}\n\n💡 Acesse o Poder Local Gestor para ver todos os detalhes e próximas ações.\n\n✅ Confirme o recebimento respondendo OK.",
+    "🔔 Olá {primeiro_nome}!\n\n📋 {tipo}: {mensagem}\n\n💡 Acesse o Jorgeus para ver todos os detalhes e próximas ações.\n\n✅ Confirme o recebimento respondendo OK.",
   tipos_ativos: [
     "atribuicao",
     "mencao",
@@ -483,7 +483,7 @@ export default function AdminNotificacoesWhatsApp() {
                 />
               </div>
               {!configCompleta && !config.ativo && (
-                <div className="flex items-center gap-2 mt-3 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mt-3 text-sm text-amber-600 bg-amber-50 rounded-lg p-3 dark:bg-amber-950/40 dark:text-amber-400">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                   <span>Preencha as credenciais W-API e a conexão Supabase antes de ativar.</span>
                 </div>
@@ -519,7 +519,7 @@ export default function AdminNotificacoesWhatsApp() {
                   <p className="text-xs text-muted-foreground">Apenas para referência visual</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2 text-sm bg-amber-50 text-amber-700 rounded-lg p-3">
+              <div className="flex items-start gap-2 text-sm bg-amber-50 text-amber-700 rounded-lg p-3 dark:bg-amber-950/40 dark:text-amber-300">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <p className="text-xs">
                   O botão de confirmação nos resumos usa o endpoint <code>send-button-list</code>,
@@ -642,7 +642,7 @@ export default function AdminNotificacoesWhatsApp() {
                 <Label>Supabase Anon Key</Label>
                 <Input placeholder="eyJhbGciOiJIUzI1NiIs..." value={config.supabase_anon_key} onChange={(e) => updateField("supabase_anon_key", e.target.value)} className="font-mono text-xs" />
               </div>
-              <div className="flex items-start gap-2 text-sm bg-blue-50 text-blue-700 rounded-lg p-3">
+              <div className="flex items-start gap-2 text-sm bg-primary/10 text-primary rounded-lg p-3">
                 <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium">Onde encontrar?</p>
@@ -666,7 +666,7 @@ export default function AdminNotificacoesWhatsApp() {
                 Enviar teste para meu WhatsApp
               </Button>
               {testResult && (
-                <div className={`flex items-center gap-2 text-sm rounded-lg p-3 ${testResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                <div className={`flex items-center gap-2 text-sm rounded-lg p-3 ${testResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"} dark:bg-green-950/40 dark:bg-red-950/40 dark:text-green-300 dark:text-red-300`}>
                   {testResult.ok ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> : <XCircle className="h-4 w-4 flex-shrink-0" />}
                   <span>{testResult.msg}</span>
                 </div>
@@ -675,9 +675,9 @@ export default function AdminNotificacoesWhatsApp() {
           </Card>
 
           {/* Webhook */}
-          <Card className="border-amber-200">
+          <Card className="border-amber-200 dark:border-amber-800">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-amber-700">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
                 <AlertTriangle className="h-4 w-4" />Configuração do Webhook W-API
               </CardTitle>
             </CardHeader>
@@ -698,9 +698,9 @@ export default function AdminNotificacoesWhatsApp() {
           </Card>
 
           {/* pg_net */}
-          <Card className="border-blue-200">
+          <Card className="border-primary/30">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-blue-700">
+              <CardTitle className="text-base flex items-center gap-2 text-primary">
                 <Info className="h-4 w-4" />Extensão pg_net
               </CardTitle>
             </CardHeader>
@@ -720,20 +720,20 @@ export default function AdminNotificacoesWhatsApp() {
 
           {/* Pré-requisitos */}
           {!assessorPronto && (
-            <Card className="border-amber-200 bg-amber-50">
+            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800">
               <CardContent className="pt-4">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                  <div className="text-sm text-amber-800 space-y-1">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0 dark:text-amber-400" />
+                  <div className="text-sm text-amber-800 space-y-1 dark:text-amber-300">
                     <p className="font-medium">Pré-requisitos para ativar o Assessor</p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="outline" className={configCompleta ? "border-green-500 text-green-700" : "border-red-400 text-red-700"}>
+                      <Badge variant="outline" className={configCompleta ? "border-green-500 text-green-700 dark:text-green-300" : "border-red-400 text-red-700 dark:text-red-300"}>
                         {configCompleta ? "✅" : "❌"} W-API configurada
                       </Badge>
-                      <Badge variant="outline" className={config.ativo ? "border-green-500 text-green-700" : "border-red-400 text-red-700"}>
+                      <Badge variant="outline" className={config.ativo ? "border-green-500 text-green-700 dark:text-green-300" : "border-red-400 text-red-700 dark:text-red-300"}>
                         {config.ativo ? "✅" : "❌"} Canal de notificações ativo
                       </Badge>
-                      <Badge variant="outline" className={config.openai_api_key ? "border-green-500 text-green-700" : "border-red-400 text-red-700"}>
+                      <Badge variant="outline" className={config.openai_api_key ? "border-green-500 text-green-700 dark:text-green-300" : "border-red-400 text-red-700 dark:text-red-300"}>
                         {config.openai_api_key ? "✅" : "❌"} Chave OpenAI preenchida
                       </Badge>
                     </div>
@@ -749,7 +749,7 @@ export default function AdminNotificacoesWhatsApp() {
             <Card>
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <MessageCircle className="h-4 w-4 text-blue-500" />
+                  <MessageCircle className="h-4 w-4 text-primary" />
                   <span className="text-xs text-muted-foreground">Interações</span>
                 </div>
                 <p className="text-2xl font-bold">{assessorStats?.totalInteracoes?.toLocaleString() || 0}</p>
@@ -792,7 +792,7 @@ export default function AdminNotificacoesWhatsApp() {
                 />
               </div>
               {config.assessor_ativo && (
-                <div className="flex items-center gap-2 mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3 dark:bg-green-950/40 dark:text-green-300">
                   <Wifi className="h-4 w-4 flex-shrink-0" />
                   <span>Assessor ativo — aguardando mensagens no número <strong>{config.wapi_phone_number || "configurado"}</strong></span>
                 </div>

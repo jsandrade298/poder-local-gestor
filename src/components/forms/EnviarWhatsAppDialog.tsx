@@ -702,7 +702,7 @@ export function EnviarWhatsAppDialog({ municipesSelecionados = [] }: EnviarWhats
                         ? 'bg-green-500 text-white'
                         : step.valid
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                          : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {step.valid && activeTab !== step.id ? (
@@ -873,7 +873,7 @@ Estamos entrando em contato para..."
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-500" />
+                        <Users className="h-4 w-4 text-primary" />
                         Selecionar Destinatários
                       </CardTitle>
                       <CardDescription>
@@ -882,9 +882,9 @@ Estamos entrando em contato para..."
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Enviar para todos */}
-                      <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-between p-4 bg-primary/10 dark:bg-blue-950/30 rounded-lg border border-primary/30 dark:border-blue-800">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-500 rounded-lg">
+                          <div className="p-2 bg-primary rounded-lg">
                             <Users className="h-5 w-5 text-white" />
                           </div>
                           <div>
@@ -1196,14 +1196,14 @@ Estamos entrando em contato para..."
                               </div>
                             )}
                             <div className="bg-[#dcf8c6] dark:bg-[#005c4b] p-3 rounded-lg shadow-sm">
-                              <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-100">
+                              <p className="text-sm whitespace-pre-wrap text-foreground">
                                 {getPreviewMensagem() || "Digite uma mensagem..."}
                               </p>
                               <div className="flex items-center justify-end gap-1 mt-1">
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                <span className="text-[10px] text-muted-foreground dark:text-muted-foreground">
                                   {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
-                                <CheckCircle2 className="h-3 w-3 text-blue-500" />
+                                <CheckCircle2 className="h-3 w-3 text-primary" />
                               </div>
                             </div>
                           </div>
@@ -1262,15 +1262,15 @@ Estamos entrando em contato para..."
 
                         {/* Checklist de validação */}
                         <div className="space-y-2 pt-2">
-                          <div className={`flex items-center gap-2 text-sm ${validacaoMensagem ? 'text-green-600' : 'text-red-500'}`}>
+                          <div className={`flex items-center gap-2 text-sm ${validacaoMensagem ? 'text-green-600' : 'text-red-500'} dark:text-green-400`}>
                             {validacaoMensagem ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                             Mensagem configurada
                           </div>
-                          <div className={`flex items-center gap-2 text-sm ${validacaoDestinatarios ? 'text-green-600' : 'text-red-500'}`}>
+                          <div className={`flex items-center gap-2 text-sm ${validacaoDestinatarios ? 'text-green-600' : 'text-red-500'} dark:text-green-400`}>
                             {validacaoDestinatarios ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                             Destinatários selecionados
                           </div>
-                          <div className={`flex items-center gap-2 text-sm ${validacaoConfig ? 'text-green-600' : 'text-red-500'}`}>
+                          <div className={`flex items-center gap-2 text-sm ${validacaoConfig ? 'text-green-600' : 'text-red-500'} dark:text-green-400`}>
                             {validacaoConfig ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                             Instância conectada
                           </div>
@@ -1278,7 +1278,7 @@ Estamos entrando em contato para..."
 
                         {/* Aviso sobre prontuário */}
                         <Alert className="bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800">
-                          <MessageSquare className="h-4 w-4 text-green-600" />
+                          <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
                           <AlertDescription className="text-green-700 dark:text-green-300 text-xs">
                             O envio será registrado automaticamente no prontuário de cada contato.
                           </AlertDescription>

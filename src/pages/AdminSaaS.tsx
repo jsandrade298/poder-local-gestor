@@ -74,6 +74,8 @@ interface TenantRow {
   max_municipes: number;
   max_demandas: number;
   created_at: string;
+  /** Identidade visual do gabinete (manual Jorgeus): "brasil" | "jovem" */
+  perfil_visual?: "brasil" | "jovem";
   total_usuarios: number;
   total_municipes: number;
   total_demandas: number;
@@ -270,6 +272,7 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
   const [maxUsuarios, setMaxUsuarios] = useState(tenant.max_usuarios);
   const [maxMunicipes, setMaxMunicipes] = useState(tenant.max_municipes);
   const [maxDemandas, setMaxDemandas] = useState(tenant.max_demandas);
+  const [perfil, setPerfil] = useState<"brasil" | "jovem">(tenant.perfil_visual === "jovem" ? "jovem" : "brasil");
   const { toast } = useToast();
 
   const editarMutation = useMutation({
@@ -279,6 +282,10 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
         p_max_usuarios: maxUsuarios, p_max_municipes: maxMunicipes, p_max_demandas: maxDemandas,
       });
       if (error) throw error;
+      if (perfil !== (tenant.perfil_visual ?? "brasil")) {
+        const { error: ePerfil } = await (supabase.rpc as any)("admin_set_tenant_perfil", { p_tenant_id: tenant.id, p_perfil: perfil });
+        if (ePerfil) throw ePerfil;
+      }
       return data;
     },
     onSuccess: () => { toast({ title: "Tenant atualizado!" }); setOpen(false); onSuccess(); },
@@ -290,8 +297,8 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Editar: {tenant.nome}</DialogTitle></DialogHeader>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Editar gabinete: {tenant.nome}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2"><Label>Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div className="space-y-2">
@@ -305,6 +312,28 @@ function EditarTenantDialog({ tenant, onSuccess }: { tenant: TenantRow; onSucces
                 <SelectItem value="enterprise">Enterprise</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Identidade visual</Label>
+            <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Identidade visual do gabinete">
+              {([
+                { v: "brasil", nome: "Brasil!", desc: "Institucional, cívico, municipalista", cores: ["#1D4ED8", "#10B981", "#EAB308"] },
+                { v: "jovem", nome: "Jovem", desc: "Digital, inovação, comunicação", cores: ["#7E22CE", "#EC4899", "#2563EB", "#84CC16"] },
+              ] as const).map((o) => (
+                <button
+                  key={o.v} type="button" role="radio" aria-checked={perfil === o.v} onClick={() => setPerfil(o.v)}
+                  className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${perfil === o.v ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+                >
+                  <img src={`/brand/${o.v}-icone.png`} alt="" className="h-10 w-10 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{o.nome}</span>
+                    <span className="block text-[11px] text-muted-foreground leading-snug">{o.desc}</span>
+                    <span className="mt-1.5 flex gap-1">{o.cores.map((c) => <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />)}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">Vale para todo o gabinete. Cada pessoa escolhe claro ou escuro no próprio menu.</p>
           </div>
           <Separator />
           <div className="grid grid-cols-3 gap-3">
@@ -928,8 +957,8 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
                 <div key={inst.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${inst.active ? "bg-green-100" : "bg-slate-100"}`}>
-                        <MessageCircle className={`h-4 w-4 ${inst.active ? "text-green-600" : "text-slate-400"}`} />
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${inst.active ? "bg-green-100" : "bg-muted"} dark:bg-green-950/40`}>
+                        <MessageCircle className={`h-4 w-4 ${inst.active ? "text-green-600" : "text-muted-foreground"} dark:text-green-400`} />
                       </div>
                       <div>
                         <p className="text-sm font-medium">{inst.display_name}</p>
@@ -948,7 +977,7 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
                         onClick={() => toggleInstanceMutation.mutate({ instanceId: inst.id, active: !inst.active })}
                         title={inst.active ? "Desativar" : "Ativar"}
                       >
-                        {inst.active ? <WifiOff className="h-4 w-4 text-destructive" /> : <Wifi className="h-4 w-4 text-green-600" />}
+                        {inst.active ? <WifiOff className="h-4 w-4 text-destructive" /> : <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />}
                       </Button>
                       <Button variant="ghost" size="icon"
                         onClick={() => { if (confirm(`Remover instância "${inst.display_name}"?`)) deleteInstanceMutation.mutate(inst.id); }}
@@ -1146,6 +1175,10 @@ export default function AdminSaaS() {
                         <p className="text-sm font-medium truncate">{t.nome}</p>
                         <Badge variant={t.ativo ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">{t.ativo ? "Ativo" : "Inativo"}</Badge>
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t.plano}</Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                          <img src={`/brand/${t.perfil_visual === "jovem" ? "jovem" : "brasil"}-icone.png`} alt="" className="h-3 w-3" />
+                          {t.perfil_visual === "jovem" ? "Jovem" : "Brasil!"}
+                        </Badge>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                         <span>{t.total_usuarios} usuários</span><span>•</span>
@@ -1158,7 +1191,7 @@ export default function AdminSaaS() {
                   <div className="flex items-center gap-1">
                     <EditarTenantDialog tenant={t} onSuccess={refetchTenants} />
                     <Button variant="ghost" size="icon" onClick={() => toggleMutation.mutate({ tenantId: t.id, ativo: !t.ativo })} title={t.ativo ? "Desativar" : "Ativar"}>
-                      {t.ativo ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-green-600" />}
+                      {t.ativo ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-green-600 dark:text-green-400" />}
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => setSelectedTenantId(t.id)}>
                       <ChevronRight className="h-4 w-4" />

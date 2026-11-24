@@ -325,7 +325,7 @@ export default function Agenda() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Esta semana:</span>
-                    <Badge className="bg-blue-500">
+                    <Badge className="bg-primary">
                       {events.filter(e => {
                         const eventDate = new Date(e.start);
                         const today = new Date();

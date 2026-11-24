@@ -191,10 +191,10 @@ export function ImportCSVDialog({
         <div className="space-y-6">
           {/* Mostrar progresso de importação */}
           {isImporting && (
-            <Card className="border-blue-500/20 bg-blue-500/5">
+            <Card className="border-primary/20 bg-primary/5">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   <div>
                     <h3 className="font-semibold text-lg">
                       {importProgress?.fase === 'geocodificando' 
@@ -269,7 +269,7 @@ export function ImportCSVDialog({
                     </Badge>
                   )}
                   {geocodificadosCount > 0 && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    <Badge variant="secondary" className="bg-primary/15 text-primary dark:bg-blue-900/30 dark:text-blue-300">
                       📍 {geocodificadosCount} geocodificados
                     </Badge>
                   )}
@@ -290,7 +290,7 @@ export function ImportCSVDialog({
                           <span className="truncate">{result.nome}</span>
                           <div className="flex gap-1 ml-auto flex-shrink-0">
                             {result.action === 'atualizado' && (
-                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 dark:text-orange-400 dark:border-orange-800">
                                 Atualizado
                               </Badge>
                             )}
@@ -398,10 +398,10 @@ export function ImportCSVDialog({
                     </CardContent>
                   </Card>
 
-                  <Card className="border-blue-500/20 bg-blue-500/5">
+                  <Card className="border-primary/20 bg-primary/5">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                        <div className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
                           4
                         </div>
                         <div>
@@ -417,17 +417,17 @@ export function ImportCSVDialog({
               </div>
 
               {/* Info sobre geocodificação */}
-              <Card className="border-blue-500/30 bg-blue-50 dark:bg-blue-950/20">
+              <Card className="border-primary/30 bg-primary/10 dark:bg-blue-950/20">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-blue-900 dark:text-blue-100">Georeferenciamento Automático</h4>
-                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <p className="text-sm text-primary dark:text-blue-300 mt-1">
                         Após a importação, o sistema buscará automaticamente as coordenadas GPS de cada munícipe 
                         usando o endereço informado, permitindo visualizá-los no mapa. Para melhores resultados:
                       </p>
-                      <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
+                      <ul className="text-sm text-primary dark:text-blue-300 mt-2 space-y-1 list-disc list-inside">
                         <li>Preencha o <strong>logradouro</strong> completo (ex: "Rua das Flores")</li>
                         <li>Inclua o <strong>número</strong> do endereço quando possível</li>
                         <li>Informe o <strong>bairro</strong> e a <strong>cidade</strong></li>
@@ -461,23 +461,23 @@ export function ImportCSVDialog({
                         <span>instagram (ex: @usuario)</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>logradouro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>numero</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>bairro</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>cidade</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <MapPin className="h-4 w-4 text-primary" />
                         <span>cep</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ export function ImportCSVDialog({
                          <span>tag (use vírgula para múltiplas tags: "Tag1, Tag2")</span>
                        </div>
                     </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1">
+                    <p className="text-xs text-primary dark:text-blue-400 mt-3 flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
                       Campos em azul são usados para geocodificação (localização no mapa)
                     </p>

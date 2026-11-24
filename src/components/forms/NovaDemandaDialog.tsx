@@ -555,7 +555,7 @@ export function NovaDemandaDialog({ trigger }: NovaDemandaDialogProps = {}) {
 
            {/* Indicador de coordenadas */}
             {coordenadas.lat && coordenadas.lng && (
-              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded-md">
+              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded-md dark:bg-green-950/40 dark:text-green-400">
                 <CheckCircle2 className="h-4 w-4" />
                 <span>
                   Localização mapeada: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}

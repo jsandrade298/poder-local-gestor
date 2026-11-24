@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// Service Worker - Poder Local PWA
+// Service Worker - Jorgeus PWA
 // Estratégia: Network-first com cache de fallback para app shell
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'poder-local-v1';
+const CACHE_NAME = 'jorgeus-v1';
 
 // Recursos estáticos essenciais para o app shell
 const APP_SHELL = [

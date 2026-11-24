@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarcaLogo } from "@/components/marca/Marca";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,15 +64,12 @@ export default function ConviteRepresentante() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
 
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center mx-auto mb-4">
-            <Building className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Poder Local Gestor</h1>
-          <p className="text-muted-foreground text-sm">Portal do Representante</p>
+          <MarcaLogo className="h-14 w-auto mx-auto mb-4" />
+          <p className="texto-etiqueta text-muted-foreground">Portal do representante</p>
         </div>
 
         <Card>

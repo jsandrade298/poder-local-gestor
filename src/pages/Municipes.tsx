@@ -17,6 +17,7 @@ import { EditMunicipeDialog } from "@/components/forms/EditMunicipeDialog";
 import { MunicipeDetailsDialog } from "@/components/forms/MunicipeDetailsDialog";
 import { MunicipeDemandasDialog } from "@/components/forms/MunicipeDemandasDialog";
 import { EnviarWhatsAppDialog } from "@/components/forms/EnviarWhatsAppDialog";
+import { FEATURES } from "@/lib/featureFlags";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -1623,8 +1624,8 @@ export default function Municipes() {
     <div>
       <div className="px-3 py-3 md:container md:mx-auto md:px-4 md:py-6 space-y-3 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0 flex-1 basis-56">
             <h1 className="text-lg md:text-3xl font-bold tracking-tight text-foreground">
               Munícipes
             </h1>
@@ -1675,7 +1676,7 @@ export default function Municipes() {
                 <RefreshCw className="h-4 w-4" />
                 Atualizar
               </Button>
-              <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
+              {FEATURES.disparosWhatsApp && <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />}
               <Button variant="outline" size="sm" onClick={findDuplicates} className="gap-2">
                 <Users className="h-4 w-4" />
                 Detectar Duplicados
@@ -2227,7 +2228,7 @@ export default function Municipes() {
               </div>
               
               <div className="flex gap-2">
-                <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />
+                {FEATURES.disparosWhatsApp && <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />}
                 
                 <AlertDialog open={showMassDeleteConfirm} onOpenChange={setShowMassDeleteConfirm}>
                   <AlertDialogTrigger asChild>
@@ -2391,10 +2392,10 @@ export default function Municipes() {
 
             <div className="border-t pt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                <span className="font-medium text-green-600">Mantidos:</span> {
+                <span className="font-medium text-green-600 dark:text-green-400">Mantidos:</span> {
                   duplicates.length - selectedForRemoval.size
                 } • 
-                <span className="font-medium text-red-600 ml-2">Removidos:</span> {
+                <span className="font-medium text-red-600 ml-2 dark:text-red-400">Removidos:</span> {
                   selectedForRemoval.size
                 }
               </div>

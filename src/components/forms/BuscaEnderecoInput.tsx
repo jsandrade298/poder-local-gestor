@@ -251,7 +251,7 @@ export function BuscaEnderecoInput({
       </div>
       
       {value && (
-        <p className="text-xs text-green-600">
+        <p className="text-xs text-green-600 dark:text-green-400">
           ✓ {value.lat.toFixed(5)}, {value.lng.toFixed(5)}
         </p>
       )}

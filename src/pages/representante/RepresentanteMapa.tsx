@@ -903,7 +903,7 @@ export default function RepresentanteMapa() {
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-primary" />
-                  <h1 className="font-semibold text-lg">Gestão Territorial</h1>
+                  <h1 className="titulo-compacto font-semibold text-lg">Gestão Territorial</h1>
                 </div>
                 <div className="flex items-center gap-1">
 
@@ -994,7 +994,7 @@ export default function RepresentanteMapa() {
                         </SelectItem>
                         <SelectItem value="nenhum">
                           <div className="flex items-center gap-2">
-                            <EyeOff className="h-4 w-4 text-gray-400" />
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
                             Nenhum (ocultar todos)
                           </div>
                         </SelectItem>
@@ -1288,7 +1288,7 @@ export default function RepresentanteMapa() {
                           variant="ghost" 
                           size="sm"
                           onClick={() => setPontosRota([])}
-                          className="h-6 text-xs text-red-600 hover:text-red-700"
+                          className="h-6 text-xs text-red-600 hover:text-red-700 dark:text-red-400"
                         >
                           Limpar
                         </Button>
@@ -1510,8 +1510,8 @@ export default function RepresentanteMapa() {
                 // Detalhes de Munícipe
                 <>
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Users className="h-5 w-5 text-purple-600" />
+                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center dark:bg-purple-950/40">
+                      <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1">
                       <h3 className="font-medium">{itemSelecionado.nome}</h3>
@@ -1692,8 +1692,8 @@ export default function RepresentanteMapa() {
                               }
                             }}
                           >
-                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
-                              <Users className="h-4 w-4 text-green-600" />
+                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0 dark:bg-green-950/40">
+                              <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm line-clamp-2">{municipe.nome}</p>
@@ -1841,7 +1841,7 @@ export default function RepresentanteMapa() {
                           <Vote className="h-4 w-4 text-purple-500" />
                           <span className="text-sm">Votos</span>
                         </div>
-                        <span className="font-mono font-bold text-lg text-purple-700">
+                        <span className="font-mono font-bold text-lg text-purple-700 dark:text-purple-300">
                           {dadosRegiaoSelecionada.votos.toLocaleString('pt-BR')}
                         </span>
                       </div>
@@ -1852,7 +1852,7 @@ export default function RepresentanteMapa() {
                           <Users className="h-4 w-4 text-cyan-500" />
                           <span className="text-sm">Eleitores</span>
                         </div>
-                        <span className="font-mono font-bold text-lg text-cyan-700">
+                        <span className="font-mono font-bold text-lg text-cyan-700 dark:text-cyan-300">
                           {dadosRegiaoSelecionada.eleitores.toLocaleString('pt-BR')}
                         </span>
                       </div>
@@ -1896,10 +1896,10 @@ export default function RepresentanteMapa() {
                             <span className="text-[10px] text-muted-foreground">Votos / Eleitores da região</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-emerald-700">
+                            <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
                               {dadosRegiaoSelecionada.percentualSobreEleitoresRegiao.toFixed(2)}%
                             </span>
-                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+                            <Badge className="bg-emerald-100 text-emerald-700 text-xs dark:bg-emerald-950/40 dark:text-emerald-300">
                               {dadosRegiaoSelecionada.rankingEleitoresRegiao}º
                             </Badge>
                           </div>
@@ -1916,10 +1916,10 @@ export default function RepresentanteMapa() {
                             <span className="text-[10px] text-muted-foreground">Votos / Total votos do candidato</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-purple-700">
+                            <span className="font-mono font-bold text-purple-700 dark:text-purple-300">
                               {dadosRegiaoSelecionada.percentualSobreTotalVotos.toFixed(2)}%
                             </span>
-                            <Badge className="bg-purple-100 text-purple-700 text-xs">
+                            <Badge className="bg-purple-100 text-purple-700 text-xs dark:bg-purple-950/40 dark:text-purple-300">
                               {dadosRegiaoSelecionada.rankingTotalVotos}º
                             </Badge>
                           </div>
@@ -2025,8 +2025,8 @@ export default function RepresentanteMapa() {
                       >
                         <CardContent className="p-3">
                           <div className="flex items-start gap-2">
-                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
-                              <Users className="h-4 w-4 text-green-600" />
+                            <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0 dark:bg-green-950/40">
+                              <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm line-clamp-2">{municipe.nome}</p>
@@ -2195,13 +2195,13 @@ export default function RepresentanteMapa() {
                               r.nome === rankingsCompletos.regiaoAtual 
                                 ? 'bg-green-100 border border-green-300 font-medium' 
                                 : 'hover:bg-muted/50'
-                            }`}
+                            } dark:bg-green-950/40 dark:border-green-800`}
                           >
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="w-10 justify-center font-mono">
                                 {r.posicao}º
                               </Badge>
-                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-green-700' : ''}>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-green-700 dark:text-green-300' : ''}>
                                 {r.nome}
                               </span>
                             </div>
@@ -2243,13 +2243,13 @@ export default function RepresentanteMapa() {
                               r.nome === rankingsCompletos.regiaoAtual 
                                 ? 'bg-amber-100 border border-amber-300 font-medium' 
                                 : 'hover:bg-muted/50'
-                            }`}
+                            } dark:bg-amber-950/40 dark:border-amber-800`}
                           >
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="w-10 justify-center font-mono">
                                 {r.posicao}º
                               </Badge>
-                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-amber-700' : ''}>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-amber-700 dark:text-amber-300' : ''}>
                                 {r.nome}
                               </span>
                             </div>
@@ -2291,13 +2291,13 @@ export default function RepresentanteMapa() {
                               r.nome === rankingsCompletos.regiaoAtual 
                                 ? 'bg-purple-100 border border-purple-300 font-medium' 
                                 : 'hover:bg-muted/50'
-                            }`}
+                            } dark:bg-purple-950/40 dark:border-purple-800`}
                           >
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="w-10 justify-center font-mono">
                                 {r.posicao}º
                               </Badge>
-                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-purple-700' : ''}>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-purple-700 dark:text-purple-300' : ''}>
                                 {r.nome}
                               </span>
                             </div>
@@ -2336,13 +2336,13 @@ export default function RepresentanteMapa() {
                               r.nome === rankingsCompletos.regiaoAtual 
                                 ? 'bg-cyan-100 border border-cyan-300 font-medium' 
                                 : 'hover:bg-muted/50'
-                            }`}
+                            } dark:bg-cyan-950/40 dark:border-cyan-800`}
                           >
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="w-10 justify-center font-mono">
                                 {r.posicao}º
                               </Badge>
-                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-cyan-700' : ''}>
+                              <span className={r.nome === rankingsCompletos.regiaoAtual ? 'text-cyan-700 dark:text-cyan-300' : ''}>
                                 {r.nome}
                               </span>
                             </div>

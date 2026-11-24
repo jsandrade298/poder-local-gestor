@@ -106,9 +106,9 @@ export function WhatsAppLogsViewer() {
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         {log.success ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                         ) : (
-                          <XCircle className="h-5 w-5 text-red-600" />
+                          <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                         )}
                         <span className="font-medium">
                           {log.success ? 'Envio Realizado' : 'Erro no Envio'}

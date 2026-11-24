@@ -712,7 +712,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                 </Button>
               </div>
               {coordenadas.lat && coordenadas.lng ? (
-                <p className="text-xs text-green-600">
+                <p className="text-xs text-green-600 dark:text-green-400">
                   📍 Coordenadas: {coordenadas.lat.toFixed(6)}, {coordenadas.lng.toFixed(6)}
                 </p>
               ) : (
@@ -871,7 +871,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
             {representanteAtivo && (
               <div className="space-y-3">
                 {temProfile ? (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                     <UserCheck className="h-4 w-4" />
                     <span>Acesso ativo — conta criada com sucesso.</span>
                   </div>
@@ -898,7 +898,7 @@ export function EditMunicipeDialog({ municipe, trigger, open: externalOpen, onOp
                   </div>
                 ) : conviteExpirado ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-amber-600">Convite expirado.</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">Convite expirado.</p>
                     <Button type="button" size="sm" variant="outline" onClick={handleGerarConvite} disabled={isGerandoConvite}>
                       {isGerandoConvite ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
                       Gerar novo convite

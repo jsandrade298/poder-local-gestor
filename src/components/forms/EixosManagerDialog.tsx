@@ -286,7 +286,7 @@ export function EixosManagerDialog({ open, onOpenChange }: EixosManagerDialogPro
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
                                     style={dragStyle}
-                                    className={snapshot.isDragging ? 'bg-white' : ''}
+                                    className={snapshot.isDragging ? 'bg-card' : ''}
                                   >
                                     <TableCell>
                                       <div 

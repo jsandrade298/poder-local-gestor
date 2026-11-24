@@ -308,7 +308,7 @@ export function ViewTarefaDialog({
               <h2 className="text-lg font-semibold">{tarefa.titulo}</h2>
               <Badge
                 variant="secondary"
-                className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                className="bg-primary/15 text-primary dark:bg-blue-900/40 dark:text-blue-300"
               >
                 Tarefa
               </Badge>

@@ -179,24 +179,24 @@ export function ConfigurarEvolutionDialog({ children }: { children: React.ReactN
         return {
           icon: CheckCircle,
           text: 'Conectado',
-          color: 'text-green-600',
-          bgColor: 'bg-green-100',
+          color: 'text-green-600 dark:text-green-400',
+          bgColor: 'bg-green-100 dark:bg-green-950/40',
           variant: 'default' as const
         };
       case 'disconnected':
         return {
           icon: XCircle,
           text: 'Desconectado',
-          color: 'text-red-600',
-          bgColor: 'bg-red-100',
+          color: 'text-red-600 dark:text-red-400',
+          bgColor: 'bg-red-100 dark:bg-red-950/40',
           variant: 'destructive' as const
         };
       default:
         return {
           icon: Loader2,
           text: 'Verificando...',
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-100',
+          color: 'text-yellow-600 dark:text-yellow-400',
+          bgColor: 'bg-yellow-100 dark:bg-yellow-950/40',
           variant: 'secondary' as const
         };
     }
@@ -245,7 +245,7 @@ export function ConfigurarEvolutionDialog({ children }: { children: React.ReactN
                 <img 
                   src={qrCode} 
                   alt="QR Code WhatsApp" 
-                  className="w-64 h-64 border-2 border-gray-200 rounded-lg"
+                  className="w-64 h-64 border-2 border-border rounded-lg"
                 />
               </div>
               <div className="space-y-2">
@@ -302,7 +302,7 @@ export function ConfigurarEvolutionDialog({ children }: { children: React.ReactN
                             {instance.instance_name}
                           </p>
                           {instance.profile_name && (
-                            <p className="text-sm text-green-600">
+                            <p className="text-sm text-green-600 dark:text-green-400">
                               Perfil: {instance.profile_name}
                             </p>
                           )}

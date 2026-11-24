@@ -85,21 +85,21 @@ interface Destinatario {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
-  pendente: { label: 'Pendente', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: Clock },
-  enviando: { label: 'Enviando', color: 'text-blue-600', bgColor: 'bg-blue-100', icon: Send },
-  pausado: { label: 'Pausado', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: Clock },
-  concluido: { label: 'Concluído', color: 'text-green-600', bgColor: 'bg-green-100', icon: CheckCircle },
-  erro: { label: 'Erro', color: 'text-red-600', bgColor: 'bg-red-100', icon: XCircle },
-  cancelado: { label: 'Cancelado', color: 'text-orange-600', bgColor: 'bg-orange-100', icon: XCircle },
+  pendente: { label: 'Pendente', color: 'text-muted-foreground', bgColor: 'bg-muted', icon: Clock },
+  enviando: { label: 'Enviando', color: 'text-primary', bgColor: 'bg-primary/15', icon: Send },
+  pausado: { label: 'Pausado', color: 'text-yellow-600 dark:text-yellow-400', bgColor: 'bg-yellow-100 dark:bg-yellow-950/40', icon: Clock },
+  concluido: { label: 'Concluído', color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-950/40', icon: CheckCircle },
+  erro: { label: 'Erro', color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-950/40', icon: XCircle },
+  cancelado: { label: 'Cancelado', color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-100 dark:bg-orange-950/40', icon: XCircle },
 };
 
 const STATUS_DEST_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  pendente: { label: 'Pendente', color: 'text-gray-500', icon: Clock },
-  enviando: { label: 'Enviando', color: 'text-blue-500', icon: Send },
+  pendente: { label: 'Pendente', color: 'text-muted-foreground', icon: Clock },
+  enviando: { label: 'Enviando', color: 'text-primary', icon: Send },
   enviado: { label: 'Enviado', color: 'text-green-500', icon: Mail },
-  entregue: { label: 'Entregue', color: 'text-blue-600', icon: MailCheck },
-  lido: { label: 'Lido', color: 'text-purple-600', icon: MailOpen },
-  reproduzido: { label: 'Reproduzido', color: 'text-purple-600', icon: Eye },
+  entregue: { label: 'Entregue', color: 'text-primary', icon: MailCheck },
+  lido: { label: 'Lido', color: 'text-purple-600 dark:text-purple-400', icon: MailOpen },
+  reproduzido: { label: 'Reproduzido', color: 'text-purple-600 dark:text-purple-400', icon: Eye },
   erro: { label: 'Erro', color: 'text-red-500', icon: XCircle },
   cancelado: { label: 'Cancelado', color: 'text-orange-500', icon: XCircle },
 };
@@ -232,7 +232,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
         <div className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 flex-shrink-0">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 bg-blue-500 rounded-lg">
+              <div className="p-2 bg-primary rounded-lg">
                 <BarChart3 className="h-5 w-5 text-white" />
               </div>
               Relatórios de Envio WhatsApp
@@ -245,20 +245,20 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
           {/* Cards de estatísticas */}
           {stats && (
             <div className="grid grid-cols-4 gap-3 mt-4">
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border">
-                <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-2xl font-bold text-primary">{stats.total}</div>
                 <div className="text-xs text-muted-foreground">Remessas</div>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border">
-                <div className="text-2xl font-bold text-green-600">{stats.concluidos}</div>
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.concluidos}</div>
                 <div className="text-xs text-muted-foreground">Concluídas</div>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border">
-                <div className="text-2xl font-bold text-purple-600">{stats.totalMensagens}</div>
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totalMensagens}</div>
                 <div className="text-xs text-muted-foreground">Total Mensagens</div>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border">
-                <div className="text-2xl font-bold text-emerald-600">{stats.totalEnviadas}</div>
+              <div className="bg-card rounded-lg p-3 border">
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.totalEnviadas}</div>
                 <div className="text-xs text-muted-foreground">Enviadas</div>
               </div>
             </div>
@@ -287,7 +287,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
-                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-3 text-blue-500" />
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-3 text-primary" />
                 <p className="text-muted-foreground">Carregando relatórios...</p>
               </div>
             </div>
@@ -315,7 +315,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
                 return (
                   <Collapsible key={envio.id} open={isExpanded}>
                     <div className={`border rounded-xl overflow-hidden transition-all ${
-                      isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+                      isHighlighted ? 'ring-2 ring-primary ring-offset-2' : ''
                     } ${isExpanded ? 'shadow-md' : 'hover:shadow-sm'}`}>
                       
                       {/* Header do envio */}
@@ -394,19 +394,19 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
                             {/* Estatísticas mini */}
                             <div className="flex items-center gap-6">
                               <div className="text-center">
-                                <div className="text-lg font-bold text-green-600">{envio.total_enviados}</div>
+                                <div className="text-lg font-bold text-green-600 dark:text-green-400">{envio.total_enviados}</div>
                                 <div className="text-[10px] text-muted-foreground">Enviados</div>
                               </div>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-blue-600">{envio.total_entregues}</div>
+                                <div className="text-lg font-bold text-primary">{envio.total_entregues}</div>
                                 <div className="text-[10px] text-muted-foreground">Entregues</div>
                               </div>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-purple-600">{envio.total_lidos}</div>
+                                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{envio.total_lidos}</div>
                                 <div className="text-[10px] text-muted-foreground">Lidos</div>
                               </div>
                               <div className="text-center">
-                                <div className="text-lg font-bold text-red-600">{envio.total_erros}</div>
+                                <div className="text-lg font-bold text-red-600 dark:text-red-400">{envio.total_erros}</div>
                                 <div className="text-[10px] text-muted-foreground">Erros</div>
                               </div>
                               
@@ -420,7 +420,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
 
                           {/* Progress bar */}
                           <div className="mt-3">
-                            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+                            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden bg-muted">
                               {envio.total_enviados - envio.total_entregues - envio.total_lidos > 0 && (
                                 <div 
                                   className="bg-green-500 transition-all" 
@@ -429,7 +429,7 @@ export function RelatoriosWhatsAppDialog({ open, onOpenChange, highlightEnvioId 
                               )}
                               {envio.total_entregues - envio.total_lidos > 0 && (
                                 <div 
-                                  className="bg-blue-500 transition-all" 
+                                  className="bg-primary transition-all" 
                                   style={{ width: `${calcPercentage(envio.total_entregues - envio.total_lidos, envio.total_destinatarios)}%` }}
                                 />
                               )}

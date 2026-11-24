@@ -230,7 +230,7 @@ export function NotificacaoAgendaCard() {
           </select>
         </div>
 
-        <div className="flex items-start gap-2 text-sm bg-blue-50 text-blue-700 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-sm bg-primary/10 text-primary rounded-lg p-3">
           <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <div className="text-xs">
             <p className="font-medium">Como funciona</p>

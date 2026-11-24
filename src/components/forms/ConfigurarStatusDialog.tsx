@@ -71,9 +71,9 @@ function SortableStatusItem({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
-      className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-900 border rounded-lg ${isDragging ? "shadow-lg" : ""}`}
+      className={`flex items-center gap-3 p-3 bg-card border rounded-lg ${isDragging ? "shadow-lg" : ""}`}
     >
-      <button className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600" {...attributes} {...listeners}>
+      <button className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-muted-foreground" {...attributes} {...listeners}>
         <GripVertical className="h-5 w-5" />
       </button>
 
@@ -88,7 +88,7 @@ function SortableStatusItem({
             </span>
           )}
         </div>
-        <div className="text-xs text-gray-500 truncate">slug: {status.slug}</div>
+        <div className="text-xs text-muted-foreground truncate">slug: {status.slug}</div>
       </div>
 
       <TooltipProvider>
@@ -96,7 +96,7 @@ function SortableStatusItem({
           <TooltipTrigger asChild>
             <div>
               {status.notificar_municipe
-                ? <Bell className="h-4 w-4 text-blue-500" />
+                ? <Bell className="h-4 w-4 text-primary" />
                 : <BellOff className="h-4 w-4 text-gray-300" />}
             </div>
           </TooltipTrigger>
@@ -152,7 +152,7 @@ function StatusForm({
   };
 
   return (
-    <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border">
+    <div className="space-y-4 p-4 bg-muted/60 rounded-lg border">
       <h4 className="font-medium">{isEditing ? "Editar Status" : "Novo Status"}</h4>
 
       <div className="grid grid-cols-2 gap-4">
@@ -173,7 +173,7 @@ function StatusForm({
             onChange={(e) => handleSlugChange(e.target.value)}
             placeholder="em_analise"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Apenas letras minúsculas, números e underscore (_)
           </p>
         </div>
@@ -211,13 +211,13 @@ function StatusForm({
       </div>
 
       {/* Notificar munícipe */}
-      <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border">
+      <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
         <div className="space-y-0.5">
           <Label htmlFor="notificar" className="flex items-center gap-1.5 cursor-pointer">
-            <Bell className="h-4 w-4 text-blue-500" />
+            <Bell className="h-4 w-4 text-primary" />
             Notificar munícipe
           </Label>
-          <p className="text-xs text-gray-500">Enviar WhatsApp quando a demanda entrar neste status</p>
+          <p className="text-xs text-muted-foreground">Enviar WhatsApp quando a demanda entrar neste status</p>
         </div>
         <Switch
           id="notificar"
@@ -227,13 +227,13 @@ function StatusForm({
       </div>
 
       {/* Status de conclusão */}
-      <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border">
+      <div className="flex items-center justify-between p-3 bg-card rounded-lg border">
         <div className="space-y-0.5">
           <Label htmlFor="is_final" className="flex items-center gap-1.5 cursor-pointer">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             Status de conclusão
           </Label>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Marca este status como "concluído" — usado para calcular taxa de conclusão e KPIs do dashboard
           </p>
         </div>
@@ -315,7 +315,7 @@ export function ConfigurarStatusDialog({ open, onOpenChange }: ConfigurarStatusD
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                 Arraste para reordenar. A ordem define o funil no dashboard.
               </p>
               {finalCount > 0 && (
@@ -326,7 +326,7 @@ export function ConfigurarStatusDialog({ open, onOpenChange }: ConfigurarStatusD
             </div>
 
             {isLoadingAll ? (
-              <div className="text-center py-8 text-gray-500">Carregando status...</div>
+              <div className="text-center py-8 text-muted-foreground">Carregando status...</div>
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={displayList.map(s => s.id)} strategy={verticalListSortingStrategy}>

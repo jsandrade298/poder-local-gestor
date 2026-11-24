@@ -35,9 +35,9 @@ export function DemandaNotificationProgress() {
       case 'error':
         return <XCircle className="h-3.5 w-3.5 text-red-500" />;
       case 'sending':
-        return <Send className="h-3.5 w-3.5 text-blue-500 animate-pulse" />;
+        return <Send className="h-3.5 w-3.5 text-primary animate-pulse" />;
       default:
-        return <Clock className="h-3.5 w-3.5 text-gray-500" />;
+        return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
 
@@ -158,7 +158,7 @@ export function DemandaNotificationProgress() {
                     key={notification.id}
                     className={cn(
                       "flex items-center gap-2 p-2 rounded border text-xs",
-                      notification.status === 'sending' && "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+                      notification.status === 'sending' && "bg-primary/10 dark:bg-blue-950/30 border-primary/30 dark:border-blue-800",
                       notification.status === 'sent' && "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
                       notification.status === 'error' && "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
                     )}
@@ -184,7 +184,7 @@ export function DemandaNotificationProgress() {
                     {/* Badge / Countdown */}
                     <div className="flex-shrink-0">
                       {notification.countdown !== undefined && notification.countdown > 0 ? (
-                        <span className="text-[10px] text-blue-600 font-mono">{notification.countdown}s</span>
+                        <span className="text-[10px] text-primary font-mono">{notification.countdown}s</span>
                       ) : (
                         <Badge 
                           variant={getStatusBadgeVariant(notification.status)}
@@ -202,11 +202,11 @@ export function DemandaNotificationProgress() {
             {/* Resumo - só mostra quando há mais de 1 notificação */}
             {state.totalNotifications > 1 && (
               <div className="mt-2 flex justify-between items-center text-[10px] bg-muted/60 px-2 py-1.5 rounded">
-                <span className="flex items-center gap-1 text-green-600">
+                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <CheckCircle className="h-3 w-3" />
                   {state.notifications.filter(n => n.status === 'sent').length}
                 </span>
-                <span className="flex items-center gap-1 text-red-600">
+                <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
                   <XCircle className="h-3 w-3" />
                   {state.notifications.filter(n => n.status === 'error').length}
                 </span>

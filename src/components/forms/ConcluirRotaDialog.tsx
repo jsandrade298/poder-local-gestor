@@ -131,7 +131,7 @@ export function ConcluirRotaDialog({
                   const isDemanda = ponto.tipo === 'demanda';
                   
                   return (
-                    <Card key={ponto.id} className={`transition-colors ${isVisitado ? 'bg-green-50 border-green-200' : ''}`}>
+                    <Card key={ponto.id} className={`transition-colors ${isVisitado ? 'bg-green-50 border-green-200' : ''} dark:bg-green-950/40 dark:border-green-800`}>
                       <CardContent className="p-3">
                         <div className="flex items-start gap-3">
                           {/* Checkbox de visitado */}

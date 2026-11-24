@@ -18,6 +18,17 @@ export default {
 			}
 		},
 		extend: {
+			// Manual Jorgeus: corpo Inter · títulos Plus Jakarta Sans · marca Michroma
+			fontFamily: {
+				sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+				display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				marca: ['Michroma', '"Plus Jakarta Sans"', 'ui-sans-serif', 'sans-serif'],
+			},
+			boxShadow: {
+				suave: 'var(--shadow-soft)',
+				media: 'var(--shadow-medium)',
+				forte: 'var(--shadow-strong)',
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',

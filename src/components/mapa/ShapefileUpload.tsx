@@ -651,9 +651,9 @@ export function ShapefileUpload({ onUploadComplete }: ShapefileUploadProps) {
                   </>
                 ) : geojsonPreview ? (
                   <>
-                    <CheckCircle2 className="h-8 w-8 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">{fileName}</span>
-                    <span className="text-xs text-green-600">
+                    <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">{fileName}</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">
                       {geojsonPreview.features.length} feições carregadas
                     </span>
                     {wasConverted && (

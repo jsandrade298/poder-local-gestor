@@ -565,16 +565,16 @@ export function ClusterMap({
                 <Popup>
                   <div className="min-w-[220px]">
                     <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-red-600" />
+                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center dark:bg-red-950/40">
+                        <FileText className="h-4 w-4 text-red-600 dark:text-red-400" />
                       </div>
                       <div>
                         <span className="font-semibold text-sm block">{demanda.titulo}</span>
-                        <span className="text-xs text-gray-500">{demanda.protocolo}</span>
+                        <span className="text-xs text-muted-foreground">{demanda.protocolo}</span>
                       </div>
                     </div>
                     
-                    <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="space-y-1.5 text-xs text-muted-foreground">
                       {demanda.status && (
                         <div className="flex items-center gap-1">
                           <strong>Status:</strong>
@@ -615,7 +615,7 @@ export function ClusterMap({
                           href={formatWhatsAppLink(demanda.municipe_telefone) || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 dark:text-green-400"
                         >
                           <Phone className="h-3 w-3" />
                           WhatsApp
@@ -650,18 +650,18 @@ export function ClusterMap({
                 <Popup>
                   <div className="min-w-[220px]">
                     <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                        <User className="h-4 w-4 text-purple-600" />
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center dark:bg-purple-950/40">
+                        <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                       </div>
                       <div>
                         <span className="font-semibold text-sm block">{municipe.nome}</span>
                         {municipe.demandas_count > 0 && (
-                          <span className="text-xs text-gray-500">{municipe.demandas_count} demanda(s)</span>
+                          <span className="text-xs text-muted-foreground">{municipe.demandas_count} demanda(s)</span>
                         )}
                       </div>
                     </div>
                     
-                    <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="space-y-1.5 text-xs text-muted-foreground">
                       {municipe.telefone && (
                         <p className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -707,7 +707,7 @@ export function ClusterMap({
                           href={formatWhatsAppLink(municipe.telefone) || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 dark:text-green-400"
                         >
                           <Phone className="h-3 w-3" />
                           WhatsApp
