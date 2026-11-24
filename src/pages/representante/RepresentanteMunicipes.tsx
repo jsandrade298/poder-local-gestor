@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { aplicarBusca } from "@/lib/busca";
+import { aplicarBusca, CAMPOS_PADRAO_MUNICIPE, CAMPOS_NUMERICOS_MUNICIPE } from "@/lib/busca";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,10 @@ export default function RepresentanteMunicipes() {
         .eq("representante_id", uid!)
         .order("nome");
 
-      query = aplicarBusca(query, debounced);
+      query = aplicarBusca(query, debounced, {
+        campos: CAMPOS_PADRAO_MUNICIPE,
+        camposNumericos: CAMPOS_NUMERICOS_MUNICIPE,
+      });
       if (bairroFilter !== "todos") query = query.eq("bairro", bairroFilter);
       if (cidadeFilter !== "todos") query = query.eq("cidade", cidadeFilter);
 

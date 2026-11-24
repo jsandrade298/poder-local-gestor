@@ -17,7 +17,11 @@ import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { aplicarBusca } from "@/lib/busca";
+import {
+  aplicarBusca, lerCamposSalvos, salvarCampos, TODOS_OS_CAMPOS,
+  CAMPOS_BUSCA_DEMANDA, CAMPOS_PADRAO_DEMANDA, CAMPOS_NUMERICOS_DEMANDA,
+} from "@/lib/busca";
+import { CamposBuscaSelect } from "@/components/ui/CamposBuscaSelect";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
@@ -32,6 +36,10 @@ import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 export default function Demandas() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  // Onde a busca procura o texto (lembrado por navegador)
+  const [camposBusca, setCamposBuscaState] = useState<string[]>(() =>
+    lerCamposSalvos("demandas", CAMPOS_PADRAO_DEMANDA, CAMPOS_BUSCA_DEMANDA)
+  );
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [municipeFilter, setMunicipeFilter] = useState<string[]>([]);
@@ -79,6 +87,16 @@ export default function Demandas() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const setCamposBusca = (campos: string[]) => {
+    setCamposBuscaState(campos);
+    salvarCampos("demandas", campos);
+    setCurrentPage(1);
+  };
+
+  const placeholderBuscaDemanda = camposBusca.includes(TODOS_OS_CAMPOS)
+    ? "Buscar em todos os campos..."
+    : `Buscar por ${CAMPOS_BUSCA_DEMANDA.filter(c => camposBusca.includes(c.value)).map(c => c.label.toLowerCase()).join(", ")}...`;
+
   const statusKey = statusFilter.join(",");
   const areaKey = areaFilter.join(",");
   const municipeKey = municipeFilter.join(",");
@@ -88,7 +106,7 @@ export default function Demandas() {
 
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading, isError: isErrorDemandas, refetch: refetchDemandas, isFetching: isFetchingDemandas } = useQuery({
-    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm, orderBy],
+    queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm, camposBusca.join(","), orderBy],
     queryFn: async () => {
       // Construir query com filtros server-side
       const buildQuery = () => {
@@ -156,9 +174,12 @@ export default function Demandas() {
         if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
         if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
 
-        // Busca: protocolo, título, descrição, endereço e nome do munícipe —
-        // sem acento e com as palavras em qualquer ordem (coluna `busca`).
-        query = aplicarBusca(query, debouncedSearchTerm);
+        // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
+        // Números são procurados também no protocolo, mesmo sem marcar.
+        query = aplicarBusca(query, debouncedSearchTerm, {
+          campos: camposBusca,
+          camposNumericos: CAMPOS_NUMERICOS_DEMANDA,
+        });
 
         return query;
       };
@@ -1533,12 +1554,19 @@ export default function Demandas() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Título, protocolo ou munícipe..."
+                  placeholder={placeholderBuscaDemanda}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
+              <CamposBuscaSelect
+                opcoes={CAMPOS_BUSCA_DEMANDA}
+                value={camposBusca}
+                onChange={setCamposBusca}
+                padrao={CAMPOS_PADRAO_DEMANDA}
+                dica="Números digitados também são procurados no protocolo."
+              />
               {/* Mobile: botão toggle filtros */}
               <Button 
                 variant="outline" 

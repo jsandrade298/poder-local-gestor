@@ -20,7 +20,11 @@ import { EnviarWhatsAppDialog } from "@/components/forms/EnviarWhatsAppDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { aplicarBusca } from "@/lib/busca";
+import {
+  aplicarBusca, lerCamposSalvos, salvarCampos, TODOS_OS_CAMPOS,
+  CAMPOS_BUSCA_MUNICIPE, CAMPOS_PADRAO_MUNICIPE, CAMPOS_NUMERICOS_MUNICIPE,
+} from "@/lib/busca";
+import { CamposBuscaSelect } from "@/components/ui/CamposBuscaSelect";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -35,6 +39,10 @@ import { formatPhoneDisplay, normalizePhone } from "@/lib/phoneUtils";
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
   const [searchTerm, setSearchTerm] = useState("");
+  // Onde a busca procura o texto (lembrado por navegador)
+  const [camposBusca, setCamposBuscaState] = useState<string[]>(() =>
+    lerCamposSalvos("municipes", CAMPOS_PADRAO_MUNICIPE, CAMPOS_BUSCA_MUNICIPE)
+  );
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
   // Debounce da busca para não disparar query a cada tecla
@@ -97,7 +105,7 @@ export default function Municipes() {
 
   // Buscar munícipes com TODOS os filtros server-side e paginação
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading, isError: isErrorMunicipes, refetch: refetchMunicipes, isFetching: isFetchingMunicipes } = useQuery({
-    queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, orderBy],
+    queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, camposBusca.join(","), orderBy],
     queryFn: async () => {
 
       // ===== FILTROS DE TAG E DE DEMANDA — resolvidos no banco =====
@@ -188,9 +196,12 @@ export default function Municipes() {
           query = query.in('categoria_id', categoriaFilter);
         }
 
-        // Busca: nome, telefone (com ou sem máscara), e-mail, CPF, bairro,
-        // endereço e cidade — sem acento e com as palavras em qualquer ordem.
-        query = aplicarBusca(query, debouncedSearchTerm);
+        // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
+        // Números (telefone/CPF) são procurados nesses campos mesmo sem marcar.
+        query = aplicarBusca(query, debouncedSearchTerm, {
+          campos: camposBusca,
+          camposNumericos: CAMPOS_NUMERICOS_MUNICIPE,
+        });
 
         // Tags: munícipe com QUALQUER uma das tags selecionadas
         if (filtrarTags) {
@@ -541,6 +552,16 @@ export default function Municipes() {
   const resetPage = () => {
     setCurrentPage(1);
   };
+
+  const setCamposBusca = (campos: string[]) => {
+    setCamposBuscaState(campos);
+    salvarCampos("municipes", campos);
+    resetPage();
+  };
+
+  const placeholderBuscaMunicipe = camposBusca.includes(TODOS_OS_CAMPOS)
+    ? "Buscar em todos os campos..."
+    : `Buscar por ${CAMPOS_BUSCA_MUNICIPE.filter(c => camposBusca.includes(c.value)).map(c => c.label.toLowerCase()).join(", ")}...`;
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -1639,12 +1660,19 @@ export default function Municipes() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Nome, email ou telefone..."
+                  placeholder={placeholderBuscaMunicipe}
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
                   className="pl-10"
                 />
               </div>
+              <CamposBuscaSelect
+                opcoes={CAMPOS_BUSCA_MUNICIPE}
+                value={camposBusca}
+                onChange={setCamposBusca}
+                padrao={CAMPOS_PADRAO_MUNICIPE}
+                dica="Telefone e CPF digitados são encontrados mesmo sem marcar."
+              />
               <Button 
                 variant="outline" size="sm" className="md:hidden shrink-0 gap-1.5"
                 onClick={() => setShowFilters(!showFilters)}
