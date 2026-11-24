@@ -210,7 +210,7 @@ export default function Inicio() {
                 {atencao.isLoading ? <Carregando /> : (atencao.data?.paradas ?? 0) === 0 ? (
                   <Vazio texto="Nenhuma demanda aberta sem alteração há mais de 30 dias." />
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {/* Há quanto tempo estão paradas */}
                     <div>
                       <p className="text-xs font-medium mb-2">Há quanto tempo estão sem alteração</p>

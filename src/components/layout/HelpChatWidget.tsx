@@ -21,6 +21,15 @@ interface ChatMessage {
 
 export function HelpChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+
+  // No celular a aba lateral some (cobria botões na borda da tela);
+  // o assistente abre pelo menu da conta, que dispara este evento.
+  useEffect(() => {
+    const abrir = () => setIsOpen(true);
+    (window as any).__jorgeusAjuda = true;
+    window.addEventListener("jorgeus:abrir-ajuda", abrir);
+    return () => { (window as any).__jorgeusAjuda = false; window.removeEventListener("jorgeus:abrir-ajuda", abrir); };
+  }, []);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -332,7 +341,7 @@ export function HelpChatWidget() {
           onClick={() => setIsOpen(true)}
           className={cn(
             "fixed z-[9970] right-0 top-1/2 -translate-y-1/2",
-            "flex items-center gap-1",
+            "hidden md:flex items-center gap-1",
             "bg-primary text-primary-foreground",
             "px-1.5 py-3 rounded-l-lg shadow-lg",
             "hover:px-2.5 hover:shadow-xl",

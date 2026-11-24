@@ -350,6 +350,46 @@ export default function Usuarios() {
     );
   }
 
+
+  const papelDo = (u: any) => (u.role === 'admin' ? 'Admin' : u.role === 'gestor' ? 'Gestor' : u.role === 'atendente' ? 'Atendente' : 'Usuário');
+
+  // Menu ⋯ de cada usuário (tabela no computador, cartões no celular)
+  const acoesDoUsuario = (usuario: any) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => handleViewProfile(usuario)}>
+          Ver Perfil
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleEditUser(usuario)}>
+          Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleViewUserDemandas(usuario.id, usuario.nome)}>
+          Ver Demandas
+        </DropdownMenuItem>
+         <DropdownMenuItem onClick={() => handleResetPassword(usuario)}>
+           Reset Senha
+         </DropdownMenuItem>
+        {usuario.ativo ? (
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
+            Desativar ou excluir…
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem onSelect={() => reativar.mutate(usuario.id)}>Reativar acesso</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
+              Excluir…
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -642,8 +682,33 @@ export default function Usuarios() {
             Usuários ({filteredUsuarios.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
+        <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+          {/* Celular: um cartão por pessoa, sem rolar para o lado */}
+          <ul className="md:hidden divide-y rounded-md border">
+            {filteredUsuarios.map((usuario) => (
+              <li key={usuario.id} className="flex items-start gap-3 p-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="font-medium text-foreground leading-snug break-words">{usuario.nome}</p>
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                    <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{usuario.email}</span>
+                  </p>
+                  {usuario.telefone && (
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Phone className="h-3 w-3 shrink-0" />{usuario.telefone}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <Badge variant={usuario.ativo ? "default" : "destructive"} className="text-[10px]">{usuario.ativo ? "Ativo" : "Inativo"}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{papelDo(usuario)}</Badge>
+                    <span className="text-[11px] text-muted-foreground">{usuario.total_demandas} demanda{usuario.total_demandas === 1 ? "" : "s"}</span>
+                  </div>
+                </div>
+                {acoesDoUsuario(usuario)}
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden md:block rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -711,39 +776,7 @@ export default function Usuarios() {
                        </span>
                      </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewProfile(usuario)}>
-                            Ver Perfil
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditUser(usuario)}>
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewUserDemandas(usuario.id, usuario.nome)}>
-                            Ver Demandas
-                          </DropdownMenuItem>
-                           <DropdownMenuItem onClick={() => handleResetPassword(usuario)}>
-                             Reset Senha
-                           </DropdownMenuItem>
-                          {usuario.ativo ? (
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
-                              Desativar ou excluir…
-                            </DropdownMenuItem>
-                          ) : (
-                            <>
-                              <DropdownMenuItem onSelect={() => reativar.mutate(usuario.id)}>Reativar acesso</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setUsuarioSaindo(usuario)}>
-                                Excluir…
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {acoesDoUsuario(usuario)}
                     </TableCell>
                   </TableRow>
                 ))}

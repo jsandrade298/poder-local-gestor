@@ -1174,7 +1174,7 @@ Estamos entrando em contato para..."
             <TabsContent value="preview" className="flex-1 mt-0 min-h-0">
               <ScrollArea className="h-[calc(90vh-280px)]">
                 <div className="px-6 py-4 space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Prévia do WhatsApp */}
                     <Card>
                       <CardHeader className="pb-3">

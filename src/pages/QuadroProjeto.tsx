@@ -33,6 +33,7 @@ import {
 } from "@/hooks/useQuadros";
 import { normalizarBusca } from "@/lib/busca";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const DIAS_FINAL_VISIVEL = 30;
 const hoje = () => new Date().toISOString().slice(0, 10);
@@ -50,6 +51,9 @@ export default function QuadroProjeto() {
   const { colunas, isLoading: carregandoColunas } = useKanbanBoardColunas(boardId);
   const { cards, isLoading: carregandoCards, createCard, moveCard, archiveCard, deleteCard } = useKanbanBoardCards(boardId);
   const arquivados = useCartoesArquivados(boardId);
+  // Celular: uma etapa por vez (abas no topo), sem rolar para o lado
+  const celular = useIsMobile();
+  const [etapaCel, setEtapaCel] = useState<string | null>(null);
   const [arquivadosAberto, setArquivadosAberto] = useState(false);
   const [cartaoExcluir, setCartaoExcluir] = useState<KanbanBoardCard | null>(null);
   const contagens = useBoardCardCounts(boardId) as any;
@@ -128,6 +132,7 @@ export default function QuadroProjeto() {
     if (semNinguem.length) lista.push({ id: "p_ninguem", pessoaId: "", nome: "Sem responsável", total: semNinguem.length, cards: semNinguem, ocultos: 0, final: false });
     return lista;
   }, [agrupar, colunas, filtrados, finais, verAntigos, membros, porId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grupoCel = grupos.some((g: any) => g.id === etapaCel) ? etapaCel : grupos[0]?.id;
 
   const totalFinal = cards.filter((c) => finais.has(c.coluna_id)).length;
   const totalAtrasados = cards.filter(atrasado).length;
@@ -204,18 +209,18 @@ export default function QuadroProjeto() {
             <h1 className="text-lg md:text-xl font-bold truncate">{nome}</h1>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           {tipo === "projeto" && (
             <>
               <button type="button" onClick={() => setMembrosAberto(true)} className="flex items-center -space-x-1.5 hover:opacity-80" aria-label="Ver membros">
                 {membros.slice(0, 6).map((m) => <Avatar key={m.usuario_id} id={m.usuario_id} nome={m.pessoa?.nome} size={28} />)}
               </button>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMembrosAberto(true)}><Users className="h-4 w-4" /> Membros ({membros.length})</Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMembrosAberto(true)}><Users className="h-4 w-4" /><span className="hidden sm:inline">Membros</span> ({membros.length})</Button>
             </>
           )}
           {tipo === "pessoal" && board.dono_id !== uid && <Avatar id={board.dono_id} nome={dono?.nome} size={28} />}
-          {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)}><Settings2 className="h-4 w-4" /> Etapas</Button>}
-          {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)}><Link2 className="h-4 w-4" /> Demanda</Button>}
+          {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)} aria-label="Etapas"><Settings2 className="h-4 w-4" /><span className="hidden sm:inline">Etapas</span></Button>}
+          {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)} aria-label="Vincular demanda"><Link2 className="h-4 w-4" /><span className="hidden sm:inline">Demanda</span></Button>}
           {editavel && colunas[0] && <Button size="sm" className="gap-1.5" onClick={() => { setNovoNaColuna(colunas[0].id); setAgrupar("etapa"); }}><Plus className="h-4 w-4" /> Cartão</Button>}
           <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} onArquivado={() => navigate("/quadros")} className="border" />
         </div>
@@ -294,15 +299,31 @@ export default function QuadroProjeto() {
         )}
       </div>
 
+      {/* Celular: escolher a etapa (ou a pessoa) */}
+      {celular && grupos.length > 1 && (
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={agrupar === "etapa" ? "Etapas" : "Pessoas"}>
+          {grupos.map((g: any) => (
+            <button key={g.id} type="button" role="tab" aria-selected={g.id === grupoCel}
+              onClick={() => setEtapaCel(g.id)}
+              className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                g.id === grupoCel ? "border-primary bg-primary text-primary-foreground font-semibold" : "bg-card text-muted-foreground")}>
+              {g.cor && <span className="h-2 w-2 rounded-full" style={{ background: g.cor }} aria-hidden />}
+              <span className="max-w-[9rem] truncate">{g.nome}</span>
+              <span className={cn("tabular-nums", g.id === grupoCel ? "opacity-80" : "")}>{g.total}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Colunas */}
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-3 overflow-x-auto pb-3 items-start -mx-1 px-1">
-          {grupos.map((g: any) => (
+        <div className={cn("flex gap-3 pb-3 items-start", celular ? "flex-col" : "overflow-x-auto -mx-1 px-1")}>
+          {grupos.filter((g: any) => !celular || g.id === grupoCel).map((g: any) => (
             <Droppable key={g.id} droppableId={g.id} isDropDisabled={agrupar !== "etapa"}>
               {(prov, snap) => (
                 <section
                   ref={prov.innerRef} {...prov.droppableProps}
-                  className={cn("flex-[0_0_86vw] sm:flex-[0_0_290px] rounded-xl bg-muted/40 p-2.5 space-y-2 min-h-[120px]", snap.isDraggingOver && "ring-2 ring-primary/40")}
+                  className={cn(celular ? "w-full" : "flex-[0_0_290px]", "rounded-xl bg-muted/40 p-2.5 space-y-2 min-h-[120px]", snap.isDraggingOver && "ring-2 ring-primary/40")}
                   aria-label={g.nome}
                 >
                   <div className="flex items-center justify-between px-1">
@@ -409,7 +430,7 @@ export default function QuadroProjeto() {
       <p className="text-xs text-muted-foreground">
         {agrupar === "pessoa"
           ? "Agrupar por pessoa mostra o que está em aberto com cada pessoa (responsável ou colaborador). Para mover, volte para Etapa."
-          : "Arraste os cartões entre as etapas (no celular, use o menu ⋯ do cartão). Atrasos aparecem sozinhos pelo prazo."}
+          : celular ? "Toque numa etapa acima para ver os cartões dela. Para mudar um cartão de etapa, use o menu ⋯ dele." : "Arraste os cartões entre as etapas. Atrasos aparecem sozinhos pelo prazo."}
       </p>
 
       {/* Membros */}

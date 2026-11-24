@@ -1,4 +1,4 @@
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, MessageCircleQuestion, Moon, Sun } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -9,6 +9,16 @@ import { cn } from "@/lib/utils";
 
 function iniciais(nome: string) {
   return nome.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
+}
+
+/** Abre o assistente (Navi). No celular é o único caminho; no computador há também a aba lateral. */
+function ItemAjuda() {
+  if (typeof window === "undefined" || !(window as any).__jorgeusAjuda) return null;
+  return (
+    <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event("jorgeus:abrir-ajuda"))}>
+      <MessageCircleQuestion className="h-4 w-4 mr-2" /> Ajuda (assistente)
+    </DropdownMenuItem>
+  );
 }
 
 /** Menu da pessoa no cabeçalho: quem está logado, modo claro/escuro e sair. */
@@ -56,6 +66,7 @@ export function MenuUsuario({ destinoAoSair = "/login" }: { destinoAoSair?: stri
           </span>
           <Switch checked={escuro} aria-label="Modo escuro" className="pointer-events-none" />
         </DropdownMenuItem>
+        <ItemAjuda />
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={sair} className="text-destructive focus:text-destructive">
           <LogOut className="h-4 w-4 mr-2" /> Sair

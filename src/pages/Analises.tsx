@@ -343,8 +343,8 @@ export default function Analises() {
                     <tr className="text-xs text-muted-foreground border-b">
                       <th className="text-left font-medium py-2 px-2">Pessoa</th>
                       <th className="text-left font-medium py-2 px-2 w-[40%]">Abertas</th>
-                      <th className="text-right font-medium py-2 px-2">Atrasadas</th>
-                      <th className="text-right font-medium py-2 px-2 whitespace-nowrap">Concluídas ({dados.periodo.rotuloCurto})</th>
+                      <th className="text-right font-medium py-2 px-2"><span className="sm:hidden">Atraso</span><span className="hidden sm:inline">Atrasadas</span></th>
+                      <th className="text-right font-medium py-2 px-2 whitespace-nowrap"><span className="sm:hidden" title={`Concluídas (${dados.periodo.rotuloCurto})`}>Concl.</span><span className="hidden sm:inline">Concluídas ({dados.periodo.rotuloCurto})</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -352,7 +352,7 @@ export default function Analises() {
                       const max = Math.max(...dados.equipe.map((e) => e.abertas), 1);
                       return dados.equipe.map((e) => (
                         <tr key={e.id} className="border-b last:border-0">
-                          <td className="py-2 px-2 whitespace-nowrap">{e.nome}</td>
+                          <td className="py-2 px-2 max-w-[7.5rem] truncate sm:max-w-none sm:whitespace-nowrap" title={e.nome}>{e.nome}</td>
                           <td className="py-2 px-2">
                             <div className="flex items-center gap-2">
                               <div className="h-2 rounded-full" style={{ width: `${(e.abertas / max) * 100}%`, minWidth: e.abertas ? 4 : 0, background: COR.seq }} />

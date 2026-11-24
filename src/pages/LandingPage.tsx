@@ -79,7 +79,7 @@ export default function LandingPage() {
       <section className="relative overflow-hidden text-white" style={{ background: "var(--marca-fundo-escuro)" }}>
         <div aria-hidden className="pointer-events-none absolute -right-48 -top-48 h-[40rem] w-[40rem] rounded-full opacity-25 blur-3xl fundo-marca" />
         <div aria-hidden className="pointer-events-none absolute -left-40 top-1/2 h-[26rem] w-[26rem] rounded-full opacity-15 blur-3xl fundo-marca" />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative mx-auto grid grid-cols-1 max-w-6xl items-center gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <p className="texto-etiqueta text-[11px] text-white/60 mb-5">Gestão e Inteligência Parlamentar</p>
             <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-extrabold leading-[1.08] tracking-tight">
@@ -125,7 +125,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Tudo o que o gabinete faz, em um só sistema</h2>
             <p className="mt-4 text-muted-foreground text-lg">Feito para a rotina de vereadores e deputados: simples para quem atende, completo para quem coordena.</p>
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {RECURSOS.map(({ icone: Icone, titulo, texto }) => (
               <article key={titulo} className="group rounded-2xl border bg-card p-6 shadow-suave transition-all hover:-translate-y-0.5 hover:shadow-media">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-accent-foreground ring-1 ring-primary/10">
@@ -146,7 +146,7 @@ export default function LandingPage() {
             <p className="texto-etiqueta text-primary mb-3">Como funciona</p>
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Três passos, todos os dias</h2>
           </div>
-          <ol className="mt-12 grid gap-6 md:grid-cols-3">
+          <ol className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
             {PASSOS.map((p) => (
               <li key={p.n} className="relative rounded-2xl border bg-card p-7 shadow-suave">
                 <span className="texto-marca text-3xl font-bold texto-degrade">{p.n}</span>
@@ -160,7 +160,7 @@ export default function LandingPage() {
 
       {/* Segurança */}
       <section id="seguranca" className="scroll-mt-16 py-20 md:py-28">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 lg:grid-cols-2">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl items-center gap-10 px-5 lg:grid-cols-2">
           <div>
             <p className="texto-etiqueta text-primary mb-3">Segurança</p>
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Os dados de cada gabinete, só do gabinete</h2>

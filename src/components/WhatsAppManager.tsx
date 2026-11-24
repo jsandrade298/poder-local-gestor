@@ -517,7 +517,7 @@ export function WhatsAppManager() {
       )}
 
       {/* Grid de Instâncias - Apenas uma instância */}
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {instances.map((instance) => (
           <Card key={instance.name} className={`${instance.status === 'connecting' ? 'border-blue-500 border-2' : ''}`}>
             <CardHeader>

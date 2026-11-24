@@ -1942,8 +1942,8 @@ export default function Municipes() {
                   <TableHead className="hidden lg:table-cell">Endereço</TableHead>
                   <TableHead className="hidden md:table-cell">Tags</TableHead>
                   <TableHead className="hidden lg:table-cell text-center">Últ. atividade</TableHead>
-                  <TableHead className="text-center">Demandas</TableHead>
-                  <TableHead className="text-right w-12">Ações</TableHead>
+                  <TableHead className="text-center px-1 md:px-4">Demandas</TableHead>
+                  <TableHead className="text-right w-10 md:w-12"><span className="sr-only md:not-sr-only">Ações</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2127,8 +2127,8 @@ export default function Municipes() {
           
           {/* Paginação */}
           {totalPages > 1 && itemsPerPage !== -1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 px-3 md:px-6 py-4 border-t">
+              <div className="flex items-center gap-2 min-w-0">
                 <Button
                   variant="outline"
                   size="sm"
@@ -2150,7 +2150,7 @@ export default function Municipes() {
                 </Button>
               </div>
               
-              <div className="flex items-center gap-1">
+              <div className="hidden sm:flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {

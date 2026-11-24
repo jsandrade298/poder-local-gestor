@@ -53,7 +53,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-[1.05fr_1fr] bg-background">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] bg-background">
       {/* Painel da marca (computador) */}
       <aside
         className="relative hidden lg:flex flex-col justify-between overflow-hidden p-12 text-white"
