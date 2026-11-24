@@ -16,6 +16,8 @@ import { HumorBadge } from "@/components/forms/HumorSelector";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { aplicarBusca } from "@/lib/busca";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
@@ -85,32 +87,9 @@ export default function Demandas() {
   const bairroKey = bairroFilter.join(",");
 
   // Buscar demandas com paginação eficiente
-  const { data: demandasData = { demandas: [], total: 0 }, isLoading } = useQuery({
+  const { data: demandasData = { demandas: [], total: 0 }, isLoading, isError: isErrorDemandas, refetch: refetchDemandas, isFetching: isFetchingDemandas } = useQuery({
     queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, debouncedSearchTerm, orderBy],
     queryFn: async () => {
-      // Se há termo de busca, resolver IDs de munícipes que correspondem ao nome (em lotes)
-      let municipeIdsFromSearch: string[] = [];
-      if (debouncedSearchTerm) {
-        const term = `%${debouncedSearchTerm}%`;
-        const BATCH = 1000;
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const { data: matchingMunicipes } = await supabase
-            .from('municipes')
-            .select('id')
-            .ilike('nome', term)
-            .range(from, from + BATCH - 1);
-          if (matchingMunicipes && matchingMunicipes.length > 0) {
-            municipeIdsFromSearch.push(...matchingMunicipes.map((m: any) => m.id));
-            from += BATCH;
-            hasMore = matchingMunicipes.length === BATCH;
-          } else {
-            hasMore = false;
-          }
-        }
-      }
-
       // Construir query com filtros server-side
       const buildQuery = () => {
         let query = supabase
@@ -177,19 +156,9 @@ export default function Demandas() {
         if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
         if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
 
-        // Busca por texto — OR entre título, protocolo e IDs de munícipes que batem no nome
-        if (debouncedSearchTerm) {
-          const term = `%${debouncedSearchTerm}%`;
-          if (municipeIdsFromSearch.length > 0) {
-            // Há munícipes com esse nome: OR entre título, protocolo e municipe_id
-            const municipeOrClauses = municipeIdsFromSearch
-              .map(id => `municipe_id.eq.${id}`)
-              .join(',');
-            query = query.or(`titulo.ilike.${term},protocolo.ilike.${term},${municipeOrClauses}`);
-          } else {
-            query = query.or(`titulo.ilike.${term},protocolo.ilike.${term}`);
-          }
-        }
+        // Busca: protocolo, título, descrição, endereço e nome do munícipe —
+        // sem acento e com as palavras em qualquer ordem (coluna `busca`).
+        query = aplicarBusca(query, debouncedSearchTerm);
 
         return query;
       };
@@ -1782,7 +1751,13 @@ export default function Demandas() {
 
         {/* Lista de Demandas */}
         <div className="space-y-4">
-          {paginatedDemandas.length === 0 ? (
+          {isErrorDemandas ? (
+            <ErrorState
+              what="as demandas"
+              onRetry={() => refetchDemandas()}
+              retrying={isFetchingDemandas}
+            />
+          ) : paginatedDemandas.length === 0 ? (
             <Card className="backdrop-blur-sm bg-card/95 border-0 shadow-lg">
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground">Nenhuma demanda encontrada.</p>

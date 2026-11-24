@@ -19,6 +19,8 @@ import { MunicipeDemandasDialog } from "@/components/forms/MunicipeDemandasDialo
 import { EnviarWhatsAppDialog } from "@/components/forms/EnviarWhatsAppDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { aplicarBusca } from "@/lib/busca";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -94,7 +96,7 @@ export default function Municipes() {
   const demandaStatusKey = demandaStatusFilter.join(",");
 
   // Buscar munícipes com TODOS os filtros server-side e paginação
-  const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading } = useQuery({
+  const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading, isError: isErrorMunicipes, refetch: refetchMunicipes, isFetching: isFetchingMunicipes } = useQuery({
     queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, orderBy],
     queryFn: async () => {
 
@@ -226,27 +228,9 @@ export default function Municipes() {
           query = query.in('categoria_id', categoriaFilter);
         }
 
-        // Busca por nome/email/telefone — inclui versão só-dígitos para casar
-        // tanto "11999991111" quanto "(11) 99999-1111" entrados pelo usuário.
-        if (debouncedSearchTerm) {
-          const sanitized = debouncedSearchTerm.replace(/[%_]/g, ''); // remover wildcards
-          if (sanitized.trim()) {
-            const term = escapeFilterValue(`%${sanitized}%`);
-            const digitsOnly = normalizePhone(sanitized);
-            const conditions = [
-              `nome.ilike.${term}`,
-              `email.ilike.${term}`,
-              `telefone.ilike.${term}`,
-            ];
-            // Se o termo tem dígitos, busca também o padrão só-dígitos
-            // (casa com números salvos sem máscara)
-            if (digitsOnly.length >= 3 && digitsOnly !== sanitized) {
-              const digitsTerm = escapeFilterValue(`%${digitsOnly}%`);
-              conditions.push(`telefone.ilike.${digitsTerm}`);
-            }
-            query = query.or(conditions.join(','));
-          }
-        }
+        // Busca: nome, telefone (com ou sem máscara), e-mail, CPF, bairro,
+        // endereço e cidade — sem acento e com as palavras em qualquer ordem.
+        query = aplicarBusca(query, debouncedSearchTerm);
 
         // Filtro de tags (pré-computado)
         if (tagMunicipeIds !== null) {
@@ -1948,6 +1932,16 @@ export default function Municipes() {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                         Carregando munícipes...
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ) : isErrorMunicipes ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-4">
+                      <ErrorState
+                        what="os munícipes"
+                        onRetry={() => refetchMunicipes()}
+                        retrying={isFetchingMunicipes}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : paginatedMunicipes.length === 0 ? (

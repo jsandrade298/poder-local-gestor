@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logError } from "@/lib/errorUtils";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { fetchAll } from "@/lib/fetchAll";
 
 export type RecentesDias = 7 | 15 | 30;
 
@@ -14,7 +15,7 @@ export function useDashboardData() {
   const todayStr = new Date().toISOString().split("T")[0];
 
   // ── KPIs via count queries ──────────────────────────────────
-  const { data: kpiData, isLoading: isLoadingKpis } = useQuery({
+  const { data: kpiData, isLoading: isLoadingKpis, isError: isErrorKpis, refetch: refetchKpis } = useQuery({
     queryKey: ["dashboard-kpis", todayStr, finalSlugs],
     queryFn: async () => {
       const closedFilter = finalSlugs.length > 0
@@ -53,32 +54,40 @@ export function useDashboardData() {
   });
 
   // ── Dados para gráficos (status, áreas, prioridade) ─────────
-  const { data: chartDemandas = [], isLoading: isLoadingCharts } = useQuery({
+  const { data: chartDemandas = [], isLoading: isLoadingCharts, isError: isErrorCharts, refetch: refetchCharts } = useQuery({
     queryKey: ["dashboard-chart-data"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("demandas")
-        .select("status, humor, area_id, prioridade, areas(nome)");
-      if (error) { logError("Dashboard chart data:", error); throw error; }
-      return data || [];
+      try {
+        return await fetchAll((from, to) =>
+          supabase
+            .from("demandas")
+            .select("id, status, humor, area_id, prioridade, areas(nome)")
+            .order("id")
+            .range(from, to)
+        );
+      } catch (error) { logError("Dashboard chart data:", error); throw error; }
     },
     retry: 2,
     staleTime: 30000,
   });
 
   // ── Demandas em atraso detalhadas ───────────────────────────
-  const { data: overdueData = [], isLoading: isLoadingOverdue } = useQuery({
+  const { data: overdueData = [], isLoading: isLoadingOverdue, isError: isErrorOverdue, refetch: refetchOverdue } = useQuery({
     queryKey: ["dashboard-overdue", todayStr, finalSlugs],
     queryFn: async () => {
       const closedFilter = finalSlugs.length > 0 ? `(${finalSlugs.join(",")})` : "(__never__)";
-      const { data, error } = await supabase
-        .from("demandas")
-        .select("id, titulo, protocolo, status, data_prazo, bairro, cidade, areas(nome)")
-        .lt("data_prazo", todayStr)
-        .not("status", "in", closedFilter)
-        .order("data_prazo", { ascending: true });
-      if (error) { logError("Dashboard overdue:", error); throw error; }
-      return data || [];
+      try {
+        return await fetchAll((from, to) =>
+          supabase
+            .from("demandas")
+            .select("id, titulo, protocolo, status, data_prazo, bairro, cidade, areas(nome)")
+            .lt("data_prazo", todayStr)
+            .not("status", "in", closedFilter)
+            .order("data_prazo", { ascending: true })
+            .order("id")
+            .range(from, to)
+        );
+      } catch (error) { logError("Dashboard overdue:", error); throw error; }
     },
     enabled: statusList.length > 0,
     retry: 2,
@@ -86,7 +95,7 @@ export function useDashboardData() {
   });
 
   // ── Demandas recentes (baseado no período selecionado) ──────
-  const { data: recentesData = [], isLoading: isLoadingRecentes } = useQuery({
+  const { data: recentesData = [], isLoading: isLoadingRecentes, isError: isErrorRecentes, refetch: refetchRecentes } = useQuery({
     queryKey: ["dashboard-recentes", recentesDias],
     queryFn: async () => {
       const since = new Date(Date.now() - recentesDias * 86400000).toISOString();
@@ -104,15 +113,19 @@ export function useDashboardData() {
 
   // ── Aniversariantes do dia ── busca tudo e filtra client-side
   // (igual à lógica do WhatsApp — .like() em data não funciona no Postgres)
-  const { data: aniversariantesRaw = [], isLoading: isLoadingAniversarios } = useQuery({
+  const { data: aniversariantesRaw = [], isLoading: isLoadingAniversarios, isError: isErrorAniversarios, refetch: refetchAniversarios } = useQuery({
     queryKey: ["dashboard-aniversarios"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("municipes")
-        .select("id, nome, telefone, bairro, cidade, data_nascimento")
-        .not("data_nascimento", "is", null);
-      if (error) { logError("Dashboard aniversarios:", error); throw error; }
-      return data || [];
+      try {
+        return await fetchAll((from, to) =>
+          supabase
+            .from("municipes")
+            .select("id, nome, telefone, bairro, cidade, data_nascimento")
+            .not("data_nascimento", "is", null)
+            .order("id")
+            .range(from, to)
+        );
+      } catch (error) { logError("Dashboard aniversarios:", error); throw error; }
     },
     retry: 2,
     staleTime: 60000,
@@ -277,6 +290,12 @@ export function useDashboardData() {
   return {
     isLoading: isLoadingKpis || isLoadingCharts || isLoadingOverdue ||
                isLoadingProjetos || isLoadingRecentes || isLoadingAniversarios,
+
+    // Erro em qualquer consulta principal: a tela mostra o erro em vez de zeros
+    isError: isErrorKpis || isErrorCharts || isErrorOverdue || isErrorRecentes || isErrorAniversarios,
+    refetchAll: () => {
+      refetchKpis(); refetchCharts(); refetchOverdue(); refetchRecentes(); refetchAniversarios();
+    },
 
     kpis,
     recentesDias,

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { fetchAll } from "@/lib/fetchAll";
 import { 
   Plus, 
   Search, 
@@ -47,7 +49,7 @@ export default function Areas() {
   const navigate = useNavigate();
 
   // Fetch areas from Supabase (incluindo a coluna 'cor')
-  const { data: areas = [], isLoading: isLoadingAreas } = useQuery({
+  const { data: areas = [], isLoading: isLoadingAreas, isError: isErrorAreas, refetch: refetchAreas } = useQuery({
     queryKey: ['areas'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -61,14 +63,17 @@ export default function Areas() {
   });
 
   // Fetch demandas count for each area
-  const { data: demandasCount = [], isLoading: isLoadingDemandas } = useQuery({
+  const { data: demandasCount = [], isLoading: isLoadingDemandas, isError: isErrorDemandas, refetch: refetchDemandas } = useQuery({
     queryKey: ['demandas-count-by-area'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('demandas')
-        .select('area_id, status');
-      
-      if (error) throw error;
+      // Paginado: sem isso, gabinetes com mais de 1.000 demandas tinham contagem errada
+      const data = await fetchAll((from, to) =>
+        supabase
+          .from('demandas')
+          .select('id, area_id, status')
+          .order('id')
+          .range(from, to)
+      );
       
       // Count demandas by area
       const countByArea = data.reduce((acc: any, demanda: any) => {
@@ -278,6 +283,15 @@ export default function Areas() {
   const totalDemandas = areasWithCount.reduce((acc, area) => acc + area.total_demandas, 0);
   const totalAtivas = areasWithCount.reduce((acc, area) => acc + area.demandas_ativas, 0);
   const totalResolvidas = areasWithCount.reduce((acc, area) => acc + area.demandas_atendidas, 0);
+
+  if (isErrorAreas || isErrorDemandas) {
+    return (
+      <ErrorState
+        what="as áreas"
+        onRetry={() => { refetchAreas(); refetchDemandas(); }}
+      />
+    );
+  }
 
   if (isLoadingAreas || isLoadingDemandas) {
     return (

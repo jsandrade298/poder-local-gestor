@@ -10,6 +10,7 @@ import {
   Download, ArrowLeft, Printer, ChevronDown, ChevronUp
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ErrorState } from "@/components/ui/ErrorState";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, LineChart, Line
@@ -45,7 +46,7 @@ export default function BalancoDemandas() {
   const [showAllResponsaveis, setShowAllResponsaveis] = useState(false);
 
   const {
-    isLoading, areas, responsaveis, cidades, statusList,
+    isLoading, isError, refetch, areas, responsaveis, cidades, statusList,
     getStatusLabel, getStatusColor, kpis,
     evolucaoData, humorEvolucaoData,
     origemData, bairroDataFull, areaStatusDataFull,
@@ -140,6 +141,11 @@ export default function BalancoDemandas() {
   const EmptyState = ({ msg }: { msg: string }) => (
     <div className="flex items-center justify-center h-[350px] text-muted-foreground text-sm">{msg}</div>
   );
+
+  // ===== Erro =====
+  if (isError) {
+    return <ErrorState what="o balanço de demandas" onRetry={() => refetch()} className="m-4" />;
+  }
 
   // ===== Loading =====
   if (isLoading) {

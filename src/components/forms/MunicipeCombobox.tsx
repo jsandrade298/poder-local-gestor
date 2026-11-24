@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, Loader2, UserPlus, X, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { aplicarBusca } from "@/lib/busca";
 
 // ─── Tipos ───────────────────────────────────────────────────
 
@@ -119,10 +120,8 @@ export function MunicipeCombobox({
           query = query.eq("representante_id", representanteId);
         }
 
-        if (debouncedSearch.trim().length > 0) {
-          const term = `%${debouncedSearch.trim()}%`;
-          query = query.or(`nome.ilike.${term},telefone.ilike.${term},bairro.ilike.${term}`);
-        }
+        // Nome, telefone (com ou sem máscara), bairro etc. — sem acento, qualquer ordem
+        query = aplicarBusca(query, debouncedSearch.trim());
 
         const { data, error } = await query;
         if (!error && data) {

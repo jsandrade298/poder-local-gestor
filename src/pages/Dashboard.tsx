@@ -17,14 +17,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { ErrorState } from "@/components/ui/ErrorState";
 
 export default function Dashboard() {
   const {
     kpis, humor, charts, overdue, recentes, aniversariantes,
     recentesDias, setRecentesDias,
-    isLoading, getStatusLabel, getStatusColor,
+    isLoading, isError, refetchAll, getStatusLabel, getStatusColor,
   } = useDashboardData();
   const navigate = useNavigate();
+
+  if (isError) {
+    return (
+      <div className="px-3 py-6 md:container md:mx-auto md:px-4 max-w-[1400px]">
+        <ErrorState what="os números do gabinete" onRetry={refetchAll} />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

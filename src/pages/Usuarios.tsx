@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export default function Usuarios() {
   const navigate = useNavigate();
 
   // Fetch users with their roles and demandas count
-  const { data: usuarios = [], isLoading: isLoadingUsuarios, refetch: refetchUsuarios } = useQuery({
+  const { data: usuarios = [], isLoading: isLoadingUsuarios, isError: isErrorUsuarios, refetch: refetchUsuarios } = useQuery({
     queryKey: ['usuarios'],
     queryFn: async () => {
       // Fetch profiles
@@ -364,6 +365,10 @@ export default function Usuarios() {
     deleteUserMutation.mutate(userId);
   };
 
+
+  if (isErrorUsuarios) {
+    return <ErrorState what="os usuários" onRetry={() => refetchUsuarios()} />;
+  }
 
   if (isLoadingUsuarios) {
     return (

@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { fetchAll } from "@/lib/fetchAll";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -73,7 +75,7 @@ export default function Categorias() {
   const queryClient = useQueryClient();
 
   // Buscar categorias com contagem de munícipes
-  const { data: categorias = [], isLoading } = useQuery({
+  const { data: categorias = [], isLoading, isError: isErrorCategorias, refetch: refetchCategorias, isFetching: isFetchingCategorias } = useQuery({
     queryKey: ['categorias-with-counts'],
     queryFn: async () => {
       const { data: categoriasData, error: categoriasError } = await supabase
@@ -107,13 +109,15 @@ export default function Categorias() {
   const { data: allMunicipes = [] } = useQuery({
     queryKey: ['all-municipes-categorias'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('id, nome, email, bairro, cidade, categoria_id')
-        .order('nome');
-      
-      if (error) throw error;
-      return data;
+      // Paginado: sem isso só os primeiros 1.000 munícipes apareciam
+      return fetchAll((from, to) =>
+        supabase
+          .from('municipes')
+          .select('id, nome, email, bairro, cidade, categoria_id')
+          .order('nome')
+          .order('id')
+          .range(from, to)
+      );
     }
   });
 
@@ -437,7 +441,9 @@ export default function Categorias() {
       </Card>
 
       {/* Lista de Categorias */}
-      {isLoading ? (
+      {isErrorCategorias ? (
+        <ErrorState what="as categorias" onRetry={() => refetchCategorias()} retrying={isFetchingCategorias} />
+      ) : isLoading ? (
         <div className="text-center py-8">Carregando categorias...</div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

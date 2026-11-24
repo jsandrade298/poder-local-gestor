@@ -107,7 +107,7 @@ export function suggestGranularity(demandas: any[]): TemporalGranularity {
 export function useBalancoData(filters: BalancoFilters, granularity: TemporalGranularity) {
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
 
-  const { data: rawDemandas = [], isLoading } = useQuery({
+  const { data: rawDemandas = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["balanco-demandas"],
     queryFn: async () => {
       let all: any[] = [];
@@ -441,7 +441,7 @@ export function useBalancoData(filters: BalancoFilters, granularity: TemporalGra
   }, [demandas, responsaveis, getStatusLabel]);
 
   return {
-    isLoading, demandas, areas, responsaveis, cidades,
+    isLoading, isError, refetch, demandas, areas, responsaveis, cidades,
     statusList, getStatusLabel, getStatusColor,
     kpis, evolucaoData, humorEvolucaoData,
     origemData, bairroDataFull, areaStatusDataFull,

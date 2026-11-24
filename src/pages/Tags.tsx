@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { fetchAll } from "@/lib/fetchAll";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,7 +54,7 @@ export default function Tags() {
   const queryClient = useQueryClient();
 
   // Buscar tags com contagem de munícipes
-  const { data: tags = [], isLoading, error } = useQuery({
+  const { data: tags = [], isLoading, error, refetch: refetchTags } = useQuery({
     queryKey: ['tags-with-counts'],
     queryFn: async () => {
       console.log('🔍 Buscando tags do banco de dados...');
@@ -97,13 +99,15 @@ export default function Tags() {
   const { data: allMunicipes = [] } = useQuery({
     queryKey: ['all-municipes'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('municipes')
-        .select('id, nome, email, bairro, cidade')
-        .order('nome');
-      
-      if (error) throw error;
-      return data;
+      // Paginado: sem isso só os primeiros 1.000 munícipes apareciam
+      return fetchAll((from, to) =>
+        supabase
+          .from('municipes')
+          .select('id, nome, email, bairro, cidade')
+          .order('nome')
+          .order('id')
+          .range(from, to)
+      );
     }
   });
 
@@ -380,6 +384,10 @@ export default function Tags() {
   const handleDeleteTag = (tagId: string) => {
     deleteTagMutation.mutate(tagId);
   };
+
+  if (error) {
+    return <ErrorState what="as tags" onRetry={() => refetchTags()} />;
+  }
 
   if (isLoading) {
     return (

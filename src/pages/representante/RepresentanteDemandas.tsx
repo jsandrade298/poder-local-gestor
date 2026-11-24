@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { aplicarBusca } from "@/lib/busca";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ export default function RepresentanteDemandas() {
         .eq("representante_id", uid!)
         .order("created_at", { ascending: false });
 
-      if (debounced) query = query.ilike("titulo", `%${debounced}%`);
+      query = aplicarBusca(query, debounced);
       if (statusFilter !== "todos") query = query.eq("status", statusFilter);
       if (prioridadeFilter !== "todos") query = query.eq("prioridade", prioridadeFilter);
 
