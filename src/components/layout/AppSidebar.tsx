@@ -52,7 +52,7 @@ const allGroups: MenuGroup[] = [
     items: [
       { title: "Demandas", url: "/demandas", icon: FileText },
       { title: "Munícipes", url: "/municipes", icon: Users },
-      { title: "Kanban", url: "/kanban", icon: Columns },
+      { title: "Quadros", url: "/quadros", icon: Columns },
       { title: "Agenda", url: "/solicitar-agenda", icon: Calendar },
       { title: "Mapa", url: "/mapa", icon: MapPin },
       { title: "Plano de Ação", url: "/plano-acao", icon: Target, enabled: FEATURES.planoAcao },
@@ -96,6 +96,8 @@ export function AppSidebar() {
     if (path === "/") {
       return currentPath === "/";
     }
+    // Os quadros de equipe e pessoal ainda abrem na tela /kanban
+    if (path === "/quadros" && currentPath.startsWith("/kanban")) return true;
     return currentPath.startsWith(path);
   };
 

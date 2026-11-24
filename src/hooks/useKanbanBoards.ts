@@ -141,8 +141,11 @@ export function useKanbanBoards() {
       return data;
     },
     onSuccess: () => {
-      toast.success('Board criado com sucesso!');
+      toast.success('Projeto criado! Você já é membro.');
       queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
+      // Galeria dos Quadros: quem é membro e o resumo dos projetos
+      queryClient.invalidateQueries({ queryKey: ['quadros-membros-todos'] });
+      queryClient.invalidateQueries({ queryKey: ['quadros-resumos'] });
     },
     onError: (err: any) => toast.error('Erro ao criar board: ' + err.message),
   });

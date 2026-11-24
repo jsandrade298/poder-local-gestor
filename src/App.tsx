@@ -46,6 +46,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Demandas = lazy(() => import("./pages/Demandas"));
 const Municipes = lazy(() => import("./pages/Municipes"));
 const Kanban = lazy(() => import("./pages/Kanban"));
+const Quadros = lazy(() => import("./pages/Quadros"));
+const QuadroProjeto = lazy(() => import("./pages/QuadroProjeto"));
 const PlanoAcao = lazy(() => import("./pages/PlanoAcao"));
 const PlanoAcaoDetalhe = lazy(() => import("./pages/PlanoAcaoDetalhe"));
 const SolicitarAgenda = lazy(() => import("./pages/SolicitarAgenda"));
@@ -126,6 +128,8 @@ const App = () => (
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />
               <Route path="/kanban" element={<Kanban />} />
+              <Route path="/quadros" element={<Quadros />} />
+              <Route path="/quadros/:id" element={<QuadroProjeto />} />
               <Route path="/plano-acao" element={<PlanoAcao />} />
               <Route path="/plano-acao/:id" element={<PlanoAcaoDetalhe />} />
               <Route path="/solicitar-agenda" element={<SolicitarAgenda />} />

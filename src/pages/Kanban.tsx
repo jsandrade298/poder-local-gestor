@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Plus, Calendar, MapPin, User, AlertTriangle, Trash2, X, ChevronDown, CheckSquare, MessageSquare, Clock, Route, History, FileText, ListTodo, MoreHorizontal } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { formatDateTime, formatDateOnly } from '@/lib/dateUtils';
@@ -97,7 +97,10 @@ export default function Kanban() {
   const [isViewRotaDialogOpen, setIsViewRotaDialogOpen] = useState(false);
   const [isAdicionarDialogOpen, setIsAdicionarDialogOpen] = useState(false);
   const [isAdicionarRotasDialogOpen, setIsAdicionarRotasDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<string>("producao-legislativa");
+  // Quadro aberto: vem de /kanban?quadro=... (galeria dos Quadros) ou o da equipe
+  const [selectedUser, setSelectedUser] = useState<string>(() => {
+    try { return new URLSearchParams(window.location.search).get('quadro') || "producao-legislativa"; } catch { return "producao-legislativa"; }
+  });
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [activeColumn, setActiveColumn] = useState('a_fazer');
   const [isAdicionarTarefaOpen, setIsAdicionarTarefaOpen] = useState(false);
@@ -784,6 +787,9 @@ export default function Kanban() {
             TÍTULO + ABAS (Pessoal / Projetos)
             ═══════════════════════════════════════════════════ */}
         <div className="flex items-center gap-4 mb-4 md:mb-6">
+          <Link to="/quadros" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" aria-label="Voltar aos Quadros">
+            <ArrowLeft className="h-4 w-4" /> Quadros
+          </Link>
           <h1 className="text-xl md:text-3xl font-bold text-foreground">Kanban</h1>
           <div className="flex rounded-lg border bg-muted/30 p-0.5">
             <button

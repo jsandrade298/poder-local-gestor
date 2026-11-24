@@ -13,7 +13,7 @@ const navItems = [
   { title: "Demandas", url: "/demandas", icon: FileText },
   // posição 2: botão "Nova demanda"
   { title: "Munícipes", url: "/municipes", icon: Users },
-  { title: "Kanban", url: "/kanban", icon: Columns },
+  { title: "Quadros", url: "/quadros", icon: Columns },
 ];
 
 export function BottomNav() {
@@ -21,6 +21,7 @@ export function BottomNav() {
 
   const isActive = (path: string, exact?: boolean) => {
     if (exact) return location.pathname === path;
+    if (path === "/quadros" && location.pathname.startsWith("/kanban")) return true;
     return location.pathname.startsWith(path);
   };
 
