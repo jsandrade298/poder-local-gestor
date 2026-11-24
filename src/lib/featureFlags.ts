@@ -12,4 +12,7 @@ export const FEATURES = {
   googleAgenda: false,
   assessorIA: false,
   disparosWhatsApp: false,
+  // Substituídos pela tela Análises (Fase 2)
+  visaoGeral: false,
+  balancoDemandas: false,
 } as const;

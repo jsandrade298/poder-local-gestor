@@ -123,7 +123,9 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
 
   // Buscar atividades da demanda para enviar ao Assessor IA
   const { data: atividades = [] } = useQuery({
-    queryKey: ['demanda-atividades-assessor', demanda?.id],
+    // Chave filha de ['demanda-atividades', id]: quando a aba registra/edita/apaga
+    // uma atividade e invalida essa chave, o contador também se atualiza.
+    queryKey: ['demanda-atividades', demanda?.id, 'resumo'],
     queryFn: async () => {
       if (!demanda?.id) return [];
       const { data, error } = await supabase
@@ -141,7 +143,8 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
       if (error) throw error;
       return data || [];
     },
-    enabled: FEATURES.assessorIA && !!demanda?.id && open
+    // Também alimenta o contador da aba "Atividades (n)" — não depende do Assessor IA
+    enabled: !!demanda?.id && open
   });
 
   if (!demanda) return null;

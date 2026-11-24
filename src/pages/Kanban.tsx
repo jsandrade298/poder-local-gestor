@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,10 @@ import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
 import { KanbanBoard } from "@/hooks/useKanbanBoards";
 import { FEATURES } from "@/lib/featureFlags";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { fetchAll } from "@/lib/fetchAll";
+import { normalizarBusca } from "@/lib/busca";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ConfirmarStatusDemandaDialog,
   MovimentoDemandaKanban,
@@ -37,6 +41,8 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 
@@ -50,6 +56,7 @@ interface KanbanItem {
   prioridade: string;
   data_prazo: string | null;
   created_at: string;
+  posicao_desde?: string;
   areas?: { nome: string };
   municipes?: { nome: string };
   responsavel_id?: string;
@@ -106,6 +113,16 @@ export default function Kanban() {
   // ── Confirmação de status ao mover demanda de coluna ──
   const { statusList } = useDemandaStatus();
   const [movimentoDemanda, setMovimentoDemanda] = useState<MovimentoDemandaKanban | null>(null);
+  // ── Filtros do quadro ──
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroResponsavel, setFiltroResponsavel] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'demanda' | 'tarefa'>('todos');
+  const [soAtrasados, setSoAtrasados] = useState(false);
+  // "Feito": por padrão só os concluídos recentemente; o resto fica recolhido
+  const [verFeitoAntigo, setVerFeitoAntigo] = useState(false);
+
+  // Exclusão de tarefa sempre confirmada (apaga checklist e comentários junto)
+  const [tarefaParaExcluir, setTarefaParaExcluir] = useState<any>(null);
 
   const processedTaskIdRef = useRef<string | null>(null);
   const isClosingModalRef = useRef(false);
@@ -117,49 +134,39 @@ export default function Kanban() {
     queryKey: ['demandas-kanban', selectedUser],
     queryFn: async () => {
       // ── 1. Demandas ──
-      const { data: kanbanData, error: kanbanError } = await supabase
-        .from('demanda_kanbans')
-        .select('demanda_id, kanban_position')
-        .eq('kanban_type', selectedUser);
-      
-      if (kanbanError) {
+      // Junção feita pelo banco (antes: lista de IDs na URL, que quebraria
+      // perto de ~850 cartões) e paginada (sem o limite de 1.000).
+      let kanbanData: any[];
+      try {
+        kanbanData = await fetchAll((from, to) =>
+          supabase
+            .from('demanda_kanbans')
+            .select(`
+              id, kanban_position, updated_at,
+              demandas!inner(*, areas(nome), municipes(nome))
+            `)
+            .eq('kanban_type', selectedUser)
+            .order('id')
+            .range(from, to) as any
+        );
+      } catch (kanbanError) {
         logError('Erro ao buscar kanban:', kanbanError);
         throw kanbanError;
       }
-      
-      let demandasCompletas: any[] = [];
-      
-      if (kanbanData && kanbanData.length > 0) {
-        const demandaIds = kanbanData.map(k => k.demanda_id);
-        const { data: demandasData, error: demandasError } = await supabase
-          .from('demandas')
-          .select(`
-            *,
-            areas(nome),
-            municipes(nome)
-          `)
-          .in('id', demandaIds)
-          .order('created_at', { ascending: false });
-        
-        if (demandasError) {
-          logError('Erro ao buscar demandas:', demandasError);
-          throw demandasError;
-        }
-        
-        demandasCompletas = demandasData?.map(demanda => {
-          const kanbanInfo = kanbanData.find(k => k.demanda_id === demanda.id);
-          return {
-            ...demanda,
-            kanban_position: kanbanInfo?.kanban_position || 'a_fazer',
-            tipo: 'demanda'
-          };
-        }) || [];
-      }
-      
-      // ── 2. Tarefas ──
+
+      const demandasCompletas: any[] = kanbanData
+        .map((k: any) => ({
+          ...k.demandas,
+          kanban_position: k.kanban_position || 'a_fazer',
+          // quando o cartão chegou na coluna atual (última movimentação)
+          posicao_desde: k.updated_at,
+          tipo: 'demanda',
+        }))
+        .sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+      // ── 2. Tarefas ── (filtradas no banco: antes vinham as do gabinete inteiro)
       let tarefasData: any[] = [];
-      
-      const { data, error } = await supabase
+      let qTarefas = supabase
         .from('tarefas')
         .select(`
           *,
@@ -168,20 +175,27 @@ export default function Kanban() {
           )
         `)
         .order('created_at', { ascending: false });
-      
+
+      if (selectedUser === "producao-legislativa") {
+        qTarefas = qTarefas.eq('kanban_type', selectedUser);
+      } else {
+        const { data: colab, error: colabError } = await supabase
+          .from('tarefa_colaboradores')
+          .select('tarefa_id')
+          .eq('colaborador_id', selectedUser);
+        if (colabError) throw colabError;
+        const idsColab = (colab || []).map((c: any) => c.tarefa_id);
+        qTarefas = idsColab.length > 0
+          ? qTarefas.or(`kanban_type.eq.${selectedUser},id.in.(${idsColab.join(',')})`)
+          : qTarefas.eq('kanban_type', selectedUser);
+      }
+
+      const { data, error } = await qTarefas;
       if (error) {
         logError('Erro ao buscar tarefas:', error);
         throw error;
       }
-      
-      if (selectedUser === "producao-legislativa") {
-        tarefasData = data?.filter(tarefa => tarefa.kanban_type === selectedUser) || [];
-      } else {
-        tarefasData = data?.filter(tarefa => 
-          tarefa.kanban_type === selectedUser ||
-          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador.id === selectedUser)
-        ) || [];
-      }
+      tarefasData = data || [];
 
       // Batch fetch checklist + comentários
       const tarefaIds = tarefasData.map(t => t.id);
@@ -226,6 +240,8 @@ export default function Kanban() {
         prioridade: tarefa.prioridade,
         data_prazo: tarefa.data_prazo || null,
         created_at: tarefa.created_at,
+        // quando chegou na coluna atual: conclusão (Feito) ou última alteração
+        posicao_desde: tarefa.completed_at || tarefa.updated_at,
         responsavel_id: tarefa.responsavel_id || tarefa.created_by,
         tipo: 'tarefa' as const,
         cor: tarefa.cor || '#3B82F6',
@@ -411,71 +427,35 @@ export default function Kanban() {
   // ══════════════════════════════════════════════
   //  Mutations (com registro de histórico)
   // ══════════════════════════════════════════════
+  // "Limpar Kanban": tira os cartões de DEMANDA (e rotas) do quadro.
+  // As demandas continuam existindo; tarefas NÃO são apagadas (antes eram,
+  // junto com checklist e comentários, sem como desfazer).
   const limparKanbanMutation = useMutation({
     mutationFn: async () => {
-      // Capturar snapshots das tarefas ANTES de deletar
-      const tarefasNaLista = demandas.filter(d => (d.tipo || 'demanda') === 'tarefa');
-      const { capturarSnapshotsTarefaBatch } = await import('@/lib/kanbanHistoricoUtils');
-      const snapshots = tarefasNaLista.length > 0
-        ? await capturarSnapshotsTarefaBatch(tarefasNaLista.map(t => t.id))
-        : new Map();
+      const itensParaRegistrar = demandas
+        .filter(item => (item.tipo || 'demanda') !== 'tarefa')
+        .map(item => ({
+          item_id: item.id,
+          item_tipo: (item.tipo || 'demanda') as 'demanda' | 'tarefa' | 'rota',
+          item_titulo: item.titulo,
+          kanban_type: selectedUser,
+          posicao_anterior: item.kanban_position,
+          posicao_nova: null as string | null,
+          acao: 'removido' as const,
+          snapshot: null,
+        }));
 
-      // Registrar remoção de todos os itens no histórico (com snapshot para tarefas)
-      const itensParaRegistrar = demandas.map(item => ({
-        item_id: item.id,
-        item_tipo: (item.tipo || 'demanda') as 'demanda' | 'tarefa' | 'rota',
-        item_titulo: item.titulo,
-        kanban_type: selectedUser,
-        posicao_anterior: item.kanban_position,
-        posicao_nova: null as string | null,
-        acao: 'removido' as const,
-        snapshot: snapshots.get(item.id) || null,
-      }));
-
-      // Registrar em batch (não bloqueia)
       if (itensParaRegistrar.length > 0) {
         const { registrarHistoricoBatch } = await import('@/lib/kanbanHistoricoUtils');
         registrarHistoricoBatch(itensParaRegistrar);
       }
 
-      // Limpar demandas do kanban
-      const { data: kanbanEntries, error: fetchError } = await supabase
+      const { error } = await supabase
         .from('demanda_kanbans')
-        .select('id')
+        .delete()
         .eq('kanban_type', selectedUser);
-      if (fetchError) throw fetchError;
-      if (kanbanEntries && kanbanEntries.length > 0) {
-        const { error } = await supabase
-          .from('demanda_kanbans')
-          .delete()
-          .eq('kanban_type', selectedUser);
-        if (error) throw error;
-      }
-      
-      // Limpar tarefas
-      let tarefasEntries: any[] = [];
-      if (selectedUser === "producao-legislativa") {
-        const { data, error } = await supabase
-          .from('tarefas').select('id').eq('kanban_type', selectedUser);
-        if (error) throw error;
-        tarefasEntries = data || [];
-      } else {
-        const { data, error } = await supabase
-          .from('tarefas')
-          .select(`id, created_by, kanban_type, tarefa_colaboradores(colaborador_id)`);
-        if (error) throw error;
-        tarefasEntries = data?.filter(tarefa => 
-          tarefa.kanban_type === selectedUser ||
-          tarefa.tarefa_colaboradores.some((tc: any) => tc.colaborador_id === selectedUser)
-        ) || [];
-      }
-      if (tarefasEntries && tarefasEntries.length > 0) {
-        const tarefaIds = tarefasEntries.map(t => t.id);
-        const { error } = await supabase.from('tarefas').delete().in('id', tarefaIds);
-        if (error) throw error;
-      }
+      if (error) throw error;
 
-      // Limpar rotas do kanban
       const { error: rotasError } = await supabase
         .from('kanban_rotas')
         .delete()
@@ -485,7 +465,7 @@ export default function Kanban() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['demandas-kanban', selectedUser] });
       queryClient.invalidateQueries({ queryKey: ['kanban-historico-removidos'] }); queryClient.invalidateQueries({ queryKey: ['kanban-historico-trajetoria'] });
-      toast.success("Kanban limpo com sucesso!");
+      toast.success("Demandas retiradas do quadro. As tarefas foram mantidas.");
     },
     onError: (error) => {
       logError('Erro ao limpar kanban:', error);
@@ -658,8 +638,17 @@ export default function Kanban() {
       }
 
       if (tipo === 'tarefa') {
+        // Coluna "Feito" = tarefa concluída (antes só o formulário marcava,
+        // e arrastar deixava a tarefa em Feito como "não concluída").
+        const concluida = newPosition === 'feito';
+        const mudouConclusao = item && (item.kanban_position === 'feito') !== concluida;
         const { error } = await supabase
-          .from('tarefas').update({ kanban_position: newPosition }).eq('id', itemId);
+          .from('tarefas')
+          .update({
+            kanban_position: newPosition,
+            ...(mudouConclusao ? { completed: concluida, completed_at: concluida ? new Date().toISOString() : null } : {}),
+          })
+          .eq('id', itemId);
         if (error) throw error;
       } else if (tipo === 'rota') {
         const { error } = await supabase
@@ -685,29 +674,16 @@ export default function Kanban() {
     }
   });
 
-  const handleDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId } = result;
-    isDraggingRef.current = true;
-
-    if (!destination) { isDraggingRef.current = false; return; }
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-      isDraggingRef.current = false; return;
-    }
-
-    const item = demandas.find(d => d.id === draggableId);
-    if (!item) { isDraggingRef.current = false; return; }
-
+  /** Move um item de coluna — usado pelo arrastar e pelo menu "Mover para…". */
+  const moverItem = (item: any, destino: string) => {
+    if (!item || item.kanban_position === destino) return;
     const tipo = item.tipo || 'demanda';
-    updatePositionMutation.mutate({
-      itemId: draggableId,
-      newPosition: destination.droppableId,
-      tipo
-    });
+    updatePositionMutation.mutate({ itemId: item.id, newPosition: destino, tipo });
 
     // Demanda mudou de coluna: perguntar se o status da demanda também deve mudar.
     // Não pergunta quando a sugestão já é o status atual (nada a sincronizar).
-    if (tipo === 'demanda' && destination.droppableId !== source.droppableId) {
-      const sugestao = sugerirStatusParaColuna(destination.droppableId, statusList);
+    if (tipo === 'demanda') {
+      const sugestao = sugerirStatusParaColuna(destino, statusList);
       if (sugestao && sugestao !== item.status) {
         setMovimentoDemanda({
           demanda: {
@@ -717,16 +693,63 @@ export default function Kanban() {
             status: item.status,
             municipe_id: item.municipe_id,
           },
-          colunaDestino: destination.droppableId,
-          colunaDestinoTitulo: statusColumns.find(c => c.id === destination.droppableId)?.title || destination.droppableId,
+          colunaDestino: destino,
+          colunaDestinoTitulo: statusColumns.find(c => c.id === destino)?.title || destino,
         });
       }
     }
   };
 
-  const getDemandsByStatus = (kanbanPosition: string) => {
-    return demandas.filter((item: KanbanItem) => item.kanban_position === kanbanPosition);
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    isDraggingRef.current = true;
+
+    if (!destination || destination.droppableId === source.droppableId) {
+      // Reordenar dentro da coluna não é salvo (a ordem é por data); nada a fazer
+      setTimeout(() => { isDraggingRef.current = false; }, 100);
+      return;
+    }
+
+    const item = demandas.find(d => d.id === draggableId);
+    if (!item) { isDraggingRef.current = false; return; }
+    moverItem(item, destination.droppableId);
   };
+
+  // ── Filtros aplicados aos cartões ──
+  const filtrosAtivos = !!filtroTexto.trim() || filtroResponsavel !== "todos" || filtroTipo !== "todos" || soAtrasados;
+  const itensFiltrados = useMemo(() => {
+    const palavras = normalizarBusca(filtroTexto).split(/\s+/).filter(Boolean);
+    return demandas.filter((item: any) => {
+      if (filtroTipo !== 'todos' && (item.tipo || 'demanda') !== filtroTipo) return false;
+      if (soAtrasados && !(isOverdue(item.data_prazo) && item.kanban_position !== 'feito')) return false;
+      if (filtroResponsavel !== 'todos') {
+        const pessoas = [item.responsavel_id, item.tarefa_responsavel_id, ...(item.colaboradores || []).map((c: any) => c?.id)];
+        if (!pessoas.includes(filtroResponsavel)) return false;
+      }
+      if (palavras.length) {
+        const alvo = normalizarBusca([item.titulo, item.protocolo, item.descricao, item.municipes?.nome, item.areas?.nome].filter(Boolean).join(' '));
+        if (!palavras.every((p) => alvo.includes(p))) return false;
+      }
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demandas, filtroTexto, filtroResponsavel, filtroTipo, soAtrasados]);
+
+  const DIAS_FEITO_VISIVEL = 30;
+  const limiteFeito = Date.now() - DIAS_FEITO_VISIVEL * 86400000;
+  const ehFeitoAntigo = (item: any) =>
+    item.kanban_position === 'feito' && !!item.posicao_desde && new Date(item.posicao_desde).getTime() < limiteFeito;
+  const feitoAntigos = itensFiltrados.filter(ehFeitoAntigo).length;
+
+  /** Cartões da coluna (respeita filtros; em Feito, esconde os antigos até pedir). */
+  const getDemandsByStatus = (kanbanPosition: string) => {
+    const daColuna = itensFiltrados.filter((item: KanbanItem) => item.kanban_position === kanbanPosition);
+    if (kanbanPosition !== 'feito' || verFeitoAntigo) return daColuna;
+    return daColuna.filter((item) => !ehFeitoAntigo(item));
+  };
+  /** Total da coluna para o contador (inclui os recolhidos de Feito). */
+  const totalDaColuna = (kanbanPosition: string) =>
+    itensFiltrados.filter((item: KanbanItem) => item.kanban_position === kanbanPosition).length;
 
   const handleEditDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
@@ -930,7 +953,9 @@ export default function Kanban() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar limpeza do kanban</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Esta ação irá remover todas as demandas, tarefas e rotas deste kanban. Esta ação não pode ser desfeita.
+                      Os {demandas.filter(d => d.tipo !== 'tarefa').length} cartões de demanda saem deste quadro.
+                      As demandas em si não são apagadas e continuam em Demandas, com o mesmo status.
+                      As tarefas do quadro são mantidas.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -987,11 +1012,55 @@ export default function Kanban() {
           />
         ) : (
           /* ══════════════ Board ══════════════ */
+          <>
+          {/* Filtros do quadro */}
+          <div className="flex flex-wrap items-center gap-2 mb-3 md:mb-4">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
+              <Input
+                value={filtroTexto}
+                onChange={(e) => setFiltroTexto(e.target.value)}
+                placeholder="Buscar no quadro (título, protocolo, munícipe)…"
+                className="h-9"
+                aria-label="Buscar no quadro"
+              />
+            </div>
+            <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+              <SelectTrigger className="h-9 w-[170px]" aria-label="Filtrar por pessoa"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as pessoas</SelectItem>
+                {responsaveis.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Tipo de cartão">
+              {([['todos', 'Todos'], ['demanda', 'Demandas'], ['tarefa', 'Tarefas']] as const).map(([v, r]) => (
+                <button
+                  key={v} type="button" role="radio" aria-checked={filtroTipo === v}
+                  onClick={() => setFiltroTipo(v)}
+                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${filtroTipo === v ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                >{r}</button>
+              ))}
+            </div>
+            <Button
+              variant={soAtrasados ? "default" : "outline"} size="sm" className="h-9 gap-1.5"
+              onClick={() => setSoAtrasados(!soAtrasados)} aria-pressed={soAtrasados}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" /> Só atrasados
+            </Button>
+            {filtrosAtivos && (
+              <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => { setFiltroTexto(""); setFiltroResponsavel("todos"); setFiltroTipo("todos"); setSoAtrasados(false); }}>
+                Limpar filtros
+              </Button>
+            )}
+            {filtrosAtivos && (
+              <span className="text-xs text-muted-foreground">{itensFiltrados.length} de {demandas.length} cartões</span>
+            )}
+          </div>
+
           <DragDropContext onDragEnd={handleDragEnd}>
             {/* Mobile: tab bar para alternar colunas */}
             <div className="md:hidden flex rounded-xl bg-muted/50 p-1 mb-3 gap-1">
               {statusColumns.map((col) => {
-                const count = getDemandsByStatus(col.id).length;
+                const count = totalDaColuna(col.id);
                 return (
                   <button
                     key={col.id}
@@ -1018,7 +1087,7 @@ export default function Kanban() {
                       <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
                         {column.title}
-                        <Badge variant="secondary" className="ml-2">{columnItems.length}</Badge>
+                        <Badge variant="secondary" className="ml-2">{totalDaColuna(column.id)}</Badge>
                       </h2>
                     </div>
 
@@ -1060,24 +1129,38 @@ export default function Kanban() {
                                     }
                                   }}
                                 >
-                                  {/* Botão remover */}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-opacity"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (item.tipo === 'tarefa') {
-                                        removerTarefaMutation.mutate(item.id);
-                                      } else if (item.tipo === 'rota') {
-                                        removerRotaMutation.mutate(item.id);
-                                      } else {
-                                        removerDemandaMutation.mutate(item.id);
-                                      }
-                                    }}
+                                  {/* Ações do cartão: mover (funciona no celular), tirar do quadro, excluir */}
+                                  <div
+                                    className="absolute top-1 right-1 z-10 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" aria-label="Ações do cartão">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-52">
+                                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Mover para</DropdownMenuLabel>
+                                        {statusColumns.filter(c => c.id !== item.kanban_position).map(c => (
+                                          <DropdownMenuItem key={c.id} onClick={() => moverItem(item, c.id)}>
+                                            <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: c.color }} />
+                                            {c.title}
+                                          </DropdownMenuItem>
+                                        ))}
+                                        <DropdownMenuSeparator />
+                                        {item.tipo === 'tarefa' ? (
+                                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setTarefaParaExcluir(item)}>
+                                            <Trash2 className="h-4 w-4 mr-2" /> Excluir tarefa…
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem onClick={() => item.tipo === 'rota' ? removerRotaMutation.mutate(item.id) : removerDemandaMutation.mutate(item.id)}>
+                                            <X className="h-4 w-4 mr-2" /> Tirar do quadro
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                   
                                   <CardHeader className="pb-2">
                                     <div className="flex items-start justify-between">
@@ -1241,9 +1324,21 @@ export default function Kanban() {
                           ))}
                           {provided.placeholder}
                           
-                          {columnItems.length === 0 && (
+                          {column.id === 'feito' && feitoAntigos > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setVerFeitoAntigo(!verFeitoAntigo)}
+                              className="w-full rounded-md border border-dashed py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                            >
+                              {verFeitoAntigo
+                                ? `Recolher os ${feitoAntigos} concluídos há mais de ${DIAS_FEITO_VISIVEL} dias`
+                                : `Mostrar ${feitoAntigos} concluídos há mais de ${DIAS_FEITO_VISIVEL} dias`}
+                            </button>
+                          )}
+
+                          {columnItems.length === 0 && !(column.id === 'feito' && feitoAntigos > 0) && (
                             <div className="text-center text-muted-foreground py-8">
-                              Nenhum item nesta coluna
+                              {filtrosAtivos ? 'Nenhum cartão com esses filtros' : 'Nenhum item nesta coluna'}
                             </div>
                           )}
                         </div>
@@ -1254,6 +1349,7 @@ export default function Kanban() {
               })}
             </div>
           </DragDropContext>
+          </>
         )}
 
         {/* ══════════════ Dialogs ══════════════ */}
@@ -1293,6 +1389,29 @@ export default function Kanban() {
           movimento={movimentoDemanda}
           onClose={() => setMovimentoDemanda(null)}
         />
+
+        <AlertDialog open={!!tarefaParaExcluir} onOpenChange={(open) => !open && setTarefaParaExcluir(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir a tarefa?</AlertDialogTitle>
+              <AlertDialogDescription>
+                "{tarefaParaExcluir?.titulo}" será excluída de vez, junto com
+                {tarefaParaExcluir?.checklist_total ? ` ${tarefaParaExcluir.checklist_total} itens de checklist,` : " o checklist,"}
+                {tarefaParaExcluir?.comentarios_count ? ` ${tarefaParaExcluir.comentarios_count} comentário(s)` : " os comentários"} e os colaboradores.
+                Para só tirar do caminho, mova para "Feito".
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { removerTarefaMutation.mutate(tarefaParaExcluir.id); setTarefaParaExcluir(null); }}
+              >
+                Excluir tarefa
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         </>
         )}
       </div>

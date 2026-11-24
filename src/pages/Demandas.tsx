@@ -1535,9 +1535,9 @@ export default function Demandas() {
                         <Settings className="h-4 w-4 mr-2" />
                         Configurar Status
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate("/balanco-demandas")}>
+                      <DropdownMenuItem onClick={() => navigate("/analises")}>
                         <BarChart3 className="h-4 w-4 mr-2" />
-                        Balanço
+                        Análises
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={exportToCSV}>
                         <Download className="h-4 w-4 mr-2" />
@@ -1552,9 +1552,9 @@ export default function Demandas() {
                   <Button variant="outline" size="sm" onClick={() => setIsConfigStatusOpen(true)} title="Configurar Status">
                     <Settings className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/balanco-demandas")} title="Balanço de Demandas">
+                  <Button variant="outline" size="sm" onClick={() => navigate("/analises")} title="Análises do gabinete">
                     <BarChart3 className="h-4 w-4 mr-2" />
-                    Balanço
+                    Análises
                   </Button>
                   <ImportCSVDialogDemandas 
                     onFileSelect={handleFileImport}

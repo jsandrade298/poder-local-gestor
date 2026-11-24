@@ -64,8 +64,8 @@ const allGroups: MenuGroup[] = [
     label: "Análises",
     items: [
       { title: "Análises", url: "/analises", icon: LineChartIcon },
-      { title: "Visão geral", url: "/visao-geral", icon: BarChart3 },
-      { title: "Balanço de Demandas", url: "/balanco-demandas", icon: PieChart },
+      { title: "Visão geral", url: "/visao-geral", icon: BarChart3, enabled: FEATURES.visaoGeral },
+      { title: "Balanço de Demandas", url: "/balanco-demandas", icon: PieChart, enabled: FEATURES.balancoDemandas },
     ],
   },
   {
