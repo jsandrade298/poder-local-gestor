@@ -41,6 +41,7 @@ function lazy<T extends ComponentType<any>>(importar: () => Promise<{ default: T
 
 // Cada tela é baixada só quando aberta (antes: um único arquivo de ~3 MB).
 const Inicio = lazy(() => import("./pages/Inicio"));
+const Analises = lazy(() => import("./pages/Analises"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Demandas = lazy(() => import("./pages/Demandas"));
 const Municipes = lazy(() => import("./pages/Municipes"));
@@ -120,6 +121,7 @@ const App = () => (
               <Route path="/admin" element={<AdminSaaS />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoesWhatsApp />} />
               <Route path="/" element={<Inicio />} />
+              <Route path="/analises" element={<Analises />} />
               <Route path="/visao-geral" element={<Dashboard />} />
               <Route path="/demandas" element={<Demandas />} />
               <Route path="/municipes" element={<Municipes />} />

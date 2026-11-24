@@ -55,6 +55,15 @@
     --chart-4: 158 64% 52%; /* #10b981 - Verde para "Resolvida" */
     --chart-5: 0 84% 60%; /* #ef4444 - Vermelho para "Cancelada" */
 
+    /* Gráficos de Análises — paleta validada (daltonismo e contraste) */
+    --viz-1: #2a78d6;        /* série 1: azul */
+    --viz-2: #eb6834;        /* série 2: laranja */
+    --viz-seq: #2a78d6;      /* magnitude (um tom só) */
+    --viz-seq-fraco: #86b6ef;
+    --viz-grid: #e1e0d9;
+    --viz-eixo: #c3c2b7;
+    --viz-texto: #898781;
+
     /* Bordas e Inputs */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
@@ -177,6 +186,14 @@
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-seq: #3987e5;
+    --viz-seq-fraco: #184f95;
+    --viz-grid: #2c2c2a;
+    --viz-eixo: #383835;
+    --viz-texto: #898781;
 
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;

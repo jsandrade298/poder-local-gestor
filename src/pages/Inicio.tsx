@@ -356,8 +356,8 @@ export default function Inicio() {
       {/* Dica discreta de onde foi a visão antiga */}
       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
         <Inbox className="h-3.5 w-3.5" />
-        Os gráficos e números gerais do gabinete estão em{" "}
-        <Link to="/visao-geral" className="underline underline-offset-2 hover:text-foreground">Análises › Visão geral</Link>.
+        Os números gerais do gabinete estão em{" "}
+        <Link to="/analises" className="underline underline-offset-2 hover:text-foreground">Análises</Link>.
       </p>
     </div>
   );

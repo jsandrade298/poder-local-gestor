@@ -17,6 +17,7 @@ import {
   Layers,
   Shield,
   PieChart,
+  LineChart as LineChartIcon,
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +63,7 @@ const allGroups: MenuGroup[] = [
   {
     label: "Análises",
     items: [
+      { title: "Análises", url: "/analises", icon: LineChartIcon },
       { title: "Visão geral", url: "/visao-geral", icon: BarChart3 },
       { title: "Balanço de Demandas", url: "/balanco-demandas", icon: PieChart },
     ],
