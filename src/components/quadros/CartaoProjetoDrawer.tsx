@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { DemandaRapida } from "@/components/demandas/DemandaRapida";
 import { CheckSquare, Link2, MessageSquare, History, Trash2, X, Plus, Lock } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,6 +65,7 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
   const historico = useHistoricoCartao(card?.id);
 
   const [aba, setAba] = useState("detalhes");
+  const [demandaAberta, setDemandaAberta] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [novoItem, setNovoItem] = useState("");
@@ -200,8 +201,13 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
               <div className="space-y-1.5">
                 {demandas.map((d) => (
                   <div key={d.id} className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
-                    <Link to={`/demandas?id=${d.id}`} className="text-xs font-mono text-primary hover:underline shrink-0">#{d.protocolo}</Link>
-                    <span className="text-sm truncate flex-1 min-w-0">{d.titulo}</span>
+                    {/* Abre a demanda aqui mesmo (ver, editar, registrar atividade), sem sair do quadro */}
+                    <button type="button" onClick={() => setDemandaAberta(d.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left rounded hover:bg-muted/60 -mx-1 px-1 py-0.5"
+                      aria-label={`Abrir a demanda ${d.protocolo}`} title="Abrir a demanda">
+                      <span className="text-xs font-mono text-primary shrink-0">#{d.protocolo}</span>
+                      <span className="text-sm truncate flex-1 min-w-0">{d.titulo}</span>
+                    </button>
                     <StatusBadge status={d.status} size="sm" />
                     {editavel && <button type="button" onClick={() => desvincular.mutate(d.id)} className="text-muted-foreground hover:text-destructive p-1" aria-label={`Desvincular ${d.protocolo}`}><X className="h-3.5 w-3.5" /></button>}
                   </div>
@@ -326,6 +332,9 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
             <p className="text-[11px] text-muted-foreground mt-4">Etapa, prazo, responsável, colaboradores, checklist e demandas vinculadas ficam registrados automaticamente.</p>
           </TabsContent>
         </Tabs>
+
+        {/* Demanda aberta por cima do cartão (fica na mesma árvore: fechar não fecha o cartão) */}
+        <DemandaRapida demandaId={demandaAberta} onClose={() => setDemandaAberta(null)} />
       </SheetContent>
     </Sheet>
   );
