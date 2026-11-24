@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { fetchAll } from "@/lib/fetchAll";
+import { AcoesEmLoteMunicipes } from "@/components/municipes/AcoesEmLoteMunicipes";
+import { LinhaSelecaoLote } from "@/components/ui/BarraAcoesEmLote";
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,124 +129,125 @@ export default function Municipes() {
   const demandaStatusKey = demandaStatusFilter.join(",");
 
   // Buscar munícipes com TODOS os filtros server-side e paginação
+  // Consulta com todos os filtros da tela (lista e seleção em lote)
+  // ===== FILTROS DE TAG E DE DEMANDA — resolvidos no banco =====
+  // Antes, buscávamos os IDs dos munícipes que batiam e colávamos a lista
+  // na URL (`id=in.(...)`). Com tags grandes (2.500+ munícipes) a URL
+  // estourava e a consulta falhava. Agora o próprio PostgREST faz a junção:
+  //   - `!inner` mantém só munícipes que têm pelo menos uma linha que bate
+  //   - embed sem `!inner` + `is null` mantém só os que NÃO têm nenhuma
+  // Os embeds de filtro usam apelidos (filtro_*) para não interferir nas
+  // tags exibidas na lista.
+  const filtrarTags = tagFilter.length > 0;
+  const filtrarDemandas = demandaFilter !== "all" || demandaStatusFilter.length > 0;
+  const modoDemanda: "com" | "sem" | null = !filtrarDemandas
+    ? null
+    : demandaFilter === "sem_demanda" ? "sem" : "com";
+
+  const selectFiltros = [
+    filtrarTags ? "filtro_tags:municipe_tags!municipe_tags_municipe_id_fkey!inner(tag_id)" : null,
+    modoDemanda === "com" ? "filtro_demandas:demandas!demandas_municipe_id_fkey!inner(id, status)" : null,
+    modoDemanda === "sem" ? "filtro_demandas:demandas!demandas_municipe_id_fkey(id, status)" : null,
+  ].filter(Boolean).join(",");
+
+  // ===== CONSTRUIR QUERY PRINCIPAL =====
+  // Helper: escapar valor para uso em .or() do PostgREST (envolver em aspas duplas se tiver caracteres especiais)
+  const escapeFilterValue = (val: string) => {
+    if (/[,().\\"]/.test(val)) {
+      return `"${val.replace(/"/g, '\\"')}"`;
+    }
+    return val;
+  };
+
+  const buildQuery = (colunas = `
+        *,
+        municipe_tags(
+          tags(
+            id,
+            nome,
+            cor
+          )
+        ),
+        municipe_categorias (
+          id,
+          nome,
+          icone,
+          cor
+        )`) => {
+    let query = supabase
+      .from('municipes')
+      .select(`${colunas}${selectFiltros ? `, ${selectFiltros}` : ''}`, { count: 'exact' });
+
+    // Ordenação dinâmica
+    switch (orderBy) {
+      case 'nome_desc':
+        query = query.order('nome', { ascending: false });
+        break;
+      case 'mais_recente':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'mais_antigo':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'ultima_atividade':
+      case 'mais_demandas':
+        // Ordem derivada — o ordenamento real é feito no cliente após receber os dados.
+        // Aqui ordenamos por nome só para ter uma ordem estável vinda do servidor.
+        query = query.order('nome', { ascending: true });
+        break;
+      case 'nome_asc':
+      default:
+        query = query.order('nome', { ascending: true });
+        break;
+    }
+
+    // Filtros server-side — bairro (case-insensitive, match por trim)
+    if (bairroFilter.length > 0) {
+      const conditions = bairroFilter.map(b => `bairro.ilike.${escapeFilterValue(b)}`).join(',');
+      query = query.or(conditions);
+    }
+    // Filtros server-side — cidade (case-insensitive, match por trim)
+    if (cidadeFilter.length > 0) {
+      const conditions = cidadeFilter.map(c => `cidade.ilike.${escapeFilterValue(c)}`).join(',');
+      query = query.or(conditions);
+    }
+
+    // Filtro de categoria
+    if (categoriaFilter.length > 0) {
+      query = query.in('categoria_id', categoriaFilter);
+    }
+
+    // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
+    // Números (telefone/CPF) são procurados nesses campos mesmo sem marcar.
+    query = aplicarBusca(query, debouncedSearchTerm, {
+      campos: camposBusca,
+      camposNumericos: CAMPOS_NUMERICOS_MUNICIPE,
+    });
+
+    // Tags: munícipe com QUALQUER uma das tags selecionadas
+    if (filtrarTags) {
+      query = query.in('filtro_tags.tag_id', tagFilter);
+    }
+
+    // Demandas:
+    //   "com"  → tem ao menos uma demanda (no status escolhido, se houver)
+    //   "sem"  → não tem nenhuma demanda (no status escolhido, se houver)
+    if (modoDemanda) {
+      if (demandaStatusFilter.length > 0) {
+        query = query.in('filtro_demandas.status', demandaStatusFilter);
+      }
+      if (modoDemanda === "sem") {
+        query = query.is('filtro_demandas', null);
+      }
+    }
+
+    return query;
+  };
+
   const { data: municipesPaginado = { municipes: [], total: 0 }, isLoading, isError: isErrorMunicipes, refetch: refetchMunicipes, isFetching: isFetchingMunicipes } = useQuery({
     queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, camposBusca.join(","), orderBy],
     queryFn: async () => {
 
-      // ===== FILTROS DE TAG E DE DEMANDA — resolvidos no banco =====
-      // Antes, buscávamos os IDs dos munícipes que batiam e colávamos a lista
-      // na URL (`id=in.(...)`). Com tags grandes (2.500+ munícipes) a URL
-      // estourava e a consulta falhava. Agora o próprio PostgREST faz a junção:
-      //   - `!inner` mantém só munícipes que têm pelo menos uma linha que bate
-      //   - embed sem `!inner` + `is null` mantém só os que NÃO têm nenhuma
-      // Os embeds de filtro usam apelidos (filtro_*) para não interferir nas
-      // tags exibidas na lista.
-      const filtrarTags = tagFilter.length > 0;
-      const filtrarDemandas = demandaFilter !== "all" || demandaStatusFilter.length > 0;
-      const modoDemanda: "com" | "sem" | null = !filtrarDemandas
-        ? null
-        : demandaFilter === "sem_demanda" ? "sem" : "com";
-
-      const selectFiltros = [
-        filtrarTags ? "filtro_tags:municipe_tags!municipe_tags_municipe_id_fkey!inner(tag_id)" : null,
-        modoDemanda === "com" ? "filtro_demandas:demandas!demandas_municipe_id_fkey!inner(id, status)" : null,
-        modoDemanda === "sem" ? "filtro_demandas:demandas!demandas_municipe_id_fkey(id, status)" : null,
-      ].filter(Boolean).join(",");
-
-      // ===== CONSTRUIR QUERY PRINCIPAL =====
-      // Helper: escapar valor para uso em .or() do PostgREST (envolver em aspas duplas se tiver caracteres especiais)
-      const escapeFilterValue = (val: string) => {
-        if (/[,().\\"]/.test(val)) {
-          return `"${val.replace(/"/g, '\\"')}"`;
-        }
-        return val;
-      };
-
-      const buildQuery = () => {
-        let query = supabase
-          .from('municipes')
-          .select(`
-            *,
-            municipe_tags(
-              tags(
-                id,
-                nome,
-                cor
-              )
-            ),
-            municipe_categorias (
-              id,
-              nome,
-              icone,
-              cor
-            )${selectFiltros ? `, ${selectFiltros}` : ''}
-          `, { count: 'exact' });
-
-        // Ordenação dinâmica
-        switch (orderBy) {
-          case 'nome_desc':
-            query = query.order('nome', { ascending: false });
-            break;
-          case 'mais_recente':
-            query = query.order('created_at', { ascending: false });
-            break;
-          case 'mais_antigo':
-            query = query.order('created_at', { ascending: true });
-            break;
-          case 'ultima_atividade':
-          case 'mais_demandas':
-            // Ordem derivada — o ordenamento real é feito no cliente após receber os dados.
-            // Aqui ordenamos por nome só para ter uma ordem estável vinda do servidor.
-            query = query.order('nome', { ascending: true });
-            break;
-          case 'nome_asc':
-          default:
-            query = query.order('nome', { ascending: true });
-            break;
-        }
-
-        // Filtros server-side — bairro (case-insensitive, match por trim)
-        if (bairroFilter.length > 0) {
-          const conditions = bairroFilter.map(b => `bairro.ilike.${escapeFilterValue(b)}`).join(',');
-          query = query.or(conditions);
-        }
-        // Filtros server-side — cidade (case-insensitive, match por trim)
-        if (cidadeFilter.length > 0) {
-          const conditions = cidadeFilter.map(c => `cidade.ilike.${escapeFilterValue(c)}`).join(',');
-          query = query.or(conditions);
-        }
-
-        // Filtro de categoria
-        if (categoriaFilter.length > 0) {
-          query = query.in('categoria_id', categoriaFilter);
-        }
-
-        // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
-        // Números (telefone/CPF) são procurados nesses campos mesmo sem marcar.
-        query = aplicarBusca(query, debouncedSearchTerm, {
-          campos: camposBusca,
-          camposNumericos: CAMPOS_NUMERICOS_MUNICIPE,
-        });
-
-        // Tags: munícipe com QUALQUER uma das tags selecionadas
-        if (filtrarTags) {
-          query = query.in('filtro_tags.tag_id', tagFilter);
-        }
-
-        // Demandas:
-        //   "com"  → tem ao menos uma demanda (no status escolhido, se houver)
-        //   "sem"  → não tem nenhuma demanda (no status escolhido, se houver)
-        if (modoDemanda) {
-          if (demandaStatusFilter.length > 0) {
-            query = query.in('filtro_demandas.status', demandaStatusFilter);
-          }
-          if (modoDemanda === "sem") {
-            query = query.is('filtro_demandas', null);
-          }
-        }
-
-        return query;
-      };
 
       if (itemsPerPage === -1) {
         // "Mostrar todos" — buscar em lotes com filtros server-side
@@ -618,13 +622,30 @@ export default function Municipes() {
   };
 
   const handleSelectAll = (checked: boolean) => {
+    const daPagina = paginatedMunicipes.map((m) => m.id);
     setSelectAll(checked);
-    if (checked) {
-      setSelectedMunicipes(paginatedMunicipes.map(m => m.id));
-    } else {
-      setSelectedMunicipes([]);
+    setSelectedMunicipes((atual) => checked
+      ? [...new Set([...atual, ...daPagina])]
+      : atual.filter((id) => !daPagina.includes(id)));
+  };
+  const paginaToda = paginatedMunicipes.length > 0 && paginatedMunicipes.every((m) => selectedMunicipes.includes(m.id));
+  const [selecionandoTodos, setSelecionandoTodos] = useState(false);
+  const selecionarTodosDoFiltro = async () => {
+    setSelecionandoTodos(true);
+    try {
+      const todos = await fetchAll((de, ate) => buildQuery("id").range(de, ate) as any);
+      setSelectedMunicipes([...new Set((todos as any[]).map((m) => m.id))]);
+    } catch (e: any) {
+      toast({ title: "Não foi possível selecionar todos", description: e.message, variant: "destructive" });
+    } finally {
+      setSelecionandoTodos(false);
     }
   };
+  // Filtro mudou: a seleção zera (nunca agir sobre quem não está na tela)
+  useEffect(() => {
+    setSelectedMunicipes([]);
+    setSelectAll(false);
+  }, [bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, debouncedSearchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Função para exportar CSV
@@ -1926,15 +1947,24 @@ export default function Municipes() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 md:p-6">
-            <div className="overflow-x-auto">
+            <div className="px-3 pt-3 md:px-0 md:pt-0 md:pb-3">
+              <LinhaSelecaoLote
+                paginaToda={paginaToda} onAlternarPagina={() => handleSelectAll(!paginaToda)}
+                naPagina={paginatedMunicipes.length} totalFiltro={totalItems} selecionados={selectedMunicipes.length}
+                onSelecionarTodos={selecionarTodosDoFiltro} selecionandoTodos={selecionandoTodos}
+                rotuloPagina={itemsPerPage === -1 ? "Selecionar todos" : "Selecionar esta página"}
+                nomePlural="munícipes" todosOuTodas="todos" singularSel="selecionado" pluralSel="selecionados"
+              />
+            </div>
+            <div className={`overflow-x-auto ${selectedMunicipes.length > 0 ? "pb-16" : ""}`}>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Selecionar todos"
+                      checked={paginaToda}
+                      onCheckedChange={(v) => handleSelectAll(!!v)}
+                      aria-label="Selecionar esta página"
                     />
                   </TableHead>
                   <TableHead>Munícipe</TableHead>
@@ -2202,84 +2232,15 @@ export default function Municipes() {
           onOpenChange={setShowDemandasDialog}
         />
 
-        {/* Botão Flutuante de Ações em Massa */}
-        {selectedMunicipes.length > 0 && (
-          <div className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-50 animate-scale-in">
-            <div className="bg-card border border-border rounded-2xl shadow-lg backdrop-blur-sm p-3 md:p-4 md:min-w-[280px]">
-              <div className="flex items-center justify-between mb-2 md:mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 md:w-8 md:h-8 bg-primary rounded-full flex items-center justify-center">
-                    <CheckSquare className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary-foreground" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">
-                    {selectedMunicipes.length} selecionado{selectedMunicipes.length > 1 ? 's' : ''}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedMunicipes([]);
-                    setSelectAll(false);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-muted"
-                >
-                </Button>
-              </div>
-              
-              <div className="flex gap-2">
-                {FEATURES.disparosWhatsApp && <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} />}
-                
-                <AlertDialog open={showMassDeleteConfirm} onOpenChange={setShowMassDeleteConfirm}>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-all duration-200 hover:scale-105"
-                      onClick={() => setShowMassDeleteConfirm(true)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Tem certeza que deseja excluir {selectedMunicipes.length} munícipe(s) selecionado(s)? 
-                        Esta ação não pode ser desfeita e removerá todos os dados associados.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={() => {
-                          setShowMassDeleteConfirm(false);
-                          deleteMunicipesInBatch.mutate(selectedMunicipes);
-                        }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Excluir {selectedMunicipes.length} munícipe(s)
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedMunicipes([]);
-                    setSelectAll(false);
-                  }}
-                  className="transition-all duration-200 hover:scale-105"
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Ações em lote (mesma barra das Demandas) */}
+        <AcoesEmLoteMunicipes
+          ids={selectedMunicipes}
+          tags={tags as any}
+          categorias={categorias as any}
+          onLimpar={() => { setSelectedMunicipes([]); setSelectAll(false); }}
+          onExcluir={(ids) => deleteMunicipesInBatch.mutate(ids)}
+          extras={FEATURES.disparosWhatsApp ? <EnviarWhatsAppDialog municipesSelecionados={selectedMunicipes} /> : undefined}
+        />
 
         {/* Dialog de Duplicados */}
         <Dialog open={showDuplicatesDialog} onOpenChange={setShowDuplicatesDialog}>

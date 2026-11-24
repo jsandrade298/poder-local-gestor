@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AcoesEmLote, type DemandaSelecionada } from "@/components/demandas/AcoesEmLote";
+import { LinhaSelecaoLote } from "@/components/ui/BarraAcoesEmLote";
 import { LixeiraDemandas, moverParaLixeira, useContagemLixeira, DIAS_LIXEIRA } from "@/components/demandas/LixeiraDemandas";
 import { usePessoasGabinete } from "@/hooks/useQuadros";
 import { fetchAll } from "@/lib/fetchAll";
@@ -1861,19 +1862,14 @@ export default function Demandas() {
         )}
 
         {/* Seleção para ações em lote */}
-        {!isLoading && paginatedDemandas.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={paginaToda} onCheckedChange={alternarPagina} aria-label="Selecionar as demandas desta página" className="h-5 w-5" />
-              <span className="text-muted-foreground">Selecionar {pageSize === "all" ? "todas" : "esta página"}</span>
-            </label>
-            {paginaToda && totalDemandas > paginatedDemandas.length && selecao.size < totalDemandas && (
-              <Button variant="link" size="sm" className="h-auto p-0" disabled={selecionandoTodas} onClick={selecionarTodasDoFiltro}>
-                {selecionandoTodas ? "Selecionando…" : `Selecionar todas as ${totalDemandas.toLocaleString("pt-BR")} deste filtro`}
-              </Button>
-            )}
-            {selecao.size > 0 && <span className="text-muted-foreground">· {selecao.size.toLocaleString("pt-BR")} selecionada{selecao.size === 1 ? "" : "s"}</span>}
-          </div>
+        {!isLoading && (
+          <LinhaSelecaoLote
+            paginaToda={paginaToda} onAlternarPagina={alternarPagina}
+            naPagina={paginatedDemandas.length} totalFiltro={totalDemandas} selecionados={selecao.size}
+            onSelecionarTodos={selecionarTodasDoFiltro} selecionandoTodos={selecionandoTodas}
+            rotuloPagina={pageSize === "all" ? "Selecionar todas" : "Selecionar esta página"}
+            nomePlural="demandas" todosOuTodas="todas" singularSel="selecionada" pluralSel="selecionadas"
+          />
         )}
 
         {/* Lista de Demandas */}

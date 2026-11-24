@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, Columns3, FolderInput, Trash2, UserRound, X } from "lucide-react";
+import { ArrowRightLeft, Columns3, FolderInput, Trash2, UserRound } from "lucide-react";
+import { BarraAcoesEmLote, classeBotaoLote } from "@/components/ui/BarraAcoesEmLote";
 import { EnviarParaQuadroDialog } from "./EnviarParaQuadroDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -108,23 +109,17 @@ export function AcoesEmLote({
 
   return (
     <>
-      {/* Barra fixa: acima da barra inferior no celular */}
-      <div className="fixed inset-x-0 bottom-[4.5rem] md:bottom-4 z-40 flex justify-center px-3 pointer-events-none">
-        <div role="toolbar" aria-label="Ações nas demandas selecionadas"
-          className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-2xl border bg-card/95 backdrop-blur-md shadow-forte px-3 py-2 max-w-full">
-          <span className="text-sm font-semibold tabular-nums pr-1">{n.toLocaleString("pt-BR")} selecionada{n === 1 ? "" : "s"}</span>
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("status")}><ArrowRightLeft className="h-3.5 w-3.5" /> Status</Button>
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("responsavel")}><UserRound className="h-3.5 w-3.5" /> Responsável</Button>
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("area")}><FolderInput className="h-3.5 w-3.5" /> Área</Button>
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setParaQuadro(true)}><Columns3 className="h-3.5 w-3.5" /> Quadro</Button>
-          {onLixeira && (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-destructive hover:text-destructive" onClick={onLixeira}>
-              <Trash2 className="h-3.5 w-3.5" /> Lixeira
-            </Button>
-          )}
-          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onLimpar} aria-label="Limpar seleção"><X className="h-4 w-4" /></Button>
-        </div>
-      </div>
+      <BarraAcoesEmLote total={n} singular="selecionada" plural="selecionadas" onLimpar={onLimpar}>
+        <Button size="sm" variant="outline" className={classeBotaoLote} onClick={() => abrir("status")}><ArrowRightLeft className="h-3.5 w-3.5" /> Status</Button>
+        <Button size="sm" variant="outline" className={classeBotaoLote} onClick={() => abrir("responsavel")}><UserRound className="h-3.5 w-3.5" /> Responsável</Button>
+        <Button size="sm" variant="outline" className={classeBotaoLote} onClick={() => abrir("area")}><FolderInput className="h-3.5 w-3.5" /> Área</Button>
+        <Button size="sm" variant="outline" className={classeBotaoLote} onClick={() => setParaQuadro(true)}><Columns3 className="h-3.5 w-3.5" /> Quadro</Button>
+        {onLixeira && (
+          <Button size="sm" variant="outline" className={`${classeBotaoLote} text-destructive hover:text-destructive`} onClick={onLixeira}>
+            <Trash2 className="h-3.5 w-3.5" /> Lixeira
+          </Button>
+        )}
+      </BarraAcoesEmLote>
 
       {paraQuadro && (
         <EnviarParaQuadroDialog aberto={paraQuadro} onAbertoChange={setParaQuadro} selecionadas={selecionadas} onConcluido={onLimpar} />
