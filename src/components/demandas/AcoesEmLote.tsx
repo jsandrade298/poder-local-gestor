@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, FolderInput, Trash2, UserRound, X } from "lucide-react";
+import { ArrowRightLeft, Columns3, FolderInput, Trash2, UserRound, X } from "lucide-react";
+import { EnviarParaQuadroDialog } from "./EnviarParaQuadroDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Ações em lote nas Demandas: mudar status, responsável ou área de várias
- * demandas de uma vez (e mandar para a lixeira, quando disponível).
+ * demandas de uma vez, enviar para um quadro (um cartão por demanda) e
+ * mandar para a lixeira.
  * Cada mudança fica registrada nas atividades da demanda, para o histórico
  * dizer o que aconteceu e quem fez.
  */
@@ -42,6 +44,7 @@ export function AcoesEmLote({
   const [valor, setValor] = useState("");
   const [registrar, setRegistrar] = useState(true);
   const [rodando, setRodando] = useState(false);
+  const [paraQuadro, setParaQuadro] = useState(false);
   const n = selecionadas.length;
   if (n === 0) return null;
 
@@ -113,6 +116,7 @@ export function AcoesEmLote({
           <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("status")}><ArrowRightLeft className="h-3.5 w-3.5" /> Status</Button>
           <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("responsavel")}><UserRound className="h-3.5 w-3.5" /> Responsável</Button>
           <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => abrir("area")}><FolderInput className="h-3.5 w-3.5" /> Área</Button>
+          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setParaQuadro(true)}><Columns3 className="h-3.5 w-3.5" /> Quadro</Button>
           {onLixeira && (
             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-destructive hover:text-destructive" onClick={onLixeira}>
               <Trash2 className="h-3.5 w-3.5" /> Lixeira
@@ -121,6 +125,10 @@ export function AcoesEmLote({
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onLimpar} aria-label="Limpar seleção"><X className="h-4 w-4" /></Button>
         </div>
       </div>
+
+      {paraQuadro && (
+        <EnviarParaQuadroDialog aberto={paraQuadro} onAbertoChange={setParaQuadro} selecionadas={selecionadas} onConcluido={onLimpar} />
+      )}
 
       <Dialog open={!!acao} onOpenChange={(v) => !rodando && !v && setAcao(null)}>
         <DialogContent className="max-w-md">
