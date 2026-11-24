@@ -25,6 +25,7 @@ import {
   CAMPOS_BUSCA_MUNICIPE, CAMPOS_PADRAO_MUNICIPE, CAMPOS_NUMERICOS_MUNICIPE,
 } from "@/lib/busca";
 import { CamposBuscaSelect } from "@/components/ui/CamposBuscaSelect";
+import { useParamTexto, useParamLista, useParamNumero, useLembrarFiltros } from "@/hooks/useParamUrl";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -38,27 +39,47 @@ import { formatPhoneDisplay, normalizePhone } from "@/lib/phoneUtils";
 
 export default function Municipes() {
   const { startDeletion, updateMunicipeStatus, state: deletionState, cancelDeletion } = useMunicipeDeletion();
-  const [searchTerm, setSearchTerm] = useState("");
+  // ── Filtros guardados no endereço da página (link compartilhável) ──
+  const [buscaNaUrl, setBuscaNaUrl] = useParamTexto("q");
+  const [searchTerm, setSearchTerm] = useState(buscaNaUrl);
   // Onde a busca procura o texto (lembrado por navegador)
   const [camposBusca, setCamposBuscaState] = useState<string[]>(() =>
     lerCamposSalvos("municipes", CAMPOS_PADRAO_MUNICIPE, CAMPOS_BUSCA_MUNICIPE)
   );
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(buscaNaUrl);
 
   // Debounce da busca para não disparar query a cada tecla
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    if (searchTerm === debouncedSearchTerm) return; // nada digitado
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setBuscaNaUrl(searchTerm);
+    }, 300);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [bairroFilter, setBairroFilter] = useState<string[]>([]);
-  const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
-  const [categoriaFilter, setCategoriaFilter] = useState<string[]>([]);
-  const [demandaFilter, setDemandaFilter] = useState("all");
-  const [demandaStatusFilter, setDemandaStatusFilter] = useState<string[]>([]);
-  const [orderBy, setOrderBy] = useState<
-    'nome_asc' | 'nome_desc' | 'mais_recente' | 'mais_antigo' | 'ultima_atividade' | 'mais_demandas'
-  >('nome_asc');
+
+  // Busca mudou no endereço por fora (voltar, link, filtros restaurados)
+  useEffect(() => {
+    if (buscaNaUrl !== debouncedSearchTerm) {
+      setSearchTerm(buscaNaUrl);
+      setDebouncedSearchTerm(buscaNaUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscaNaUrl]);
+
+  // Volta pelo menu com os últimos filtros usados nesta aba
+  useLembrarFiltros("municipes");
+  const [tagFilter, setTagFilter] = useParamLista("tag");
+  const [bairroFilter, setBairroFilter] = useParamLista("bairro");
+  const [cidadeFilter, setCidadeFilter] = useParamLista("cidade");
+  const [categoriaFilter, setCategoriaFilter] = useParamLista("categoria");
+  const [demandaFilter, setDemandaFilter] = useParamTexto("demandas", "all");
+  const [demandaStatusFilter, setDemandaStatusFilter] = useParamLista("statusDemanda");
+  type OrdemMunicipes = 'nome_asc' | 'nome_desc' | 'mais_recente' | 'mais_antigo' | 'ultima_atividade' | 'mais_demandas';
+  const [ordemUrl, setOrdemUrl] = useParamTexto("ordem", "nome_asc");
+  const orderBy = ordemUrl as OrdemMunicipes;
+  const setOrderBy = (v: OrdemMunicipes) => setOrdemUrl(v);
   const [selectedMunicipe, setSelectedMunicipe] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -89,8 +110,8 @@ export default function Municipes() {
   const [showConfirmDuplicatesDialog, setShowConfirmDuplicatesDialog] = useState(false);
   const [pendingRawTagNames, setPendingRawTagNames] = useState<Map<string, string>>(new Map()); // lowercase -> original
   // Estados para paginação
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useParamNumero("pagina", 1);
+  const [itemsPerPage, setItemsPerPage] = useParamNumero("porPagina", 50);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { statusList, getStatusLabel, getStatusColor } = useDemandaStatus();
@@ -571,6 +592,7 @@ export default function Municipes() {
     setCategoriaFilter([]);
     setDemandaFilter("all");
     setDemandaStatusFilter([]);
+    setBuscaNaUrl("");
     resetPage();
   };
 

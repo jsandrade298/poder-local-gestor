@@ -22,6 +22,7 @@ import {
   CAMPOS_BUSCA_DEMANDA, CAMPOS_PADRAO_DEMANDA, CAMPOS_NUMERICOS_DEMANDA,
 } from "@/lib/busca";
 import { CamposBuscaSelect } from "@/components/ui/CamposBuscaSelect";
+import { useParamTexto, useParamLista, useParamNumero, useDefinirParams, useLembrarFiltros } from "@/hooks/useParamUrl";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { EditDemandaDialog } from "@/components/forms/EditDemandaDialog";
 import { ViewDemandaDialog } from "@/components/forms/ViewDemandaDialog";
@@ -34,21 +35,34 @@ import { formatDateOnly, formatDateTime } from '@/lib/dateUtils';
 import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 
 export default function Demandas() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  // ── Filtros guardados no endereço da página (link compartilhável) ──
+  const [buscaNaUrl, setBuscaNaUrl] = useParamTexto("q");
+  const [searchTerm, setSearchTerm] = useState(buscaNaUrl);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(buscaNaUrl);
   // Onde a busca procura o texto (lembrado por navegador)
   const [camposBusca, setCamposBuscaState] = useState<string[]>(() =>
     lerCamposSalvos("demandas", CAMPOS_PADRAO_DEMANDA, CAMPOS_BUSCA_DEMANDA)
   );
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [areaFilter, setAreaFilter] = useState<string[]>([]);
-  const [municipeFilter, setMunicipeFilter] = useState<string[]>([]);
-  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
-  const [cidadeFilter, setCidadeFilter] = useState<string[]>([]);
-  const [bairroFilter, setBairroFilter] = useState<string[]>([]);
-  const [atrasoFilter, setAtrasoFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useParamLista("status");
+  const [areaFilter, setAreaFilterUrl] = useParamLista("area");
+  const [municipeFilter, setMunicipeFilter] = useParamLista("municipe");
+  const [responsavelFilter, setResponsavelFilterUrl] = useParamLista("responsavel");
+  const [cidadeFilter, setCidadeFilter] = useParamLista("cidade");
+  const [bairroFilter, setBairroFilter] = useParamLista("bairro");
+  const [atrasoFilter, setAtrasoFilter] = useParamTexto("atraso", "all");
+  const [dateFrom, setDateFrom] = useParamTexto("de");
+  const [dateTo, setDateTo] = useParamTexto("ate");
+  const definirParams = useDefinirParams();
+  // Links antigos traziam o nome da área/responsável só para exibição;
+  // ao mudar o filtro, o nome deixa de valer.
+  const setAreaFilter = (v: string[] | ((a: string[]) => string[])) => {
+    setAreaFilterUrl(v);
+    definirParams({ areaNome: null });
+  };
+  const setResponsavelFilter = (v: string[] | ((a: string[]) => string[])) => {
+    setResponsavelFilterUrl(v);
+    definirParams({ responsavelNome: null });
+  };
   const [selectedDemanda, setSelectedDemanda] = useState<any>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -62,16 +76,19 @@ export default function Demandas() {
   const [highlightedActivityId, setHighlightedActivityId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   
-  // Estados para paginação
-  const [pageSize, setPageSize] = useState<number | "all">(50);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Estados para paginação (no endereço também)
+  const [porPaginaUrl, setPorPaginaUrl] = useParamTexto("porPagina", "50");
+  const pageSize: number | "all" = porPaginaUrl === "todas" ? "all" : (Number(porPaginaUrl) || 50);
+  const setPageSize = (v: number | "all") => setPorPaginaUrl(v === "all" ? "todas" : String(v));
+  const [currentPage, setCurrentPage] = useParamNumero("pagina", 1);
 
   // Estado para ordenação
-  const [orderBy, setOrderBy] = useState<
-    'mais_recente' | 'mais_antigo' | 'titulo_asc' | 'titulo_desc' | 'prazo_proximo' | 'prioridade'
-  >('mais_recente');
+  type Ordem = 'mais_recente' | 'mais_antigo' | 'titulo_asc' | 'titulo_desc' | 'prazo_proximo' | 'prioridade';
+  const [ordemUrl, setOrdemUrl] = useParamTexto("ordem", "mais_recente");
+  const orderBy = ordemUrl as Ordem;
+  const setOrderBy = (v: Ordem) => setOrdemUrl(v);
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isConfigStatusOpen, setIsConfigStatusOpen] = useState(false);
@@ -81,11 +98,27 @@ export default function Demandas() {
 
   // Debounce do termo de busca — 600ms para não disparar query a cada tecla
   useEffect(() => {
+    if (searchTerm === debouncedSearchTerm) return; // nada digitado
     const timer = setTimeout(() => {
+      setCurrentPage(1);
       setDebouncedSearchTerm(searchTerm);
+      setBuscaNaUrl(searchTerm);
     }, 600);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
+
+  // Busca mudou no endereço por fora (voltar, link, filtros restaurados)
+  useEffect(() => {
+    if (buscaNaUrl !== debouncedSearchTerm) {
+      setSearchTerm(buscaNaUrl);
+      setDebouncedSearchTerm(buscaNaUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscaNaUrl]);
+
+  // Volta pelo menu com os últimos filtros usados nesta aba
+  useLembrarFiltros("demandas", ["id", "protocolo", "atividade", "areaNome", "responsavelNome"]);
 
   const setCamposBusca = (campos: string[]) => {
     setCamposBuscaState(campos);
@@ -231,25 +264,22 @@ export default function Demandas() {
   
   const demandas = demandasData.demandas;
   const totalDemandas = demandasData.total;
-  
+  const linkAberto = useRef<string | null>(null);
+
   useEffect(() => {
-    const atrasoParam = searchParams.get('atraso');
-    const areaParam = searchParams.get('area');
+    // Filtros (atraso, area, responsavel...) já são lidos direto do endereço.
+    // Aqui só abrimos a demanda indicada por ?id= ou ?protocolo= (links de
+    // notificação, do Início etc.), uma vez por link.
     const protocolo = searchParams.get('protocolo');
     const demandaId = searchParams.get('id');
     const atividadeId = searchParams.get('atividade');
-    const responsavelParam = searchParams.get('responsavel');
 
-    const hasAnyParam = atrasoParam || areaParam || protocolo || demandaId || responsavelParam;
-    if (!hasAnyParam) return;
+    if (!protocolo && !demandaId) { linkAberto.current = null; return; }
+    const chaveLink = `${protocolo || ''}|${demandaId || ''}|${atividadeId || ''}`;
+    if (linkAberto.current === chaveLink) return;
 
-    // Aplicar filtros vindos de outras páginas
-    if (atrasoParam) setAtrasoFilter(atrasoParam);
-    if (areaParam) setAreaFilter([areaParam]);
-    if (responsavelParam) setResponsavelFilter([responsavelParam]);
-
-    // Processar redirecionamento de notificação ou de outros locais
-    if ((protocolo || demandaId) && demandas.length > 0) {
+    if ((protocolo || demandaId) && !isLoading) {
+      linkAberto.current = chaveLink;
       const demanda = demandas?.find(d =>
         protocolo ? d.protocolo === protocolo : d.id === demandaId
       );
@@ -275,14 +305,7 @@ export default function Demandas() {
         })();
       }
     }
-
-    // Limpar apenas filtros da URL (area, atraso, responsavel)
-    // NÃO limpa protocolo/id — o link fica compartilhável e é limpo ao fechar o modal
-    const needsDemandas = protocolo || demandaId;
-    if (!needsDemandas) {
-      setSearchParams({}, { replace: true });
-    }
-  }, [searchParams, demandas, setSearchParams]);
+  }, [searchParams, demandas, isLoading]);
 
 
   const { data: areas = [] } = useQuery({
@@ -472,9 +495,13 @@ export default function Demandas() {
   const paginatedDemandas = filteredDemandas;
   const totalPages = pageSize === "all" ? 1 : Math.ceil(totalDemandas / (pageSize as number));
 
-  // Resetar página quando mudar filtros ou pageSize
+  // Resetar página quando mudar filtros ou pageSize — mas não ao abrir a tela,
+  // senão um link com ?pagina=3 voltaria sempre para a página 1.
+  const filtrosMontados = useRef(false);
   useEffect(() => {
+    if (!filtrosMontados.current) { filtrosMontados.current = true; return; }
     setCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, dateFrom, dateTo, pageSize, orderBy]);
 
 
@@ -522,9 +549,10 @@ export default function Demandas() {
   const handleViewDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
     setIsViewDialogOpen(true);
-    // Atualizar URL com protocolo para link compartilhável
+    // Protocolo no endereço = link compartilhável; mantém os filtros
     if (demanda.protocolo) {
-      setSearchParams({ protocolo: demanda.protocolo }, { replace: true });
+      linkAberto.current = `${demanda.protocolo}||`;
+      definirParams({ protocolo: demanda.protocolo, id: null, atividade: null });
     }
   };
 
@@ -556,6 +584,8 @@ export default function Demandas() {
     setAtrasoFilter("all");
     setDateFrom("");
     setDateTo("");
+    setBuscaNaUrl("");
+    setCurrentPage(1);
   };
 
   // Contagem de filtros ativos (para badge mobile)
@@ -2006,8 +2036,8 @@ export default function Demandas() {
             onOpenChange={(open) => {
               setIsViewDialogOpen(open);
               if (!open) {
-                // Limpar protocolo da URL ao fechar o modal
-                setSearchParams({}, { replace: true });
+                // Ao fechar, tira só a demanda do endereço; os filtros ficam
+                definirParams({ protocolo: null, id: null, atividade: null });
               }
             }}
             onEdit={handleEditFromView}
