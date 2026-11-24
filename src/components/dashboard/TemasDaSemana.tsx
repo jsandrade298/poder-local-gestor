@@ -10,6 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { FEATURES } from "@/lib/featureFlags";
 import { useToast } from "@/hooks/use-toast";
 
 interface TemaItem {
@@ -285,7 +286,7 @@ export function TemasDaSemana() {
                         <div className="mt-2 ml-14 space-y-1.5">
                           <p className="text-[12px] text-muted-foreground leading-relaxed">{s.justificativa}</p>
                           <p className="text-[11px] text-muted-foreground/60 italic">{s.base_dados}</p>
-                          <button onClick={() => navegarAssessor("redigir",
+                          {FEATURES.assessorIA && <button onClick={() => navegarAssessor("redigir",
                             `Preciso redigir uma ${s.tipo} com base na seguinte análise do gabinete:\n\n` +
                             `📋 PROPOSITURA SUGERIDA: ${s.titulo}\n` +
                             `📊 JUSTIFICATIVA: ${s.justificativa}\n` +
@@ -294,7 +295,7 @@ export function TemasDaSemana() {
                           )}
                             className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-primary hover:underline mt-0.5">
                             <Gavel className="w-3 h-3" /> Redigir no Assessor IA
-                          </button>
+                          </button>}
                         </div>
                       )}
                     </div>
@@ -324,7 +325,7 @@ export function TemasDaSemana() {
                     <TooltipContent side="top" className="max-w-[280px] text-[11px]">{rel.observacoes}</TooltipContent>
                   </Tooltip>
                 )}
-                <button onClick={() => {
+                {FEATURES.assessorIA && <button onClick={() => {
                   const temas = rel.temas_prioritarios?.slice(0, 3).map((t: any) =>
                     `• ${t.nome} (${t.quantidade} dem.) — ${t.descricao}`).join("\n") ?? "";
                   const sugestoes = rel.sugestoes_legislativas?.slice(0, 2).map((s: any) =>
@@ -339,7 +340,7 @@ export function TemasDaSemana() {
                 }}
                   className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                   <Sparkles className="w-3 h-3" /> Aprofundar no Assessor IA
-                </button>
+                </button>}
               </div>
             </>
           )}

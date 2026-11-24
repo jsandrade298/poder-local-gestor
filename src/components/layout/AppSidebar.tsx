@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { useAuth } from "@/contexts/AuthContext";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   Sidebar,
   SidebarContent,
@@ -31,22 +32,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const menuItems = [
+type MenuItem = { title: string; url: string; icon: typeof Home; enabled?: boolean };
+
+const allMenuItems: MenuItem[] = [
   { title: "Visão Geral", url: "/", icon: Home },
   { title: "Demandas", url: "/demandas", icon: FileText },
   { title: "Mapa", url: "/mapa", icon: MapPin },
   { title: "Munícipes", url: "/municipes", icon: Users },
   { title: "Kanban", url: "/kanban", icon: Columns },
-  { title: "Plano de Ação", url: "/plano-acao", icon: Target },
+  { title: "Plano de Ação", url: "/plano-acao", icon: Target, enabled: FEATURES.planoAcao },
   { title: "Solicitar Agenda", url: "/solicitar-agenda", icon: Calendar },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
-  { title: "Assessor IA", url: "/assessor-ia", icon: Bot },
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, enabled: FEATURES.disparosWhatsApp },
+  { title: "Assessor IA", url: "/assessor-ia", icon: Bot, enabled: FEATURES.assessorIA },
   { title: "Tags", url: "/tags", icon: Tags },
   { title: "Categorias", url: "/categorias", icon: Layers },
   { title: "Áreas", url: "/areas", icon: Building2 },
   { title: "Usuários", url: "/usuarios", icon: UserCheck },
   { title: "Configurações", url: "/config", icon: Settings },
 ];
+
+const menuItems = allMenuItems.filter((item) => item.enabled !== false);
 
 export function AppSidebar() {
   const { state } = useSidebar();

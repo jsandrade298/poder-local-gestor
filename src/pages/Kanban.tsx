@@ -26,6 +26,13 @@ import { BoardGallery } from "@/components/kanban/BoardGallery";
 import { BoardView } from "@/components/kanban/BoardView";
 import { CreateBoardDialog } from "@/components/kanban/CreateBoardDialog";
 import { KanbanBoard } from "@/hooks/useKanbanBoards";
+import { FEATURES } from "@/lib/featureFlags";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import {
+  ConfirmarStatusDemandaDialog,
+  MovimentoDemandaKanban,
+  sugerirStatusParaColuna,
+} from "@/components/kanban/ConfirmarStatusDemandaDialog";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -46,6 +53,7 @@ interface KanbanItem {
   areas?: { nome: string };
   municipes?: { nome: string };
   responsavel_id?: string;
+  municipe_id?: string | null;
   tipo?: 'demanda' | 'tarefa' | 'rota';
   tarefa_responsavel_id?: string;
   eixo_id?: string;
@@ -94,6 +102,10 @@ export default function Kanban() {
   const [activeTab, setActiveTab] = useState<'pessoal' | 'projetos'>('pessoal');
   const [selectedBoard, setSelectedBoard] = useState<KanbanBoard | null>(null);
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
+
+  // ── Confirmação de status ao mover demanda de coluna ──
+  const { statusList } = useDemandaStatus();
+  const [movimentoDemanda, setMovimentoDemanda] = useState<MovimentoDemandaKanban | null>(null);
 
   const processedTaskIdRef = useRef<string | null>(null);
   const isClosingModalRef = useRef(false);
@@ -685,11 +697,31 @@ export default function Kanban() {
     const item = demandas.find(d => d.id === draggableId);
     if (!item) { isDraggingRef.current = false; return; }
 
+    const tipo = item.tipo || 'demanda';
     updatePositionMutation.mutate({
       itemId: draggableId,
       newPosition: destination.droppableId,
-      tipo: item.tipo || 'demanda'
+      tipo
     });
+
+    // Demanda mudou de coluna: perguntar se o status da demanda também deve mudar.
+    // Não pergunta quando a sugestão já é o status atual (nada a sincronizar).
+    if (tipo === 'demanda' && destination.droppableId !== source.droppableId) {
+      const sugestao = sugerirStatusParaColuna(destination.droppableId, statusList);
+      if (sugestao && sugestao !== item.status) {
+        setMovimentoDemanda({
+          demanda: {
+            id: item.id,
+            titulo: item.titulo,
+            protocolo: item.protocolo,
+            status: item.status,
+            municipe_id: item.municipe_id,
+          },
+          colunaDestino: destination.droppableId,
+          colunaDestinoTitulo: statusColumns.find(c => c.id === destination.droppableId)?.title || destination.droppableId,
+        });
+      }
+    }
   };
 
   const getDemandsByStatus = (kanbanPosition: string) => {
@@ -865,13 +897,15 @@ export default function Kanban() {
                 Adicionar Demanda
               </Button>
 
-              <Button 
-                onClick={() => setIsAdicionarRotasDialogOpen(true)} 
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Route className="h-4 w-4" />
-                Adicionar Rota
-              </Button>
+              {FEATURES.rotas && (
+                <Button
+                  onClick={() => setIsAdicionarRotasDialogOpen(true)}
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <Route className="h-4 w-4" />
+                  Adicionar Rota
+                </Button>
+              )}
               
               <AdicionarDemandasKanbanDialog 
                 open={isAdicionarDialogOpen}
@@ -929,10 +963,12 @@ export default function Kanban() {
                     <FileText className="h-4 w-4 mr-2" />
                     Adicionar Demanda
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsAdicionarRotasDialogOpen(true)}>
-                    <Route className="h-4 w-4 mr-2" />
-                    Adicionar Rota
-                  </DropdownMenuItem>
+                  {FEATURES.rotas && (
+                    <DropdownMenuItem onClick={() => setIsAdicionarRotasDialogOpen(true)}>
+                      <Route className="h-4 w-4 mr-2" />
+                      Adicionar Rota
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               <AdicionarTarefaDialog kanbanType={selectedUser} open={isAdicionarTarefaOpen} onOpenChange={setIsAdicionarTarefaOpen} />
@@ -1251,6 +1287,11 @@ export default function Kanban() {
           rota={selectedRota}
           open={isViewRotaDialogOpen}
           onOpenChange={setIsViewRotaDialogOpen}
+        />
+
+        <ConfirmarStatusDemandaDialog
+          movimento={movimentoDemanda}
+          onClose={() => setMovimentoDemanda(null)}
         />
         </>
         )}

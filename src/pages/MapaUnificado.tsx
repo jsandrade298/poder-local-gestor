@@ -84,6 +84,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { FEATURES } from '@/lib/featureFlags';
 
 export default function MapaUnificado() {
   // Hook de dados
@@ -968,15 +969,17 @@ export default function MapaUnificado() {
             </div>
 
             <Tabs defaultValue="filtros" className="flex-1 flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-3 px-4 pt-2 flex-shrink-0">
+              <TabsList className={`grid w-full ${FEATURES.rotas ? 'grid-cols-3' : 'grid-cols-2'} px-4 pt-2 flex-shrink-0`}>
                 <TabsTrigger value="filtros" className="text-xs">
                   <Filter className="h-3 w-3 mr-1" />
                   Filtros
                 </TabsTrigger>
-                <TabsTrigger value="rotas" className="text-xs">
-                  <Route className="h-3 w-3 mr-1" />
-                  Rotas
-                </TabsTrigger>
+                {FEATURES.rotas && (
+                  <TabsTrigger value="rotas" className="text-xs">
+                    <Route className="h-3 w-3 mr-1" />
+                    Rotas
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="analise" className="text-xs">
                   <BarChart3 className="h-3 w-3 mr-1" />
                   Análise

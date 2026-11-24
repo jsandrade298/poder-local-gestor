@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { MunicipeDetailsDialog } from "./MunicipeDetailsDialog";
+import { FEATURES } from "@/lib/featureFlags";
 
 interface ViewDemandaDialogProps {
   demanda: any;
@@ -136,11 +137,11 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
         `)
         .eq('demanda_id', demanda.id)
         .order('data_atividade', { ascending: true });
-      
+
       if (error) throw error;
       return data || [];
     },
-    enabled: !!demanda?.id && open
+    enabled: FEATURES.assessorIA && !!demanda?.id && open
   });
 
   if (!demanda) return null;
@@ -355,6 +356,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       {linkCopied ? <Check className="h-4 w-4 text-green-600" /> : <Link2 className="h-4 w-4" />}
                       {linkCopied ? "Copiado!" : "Copiar link"}
                     </Button>
+                    {FEATURES.assessorIA && (
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button
@@ -414,6 +416,7 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                         </div>
                       </PopoverContent>
                     </Popover>
+                    )}
                     {onEdit && (
                       <Button
                         variant="outline"

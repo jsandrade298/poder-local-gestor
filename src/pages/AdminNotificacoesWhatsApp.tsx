@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FEATURES } from "@/lib/featureFlags";
 import {
   Select,
   SelectContent,
@@ -405,15 +406,17 @@ export default function AdminNotificacoesWhatsApp() {
 
       {/* Tabs */}
       <Tabs defaultValue="notificacoes">
-        <TabsList className="grid grid-cols-2 w-full">
+        <TabsList className={`grid w-full ${FEATURES.assessorIAWhatsApp ? "grid-cols-2" : "grid-cols-1"}`}>
           <TabsTrigger value="notificacoes">
             <Bell className="h-4 w-4 mr-2" />
             Notificações
           </TabsTrigger>
-          <TabsTrigger value="assessor">
-            <Bot className="h-4 w-4 mr-2" />
-            Assessor Virtual
-          </TabsTrigger>
+          {FEATURES.assessorIAWhatsApp && (
+            <TabsTrigger value="assessor">
+              <Bot className="h-4 w-4 mr-2" />
+              Assessor Virtual
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ══════════════════════════════════════════════════ */}
