@@ -149,7 +149,8 @@ export function useExtrasDoQuadro(boardId: string | undefined) {
       const colab = new Map<string, string[]>();
       (c as any[]).forEach((r) => colab.set(r.card_id, [...(colab.get(r.card_id) || []), r.usuario_id]));
       const dems = new Map<string, DemandaNoCartao[]>();
-      (d as any[]).forEach((r) => dems.set(r.card_id, [...(dems.get(r.card_id) || []), {
+      // Demanda na lixeira vem sem dados (a leitura a esconde): não mostra no cartão
+      (d as any[]).filter((r) => r.demandas).forEach((r) => dems.set(r.card_id, [...(dems.get(r.card_id) || []), {
         id: r.demanda_id, protocolo: r.demandas?.protocolo, titulo: r.demandas?.titulo,
         status: r.demandas?.status, municipe_id: r.demandas?.municipe_id ?? null,
       }]));

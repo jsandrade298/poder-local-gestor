@@ -6,6 +6,8 @@ import {
   MoreHorizontal, Settings2, UserPlus, Eye, Pencil, Archive, ArchiveRestore, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -28,7 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useKanbanBoards, useKanbanBoardColunas, useKanbanBoardCards, KanbanBoardCard } from "@/hooks/useKanbanBoards";
 import { useBoardCardCounts } from "@/hooks/useBoardCardExtras";
 import {
-  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal, useCartoesArquivados,
+  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal, useCartoesArquivados, useProjetosArquivados,
   etapaComoKanban, nomeDoQuadro,
 } from "@/hooks/useQuadros";
 import { normalizarBusca } from "@/lib/busca";
@@ -47,7 +49,20 @@ export default function QuadroProjeto() {
   const uid = user?.id || "";
 
   const { boards, isLoading: carregandoQuadros } = useKanbanBoards();
-  const board = boards.find((b) => b.id === boardId);
+  const ativo = boards.find((b) => b.id === boardId);
+  // Projeto arquivado: abre só para consulta (a lista de quadros traz só os ativos)
+  const arquivadoQ = useQuery({
+    queryKey: ["quadro-arquivado", boardId],
+    enabled: !!boardId && !carregandoQuadros && !ativo,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("kanban_boards") as any).select("*").eq("id", boardId!).maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+  const board = ativo ?? (arquivadoQ.data?.arquivado_em ? arquivadoQ.data : undefined);
+  const soConsulta = !!board?.arquivado_em;
+  const { desarquivar } = useProjetosArquivados();
   const { colunas, isLoading: carregandoColunas } = useKanbanBoardColunas(boardId);
   const { cards, isLoading: carregandoCards, createCard, moveCard, archiveCard, deleteCard } = useKanbanBoardCards(boardId);
   const arquivados = useCartoesArquivados(boardId);
@@ -79,9 +94,9 @@ export default function QuadroProjeto() {
   // Quem edita o quadro: pessoal = só o dono; projeto = membros.
   // (O banco garante o mesmo.) Responsável e colaboradores editam o próprio cartão.
   const tipo = board?.tipo ?? "projeto";
-  const editavel = tipo === "pessoal" ? board?.dono_id === uid : tipo === "equipe" || souMembro;
+  const editavel = !soConsulta && (tipo === "pessoal" ? board?.dono_id === uid : tipo === "equipe" || souMembro);
   const podeEditar = (c: KanbanBoardCard) =>
-    editavel || c.responsavel_id === uid || (extras.colab.get(c.id) || []).includes(uid);
+    !soConsulta && (editavel || c.responsavel_id === uid || (extras.colab.get(c.id) || []).includes(uid));
   const dono = board?.dono_id ? porId.get(board.dono_id) : undefined;
   const nome = board ? nomeDoQuadro(board, uid) : "";
 
@@ -188,7 +203,7 @@ export default function QuadroProjeto() {
 
   useEffect(() => { if (params.get("membros") === "1") setMembrosAberto(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (carregandoQuadros || carregandoColunas || carregandoCards) {
+  if (carregandoQuadros || carregandoColunas || carregandoCards || (!ativo && arquivadoQ.isLoading)) {
     return <div className="space-y-4"><Skeleton className="h-12 w-72" /><div className="flex gap-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-80 w-72" />)}</div></div>;
   }
   if (!board) {
@@ -222,7 +237,7 @@ export default function QuadroProjeto() {
           {editavel && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setColunasAberto(true)} aria-label="Etapas"><Settings2 className="h-4 w-4" /><span className="hidden sm:inline">Etapas</span></Button>}
           {editavel && colunas[0] && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDemandaAberto(true)} aria-label="Vincular demanda"><Link2 className="h-4 w-4" /><span className="hidden sm:inline">Demanda</span></Button>}
           {editavel && colunas[0] && <Button size="sm" className="gap-1.5" onClick={() => { setNovoNaColuna(colunas[0].id); setAgrupar("etapa"); }}><Plus className="h-4 w-4" /> Cartão</Button>}
-          <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} onArquivado={() => navigate("/quadros")} className="border" />
+          {!soConsulta && <AcoesProjeto board={board} podeEditar={editavel} onExcluido={() => navigate("/quadros", { replace: true })} onArquivado={() => navigate("/quadros")} className="border" />}
         </div>
       </div>
 
@@ -235,7 +250,23 @@ export default function QuadroProjeto() {
         {board.descricao && tipo === "projeto" && <span className="truncate max-w-full">· {board.descricao}</span>}
       </div>
 
-      {!editavel && (
+      {soConsulta && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+          <Archive className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+          <span className="text-sm flex-1 min-w-[220px]">
+            Projeto arquivado em {new Date(board.arquivado_em).toLocaleDateString("pt-BR")}: dá para consultar tudo, mas nada pode ser mudado.
+            {!souMembro && " Só os membros desarquivam."}
+          </span>
+          {souMembro && (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={desarquivar.isPending}
+              onClick={() => desarquivar.mutate(board.id, { onSuccess: () => arquivadoQ.refetch() })}>
+              <ArchiveRestore className="h-4 w-4" /> Desarquivar
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!editavel && !soConsulta && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-violet-50 dark:bg-violet-950/30 px-4 py-3">
           <Lock className="h-4 w-4 text-violet-700 dark:text-violet-300" />
           {tipo === "pessoal" ? (

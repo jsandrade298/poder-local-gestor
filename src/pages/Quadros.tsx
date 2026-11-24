@@ -237,7 +237,7 @@ export default function Quadros() {
                 {arquivados.data!.map((b: any) => (
                   <div key={b.id} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: b.cor || "hsl(var(--muted-foreground))" }} />
-                    <span className="text-sm flex-1 min-w-0 truncate">{b.nome}</span>
+                    <Link to={`/quadros/${b.id}`} className="text-sm flex-1 min-w-0 truncate hover:underline" title="Abrir para consultar">{b.nome}</Link>
                     <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">arquivado em {new Date(b.arquivado_em).toLocaleDateString("pt-BR")}</span>
                     {b.membros.includes(uid) ? (
                       <Button size="sm" variant="outline" className="h-8 gap-1 shrink-0" disabled={arquivados.desarquivar.isPending}

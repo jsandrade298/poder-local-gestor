@@ -19,4 +19,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Bibliotecas em arquivos próprios: mudam pouco, então o celular
+        // guarda no cache e, a cada atualização do app, baixa só o código novo.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          supabase: ["@supabase/supabase-js"],
+          consultas: ["@tanstack/react-query"],
+        },
+      },
+    },
+  },
 }));

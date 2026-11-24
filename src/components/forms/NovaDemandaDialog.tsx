@@ -19,12 +19,14 @@ import { useAuth } from "@/contexts/AuthContext";
 interface NovaDemandaDialogProps {
   /** Botão que abre o diálogo. Sem ele, usa o botão padrão "Nova Demanda". */
   trigger?: React.ReactNode;
+  /** Já abre ao aparecer (usado quando o diálogo é carregado só no primeiro toque). */
+  abrirAoMontar?: boolean;
 }
 
-export function NovaDemandaDialog({ trigger }: NovaDemandaDialogProps = {}) {
+export function NovaDemandaDialog({ trigger, abrirAoMontar }: NovaDemandaDialogProps = {}) {
   const { user, roleNoTenant } = useAuth();
   const isRepresentante = roleNoTenant === "representante";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!abrirAoMontar);
   const [files, setFiles] = useState<File[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null; fonte: string | null }>({ lat: null, lng: null, fonte: null });

@@ -17,6 +17,11 @@ import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { ConfigurarStatusDialog } from "@/components/forms/ConfigurarStatusDialog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AcoesEmLote, type DemandaSelecionada } from "@/components/demandas/AcoesEmLote";
+import { LixeiraDemandas, moverParaLixeira, useContagemLixeira, DIAS_LIXEIRA } from "@/components/demandas/LixeiraDemandas";
+import { usePessoasGabinete } from "@/hooks/useQuadros";
+import { fetchAll } from "@/lib/fetchAll";
 import {
   aplicarBusca, lerCamposSalvos, salvarCampos, TODOS_OS_CAMPOS,
   CAMPOS_BUSCA_DEMANDA, CAMPOS_PADRAO_DEMANDA, CAMPOS_NUMERICOS_DEMANDA,
@@ -143,106 +148,108 @@ export default function Demandas() {
   const cidadeKey = cidadeFilter.join(",");
   const bairroKey = bairroFilter.join(",");
 
+  // Consulta com todos os filtros da tela (lista, exportação e seleção em lote)
+  // Construir query com filtros server-side
+  const buildQuery = (colunas = `
+            *,
+            areas(nome),
+            municipes(nome)
+          `) => {
+    let query = supabase
+      .from('demandas')
+      .select(colunas, { count: 'exact' });
+
+    // Ordenação dinâmica
+    switch (orderBy) {
+      case 'mais_antigo':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'sem_alteracao':
+        // Última alteração mais antiga primeiro
+        query = query.order('updated_at', { ascending: true });
+        break;
+      case 'titulo_asc':
+        query = query.order('titulo', { ascending: true });
+        break;
+      case 'titulo_desc':
+        query = query.order('titulo', { ascending: false });
+        break;
+      case 'prazo_proximo':
+        // Prazo mais próximo primeiro (nulls por último)
+        query = query.order('data_prazo', { ascending: true, nullsFirst: false });
+        break;
+      case 'prioridade':
+        // Prioridade é text, então ordenamos por urgente > alta > media > baixa via created_at como fallback
+        // Supabase PostgREST não suporta CASE diretamente, então usamos created_at como secundário
+        query = query.order('prioridade', { ascending: false }).order('created_at', { ascending: false });
+        break;
+      case 'mais_recente':
+      default:
+        query = query.order('created_at', { ascending: false });
+        break;
+    }
+
+    // Filtros: delegar ao PostgreSQL
+    if (statusFilter.length > 0) query = query.in('status', statusFilter);
+    if (areaFilter.length > 0) query = query.in('area_id', areaFilter);
+    if (municipeFilter.length > 0) query = query.in('municipe_id', municipeFilter);
+    if (responsavelFilter.length > 0) query = query.in('responsavel_id', responsavelFilter);
+    if (cidadeFilter.length > 0) query = query.in('cidade', cidadeFilter);
+    if (bairroFilter.length > 0) query = query.in('bairro', bairroFilter);
+
+    // Filtro de atraso
+    // (antes usava uma lista fixa de status que não incluía "concluida"
+    //  e incluía "devolvido": concluídas apareciam como atrasadas)
+    if (atrasoFilter !== "all") {
+      const todayStr = hojeLocalISO();
+      query = query
+        .not('status', 'in', filtroFinais)
+        .not('data_prazo', 'is', null);
+      
+      if (atrasoFilter === "overdue") {
+        query = query.lt('data_prazo', todayStr);
+      } else if (["30", "60", "90"].includes(atrasoFilter)) {
+        const minDays = parseInt(atrasoFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - minDays);
+        query = query.lt('data_prazo', cutoffDate.toISOString().split('T')[0]);
+      }
+    }
+
+    // Atalho do Início (sempre só demandas abertas)
+    if (situacao) {
+      query = query.not('status', 'in', filtroFinais);
+      if (situacao.tipo === "sem-responsavel") {
+        query = query.is('responsavel_id', null);
+      } else if (situacao.tipo === "vence") {
+        const hojeStr = hojeLocalISO();
+        query = query.gte('data_prazo', hojeStr).lte('data_prazo', somarDiasISO(hojeStr, situacao.min));
+      } else if (situacao.tipo === "parada") {
+        query = query.lt('updated_at', diasAtrasISO(situacao.min));
+        if (situacao.max) query = query.gte('updated_at', diasAtrasISO(situacao.max));
+      }
+    }
+
+    // Filtro de período (data de criação)
+    if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
+    if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
+
+    // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
+    // Números são procurados também no protocolo, mesmo sem marcar.
+    query = aplicarBusca(query, debouncedSearchTerm, {
+      campos: camposBusca,
+      camposNumericos: CAMPOS_NUMERICOS_DEMANDA,
+    });
+
+    return query;
+  };
+
   // Buscar demandas com paginação eficiente
   const { data: demandasData = { demandas: [], total: 0 }, isLoading, isError: isErrorDemandas, refetch: refetchDemandas, isFetching: isFetchingDemandas } = useQuery({
     queryKey: ['demandas', pageSize, currentPage, statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, situacaoFilter, filtroFinais, dateFrom, dateTo, debouncedSearchTerm, camposBusca.join(","), orderBy],
     // Atraso e "situação" dependem de saber quais status são finais
     enabled: (atrasoFilter === "all" && !situacao) || statusList.length > 0,
     queryFn: async () => {
-      // Construir query com filtros server-side
-      const buildQuery = () => {
-        let query = supabase
-          .from('demandas')
-          .select(`
-            *,
-            areas(nome),
-            municipes(nome)
-          `, { count: 'exact' });
-
-        // Ordenação dinâmica
-        switch (orderBy) {
-          case 'mais_antigo':
-            query = query.order('created_at', { ascending: true });
-            break;
-          case 'sem_alteracao':
-            // Última alteração mais antiga primeiro
-            query = query.order('updated_at', { ascending: true });
-            break;
-          case 'titulo_asc':
-            query = query.order('titulo', { ascending: true });
-            break;
-          case 'titulo_desc':
-            query = query.order('titulo', { ascending: false });
-            break;
-          case 'prazo_proximo':
-            // Prazo mais próximo primeiro (nulls por último)
-            query = query.order('data_prazo', { ascending: true, nullsFirst: false });
-            break;
-          case 'prioridade':
-            // Prioridade é text, então ordenamos por urgente > alta > media > baixa via created_at como fallback
-            // Supabase PostgREST não suporta CASE diretamente, então usamos created_at como secundário
-            query = query.order('prioridade', { ascending: false }).order('created_at', { ascending: false });
-            break;
-          case 'mais_recente':
-          default:
-            query = query.order('created_at', { ascending: false });
-            break;
-        }
-
-        // Filtros: delegar ao PostgreSQL
-        if (statusFilter.length > 0) query = query.in('status', statusFilter);
-        if (areaFilter.length > 0) query = query.in('area_id', areaFilter);
-        if (municipeFilter.length > 0) query = query.in('municipe_id', municipeFilter);
-        if (responsavelFilter.length > 0) query = query.in('responsavel_id', responsavelFilter);
-        if (cidadeFilter.length > 0) query = query.in('cidade', cidadeFilter);
-        if (bairroFilter.length > 0) query = query.in('bairro', bairroFilter);
-
-        // Filtro de atraso
-        // (antes usava uma lista fixa de status que não incluía "concluida"
-        //  e incluía "devolvido": concluídas apareciam como atrasadas)
-        if (atrasoFilter !== "all") {
-          const todayStr = hojeLocalISO();
-          query = query
-            .not('status', 'in', filtroFinais)
-            .not('data_prazo', 'is', null);
-          
-          if (atrasoFilter === "overdue") {
-            query = query.lt('data_prazo', todayStr);
-          } else if (["30", "60", "90"].includes(atrasoFilter)) {
-            const minDays = parseInt(atrasoFilter);
-            const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - minDays);
-            query = query.lt('data_prazo', cutoffDate.toISOString().split('T')[0]);
-          }
-        }
-
-        // Atalho do Início (sempre só demandas abertas)
-        if (situacao) {
-          query = query.not('status', 'in', filtroFinais);
-          if (situacao.tipo === "sem-responsavel") {
-            query = query.is('responsavel_id', null);
-          } else if (situacao.tipo === "vence") {
-            const hojeStr = hojeLocalISO();
-            query = query.gte('data_prazo', hojeStr).lte('data_prazo', somarDiasISO(hojeStr, situacao.min));
-          } else if (situacao.tipo === "parada") {
-            query = query.lt('updated_at', diasAtrasISO(situacao.min));
-            if (situacao.max) query = query.gte('updated_at', diasAtrasISO(situacao.max));
-          }
-        }
-
-        // Filtro de período (data de criação)
-        if (dateFrom) query = query.gte('created_at', dateFrom + 'T00:00:00');
-        if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59');
-
-        // Busca nos campos escolhidos — sem acento, palavras em qualquer ordem.
-        // Números são procurados também no protocolo, mesmo sem marcar.
-        query = aplicarBusca(query, debouncedSearchTerm, {
-          campos: camposBusca,
-          camposNumericos: CAMPOS_NUMERICOS_DEMANDA,
-        });
-
-        return query;
-      };
 
       if (pageSize === "all") {
         // Buscar todas com filtros server-side (em lotes eficientes)
@@ -528,41 +535,53 @@ export default function Demandas() {
   useEffect(() => {
     if (!filtrosMontados.current) { filtrosMontados.current = true; return; }
     setCurrentPage(1);
+    setSelecao(new Map());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusKey, areaKey, municipeKey, responsavelKey, cidadeKey, bairroKey, atrasoFilter, situacaoFilter, dateFrom, dateTo, pageSize, orderBy]);
 
 
   // Mutação para excluir demanda
   const [demandaExcluir, setDemandaExcluir] = useState<any | null>(null);
-  const deleteMutation = useMutation({
-    mutationFn: async (demandaId: string) => {
-      const { data: anexos } = await supabase
-        .from('anexos')
-        .select('url_arquivo')
-        .eq('demanda_id', demandaId);
 
-      // Anexos, atividades, etiquetas e vínculos com cartões saem em cascata
-      const { data: apagadas, error } = await (supabase
-        .from('demandas') as any)
-        .delete()
-        .eq('id', demandaId)
-        .select('id');
-      if (error) throw error;
-      if (!apagadas?.length) throw new Error('sem permissão para excluir esta demanda');
-
-      // Só depois de a demanda sair, os arquivos
-      const caminhos = (anexos || []).map((a: any) => a.url_arquivo).filter(Boolean);
-      if (caminhos.length > 0) await supabase.storage.from('demanda-anexos').remove(caminhos);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['demandas'] });
-      toast.success("Demanda excluída com sucesso!");
-    },
-    onError: (error) => {
-      console.error('Erro ao excluir demanda:', error);
-      toast.error("Erro ao excluir demanda: " + error.message);
-    }
+  // ── Seleção para ações em lote ──
+  const [selecao, setSelecao] = useState<Map<string, DemandaSelecionada>>(new Map());
+  const [selecionandoTodas, setSelecionandoTodas] = useState(false);
+  const pessoasAtivas = usePessoasGabinete().pessoas;
+  const alternarSelecao = (d: any) => setSelecao((m) => {
+    const n = new Map(m);
+    if (n.has(d.id)) n.delete(d.id); else n.set(d.id, { id: d.id, protocolo: d.protocolo, titulo: d.titulo, status: d.status });
+    return n;
   });
+  const paginaToda = paginatedDemandas.length > 0 && paginatedDemandas.every((d: any) => selecao.has(d.id));
+  const alternarPagina = () => setSelecao((m) => {
+    const n = new Map(m);
+    if (paginaToda) paginatedDemandas.forEach((d: any) => n.delete(d.id));
+    else paginatedDemandas.forEach((d: any) => n.set(d.id, { id: d.id, protocolo: d.protocolo, titulo: d.titulo, status: d.status }));
+    return n;
+  });
+  const selecionarTodasDoFiltro = async () => {
+    setSelecionandoTodas(true);
+    try {
+      const todas = await fetchAll((de, ate) => buildQuery("id, protocolo, titulo, status").range(de, ate) as any);
+      setSelecao(new Map((todas as any[]).map((d) => [d.id, { id: d.id, protocolo: d.protocolo, titulo: d.titulo, status: d.status }])));
+    } catch (e: any) {
+      toast.error("Não foi possível selecionar todas: " + e.message);
+    } finally {
+      setSelecionandoTodas(false);
+    }
+  };
+  // Excluir = mandar para a lixeira (30 dias para restaurar)
+  const atualizarAposLixeira = () => {
+    queryClient.invalidateQueries({ queryKey: ['demandas'] });
+    queryClient.invalidateQueries({ queryKey: ['lixeira-demandas'] });
+  };
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => moverParaLixeira(ids, atualizarAposLixeira),
+    onError: (error: any) => toast.error("Não foi possível excluir: " + error.message),
+  });
+  const [lixeiraAberta, setLixeiraAberta] = useState(false);
+  const [confirmarLoteLixeira, setConfirmarLoteLixeira] = useState(false);
+  const lixeira = useContagemLixeira();
 
   const handleViewDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
@@ -587,7 +606,7 @@ export default function Demandas() {
   };
 
   const handleDeleteDemanda = (demandaId: string) => {
-    deleteMutation.mutate(demandaId);
+    deleteMutation.mutate([demandaId]);
   };
 
   const clearFilters = () => {
@@ -1558,6 +1577,10 @@ export default function Demandas() {
                         <Download className="h-4 w-4 mr-2" />
                         Exportar CSV
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setLixeiraAberta(true)}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Lixeira{(lixeira.data?.length ?? 0) > 0 ? ` (${lixeira.data!.length})` : ""}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1581,6 +1604,10 @@ export default function Demandas() {
                   <Button variant="outline" size="sm" onClick={exportToCSV}>
                     <Download className="h-4 w-4 mr-2" />
                     Exportar CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setLixeiraAberta(true)} title="Demandas excluídas (30 dias para restaurar)">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Lixeira{(lixeira.data?.length ?? 0) > 0 ? ` (${lixeira.data!.length})` : ""}
                   </Button>
                 </div>
 
@@ -1833,8 +1860,24 @@ export default function Demandas() {
           </div>
         )}
 
+        {/* Seleção para ações em lote */}
+        {!isLoading && paginatedDemandas.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox checked={paginaToda} onCheckedChange={alternarPagina} aria-label="Selecionar as demandas desta página" className="h-5 w-5" />
+              <span className="text-muted-foreground">Selecionar {pageSize === "all" ? "todas" : "esta página"}</span>
+            </label>
+            {paginaToda && totalDemandas > paginatedDemandas.length && selecao.size < totalDemandas && (
+              <Button variant="link" size="sm" className="h-auto p-0" disabled={selecionandoTodas} onClick={selecionarTodasDoFiltro}>
+                {selecionandoTodas ? "Selecionando…" : `Selecionar todas as ${totalDemandas.toLocaleString("pt-BR")} deste filtro`}
+              </Button>
+            )}
+            {selecao.size > 0 && <span className="text-muted-foreground">· {selecao.size.toLocaleString("pt-BR")} selecionada{selecao.size === 1 ? "" : "s"}</span>}
+          </div>
+        )}
+
         {/* Lista de Demandas */}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${selecao.size > 0 ? "pb-20" : ""}`}>
           {isErrorDemandas ? (
             <ErrorState
               what="as demandas"
@@ -1851,11 +1894,16 @@ export default function Demandas() {
             paginatedDemandas.map((demanda) => (
               <Card 
                 key={demanda.id} 
-                className="shadow-suave hover:shadow-media hover:border-primary/30 transition-all cursor-pointer"
+                className={`shadow-suave hover:shadow-media hover:border-primary/30 transition-all cursor-pointer ${selecao.has(demanda.id) ? "border-primary/60 bg-primary/[0.03]" : ""}`}
                 onClick={() => handleViewDemanda(demanda)}
               >
                 <CardContent className="p-3 md:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 md:gap-4">
+                  <div className="flex gap-2.5 md:gap-4">
+                  <div className="pt-0.5 md:pt-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox checked={selecao.has(demanda.id)} onCheckedChange={() => alternarSelecao(demanda)}
+                      aria-label={`Selecionar a demanda ${demanda.protocolo ?? ""}`} className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col lg:flex-row lg:items-center justify-between gap-2 md:gap-4">
                     <div className="flex-1 space-y-1.5 md:space-y-3 min-w-0">
                       <div className="flex flex-wrap items-center gap-1 md:gap-2">
                         <h3 className="text-sm md:text-lg font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
@@ -1950,6 +1998,7 @@ export default function Demandas() {
                       </div>
                     </div>
                   </div>
+                  </div>
                 </CardContent>
               </Card>
             ))
@@ -2031,14 +2080,43 @@ export default function Demandas() {
           </Card>
         )}
 
+        <AcoesEmLote
+          selecionadas={[...selecao.values()]}
+          statusList={statusList as any}
+          pessoas={pessoasAtivas}
+          areas={areas as any}
+          onLimpar={() => setSelecao(new Map())}
+          onLixeira={() => setConfirmarLoteLixeira(true)}
+        />
+
+        <AlertDialog open={confirmarLoteLixeira} onOpenChange={setConfirmarLoteLixeira}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Mandar {selecao.size.toLocaleString("pt-BR")} demanda{selecao.size === 1 ? "" : "s"} para a lixeira?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Somem das listas, com atividades e anexos, e ficam {DIAS_LIXEIRA} dias na lixeira para restaurar.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { deleteMutation.mutate([...selecao.keys()], { onSuccess: () => setSelecao(new Map()) }); }}>
+                Mandar para a lixeira
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <LixeiraDemandas aberto={lixeiraAberta} onAbertoChange={setLixeiraAberta} />
+
         {/* Confirmar exclusão (fora do menu, senão o menu fica por cima) */}
       <AlertDialog open={!!demandaExcluir} onOpenChange={(v) => !v && setDemandaExcluir(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir a demanda #{demandaExcluir?.protocolo}?</AlertDialogTitle>
+            <AlertDialogTitle>Mandar a demanda #{demandaExcluir?.protocolo} para a lixeira?</AlertDialogTitle>
             <AlertDialogDescription>
-              "{demandaExcluir?.titulo}" sai do sistema junto com as atividades, os anexos e os vínculos com cartões dos quadros.
-              Isso não pode ser desfeito. Se ela só foi resolvida, mude o status em vez de excluir.
+              "{demandaExcluir?.titulo}" some das listas, com atividades e anexos. Fica {DIAS_LIXEIRA} dias na lixeira
+              e pode ser restaurada. Se ela só foi resolvida, mude o status em vez de excluir.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2047,7 +2125,7 @@ export default function Demandas() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { if (demandaExcluir) handleDeleteDemanda(demandaExcluir.id); setDemandaExcluir(null); }}
             >
-              Excluir de vez
+              Mandar para a lixeira
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

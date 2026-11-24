@@ -3,15 +3,18 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { HelpChatWidget } from "@/components/layout/HelpChatWidget";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
-import { RepresentanteLayout } from "@/components/layout/RepresentanteLayout";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDemandaStatusMonitor } from "@/hooks/useDemandaStatusMonitor";
 import { useDemandaNotificationSender } from "@/hooks/useDemandaNotificationSender";
-import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { MenuUsuario } from "@/components/layout/MenuUsuario";
 import { MarcaIcone } from "@/components/marca/Marca";
+import { lazy, Suspense } from "react";
+
+// Layouts usados só por representantes e pelo super admin: carregam à parte
+const RepresentanteLayout = lazy(() => import("@/components/layout/RepresentanteLayout").then((m) => ({ default: m.RepresentanteLayout })));
+const AdminLayout = lazy(() => import("@/components/layout/AdminLayout").then((m) => ({ default: m.AdminLayout })));
 
 /** Tela inicial do app depois do login (a raiz "/" é a apresentação). */
 export const INICIO_APP = "/inicio";
@@ -136,7 +139,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     if (roleNoTenant !== "representante") {
       return <Navigate to={INICIO_APP} replace />;
     }
-    return <RepresentanteLayout>{children}</RepresentanteLayout>;
+    return <Suspense fallback={<TelaCarregando texto="Carregando…" />}><RepresentanteLayout>{children}</RepresentanteLayout></Suspense>;
   }
 
   // ========== ÁREA ADMIN (layout próprio) ==========
@@ -150,7 +153,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     if (!isSuperAdmin) {
       return <Navigate to={INICIO_APP} replace />;
     }
-    return <AdminLayout>{children}</AdminLayout>;
+    return <Suspense fallback={<TelaCarregando texto="Carregando…" />}><AdminLayout>{children}</AdminLayout></Suspense>;
   }
 
   // ========== GABINETE (layout padrão com sidebar) ==========

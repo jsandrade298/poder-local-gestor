@@ -1,7 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Home, FileText, Columns, Users, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
+import { lazy, Suspense, useState } from "react";
+// O formulário de nova demanda é grande: só carrega no primeiro toque no "+"
+const NovaDemandaDialog = lazy(() => import("@/components/forms/NovaDemandaDialog").then((m) => ({ default: m.NovaDemandaDialog })));
 
 /**
  * Barra inferior do celular (assessores na rua).
@@ -18,6 +20,7 @@ const navItems = [
 
 export function BottomNav() {
   const location = useLocation();
+  const [carregarNova, setCarregarNova] = useState(false);
 
   const isActive = (path: string, exact?: boolean) => {
     if (exact) return location.pathname === path;
@@ -46,6 +49,17 @@ export function BottomNav() {
     );
   };
 
+  const botaoNova = (onClick?: () => void) => (
+    <button
+      type="button"
+      aria-label="Nova demanda"
+      onClick={onClick}
+      className="flex h-11 w-11 -mt-4 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95 transition-transform"
+    >
+      <Plus className="h-6 w-6" />
+    </button>
+  );
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t safe-area-bottom">
       <div className="flex items-stretch justify-around h-14">
@@ -53,17 +67,11 @@ export function BottomNav() {
 
         {/* Nova demanda — sempre a um toque */}
         <div className="flex flex-1 items-center justify-center min-w-0">
-          <NovaDemandaDialog
-            trigger={
-              <button
-                type="button"
-                aria-label="Nova demanda"
-                className="flex h-11 w-11 -mt-4 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95 transition-transform"
-              >
-                <Plus className="h-6 w-6" />
-              </button>
-            }
-          />
+          {carregarNova ? (
+            <Suspense fallback={botaoNova()}>
+              <NovaDemandaDialog trigger={botaoNova()} abrirAoMontar />
+            </Suspense>
+          ) : botaoNova(() => setCarregarNova(true))}
         </div>
 
         {navItems.slice(2).map(renderItem)}

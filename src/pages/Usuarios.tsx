@@ -23,6 +23,7 @@ import { SaidaUsuarioDialog, reativarUsuario } from '@/components/forms/SaidaUsu
 export default function Usuarios() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [situacao, setSituacao] = useState<"todos" | "ativos" | "inativos">("ativos");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -264,10 +265,13 @@ export default function Usuarios() {
 
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter(usuario => {
+      if (situacao === "ativos" && !usuario.ativo) return false;
+      if (situacao === "inativos" && usuario.ativo) return false;
       return usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
              usuario.email.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [usuarios, searchTerm]);
+  }, [usuarios, searchTerm, situacao]);
+  const totalInativos = useMemo(() => usuarios.filter((u: any) => !u.ativo).length, [usuarios]);
 
   const handleCreateUser = () => {
     if (!newUser.nome.trim() || !newUser.email.trim() || !newUser.senha.trim()) return;
@@ -670,6 +674,12 @@ export default function Usuarios() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
+            </div>
+            <div className="flex rounded-lg border bg-muted/30 p-0.5 w-fit" role="radiogroup" aria-label="Situação">
+              {([["ativos", "Ativos"], ["inativos", `Inativos (${totalInativos})`], ["todos", "Todos"]] as const).map(([v, r]) => (
+                <button key={v} type="button" role="radio" aria-checked={situacao === v} onClick={() => setSituacao(v)}
+                  className={`px-3 py-1 text-xs rounded-md ${situacao === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}>{r}</button>
+              ))}
             </div>
           </div>
         </CardContent>
