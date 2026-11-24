@@ -100,65 +100,25 @@ export default function Municipes() {
     queryKey: ['municipes-complete', bairroKey, cidadeKey, tagKey, categoriaKey, demandaFilter, demandaStatusKey, itemsPerPage, currentPage, debouncedSearchTerm, orderBy],
     queryFn: async () => {
 
-      // ===== PRÉ-FILTRO: Tags (buscar IDs que possuem as tags selecionadas) =====
-      let tagMunicipeIds: string[] | null = null;
-      if (tagFilter.length > 0) {
-        const BATCH = 1000;
-        const ids = new Set<string>();
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from('municipe_tags')
-            .select('municipe_id')
-            .in('tag_id', tagFilter)
-            .range(from, from + BATCH - 1);
-          if (error) throw error;
-          if (data && data.length > 0) {
-            data.forEach(d => ids.add(d.municipe_id));
-            from += BATCH;
-            hasMore = data.length === BATCH;
-          } else {
-            hasMore = false;
-          }
-        }
-        tagMunicipeIds = Array.from(ids);
-        // Se nenhum munícipe tem as tags selecionadas, retornar vazio
-        if (tagMunicipeIds.length === 0) {
-          return { municipes: [], total: 0 };
-        }
-      }
+      // ===== FILTROS DE TAG E DE DEMANDA — resolvidos no banco =====
+      // Antes, buscávamos os IDs dos munícipes que batiam e colávamos a lista
+      // na URL (`id=in.(...)`). Com tags grandes (2.500+ munícipes) a URL
+      // estourava e a consulta falhava. Agora o próprio PostgREST faz a junção:
+      //   - `!inner` mantém só munícipes que têm pelo menos uma linha que bate
+      //   - embed sem `!inner` + `is null` mantém só os que NÃO têm nenhuma
+      // Os embeds de filtro usam apelidos (filtro_*) para não interferir nas
+      // tags exibidas na lista.
+      const filtrarTags = tagFilter.length > 0;
+      const filtrarDemandas = demandaFilter !== "all" || demandaStatusFilter.length > 0;
+      const modoDemanda: "com" | "sem" | null = !filtrarDemandas
+        ? null
+        : demandaFilter === "sem_demanda" ? "sem" : "com";
 
-      // ===== PRÉ-FILTRO: Demandas (buscar IDs com/sem demandas) =====
-      let demandaMunicipeIds: string[] | null = null; // IDs que TÊM demanda
-      if (demandaFilter !== "all" || demandaStatusFilter.length > 0) {
-        const BATCH = 1000;
-        const ids = new Set<string>();
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          let q = supabase.from('demandas').select('municipe_id, status').range(from, from + BATCH - 1);
-          const { data, error } = await q;
-          if (error) throw error;
-          if (data && data.length > 0) {
-            data.forEach((d: any) => {
-              // Se filtro de status ativo, só contar munícipes com demandas nesse status
-              if (demandaStatusFilter.length > 0) {
-                if (demandaStatusFilter.includes(d.status || 'solicitada')) {
-                  ids.add(d.municipe_id);
-                }
-              } else {
-                ids.add(d.municipe_id);
-              }
-            });
-            from += BATCH;
-            hasMore = data.length === BATCH;
-          } else {
-            hasMore = false;
-          }
-        }
-        demandaMunicipeIds = Array.from(ids);
-      }
+      const selectFiltros = [
+        filtrarTags ? "filtro_tags:municipe_tags!municipe_tags_municipe_id_fkey!inner(tag_id)" : null,
+        modoDemanda === "com" ? "filtro_demandas:demandas!demandas_municipe_id_fkey!inner(id, status)" : null,
+        modoDemanda === "sem" ? "filtro_demandas:demandas!demandas_municipe_id_fkey(id, status)" : null,
+      ].filter(Boolean).join(",");
 
       // ===== CONSTRUIR QUERY PRINCIPAL =====
       // Helper: escapar valor para uso em .or() do PostgREST (envolver em aspas duplas se tiver caracteres especiais)
@@ -186,7 +146,7 @@ export default function Municipes() {
               nome,
               icone,
               cor
-            )
+            )${selectFiltros ? `, ${selectFiltros}` : ''}
           `, { count: 'exact' });
 
         // Ordenação dinâmica
@@ -232,33 +192,20 @@ export default function Municipes() {
         // endereço e cidade — sem acento e com as palavras em qualquer ordem.
         query = aplicarBusca(query, debouncedSearchTerm);
 
-        // Filtro de tags (pré-computado)
-        if (tagMunicipeIds !== null) {
-          query = query.in('id', tagMunicipeIds);
+        // Tags: munícipe com QUALQUER uma das tags selecionadas
+        if (filtrarTags) {
+          query = query.in('filtro_tags.tag_id', tagFilter);
         }
 
-        // Filtro de demandas (pré-computado)
-        if (demandaFilter === "com_demanda" && demandaMunicipeIds !== null) {
-          if (demandaMunicipeIds.length === 0) {
-            // Nenhum munícipe tem demanda → retornar vazio via filtro impossível
-            query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
-          } else {
-            query = query.in('id', demandaMunicipeIds);
+        // Demandas:
+        //   "com"  → tem ao menos uma demanda (no status escolhido, se houver)
+        //   "sem"  → não tem nenhuma demanda (no status escolhido, se houver)
+        if (modoDemanda) {
+          if (demandaStatusFilter.length > 0) {
+            query = query.in('filtro_demandas.status', demandaStatusFilter);
           }
-        } else if (demandaFilter === "sem_demanda" && demandaMunicipeIds !== null) {
-          if (demandaMunicipeIds.length > 0) {
-            // Excluir IDs que têm demanda — Supabase não suporta NOT IN direto,
-            // então usamos .not('id', 'in', `(ids)`)
-            const idsStr = `(${demandaMunicipeIds.join(',')})`;
-            query = query.not('id', 'in', idsStr);
-          }
-          // Se nenhum tem demanda, não precisa filtrar — todos são "sem demanda"
-        } else if (demandaStatusFilter.length > 0 && demandaMunicipeIds !== null) {
-          // Filtro por status de demanda sem filtro com/sem
-          if (demandaMunicipeIds.length === 0) {
-            query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
-          } else {
-            query = query.in('id', demandaMunicipeIds);
+          if (modoDemanda === "sem") {
+            query = query.is('filtro_demandas', null);
           }
         }
 
