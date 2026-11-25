@@ -54,7 +54,7 @@ const allGroups: MenuGroup[] = [
       { title: "Demandas", url: "/demandas", icon: FileText },
       { title: "Munícipes", url: "/municipes", icon: Users },
       { title: "Quadros", url: "/quadros", icon: Columns },
-      { title: "Agenda", url: "/solicitar-agenda", icon: Calendar },
+      { title: "Agenda", url: "/agenda", icon: Calendar },
       { title: "Mapa", url: "/mapa", icon: MapPin },
       { title: "Plano de Ação", url: "/plano-acao", icon: Target, enabled: FEATURES.planoAcao },
       { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle, enabled: FEATURES.disparosWhatsApp },

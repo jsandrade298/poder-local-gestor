@@ -54,6 +54,7 @@ const QuadroProjeto = lazy(() => import("./pages/QuadroProjeto"));
 const PlanoAcao = lazy(() => import("./pages/PlanoAcao"));
 const PlanoAcaoDetalhe = lazy(() => import("./pages/PlanoAcaoDetalhe"));
 const SolicitarAgenda = lazy(() => import("./pages/SolicitarAgenda"));
+const Agenda = lazy(() => import("./pages/Agenda"));
 const WhatsApp = lazy(() => import("./pages/WhatsApp"));
 const ConfiguracoesWhatsApp = lazy(() => import("./pages/ConfiguracoesWhatsApp"));
 const AssessorIA = lazy(() => import("./pages/AssessorIA"));
@@ -140,6 +141,7 @@ const App = () => (
               <Route path="/quadros/:id" element={<QuadroProjeto />} />
               <Route path="/plano-acao" element={<PlanoAcao />} />
               <Route path="/plano-acao/:id" element={<PlanoAcaoDetalhe />} />
+              <Route path="/agenda" element={<Agenda />} />
               <Route path="/solicitar-agenda" element={<SolicitarAgenda />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/configuracoes-whatsapp" element={<ConfiguracoesWhatsApp />} />

@@ -44,6 +44,12 @@ export interface AgendaResumo {
   data_hora_proposta: string;
   local_endereco: string | null;
   status: string;
+  /** Eventos do Google Agenda: para onde o item leva e como aparece */
+  link?: string;
+  diaInteiro?: boolean;
+  /** Ex.: "mandato", "minha agenda", "convite" (no lugar de confirmada/pendente) */
+  selo?: string;
+  cor?: string;
 }
 
 function hojeISO() {

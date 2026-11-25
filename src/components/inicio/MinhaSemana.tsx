@@ -206,20 +206,27 @@ export function MinhaSemana({
                   {!recolhido && (
                     <div className="divide-y">
                       {visiveis.map((l) => l.tipo === "agenda" ? (
-                        <Link key={"a" + l.a.id} to="/solicitar-agenda" className="flex items-center gap-3 rounded-md px-2 py-2 -mx-2 hover:bg-muted/60">
-                          <span className="h-5 w-5 grid place-items-center shrink-0"><CalendarClock className="h-4 w-4 text-primary" /></span>
+                        <Link key={"a" + l.a.id} to={l.a.link ?? "/solicitar-agenda"} className="flex items-center gap-3 rounded-md px-2 py-2 -mx-2 hover:bg-muted/60">
+                          <span className="h-5 w-5 grid place-items-center shrink-0"><CalendarClock className="h-4 w-4 text-primary" style={l.a.cor ? { color: l.a.cor } : undefined} /></span>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{l.a.titulo || l.a.descricao_objetivo || "Agenda"}</p>
                             <p className="text-[11px] text-muted-foreground truncate">
                               {g === "semana" || g === "depois" ? `${diaCurto(l.quando)} · ` : ""}
-                              {new Date(l.a.data_hora_proposta).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              {l.a.diaInteiro ? "dia inteiro" : new Date(l.a.data_hora_proposta).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                               {l.a.local_endereco ? ` · ${l.a.local_endereco}` : ""}
                             </p>
                           </div>
-                          <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",
-                            l.a.status === "confirmado" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}>
-                            {l.a.status === "confirmado" ? "agenda confirmada" : "agenda pendente"}
-                          </span>
+                          {l.a.selo ? (
+                            <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",
+                              l.a.selo === "convite" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-muted text-muted-foreground")}>
+                              {l.a.selo}
+                            </span>
+                          ) : (
+                            <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",
+                              l.a.status === "confirmado" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}>
+                              {l.a.status === "confirmado" ? "agenda confirmada" : "agenda pendente"}
+                            </span>
+                          )}
                         </Link>
                       ) : (
                         <div key={l.t.id} className="flex items-center gap-3 rounded-md px-2 py-1.5 -mx-2 hover:bg-muted/60 group">

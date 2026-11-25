@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { EditoresAgendaCard } from "@/components/admin/EditoresAgendaCard";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -896,6 +897,9 @@ function TenantDetalhe({ tenantId, onBack }: { tenantId: string; onBack: () => v
         <Badge variant={data.tenant?.ativo ? "default" : "secondary"}>{data.tenant?.ativo ? "Ativo" : "Inativo"}</Badge>
         <Badge variant="outline">{data.tenant?.plano}</Badge>
       </div>
+
+      {/* Agenda do mandato: quem pode editar */}
+      <EditoresAgendaCard tenantId={tenantId} usuarios={data.usuarios || []} />
 
       {/* Usuários */}
       <Card>

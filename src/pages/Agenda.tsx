@@ -1,581 +1,308 @@
-import { useState, useEffect } from "react";
-import { Calendar, Clock, User, Link2, Plus, Eye, Settings2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Inbox, Plus, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { ConexoesAgenda, EscolherCalendariosDialog } from "@/components/agenda/ConexoesAgenda";
+import { EventoFormDialog } from "@/components/agenda/EventoFormDialog";
+import { EventoDetalheDialog } from "@/components/agenda/EventoDetalheDialog";
+import {
+  ROTULO_ORIGEM, diaISO, eventoNoDia, horaCurta, inicioDaSemana, inicioDoDia, somarDias, useAcoesGoogle,
+  useEventosGoogle, useStatusGoogle, type EventoGoogle, type OrigemAgenda,
+} from "@/hooks/useGoogleAgenda";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end?: string;
-  description?: string;
-  location?: string;
-  attendees?: string[];
-  url?: string;
-  color?: string;
+/**
+ * Agenda — o Google Agenda dentro do Jorgeus:
+ *   - Agenda do mandato (a do vereador): toda a equipe vê; editores mexem.
+ *   - Minha agenda: a conta Google de cada pessoa; convites com Sim/Talvez/Não.
+ * Visões de dia, semana e mês. Os pedidos de agenda antigos continuam em
+ * /solicitar-agenda até virarem o agendamento por horários livres.
+ */
+
+type Visao = "dia" | "semana" | "mes";
+const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+
+function periodo(visao: Visao, ref: Date) {
+  if (visao === "dia") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 1) }; }
+  if (visao === "semana") { const de = inicioDaSemana(ref); return { de, ate: somarDias(de, 7) }; }
+  const primeiro = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const de = inicioDaSemana(primeiro);
+  return { de, ate: somarDias(de, 42) };
+}
+
+function rotuloPeriodo(visao: Visao, ref: Date) {
+  if (visao === "dia") return ref.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  if (visao === "mes") return ref.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const de = inicioDaSemana(ref), ate = somarDias(de, 6);
+  const mesmoMes = de.getMonth() === ate.getMonth();
+  return `${de.getDate()}${mesmoMes ? "" : " de " + de.toLocaleDateString("pt-BR", { month: "short" })} a ${ate.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}`;
+}
+
+function LinhaEvento({ e, onAbrir, compacta }: { e: EventoGoogle; onAbrir: (e: EventoGoogle) => void; compacta?: boolean }) {
+  const pendente = e.minhaResposta === "needsAction";
+  const recusado = e.minhaResposta === "declined";
+  return (
+    <button type="button" onClick={() => onAbrir(e)}
+      className={cn("w-full text-left flex items-start gap-2 rounded-md border-l-[3px] bg-card px-2 py-1.5 hover:bg-muted/60 transition-colors",
+        compacta ? "text-[11px]" : "text-sm", recusado && "opacity-50 line-through")}
+      style={{ borderLeftColor: e.cor }}>
+      <span className={cn("shrink-0 tabular-nums text-muted-foreground", compacta ? "w-9" : "w-11")}>{e.diaInteiro ? "dia" : horaCurta(e.inicio)}</span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block truncate font-medium", pendente && "italic")}>{e.titulo}</span>
+        {!compacta && e.local && <span className="block truncate text-xs text-muted-foreground">{e.local}</span>}
+      </span>
+      {pendente && <span className="shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 text-[10px] font-medium">convite</span>}
+    </button>
+  );
 }
 
 export default function Agenda() {
-  const [calUsername, setCalUsername] = useState("agenda-clovis-am3eym");
-  const [customCalUrl, setCustomCalUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeCalUrl, setActiveCalUrl] = useState("https://cal.com/agenda-clovis-am3eym");
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [loadingEvents, setLoadingEvents] = useState(false);
-  const [eventsSource, setEventsSource] = useState<'cal.com' | 'mock' | 'loading'>('loading');
+  const [params, setParams] = useSearchParams();
+  const celular = useIsMobile();
+  const [visao, setVisao] = useState<Visao>(() => { try { return (localStorage.getItem("agenda-visao") as Visao) || "semana"; } catch { return "semana"; } });
+  const [ref, setRef] = useState(() => new Date());
+  const [mostrar, setMostrar] = useState<Record<OrigemAgenda, boolean>>({ mandato: true, pessoal: true });
+  const [aberto, setAberto] = useState<EventoGoogle | null>(null);
+  const [editando, setEditando] = useState<EventoGoogle | null>(null);
+  const [criandoEm, setCriandoEm] = useState<Date | null>(null);
+  const [conexoes, setConexoes] = useState(false);
+  const [escolherApos, setEscolherApos] = useState<OrigemAgenda | null>(null);
+  const status = useStatusGoogle();
+  const { responder } = useAcoesGoogle();
 
-  // Carregar eventos reais da Cal.com
+  const trocarVisao = (v: Visao) => { setVisao(v); try { localStorage.setItem("agenda-visao", v); } catch { /* sem storage */ } };
+  const { de, ate } = useMemo(() => periodo(visao, ref), [visao, ref]);
+  const eventos = useEventosGoogle(de, ate);
+  // Convites pendentes nos próximos 60 dias (independe da visão)
+  const hoje0 = useMemo(() => inicioDoDia(new Date()), []);
+  const proximos = useEventosGoogle(hoje0, somarDias(hoje0, 60), !!status.data?.pessoal);
+  const convites = (proximos.data?.eventos ?? []).filter((e) => e.minhaResposta === "needsAction");
+
+  // Volta do Google
   useEffect(() => {
-    loadCalEvents();
-  }, []);
+    const g = params.get("google");
+    if (!g) return;
+    const tipo = params.get("tipo") as OrigemAgenda | null;
+    if (g === "conectado") {
+      toast.success(tipo === "mandato" ? "Agenda do mandato conectada" : "Sua agenda Google foi conectada");
+      status.refetch();
+      if (tipo) setEscolherApos(tipo);
+    } else if (g === "cancelado") toast("Conexão cancelada");
+    else if (g === "sem_permissao") toast.error("Para funcionar, marque as permissões da agenda na tela do Google e tente de novo.");
+    else toast.error("Não foi possível conectar com o Google. Tente de novo.");
+    const p = new URLSearchParams(params); p.delete("google"); p.delete("tipo");
+    setParams(p, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadCalEvents = async () => {
-    setLoadingEvents(true);
-    setEventsSource('loading');
-    
-    try {
-      console.log('Buscando eventos da Cal.com...');
-      const { data, error } = await supabase.functions.invoke('cal-events');
-      
-      if (error) {
-        console.error('Erro ao buscar eventos:', error);
-        setEventsSource('mock');
-        loadMockEvents();
-        return;
-      }
+  const lista = (eventos.data?.eventos ?? []).filter((e) => mostrar[e.origem]);
+  const algumConectado = !!(status.data?.mandato || status.data?.pessoal);
+  const podeCriar = !!status.data && (
+    (status.data.souEditorMandato && (status.data.mandato?.calendarios || []).some((c) => c.papel === "owner" || c.papel === "writer")) ||
+    (status.data.pessoal?.calendarios || []).some((c) => c.papel === "owner" || c.papel === "writer"));
 
-      console.log('Resposta da API:', data);
-
-      if (data?.events && data.events.length > 0) {
-        setEvents(data.events);
-        setEventsSource(data.source || 'cal.com');
-        console.log(`Carregados ${data.events.length} eventos da fonte: ${data.source}`);
-      } else {
-        console.log('Nenhum evento encontrado, usando eventos mock');
-        setEventsSource('mock');
-        loadMockEvents();
-      }
-    } catch (error) {
-      console.error('Erro na requisição:', error);
-      setEventsSource('mock');
-      loadMockEvents();
-    } finally {
-      setLoadingEvents(false);
-    }
-  };
-
-  const loadMockEvents = () => {
-    // Eventos de exemplo caso a API não esteja configurada ou sem eventos
-    const mockEvents: CalendarEvent[] = [
-      {
-        id: "1",
-        title: "Reunião com Cliente - João Silva",
-        start: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-        description: "Discussão sobre novo projeto de desenvolvimento",
-        location: "Zoom Meeting",
-        attendees: ["joao@email.com"],
-        color: "#3B82F6"
-      },
-      {
-        id: "2", 
-        title: "Atendimento - Maria Santos",
-        start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(),
-        description: "Consultoria em gestão municipal",
-        location: "Presencial - Gabinete",
-        attendees: ["maria@email.com"],
-        color: "#10B981"
-      },
-      {
-        id: "3",
-        title: "Workshop - Gestão Pública Digital",
-        start: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
-        description: "Apresentação sobre digitalização de processos",
-        location: "Auditório Municipal", 
-        attendees: ["equipe@prefeitura.com", "cidadaos@municipio.com"],
-        color: "#8B5CF6"
-      }
-    ];
-    
-    setEvents(mockEvents);
-  };
-
-  const handleConnectCal = () => {
-    if (calUsername.trim()) {
-      const newUrl = `https://cal.com/${calUsername.trim()}`;
-      setActiveCalUrl(newUrl);
-      setIsLoading(true);
-      setTimeout(() => setIsLoading(false), 1500);
-    }
-  };
-
-  const handleCustomUrl = () => {
-    if (customCalUrl.trim()) {
-      setActiveCalUrl(customCalUrl.trim());
-      setIsLoading(true);
-      setTimeout(() => setIsLoading(false), 1500);
-    }
-  };
-
-  const handleEventClick = (clickInfo: any) => {
-    const event = events.find(e => e.id === clickInfo.event.id);
-    if (event) {
-      setSelectedEvent(event);
-    }
-  };
-
-  const formatEventTime = (start: string, end?: string) => {
-    const startDate = new Date(start);
-    const endDate = end ? new Date(end) : null;
-    
-    const startTime = startDate.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-    
-    if (endDate) {
-      const endTime = endDate.toLocaleTimeString('pt-BR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-      return `${startTime} - ${endTime}`;
-    }
-    
-    return startTime;
-  };
-
-  const openInNewTab = () => {
-    window.open(activeCalUrl, '_blank');
-  };
+  const andar = (n: number) => setRef((r) => visao === "dia" ? somarDias(r, n) : visao === "semana" ? somarDias(r, 7 * n) : new Date(r.getFullYear(), r.getMonth() + n, 1));
+  const dias = useMemo(() => {
+    const n = visao === "dia" ? 1 : visao === "semana" ? 7 : 42;
+    return Array.from({ length: n }, (_, i) => somarDias(de, i));
+  }, [de, visao]);
+  const hojeISO = diaISO(new Date());
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="space-y-4 md:container md:mx-auto md:px-4 max-w-[1400px]">
+      {/* Cabeçalho */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
-          <div className="flex items-center gap-2">
-            <p className="text-muted-foreground">
-              Visualize e gerencie seus agendamentos
-            </p>
-            {eventsSource === 'cal.com' && (
-              <Badge variant="default" className="bg-green-500">
-                Cal.com
-              </Badge>
-            )}
-            {eventsSource === 'mock' && (
-              <Badge variant="secondary">
-                Demonstração
-              </Badge>
-            )}
-          </div>
+          <h1>Agenda</h1>
+          <p className="text-sm text-muted-foreground">A agenda do mandato e a sua, ligadas ao Google Agenda.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={loadCalEvents} 
-            variant="outline" 
-            size="sm"
-            disabled={loadingEvents}
-          >
-            <Clock className="h-4 w-4 mr-2" />
-            {loadingEvents ? "Carregando..." : "Atualizar"}
-          </Button>
-          <Button onClick={openInNewTab} variant="outline" size="sm">
-            <Link2 className="h-4 w-4 mr-2" />
-            Cal.com
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"><Link to="/solicitar-agenda"><Inbox className="h-4 w-4" /> Pedidos de agenda</Link></Button>
+          {algumConectado && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConexoes(true)}><Settings2 className="h-4 w-4" /> Conexões</Button>}
+          {podeCriar && <Button size="sm" className="gap-1.5" onClick={() => setCriandoEm(visao === "dia" ? ref : new Date())}><Plus className="h-4 w-4" /> Novo evento</Button>}
         </div>
       </div>
 
-      <Tabs defaultValue="calendario" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="calendario" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Calendário
-          </TabsTrigger>
-          <TabsTrigger value="agendamento" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Agendamento
-          </TabsTrigger>
-          <TabsTrigger value="configuracao" className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            Configuração
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="calendario" className="mt-6">
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Calendário Principal */}
-            <div className="xl:col-span-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Calendário de Eventos
-                  </CardTitle>
-                  <CardDescription>
-                    Visualização completa de seus agendamentos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="calendar-container">
-                    <FullCalendar
-                      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                      initialView="dayGridMonth"
-                      headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                      }}
-                      events={events}
-                      eventClick={handleEventClick}
-                      height="600px"
-                      locale="pt-br"
-                      buttonText={{
-                        today: 'Hoje',
-                        month: 'Mês',
-                        week: 'Semana',
-                        day: 'Dia'
-                      }}
-                      dayHeaderFormat={{ weekday: 'short' }}
-                      eventDisplay="block"
-                      displayEventTime={true}
-                      eventTimeFormat={{
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        meridiem: false
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+      {status.isLoading ? (
+        <Skeleton className="h-40" />
+      ) : status.isError ? (
+        <ErrorState what="a agenda" onRetry={() => status.refetch()} />
+      ) : !algumConectado ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Conecte uma agenda do Google para ver e marcar compromissos aqui. Os eventos continuam no Google; o Jorgeus mostra e altera direto lá.</p>
+          <ConexoesAgenda status={status.data!} />
+        </div>
+      ) : (
+        <>
+          {/* Avisos (ex.: conexão que precisa ser refeita) */}
+          {(eventos.data?.avisos ?? []).map((a) => (
+            <div key={a.origem} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm dark:border-amber-800/60 dark:bg-amber-950/40">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+              <span className="flex-1 min-w-[200px]">{ROTULO_ORIGEM[a.origem]}: {a.mensagem}</span>
+              {a.codigo === "reconectar" && <Button size="sm" variant="outline" className="h-7" onClick={() => setConexoes(true)}>Reconectar</Button>}
             </div>
+          ))}
 
-            {/* Sidebar com Detalhes */}
-            <div className="space-y-6">
-              {/* Evento Selecionado */}
-              {selectedEvent && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Detalhes do Evento</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold text-lg">{selectedEvent.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {formatEventTime(selectedEvent.start, selectedEvent.end)}
-                      </p>
-                    </div>
-                    
-                    {selectedEvent.description && (
-                      <div>
-                        <Label className="text-sm font-medium">Descrição</Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {selectedEvent.description}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {selectedEvent.location && (
-                      <div>
-                        <Label className="text-sm font-medium">Local</Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {selectedEvent.location}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {selectedEvent.attendees && selectedEvent.attendees.length > 0 && (
-                      <div>
-                        <Label className="text-sm font-medium">Participantes</Label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedEvent.attendees.map((attendee, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {attendee}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Resumo de Eventos */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Resumo</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total de eventos:</span>
-                    <Badge variant="secondary">{events.length}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Esta semana:</span>
-                    <Badge className="bg-primary">
-                      {events.filter(e => {
-                        const eventDate = new Date(e.start);
-                        const today = new Date();
-                        const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-                        return eventDate >= today && eventDate <= weekFromNow;
-                      }).length}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Hoje:</span>
-                    <Badge className="bg-green-500">
-                      {events.filter(e => {
-                        const eventDate = new Date(e.start);
-                        const today = new Date();
-                        return eventDate.toDateString() === today.toDateString();
-                      }).length}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Próximos Eventos */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Próximos Eventos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {events
-                      .filter(e => new Date(e.start) > new Date())
-                      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-                      .slice(0, 3)
-                      .map((event) => (
-                        <div 
-                          key={event.id} 
-                          className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
-                          onClick={() => setSelectedEvent(event)}
-                        >
-                          <h4 className="font-medium text-sm">{event.title}</h4>
-                          <p className="text-xs text-muted-foreground">
-                            {formatEventTime(event.start, event.end)}
-                          </p>
-                        </div>
+          {/* Convites pendentes */}
+          {convites.length > 0 && (
+            <section className="rounded-xl border border-amber-300/50 bg-amber-50/60 dark:bg-amber-950/20 p-3">
+              <p className="text-sm font-semibold mb-2">Convites aguardando sua resposta ({convites.length})</p>
+              <ul className="space-y-1.5">
+                {convites.slice(0, 5).map((e) => (
+                  <li key={e.id + e.calendarId} className="flex flex-wrap items-center gap-2 rounded-lg bg-card border px-3 py-2">
+                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setAberto(e)}>
+                      <span className="block text-sm font-medium truncate">{e.titulo}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {new Date(e.inicio.length === 10 ? e.inicio + "T12:00:00" : e.inicio).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+                        {!e.diaInteiro && ` · ${horaCurta(e.inicio)}`}{e.organizador ? ` · de ${e.organizador}` : ""}
+                      </span>
+                    </button>
+                    <div className="flex gap-1">
+                      {([["accepted", Check, "Sim"], ["tentative", HelpCircle, "Talvez"], ["declined", X, "Não"]] as const).map(([r, Ic, rot]) => (
+                        <Button key={r} size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" disabled={responder.isPending}
+                          onClick={() => responder.mutate({ calendarId: e.calendarId, eventId: e.id, resposta: r })}>
+                          <Ic className="h-3 w-3" /> {rot}
+                        </Button>
                       ))}
-                  </div>
-                </CardContent>
-              </Card>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Barra: visão, navegação e filtros */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Visão">
+              {([["dia", "Dia"], ["semana", "Semana"], ["mes", "Mês"]] as const).map(([v, r]) => (
+                <button key={v} type="button" role="radio" aria-checked={visao === v} onClick={() => trocarVisao(v)}
+                  className={cn("px-3 py-1 text-xs rounded-md", visao === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => andar(-1)} aria-label="Anterior"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => setRef(new Date())}>Hoje</Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => andar(1)} aria-label="Próximo"><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+            <span className="text-sm font-semibold first-letter:uppercase">{rotuloPeriodo(visao, ref)}</span>
+            <span className="flex-1" />
+            <div className="flex flex-wrap gap-1.5">
+              {(["mandato", "pessoal"] as OrigemAgenda[]).filter((o) => (o === "mandato" ? status.data?.mandato : status.data?.pessoal)).map((o) => (
+                <button key={o} type="button" aria-pressed={mostrar[o]} onClick={() => setMostrar((m) => ({ ...m, [o]: !m[o] }))}
+                  className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs", mostrar[o] ? "bg-card" : "opacity-50")}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: (o === "mandato" ? status.data?.mandato?.calendarios[0]?.cor : status.data?.pessoal?.calendarios[0]?.cor) || "#888" }} />
+                  {ROTULO_ORIGEM[o]}
+                </button>
+              ))}
             </div>
           </div>
-        </TabsContent>
 
-        <TabsContent value="agendamento" className="mt-6">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Cal.com - Sistema de Agendamento
-              </CardTitle>
-              <CardDescription>
-                Interface para agendamentos online
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                  <div className="text-center">
-                    <Calendar className="h-8 w-8 animate-pulse mx-auto mb-2 text-primary" />
-                    <p className="text-sm text-muted-foreground">Carregando agenda...</p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="relative h-[700px] w-full">
-                <iframe
-                  src={activeCalUrl}
-                  className="w-full h-full border-0 rounded-lg"
-                  title="Cal.com Agendamento"
-                  frameBorder="0"
-                  allowFullScreen
-                  loading="lazy"
-                  onLoad={() => setIsLoading(false)}
-                />
+          {/* Visões */}
+          {eventos.isLoading ? <Skeleton className="h-80" /> : eventos.isError ? (
+            <ErrorState what="os eventos" onRetry={() => eventos.refetch()} />
+          ) : visao === "mes" ? (
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="grid grid-cols-7 border-b bg-muted/40">
+                {DIAS_SEMANA.map((d) => <div key={d} className="px-2 py-1.5 text-[11px] font-medium uppercase text-muted-foreground">{d}</div>)}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="configuracao" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Configuração Cal.com */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Conectar Cal.com
-                </CardTitle>
-                <CardDescription>
-                  Configure sua agenda do Cal.com
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username do Cal.com</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 flex items-center gap-1 px-3 py-2 bg-muted rounded-md text-sm">
-                      <span className="text-muted-foreground">cal.com/</span>
-                      <Input
-                        id="username"
-                        value={calUsername}
-                        onChange={(e) => setCalUsername(e.target.value)}
-                        placeholder="seu-username"
-                        className="border-0 bg-transparent p-0 focus-visible:ring-0"
-                      />
+              <div className="grid grid-cols-7">
+                {dias.map((d) => {
+                  const doDia = lista.filter((e) => eventoNoDia(e, d));
+                  const foraDoMes = d.getMonth() !== ref.getMonth();
+                  const ehHoje = diaISO(d) === hojeISO;
+                  return (
+                    <div key={d.toISOString()} className={cn("min-h-[86px] md:min-h-[108px] border-b border-r p-1 flex flex-col gap-0.5", foraDoMes && "bg-muted/20")}>
+                      <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }}
+                        className={cn("self-start rounded-full px-1.5 text-xs tabular-nums hover:bg-muted", ehHoje && "bg-primary text-primary-foreground hover:bg-primary", foraDoMes && "text-muted-foreground")}>
+                        {d.getDate()}
+                      </button>
+                      {celular ? (
+                        doDia.length > 0 && (
+                          <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="flex flex-wrap gap-0.5 px-0.5" aria-label={`${doDia.length} eventos`}>
+                            {doDia.slice(0, 4).map((e) => <span key={e.id + e.calendarId} className="h-1.5 w-1.5 rounded-full" style={{ background: e.cor }} />)}
+                            {doDia.length > 4 && <span className="text-[9px] text-muted-foreground">+{doDia.length - 4}</span>}
+                          </button>
+                        )
+                      ) : (
+                        <>
+                          {doDia.slice(0, 3).map((e) => (
+                            <button key={e.id + e.calendarId} type="button" onClick={() => setAberto(e)}
+                              className="truncate rounded px-1 text-left text-[11px] text-white hover:opacity-90" style={{ background: e.cor }}>
+                              {!e.diaInteiro && <span className="opacity-80">{horaCurta(e.inicio)} </span>}{e.titulo}
+                            </button>
+                          ))}
+                          {doDia.length > 3 && (
+                            <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="text-left px-1 text-[11px] text-muted-foreground hover:underline">
+                              +{doDia.length - 3} mais
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
-                    <Button onClick={handleConnectCal} disabled={!calUsername.trim()}>
-                      Conectar
-                    </Button>
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className={cn(visao === "semana" && !celular ? "grid grid-cols-7 gap-2" : "space-y-3")}>
+              {dias.map((d) => {
+                const doDia = lista.filter((e) => eventoNoDia(e, d));
+                const ehHoje = diaISO(d) === hojeISO;
+                return (
+                  <section key={d.toISOString()} className={cn("rounded-xl border bg-muted/20 p-2 min-w-0", ehHoje && "border-primary/40 bg-primary/[0.03]", visao === "semana" && !celular && "min-h-[220px]")}>
+                    <div className="flex items-center justify-between gap-1 px-1 pb-1.5">
+                      <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="text-left">
+                        <span className="text-[11px] uppercase text-muted-foreground">{DIAS_SEMANA[(d.getDay() + 6) % 7]}</span>{" "}
+                        <span className={cn("text-sm font-semibold tabular-nums", ehHoje && "text-primary")}>{d.getDate()}</span>
+                      </button>
+                      {podeCriar && (
+                        <button type="button" onClick={() => setCriandoEm(d)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Novo evento neste dia">
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {doDia.length === 0 ? (
+                        <p className="px-1 text-[11px] text-muted-foreground">{visao === "dia" ? "Nada marcado." : "—"}</p>
+                      ) : doDia.map((e) => <LinhaEvento key={e.id + e.calendarId} e={e} onAbrir={setAberto} compacta={visao === "semana" && !celular} />)}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
-                <Alert>
-                  <Clock className="h-4 w-4" />
-                  <AlertDescription>
-                    Não tem conta? Crie gratuitamente em{" "}
-                    <a 
-                      href="https://cal.com" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      cal.com
-                    </a>
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
+      {/* Conexões */}
+      <Sheet open={conexoes} onOpenChange={setConexoes}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="text-left mb-4">
+            <SheetTitle>Conexões com o Google</SheetTitle>
+            <SheetDescription>Escolha quais agendas aparecem, reconecte ou desconecte.</SheetDescription>
+          </SheetHeader>
+          {status.data && <ConexoesAgenda status={status.data} compacto />}
+        </SheetContent>
+      </Sheet>
 
-            {/* URL Personalizada */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Link2 className="h-5 w-5" />
-                  URL Personalizada
-                </CardTitle>
-                <CardDescription>
-                  Use uma URL específica do Cal.com
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="custom-url">URL Completa</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="custom-url"
-                      value={customCalUrl}
-                      onChange={(e) => setCustomCalUrl(e.target.value)}
-                      placeholder="https://cal.com/seu-evento-especifico"
-                      className="flex-1"
-                    />
-                    <Button onClick={handleCustomUrl} disabled={!customCalUrl.trim()}>
-                      Usar
-                    </Button>
-                  </div>
-                </div>
+      {/* Logo depois de conectar: escolher as agendas */}
+      <EscolherCalendariosDialog tipo={escolherApos} onClose={() => setEscolherApos(null)}
+        somenteLeitura={escolherApos === "mandato" && !status.data?.souEditorMandato} />
 
-                <Alert>
-                  <Eye className="h-4 w-4" />
-                  <AlertDescription>
-                    Configure eventos específicos ou tipos de agendamento personalizados
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-
-            {/* Configuração da API */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Configuração da API Cal.com</CardTitle>
-                <CardDescription>
-                  Para ver seus eventos reais, configure a API key do Cal.com
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-muted/50 border-l-4 border-primary p-4 rounded">
-                  <h4 className="font-semibold mb-2">Como obter sua API Key:</h4>
-                  <ol className="text-sm space-y-2 list-decimal list-inside">
-                    <li>Acesse <a href="https://app.cal.com/settings/developer/api-keys" target="_blank" className="text-primary hover:underline">cal.com/settings/developer/api-keys</a></li>
-                    <li>Clique em "Create New API Key"</li>
-                    <li>Dê um nome para a chave (ex: "Minha Agenda")</li>
-                    <li>Copie a API key gerada</li>
-                    <li>Cole no campo secreto que apareceu no chat</li>
-                  </ol>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">Status da API:</p>
-                    <p className="text-sm text-muted-foreground">
-                      {eventsSource === 'cal.com' ? 'Conectado - Eventos reais' : 
-                       eventsSource === 'mock' ? 'Usando eventos de demonstração' : 'Carregando...'}
-                    </p>
-                  </div>
-                  {eventsSource === 'cal.com' && (
-                    <Badge variant="default" className="bg-green-500">
-                      ✓ Conectado
-                    </Badge>
-                  )}
-                  {eventsSource === 'mock' && (
-                    <Badge variant="secondary">
-                      Demo
-                    </Badge>
-                  )}
-                </div>
-
-                <Alert>
-                  <Clock className="h-4 w-4" />
-                  <AlertDescription>
-                    Após configurar a API key, clique no botão "Atualizar" para buscar seus eventos reais.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .fc-theme-standard .fc-scrollgrid {
-            border: 1px solid hsl(var(--border));
-          }
-          .fc-theme-standard th,
-          .fc-theme-standard td {
-            border: 1px solid hsl(var(--border));
-          }
-          .fc-button-primary {
-            background-color: hsl(var(--primary));
-            border-color: hsl(var(--primary));
-          }
-          .fc-button-primary:hover {
-            background-color: hsl(var(--primary));
-            border-color: hsl(var(--primary));
-            opacity: 0.9;
-          }
-          .fc-daygrid-event {
-            border-radius: 4px;
-            padding: 2px 4px;
-          }
-        `
-      }} />
+      <EventoDetalheDialog evento={aberto} onClose={() => setAberto(null)} onEditar={(e) => { setAberto(null); setEditando(e); }} />
+      {status.data && (
+        <EventoFormDialog
+          aberto={!!editando || !!criandoEm}
+          onClose={() => { setEditando(null); setCriandoEm(null); }}
+          status={status.data}
+          evento={editando}
+          diaInicial={criandoEm ?? undefined}
+        />
+      )}
     </div>
   );
 }

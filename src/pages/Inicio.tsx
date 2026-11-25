@@ -18,6 +18,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useInicioData, DemandaResumo } from "@/hooks/useInicioData";
 import { useNovidades, useSemanaGabinete, type Novidade, type NumeroSemana } from "@/hooks/useInicioExtras";
 import { usePessoasGabinete } from "@/hooks/useQuadros";
+import { useEventosGoogle, inicioDoDia as inicioDoDiaG, somarDias as somarDiasG } from "@/hooks/useGoogleAgenda";
+import type { AgendaResumo } from "@/hooks/useInicioData";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { formatPhoneDisplay, normalizePhoneNoDDI } from "@/lib/phoneUtils";
 import { cn } from "@/lib/utils";
@@ -296,9 +298,29 @@ export default function Inicio() {
   const primeiroNome = (profile?.nome || "").split(" ")[0];
   const dataExtenso = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
+  // Google Agenda (mandato + minha), próximos dias, no mesmo formato das agendas
+  const hoje0 = useMemo(() => inicioDoDiaG(new Date()), []);
+  const google = useEventosGoogle(hoje0, somarDiasG(hoje0, 9), !!uid);
+  const doGoogle = useMemo<AgendaResumo[]>(() => (google.data?.eventos ?? [])
+    .filter((e) => e.minhaResposta !== "declined")
+    .map((e) => ({
+      id: `g-${e.calendarId}-${e.id}`,
+      titulo: e.titulo,
+      descricao_objetivo: null,
+      data_hora_proposta: e.diaInteiro ? `${e.inicio.slice(0, 10)}T09:00:00` : e.inicio,
+      local_endereco: e.local || null,
+      status: "confirmado",
+      link: "/agenda",
+      diaInteiro: e.diaInteiro,
+      selo: e.minhaResposta === "needsAction" ? "convite" : e.origem === "mandato" ? "mandato" : "minha agenda",
+      cor: e.cor,
+    })), [google.data]);
+  const todasAgendas = useMemo(() => [...(agendas.data ?? []), ...doGoogle]
+    .sort((a, b) => a.data_hora_proposta.localeCompare(b.data_hora_proposta)), [agendas.data, doGoogle]);
+
   // Compromissos de hoje ficam na faixa do topo; o resto da agenda, na Minha semana
-  const agendaHoje = useMemo(() => (agendas.data ?? []).filter((a) => diaLocal(a.data_hora_proposta) === hoje), [agendas.data, hoje]);
-  const agendasSemana = useMemo(() => ({ ...agendas, data: (agendas.data ?? []).filter((a) => diaLocal(a.data_hora_proposta) !== hoje) }), [agendas, hoje]);
+  const agendaHoje = useMemo(() => todasAgendas.filter((a) => diaLocal(a.data_hora_proposta) === hoje), [todasAgendas, hoje]);
+  const agendasSemana = useMemo(() => ({ ...agendas, data: todasAgendas.filter((a) => diaLocal(a.data_hora_proposta) !== hoje) }), [agendas, todasAgendas, hoje]);
   const cartoesComigo = useMemo(() => (tarefas.data ?? []).map((t) => t.id), [tarefas.data]);
   const paraHoje = (tarefas.data ?? []).filter((t) => t.data_prazo && t.data_prazo <= hoje).length;
   const saindoDaLixeira = (lixeira.data ?? []).filter((d) => Date.now() - new Date(d.excluida_em).getTime() > (DIAS_LIXEIRA - 3) * 86_400_000).length;
@@ -337,17 +359,19 @@ export default function Inicio() {
         <section aria-label="Compromissos de hoje" className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 md:p-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <h2 className="titulo-compacto text-sm font-semibold flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Hoje na agenda</h2>
-            <Link to="/solicitar-agenda" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">Agenda <ChevronRight className="h-3.5 w-3.5" /></Link>
+            <Link to="/agenda" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">Agenda <ChevronRight className="h-3.5 w-3.5" /></Link>
           </div>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {agendaHoje.map((a) => (
               <li key={a.id}>
-                <Link to="/solicitar-agenda" className="flex gap-3 rounded-lg border bg-card px-3 py-2 hover:border-primary/50 transition-colors">
-                  <span className="text-lg font-bold tabular-nums text-primary leading-tight">{hora(a.data_hora_proposta)}</span>
+                <Link to={a.link ?? "/solicitar-agenda"} className="flex gap-3 rounded-lg border bg-card px-3 py-2 hover:border-primary/50 transition-colors"
+                  style={a.cor ? { borderLeftColor: a.cor, borderLeftWidth: 3 } : undefined}>
+                  <span className="text-lg font-bold tabular-nums text-primary leading-tight">{a.diaInteiro ? "dia" : hora(a.data_hora_proposta)}</span>
                   <span className="min-w-0">
                     <span className="block text-sm font-medium truncate">{a.titulo || a.descricao_objetivo || "Compromisso"}</span>
                     {a.local_endereco && <span className="flex items-center gap-1 text-xs text-muted-foreground truncate"><MapPin className="h-3 w-3 shrink-0" />{a.local_endereco}</span>}
-                    {a.status === "pendente" && <span className="text-[11px] text-amber-600 dark:text-amber-400">aguardando confirmação</span>}
+                    {a.selo ? <span className="text-[11px] text-muted-foreground">{a.selo === "convite" ? "convite aguardando resposta" : a.selo}</span>
+                      : a.status === "pendente" && <span className="text-[11px] text-amber-600 dark:text-amber-400">aguardando confirmação</span>}
                   </span>
                 </Link>
               </li>
