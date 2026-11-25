@@ -335,16 +335,11 @@
   background: rgb(243 244 246);
 }
 
-/* Quadros: a barra nativa (embaixo das colunas) no mesmo visual da barra de
-   cima (BarraRolagem): trilho suave e marcador na cor do tema, arredondados.
-   Sem scrollbar-color no Chrome/Edge: ele anularia o ::-webkit-scrollbar. */
-.rolagem-quadro::-webkit-scrollbar { height: 10px; }
-.rolagem-quadro::-webkit-scrollbar-track { background: hsl(var(--muted)); border-radius: 9999px; }
-.rolagem-quadro::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.6); border-radius: 9999px; }
-.rolagem-quadro::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)); }
-@supports (-moz-appearance: none) {
-  .rolagem-quadro { scrollbar-color: hsl(var(--primary) / 0.6) hsl(var(--muted)); }
-}
+/* Quadros: sem a barra nativa embaixo das colunas; quem rola é a barra de
+   cima (BarraRolagem). Continua dando para rolar com o mouse, o touchpad
+   e deslizando no celular. */
+.rolagem-quadro { scrollbar-width: none; }
+.rolagem-quadro::-webkit-scrollbar { display: none; }
 
 /* Container de planilha com scroll SEMPRE VISÍVEL - CORRIGIDO */
 .planilha-container {
