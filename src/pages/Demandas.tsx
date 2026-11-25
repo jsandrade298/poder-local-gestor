@@ -584,6 +584,22 @@ export default function Demandas() {
   const [confirmarLoteLixeira, setConfirmarLoteLixeira] = useState(false);
   const lixeira = useContagemLixeira();
 
+  // Atalhos vindos do Início:
+  //   ?lote=1    → já seleciona tudo do filtro (para revisar em lote)
+  //   ?lixeira=1 → abre a lixeira
+  const loteFeito = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("lixeira") === "1") {
+      setLixeiraAberta(true);
+      definirParams({ lixeira: null });
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (searchParams.get("lote") !== "1" || loteFeito.current || isLoading || totalDemandas === 0) return;
+    loteFeito.current = true;
+    selecionarTodasDoFiltro().then(() => definirParams({ lote: null }));
+  }, [searchParams, isLoading, totalDemandas]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleViewDemanda = (demanda: any) => {
     setSelectedDemanda(demanda);
     setIsViewDialogOpen(true);

@@ -295,35 +295,7 @@ export function useInicioData() {
     staleTime: 10 * 60_000,
   });
 
-  // ── Hoje no gabinete ────────────────────────────────────────────
-  const hojeNoGabinete = useQuery({
-    queryKey: ["inicio-hoje", hoje],
-    enabled: !!uid,
-    queryFn: async () => {
-      const inicioDia = new Date(hoje + "T00:00:00").toISOString();
-      const contar = (tabela: "demandas" | "municipes" | "demanda_atividades") =>
-        supabase.from(tabela).select("id", { count: "exact", head: true }).gte("created_at", inicioDia);
+  // ("Hoje no gabinete" virou "A semana do gabinete": useSemanaGabinete em useInicioExtras)
 
-      const [demandas, municipes, atividades, ultimas] = await Promise.all([
-        contar("demandas"),
-        contar("municipes"),
-        contar("demanda_atividades"),
-        supabase.from("demanda_atividades")
-          .select("id, titulo, tipo_atividade, created_at, demanda_id, demandas(protocolo, titulo), autor:profiles!fk_demanda_atividades_created_by(nome)")
-          .gte("created_at", inicioDia)
-          .order("created_at", { ascending: false }).limit(6),
-      ]);
-      for (const r of [demandas, municipes, atividades, ultimas]) if (r.error) throw r.error;
-
-      return {
-        demandasNovas: demandas.count ?? 0,
-        municipesNovos: municipes.count ?? 0,
-        atividades: atividades.count ?? 0,
-        ultimas: ultimas.data ?? [],
-      };
-    },
-    staleTime: 60_000,
-  });
-
-  return { uid, hoje, minhas, atencao, tarefas, projetos, agendas, aniversariantes, hojeNoGabinete };
+  return { uid, hoje, minhas, atencao, tarefas, projetos, agendas, aniversariantes };
 }
