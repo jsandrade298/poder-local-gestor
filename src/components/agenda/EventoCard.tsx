@@ -17,7 +17,7 @@ export function EventoCard({ e, onAbrir, compacto }: { e: EventoGoogle; onAbrir:
   const descricao = !compacto && e.descricao ? textoSimples(e.descricao) : "";
   return (
     <button type="button" onClick={() => onAbrir(e)}
-      className={cn("w-full text-left rounded-lg border border-l-[4px] bg-card hover:shadow-suave hover:border-primary/40 transition-all",
+      className={cn("block w-full min-w-0 overflow-hidden text-left rounded-lg border border-l-[4px] bg-card hover:shadow-suave hover:border-primary/40 transition-all",
         compacto ? "px-2 py-1.5" : "px-3 py-2.5", recusado && "opacity-50", e.oculto && "bg-muted/50")}
       style={{ borderLeftColor: e.cor }}
       aria-label={`${e.titulo}, ${faixaHorario(e)}`}>
@@ -30,7 +30,7 @@ export function EventoCard({ e, onAbrir, compacto }: { e: EventoGoogle; onAbrir:
           <span className="inline-flex items-center gap-0.5" title={`${vao} de ${e.convidados.length} confirmaram`}><Users className="h-3 w-3" />{e.convidados.length}</span>
         )}
       </div>
-      <p className={cn("font-medium leading-snug", compacto ? "text-[12px] line-clamp-2" : "text-sm line-clamp-2", convite && "italic", recusado && "line-through")}>
+      <p className={cn("font-medium leading-snug [overflow-wrap:anywhere]", compacto ? "text-[12px] line-clamp-2" : "text-sm line-clamp-2", convite && "italic", recusado && "line-through")}>
         {e.titulo}
       </p>
       {e.local && (
@@ -38,7 +38,7 @@ export function EventoCard({ e, onAbrir, compacto }: { e: EventoGoogle; onAbrir:
           <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{e.local}</span>
         </p>
       )}
-      {descricao && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{descricao}</p>}
+      {descricao && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]">{descricao}</p>}
       <div className={cn("mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5", compacto ? "text-[10px]" : "text-[11px]")}>
         <span className="inline-flex items-center gap-1 text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: e.cor }} />
@@ -52,8 +52,8 @@ export function EventoCard({ e, onAbrir, compacto }: { e: EventoGoogle; onAbrir:
 }
 
 /**
- * Eventos de um dia, em ordem de horário. Os que acontecem AO MESMO TEMPO
- * ficam juntos numa moldura "Mesmo horário" (lado a lado quando cabe),
+ * Eventos de um dia, em ordem de horário (visão Lista). Os que acontecem AO
+ * MESMO TEMPO ficam lado a lado sob "Ao mesmo tempo · N compromissos",
  * para não parecer que um vem depois do outro.
  */
 export function EventosDoDia({ eventos, onAbrir, compacto, vazio }: {
@@ -67,11 +67,11 @@ export function EventosDoDia({ eventos, onAbrir, compacto, vazio }: {
       {blocos.map((b) => b.length === 1 ? (
         <EventoCard key={b[0].id + b[0].calendarId} e={b[0]} onAbrir={onAbrir} compacto={compacto} />
       ) : (
-        <div key={b.map((e) => e.id).join("-")} className="rounded-lg border-2 border-dashed border-amber-400/70 bg-amber-50/50 dark:bg-amber-950/20 p-1.5 space-y-1">
-          <p className={cn("flex items-center gap-1 font-semibold text-amber-800 dark:text-amber-300", compacto ? "text-[10px]" : "text-[11px]")}>
-            <AlertTriangle className="h-3 w-3" /> Mesmo horário · {b.length} compromissos
+        <div key={b.map((e) => e.id).join("-")} className="space-y-1">
+          <p className={cn("flex items-center gap-1 text-muted-foreground", compacto ? "text-[10px]" : "text-[11px]")}>
+            <AlertTriangle className="h-3 w-3 text-amber-600" /> Ao mesmo tempo · {b.length} compromissos
           </p>
-          <div className={cn("grid gap-1.5", !compacto && "sm:grid-cols-2")}>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(b.length, compacto ? 1 : 3)}, minmax(0, 1fr))` }}>
             {b.map((e) => <EventoCard key={e.id + e.calendarId} e={e} onAbrir={onAbrir} compacto={compacto} />)}
           </div>
         </div>

@@ -140,10 +140,28 @@ export function useEventosGoogle(de: Date, ate: Date, habilitado = true, guardar
   return { ...q, status, algumConectado, buscando };
 }
 
+/** Busca na agenda: de um ano atrás até um ano à frente (o Google procura). */
+export function useBuscaAgenda(termo: string) {
+  const status = useStatusGoogle();
+  const algumConectado = !!(status.data?.mandato?.calendarios?.length || status.data?.pessoal?.calendarios?.length);
+  const t = termo.trim();
+  return useQuery({
+    queryKey: ["google-agenda-busca", t],
+    enabled: algumConectado && t.length >= 2,
+    queryFn: () => {
+      const hoje = inicioDoDia(new Date());
+      return chamarAgenda<RespostaEventos>("eventos", { de: somarDias(hoje, -365).toISOString(), ate: somarDias(hoje, 366).toISOString(), busca: t });
+    },
+    staleTime: 60_000,
+    retry: 1,
+  });
+}
+
 export function useAcoesGoogle() {
   const qc = useQueryClient();
   const recarregar = () => {
     qc.invalidateQueries({ queryKey: ["google-agenda-eventos"] });
+    qc.invalidateQueries({ queryKey: ["google-agenda-busca"] });
   };
   const erro = (e: any) => toast.error(e?.message || "Não foi possível concluir");
 

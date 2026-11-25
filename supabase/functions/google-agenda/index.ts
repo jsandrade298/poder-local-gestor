@@ -7,7 +7,7 @@
 //   desconectar  {tipo}
 //   calendarios  {tipo}            agendas da conta (para escolher quais aparecem)
 //   escolher     {tipo, ids}       salva as agendas escolhidas
-//   eventos      {de, ate}         eventos das duas agendas no intervalo
+//   eventos      {de, ate, busca?} eventos das duas agendas no intervalo (busca: texto livre)
 //   criar        {origem, calendarId, evento}
 //   editar       {origem, calendarId, eventId, evento}
 //   excluir      {origem, calendarId, eventId}
@@ -320,6 +320,8 @@ Deno.serve(async (req: Request) => {
       case "eventos": {
         const de = String(body.de || ""), ate = String(body.ate || "");
         if (!de || !ate) throw new HttpError(400, "Informe o período");
+        // Busca (opcional): o próprio Google procura no título, descrição, local e convidados
+        const busca = typeof body.busca === "string" ? body.busca.trim().slice(0, 100) : "";
         const contas = (await Promise.all((["mandato", "pessoal"] as Tipo[]).map(async (t) => ({ t, c: await contaDe(admin, quem, t) }))))
           .filter((x) => x.c && x.c.calendarios.length > 0);
         const avisos: { origem: Tipo; codigo?: string; mensagem: string }[] = [];
@@ -328,10 +330,12 @@ Deno.serve(async (req: Request) => {
             const token = await tokenDeAcesso(admin, c!.id);
             const porCal = await Promise.all(c!.calendarios.map(async (cal) => {
               const r = await google(token, `/calendars/${encodeURIComponent(cal.id)}/events`, {
-                query: { timeMin: de, timeMax: ate, singleEvents: "true", orderBy: "startTime", maxResults: "250", timeZone: FUSO },
+                query: { timeMin: de, timeMax: ate, singleEvents: "true", orderBy: "startTime", maxResults: "250", timeZone: FUSO, ...(busca ? { q: busca } : {}) },
               });
               return (r?.items ?? []).filter((e: any) => e.status !== "cancelled")
-                .map((e: any) => normalizar(e, t, cal, t === "pessoal" || quem.editor));
+                .map((e: any) => normalizar(e, t, cal, t === "pessoal" || quem.editor))
+                // Na busca, reservados mascarados não entram: o resultado revelaria o que está escondido
+                .filter((e: any) => !busca || !e.oculto);
             }));
             return porCal.flat();
           } catch (e: any) {

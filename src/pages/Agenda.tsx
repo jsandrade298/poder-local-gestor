@@ -9,6 +9,9 @@ import { ConexoesAgenda, EscolherCalendariosDialog } from "@/components/agenda/C
 import { EventoFormDialog } from "@/components/agenda/EventoFormDialog";
 import { EventoDetalheDialog } from "@/components/agenda/EventoDetalheDialog";
 import { EventosDoDia } from "@/components/agenda/EventoCard";
+import { GradeHorarios } from "@/components/agenda/GradeHorarios";
+import { CriacaoRapida } from "@/components/agenda/CriacaoRapida";
+import { CampoBuscaAgenda, ResultadosBusca } from "@/components/agenda/BuscaAgenda";
 import { HorariosLivres } from "@/components/agenda/HorariosLivres";
 import { agruparPorHorario } from "@/components/agenda/agendaUtil";
 import { PedirHorarioDialog } from "@/components/agenda/PedirHorarioDialog";
@@ -29,15 +32,19 @@ import { cn } from "@/lib/utils";
  *     Eventos "reservados" aparecem para os outros só como "Ocupado".
  *   - Minha agenda: a conta Google de cada pessoa; convites com Sim/Talvez/Não.
  * Visões: dia, semana, mês, lista (30 dias) e livres (livre/ocupado).
- * Eventos ao mesmo tempo ficam juntos na moldura "Mesmo horário".
+ * Dia e Semana: grade de horas (estilo Google); simultâneos lado a lado.
+ * Clicar num horário vazio abre a criação rápida (ou o pedido de horário).
+ * A busca procura em um ano para trás e um para frente.
  */
 
 type Visao = "dia" | "semana" | "mes" | "lista" | "livres";
 const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 const VISOES: [Visao, string][] = [["dia", "Dia"], ["semana", "Semana"], ["mes", "Mês"], ["lista", "Lista"], ["livres", "Livres"]];
 
-function periodo(visao: Visao, ref: Date) {
+function periodo(visao: Visao, ref: Date, celular = false) {
   if (visao === "dia") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 1), dias: 1 }; }
+  // No celular a semana vira 3 dias (como no Google), para os blocos caberem
+  if (visao === "semana" && celular) { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 3), dias: 3 }; }
   if (visao === "semana" || visao === "livres") { const de = inicioDaSemana(ref); return { de, ate: somarDias(de, 7), dias: 7 }; }
   if (visao === "lista") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 30), dias: 30 }; }
   const primeiro = new Date(ref.getFullYear(), ref.getMonth(), 1);
@@ -45,7 +52,11 @@ function periodo(visao: Visao, ref: Date) {
   return { de, ate: somarDias(de, 42), dias: 42 };
 }
 
-function rotuloPeriodo(visao: Visao, ref: Date) {
+function rotuloPeriodo(visao: Visao, ref: Date, celular = false) {
+  if (visao === "semana" && celular) {
+    const ate = somarDias(ref, 2);
+    return `${ref.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${ate.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}`;
+  }
   if (visao === "dia") return ref.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   if (visao === "mes") return ref.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   if (visao === "lista") return `próximos 30 dias a partir de ${ref.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}`;
@@ -64,7 +75,10 @@ export default function Agenda() {
   const [mostrar, setMostrar] = useState<Record<OrigemAgenda, boolean>>({ mandato: true, pessoal: true });
   const [aberto, setAberto] = useState<EventoGoogle | null>(null);
   const [editando, setEditando] = useState<EventoGoogle | null>(null);
-  const [criando, setCriando] = useState<{ dia: Date; inicio?: Date; fim?: Date } | null>(null);
+  const [criando, setCriando] = useState<{ dia: Date; inicio?: Date; fim?: Date; titulo?: string; destino?: string } | null>(null);
+  const [rapido, setRapido] = useState<{ inicio: Date; fim: Date } | null>(null);
+  const [busca, setBusca] = useState("");
+  const buscando = busca.trim().length > 0;
   const [conexoes, setConexoes] = useState(false);
   const [escolherApos, setEscolherApos] = useState<OrigemAgenda | null>(null);
   const status = useStatusGoogle();
@@ -83,7 +97,7 @@ export default function Agenda() {
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trocarVisao = (v: Visao) => { setVisao(v); try { localStorage.setItem("agenda-visao", v); } catch { /* sem storage */ } };
-  const { de, ate, dias: nDias } = useMemo(() => periodo(visao, ref), [visao, ref]);
+  const { de, ate, dias: nDias } = useMemo(() => periodo(visao, ref, celular), [visao, ref, celular]);
   const eventos = useEventosGoogle(de, ate);
   // Convites pendentes nos próximos 60 dias (independe da visão)
   const hoje0 = useMemo(() => inicioDoDia(new Date()), []);
@@ -114,6 +128,7 @@ export default function Agenda() {
 
   const andar = (n: number) => setRef((r) => {
     if (visao === "dia") return somarDias(r, n);
+    if (visao === "semana" && celular) return somarDias(r, 3 * n);
     if (visao === "semana" || visao === "livres") return somarDias(r, 7 * n);
     if (visao === "lista") return somarDias(r, 30 * n);
     return new Date(r.getFullYear(), r.getMonth() + n, 1);
@@ -210,9 +225,10 @@ export default function Agenda() {
               <Button size="sm" variant="outline" className="h-8" onClick={() => setRef(new Date())}>Hoje</Button>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => andar(1)} aria-label="Próximo"><ChevronRight className="h-4 w-4" /></Button>
             </div>
-            <span className="text-sm font-semibold first-letter:uppercase">{rotuloPeriodo(visao, ref)}</span>
+            <span className="text-sm font-semibold first-letter:uppercase">{rotuloPeriodo(visao, ref, celular)}</span>
             {eventos.isFetching && <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" aria-label="atualizando" />}
             <span className="flex-1" />
+            <CampoBuscaAgenda valor={busca} onBuscar={setBusca} />
             <div className="flex flex-wrap gap-1.5">
               {(["mandato", "pessoal"] as OrigemAgenda[]).filter((o) => (o === "mandato" ? status.data?.mandato : status.data?.pessoal)).map((o) => (
                 <button key={o} type="button" aria-pressed={mostrar[o]} onClick={() => setMostrar((m) => ({ ...m, [o]: !m[o] }))}
@@ -224,15 +240,18 @@ export default function Agenda() {
             </div>
           </div>
 
-          {simultaneosNoPeriodo > 0 && visao !== "livres" && (
+          {simultaneosNoPeriodo > 0 && visao !== "livres" && !buscando && (
             <p className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {simultaneosNoPeriodo === 1 ? "1 horário com compromissos ao mesmo tempo" : `${simultaneosNoPeriodo} horários com compromissos ao mesmo tempo`} neste período (moldura "Mesmo horário").
+              {simultaneosNoPeriodo === 1 ? "1 horário com compromissos ao mesmo tempo" : `${simultaneosNoPeriodo} horários com compromissos ao mesmo tempo`} neste período (aparecem lado a lado).
             </p>
           )}
 
           {/* Visões */}
-          {eventos.isLoading && !eventos.data ? <Skeleton className="h-80" /> : eventos.isError && !eventos.data ? (
+          {buscando ? (
+            <ResultadosBusca termo={busca} mostrar={mostrar} onAbrir={setAberto} onLimpar={() => setBusca("")}
+              onVerDia={(d) => { setRef(d); trocarVisao("dia"); setBusca(""); }} />
+          ) : eventos.isLoading && !eventos.data ? <Skeleton className="h-80" /> : eventos.isError && !eventos.data ? (
             <ErrorState what="os eventos" onRetry={() => eventos.refetch()} />
           ) : visao === "livres" ? (
             <HorariosLivres dias={dias} eventos={eventos.data?.eventos ?? []} origens={origensAtivas.length ? origensAtivas : ["mandato"]}
@@ -305,29 +324,25 @@ export default function Agenda() {
               })}
             </div>
           ) : (
-            <div className={cn(visao === "semana" && !celular ? "grid grid-cols-7 gap-2" : "space-y-3")}>
-              {dias.map((d) => {
-                const doDia = lista.filter((e) => eventoNoDia(e, d));
-                const ehHoje = diaISO(d) === hojeISO;
-                const compacto = visao === "semana" && !celular;
-                return (
-                  <section key={d.toISOString()} className={cn("rounded-xl border bg-muted/20 p-2 min-w-0", ehHoje && "border-primary/40 bg-primary/[0.03]", compacto && "min-h-[260px]")}>
-                    <div className="flex items-center justify-between gap-1 px-1 pb-1.5">
-                      <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="text-left">
-                        <span className="text-[11px] uppercase text-muted-foreground">{DIAS_SEMANA[(d.getDay() + 6) % 7]}</span>{" "}
-                        <span className={cn("text-sm font-semibold tabular-nums", ehHoje && "text-primary")}>{d.getDate()}</span>
-                      </button>
-                      {podeCriar && (
-                        <button type="button" onClick={() => setCriando({ dia: d })} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Novo evento neste dia">
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                    <EventosDoDia eventos={doDia} onAbrir={setAberto} compacto={compacto} vazio={visao === "dia" ? "Nada marcado." : "—"} />
-                  </section>
-                );
-              })}
-            </div>
+            /* Dia e Semana: grade de horários no modelo do Google */
+            <GradeHorarios
+              dias={dias}
+              eventos={lista}
+              onAbrir={setAberto}
+              onDia={(d) => { setRef(d); trocarVisao("dia"); }}
+              onHorario={podeCriar ? (inicio, fim) => setRapido({ inicio, fim })
+                : status.data?.mandato ? (inicio, fim) => setPedindo({ inicio, fim }) : undefined}
+              onFecharRascunho={() => setRapido(null)}
+              rascunho={rapido && status.data ? {
+                ...rapido,
+                painel: (
+                  <CriacaoRapida key={rapido.inicio.toISOString()} inicio={rapido.inicio} fim={rapido.fim} status={status.data} eventos={lista}
+                    onMudarFim={(fim) => setRapido((r) => (r ? { ...r, fim } : r))}
+                    onFechar={() => setRapido(null)}
+                    onMaisOpcoes={({ titulo, destino }) => { setCriando({ dia: rapido.inicio, inicio: rapido.inicio, fim: rapido.fim, titulo, destino }); setRapido(null); }} />
+                ),
+              } : null}
+            />
           )}
         </>
       )}
@@ -360,6 +375,8 @@ export default function Agenda() {
           evento={editando}
           diaInicial={criando?.dia}
           horarioInicial={criando?.inicio && criando?.fim ? { inicio: criando.inicio, fim: criando.fim } : undefined}
+          tituloInicial={criando?.titulo}
+          destinoInicial={criando?.destino}
         />
       )}
     </div>

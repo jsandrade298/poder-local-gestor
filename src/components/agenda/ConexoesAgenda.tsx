@@ -45,9 +45,9 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
         {lista.isError ? (
           <p className="text-sm text-destructive">{(lista.error as Error).message}</p>
         ) : !lista.data ? <Skeleton className="h-32" /> : (
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             {lista.data.calendarios.map((c) => (
-              <label key={c.id} className={cn("flex items-center gap-3 rounded-lg border px-3 py-2", !somenteLeitura && "cursor-pointer hover:bg-muted/40")}>
+              <label key={c.id} className={cn("flex min-w-0 items-center gap-3 rounded-lg border px-3 py-2", !somenteLeitura && "cursor-pointer hover:bg-muted/40")}>
                 <Checkbox checked={marcadas.has(c.id)} disabled={somenteLeitura}
                   onCheckedChange={(v) => setMarcadas((s) => { const n = new Set(s); if (v) n.add(c.id); else n.delete(c.id); return n; })} />
                 {somenteLeitura ? (
@@ -72,7 +72,7 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
                   </Popover>
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium truncate">{c.nome}{c.principal ? " (principal)" : ""}</span>
+                  <span className="block text-sm font-medium break-words [overflow-wrap:anywhere] line-clamp-2" title={c.nome}>{c.nome}{c.principal ? " (principal)" : ""}</span>
                   <span className="block text-[11px] text-muted-foreground">
                     {c.papel === "owner" || c.papel === "writer" ? "pode criar e editar" : "só visualização"}
                   </span>

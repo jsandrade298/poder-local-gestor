@@ -23,7 +23,7 @@ const escreve = (papel: string) => papel === "owner" || papel === "writer";
 const horaDe = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
 
 export function EventoFormDialog({
-  aberto, onClose, status, evento, diaInicial, horarioInicial, vinculos, tituloInicial,
+  aberto, onClose, status, evento, diaInicial, horarioInicial, vinculos, tituloInicial, destinoInicial,
 }: {
   aberto: boolean;
   onClose: () => void;
@@ -36,6 +36,8 @@ export function EventoFormDialog({
   /** Evento criado a partir de uma demanda/munícipe */
   vinculos?: { demandaId?: string | null; municipeId?: string | null };
   tituloInicial?: string;
+  /** "origem|calendarId" já escolhido (criação rápida) */
+  destinoInicial?: string;
 }) {
   const { criar, editar } = useAcoesGoogle();
   const destinos = useMemo(() => {
@@ -79,7 +81,8 @@ export function EventoFormDialog({
       setReservado(evento.reservado);
     } else {
       const d = diaISO(horarioInicial?.inicio ?? diaInicial ?? new Date());
-      setDestino(destinos[0] ? `${destinos[0].origem}|${destinos[0].id}` : "");
+      setDestino(destinoInicial && destinos.some((x) => `${x.origem}|${x.id}` === destinoInicial) ? destinoInicial
+        : destinos[0] ? `${destinos[0].origem}|${destinos[0].id}` : "");
       setTitulo(tituloInicial ?? ""); setDiaInteiro(false); setData(d); setDataFim(d);
       setHIni(horarioInicial ? horaDe(horarioInicial.inicio.toISOString()) : "09:00");
       setHFim(horarioInicial ? horaDe(horarioInicial.fim.toISOString()) : "10:00");

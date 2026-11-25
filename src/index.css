@@ -560,8 +560,9 @@ table {
 
 /* ─── Mobile dialog fullscreen ──────────────────────────── */
 @media (max-width: 639px) {
-  /* Make dialogs fullscreen on mobile, but NOT sheets/sidebars */
-  [role="dialog"]:not([data-sheet]):not([data-sidebar]) {
+  /* Make dialogs fullscreen on mobile, but NOT sheets/sidebars nor popovers
+     (Radix Popover also uses role="dialog", inside the popper wrapper) */
+  [role="dialog"]:not([data-sheet]):not([data-sidebar]):not([data-radix-popper-content-wrapper] > *) {
     left: 0 !important;
     top: 0 !important;
     right: 0 !important;
