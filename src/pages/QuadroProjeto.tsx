@@ -389,7 +389,7 @@ export default function QuadroProjeto() {
       {/* Colunas (lado a lado; no celular, deslizando de uma em uma) */}
       <DragDropContext onDragStart={() => setArrastando(true)} onDragEnd={(r) => { setArrastando(false); onDragEnd(r); }}>
         <div ref={trilho} onScroll={celular ? sincronizarAba : undefined}
-          className={cn("flex gap-3 pb-3 items-start overflow-x-auto -mx-1 px-1 overscroll-x-contain", celular && !arrastando && "snap-x snap-mandatory")}>
+          className={cn("rolagem-quadro flex gap-3 pb-3 items-start overflow-x-auto -mx-1 px-1 overscroll-x-contain", celular && !arrastando && "snap-x snap-mandatory")}>
           {grupos.map((g: any) => (
             <Droppable key={g.id} droppableId={g.id} isDropDisabled={agrupar !== "etapa"}>
               {(prov, snap) => (
