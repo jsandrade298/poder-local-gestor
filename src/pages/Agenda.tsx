@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Inbox, Plus, Settings2, X } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Check, ChevronLeft, ChevronRight, HelpCircle, Inbox, Plus, Settings2, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -8,9 +8,16 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { ConexoesAgenda, EscolherCalendariosDialog } from "@/components/agenda/ConexoesAgenda";
 import { EventoFormDialog } from "@/components/agenda/EventoFormDialog";
 import { EventoDetalheDialog } from "@/components/agenda/EventoDetalheDialog";
+import { EventosDoDia } from "@/components/agenda/EventoCard";
+import { HorariosLivres } from "@/components/agenda/HorariosLivres";
+import { agruparPorHorario } from "@/components/agenda/agendaUtil";
+import { PedirHorarioDialog } from "@/components/agenda/PedirHorarioDialog";
+import { PedidosAgendaSheet } from "@/components/agenda/PedidosAgendaSheet";
+import { CompartilharSemanaDialog } from "@/components/agenda/CompartilharSemanaDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ROTULO_ORIGEM, diaISO, eventoNoDia, horaCurta, inicioDaSemana, inicioDoDia, somarDias, useAcoesGoogle,
-  useEventosGoogle, useStatusGoogle, type EventoGoogle, type OrigemAgenda,
+  useEventosGoogle, usePedidosAgenda, useStatusGoogle, type EventoGoogle, type OrigemAgenda,
 } from "@/hooks/useGoogleAgenda";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
@@ -19,64 +26,64 @@ import { cn } from "@/lib/utils";
 /**
  * Agenda — o Google Agenda dentro do Jorgeus:
  *   - Agenda do mandato (a do vereador): toda a equipe vê; editores mexem.
+ *     Eventos "reservados" aparecem para os outros só como "Ocupado".
  *   - Minha agenda: a conta Google de cada pessoa; convites com Sim/Talvez/Não.
- * Visões de dia, semana e mês. Os pedidos de agenda antigos continuam em
- * /solicitar-agenda até virarem o agendamento por horários livres.
+ * Visões: dia, semana, mês, lista (30 dias) e livres (livre/ocupado).
+ * Eventos ao mesmo tempo ficam juntos na moldura "Mesmo horário".
  */
 
-type Visao = "dia" | "semana" | "mes";
+type Visao = "dia" | "semana" | "mes" | "lista" | "livres";
 const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+const VISOES: [Visao, string][] = [["dia", "Dia"], ["semana", "Semana"], ["mes", "Mês"], ["lista", "Lista"], ["livres", "Livres"]];
 
 function periodo(visao: Visao, ref: Date) {
-  if (visao === "dia") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 1) }; }
-  if (visao === "semana") { const de = inicioDaSemana(ref); return { de, ate: somarDias(de, 7) }; }
+  if (visao === "dia") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 1), dias: 1 }; }
+  if (visao === "semana" || visao === "livres") { const de = inicioDaSemana(ref); return { de, ate: somarDias(de, 7), dias: 7 }; }
+  if (visao === "lista") { const de = inicioDoDia(ref); return { de, ate: somarDias(de, 30), dias: 30 }; }
   const primeiro = new Date(ref.getFullYear(), ref.getMonth(), 1);
   const de = inicioDaSemana(primeiro);
-  return { de, ate: somarDias(de, 42) };
+  return { de, ate: somarDias(de, 42), dias: 42 };
 }
 
 function rotuloPeriodo(visao: Visao, ref: Date) {
   if (visao === "dia") return ref.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   if (visao === "mes") return ref.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  if (visao === "lista") return `próximos 30 dias a partir de ${ref.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}`;
   const de = inicioDaSemana(ref), ate = somarDias(de, 6);
   const mesmoMes = de.getMonth() === ate.getMonth();
   return `${de.getDate()}${mesmoMes ? "" : " de " + de.toLocaleDateString("pt-BR", { month: "short" })} a ${ate.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}`;
 }
 
-function LinhaEvento({ e, onAbrir, compacta }: { e: EventoGoogle; onAbrir: (e: EventoGoogle) => void; compacta?: boolean }) {
-  const pendente = e.minhaResposta === "needsAction";
-  const recusado = e.minhaResposta === "declined";
-  return (
-    <button type="button" onClick={() => onAbrir(e)}
-      className={cn("w-full text-left flex items-start gap-2 rounded-md border-l-[3px] bg-card px-2 py-1.5 hover:bg-muted/60 transition-colors",
-        compacta ? "text-[11px]" : "text-sm", recusado && "opacity-50 line-through")}
-      style={{ borderLeftColor: e.cor }}>
-      <span className={cn("shrink-0 tabular-nums text-muted-foreground", compacta ? "w-9" : "w-11")}>{e.diaInteiro ? "dia" : horaCurta(e.inicio)}</span>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block truncate font-medium", pendente && "italic")}>{e.titulo}</span>
-        {!compacta && e.local && <span className="block truncate text-xs text-muted-foreground">{e.local}</span>}
-      </span>
-      {pendente && <span className="shrink-0 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 text-[10px] font-medium">convite</span>}
-    </button>
-  );
-}
-
 export default function Agenda() {
   const [params, setParams] = useSearchParams();
   const celular = useIsMobile();
-  const [visao, setVisao] = useState<Visao>(() => { try { return (localStorage.getItem("agenda-visao") as Visao) || "semana"; } catch { return "semana"; } });
+  const [visao, setVisao] = useState<Visao>(() => {
+    try { const v = localStorage.getItem("agenda-visao") as Visao; return VISOES.some(([x]) => x === v) ? v : "semana"; } catch { return "semana"; }
+  });
   const [ref, setRef] = useState(() => new Date());
   const [mostrar, setMostrar] = useState<Record<OrigemAgenda, boolean>>({ mandato: true, pessoal: true });
   const [aberto, setAberto] = useState<EventoGoogle | null>(null);
   const [editando, setEditando] = useState<EventoGoogle | null>(null);
-  const [criandoEm, setCriandoEm] = useState<Date | null>(null);
+  const [criando, setCriando] = useState<{ dia: Date; inicio?: Date; fim?: Date } | null>(null);
   const [conexoes, setConexoes] = useState(false);
   const [escolherApos, setEscolherApos] = useState<OrigemAgenda | null>(null);
   const status = useStatusGoogle();
   const { responder } = useAcoesGoogle();
+  const { user } = useAuth();
+  const [pedindo, setPedindo] = useState<{ inicio?: Date; fim?: Date } | null>(null);
+  const [pedidosAberto, setPedidosAberto] = useState(() => params.get("pedidos") === "1");
+  const [compartilhar, setCompartilhar] = useState(false);
+  const pedidos = usePedidosAgenda(!!status.data?.mandato);
+  const editor = !!status.data?.souEditorMandato;
+  const nPedidos = (pedidos.data ?? []).filter((p) => editor ? p.status === "pendente" : p.solicitante_id === user?.id && (p.status === "pendente" || p.status === "contraproposta")).length;
+  useEffect(() => {
+    if (params.get("pedidos") !== "1") return;
+    setPedidosAberto(true);
+    const p = new URLSearchParams(params); p.delete("pedidos"); setParams(p, { replace: true });
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trocarVisao = (v: Visao) => { setVisao(v); try { localStorage.setItem("agenda-visao", v); } catch { /* sem storage */ } };
-  const { de, ate } = useMemo(() => periodo(visao, ref), [visao, ref]);
+  const { de, ate, dias: nDias } = useMemo(() => periodo(visao, ref), [visao, ref]);
   const eventos = useEventosGoogle(de, ate);
   // Convites pendentes nos próximos 60 dias (independe da visão)
   const hoje0 = useMemo(() => inicioDoDia(new Date()), []);
@@ -105,12 +112,18 @@ export default function Agenda() {
     (status.data.souEditorMandato && (status.data.mandato?.calendarios || []).some((c) => c.papel === "owner" || c.papel === "writer")) ||
     (status.data.pessoal?.calendarios || []).some((c) => c.papel === "owner" || c.papel === "writer"));
 
-  const andar = (n: number) => setRef((r) => visao === "dia" ? somarDias(r, n) : visao === "semana" ? somarDias(r, 7 * n) : new Date(r.getFullYear(), r.getMonth() + n, 1));
-  const dias = useMemo(() => {
-    const n = visao === "dia" ? 1 : visao === "semana" ? 7 : 42;
-    return Array.from({ length: n }, (_, i) => somarDias(de, i));
-  }, [de, visao]);
+  const andar = (n: number) => setRef((r) => {
+    if (visao === "dia") return somarDias(r, n);
+    if (visao === "semana" || visao === "livres") return somarDias(r, 7 * n);
+    if (visao === "lista") return somarDias(r, 30 * n);
+    return new Date(r.getFullYear(), r.getMonth() + n, 1);
+  });
+  const dias = useMemo(() => Array.from({ length: nDias }, (_, i) => somarDias(de, i)), [de, nDias]);
   const hojeISO = diaISO(new Date());
+  const simultaneosNoPeriodo = useMemo(() => dias.reduce((n, d) => n + agruparPorHorario(lista.filter((e) => eventoNoDia(e, d))).blocos.filter((b) => b.length > 1).length, 0), [dias, lista]);
+  const origensAtivas = (["mandato", "pessoal"] as OrigemAgenda[]).filter((o) => mostrar[o] && (o === "mandato" ? status.data?.mandato : status.data?.pessoal));
+
+  const corDe = (o: OrigemAgenda) => (o === "mandato" ? status.data?.mandato?.calendarios[0]?.cor : status.data?.pessoal?.calendarios[0]?.cor) || "#888";
 
   return (
     <div className="space-y-4 md:container md:mx-auto md:px-4 max-w-[1400px]">
@@ -121,15 +134,24 @@ export default function Agenda() {
           <p className="text-sm text-muted-foreground">A agenda do mandato e a sua, ligadas ao Google Agenda.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"><Link to="/solicitar-agenda"><Inbox className="h-4 w-4" /> Pedidos de agenda</Link></Button>
-          {algumConectado && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConexoes(true)}><Settings2 className="h-4 w-4" /> Conexões</Button>}
-          {podeCriar && <Button size="sm" className="gap-1.5" onClick={() => setCriandoEm(visao === "dia" ? ref : new Date())}><Plus className="h-4 w-4" /> Novo evento</Button>}
+          {status.data?.mandato && (
+            <>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPedidosAberto(true)}>
+                <Inbox className="h-4 w-4" /> Pedidos{nPedidos > 0 && <span className="rounded-full bg-primary text-primary-foreground px-1.5 text-[10px] font-semibold tabular-nums">{nPedidos}</span>}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPedindo({})}><CalendarPlus className="h-4 w-4" /> Pedir horário</Button>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setCompartilhar(true)}><Share2 className="h-4 w-4" /> Compartilhar semana</Button>
+            </>
+          )}
+          {!status.data?.mandato && <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"><Link to="/solicitar-agenda"><Inbox className="h-4 w-4" /> Pedidos antigos</Link></Button>}
+          {algumConectado && <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConexoes(true)}><Settings2 className="h-4 w-4" /> Conexões e cores</Button>}
+          {podeCriar && <Button size="sm" className="gap-1.5" onClick={() => setCriando({ dia: visao === "dia" ? ref : new Date() })}><Plus className="h-4 w-4" /> Novo evento</Button>}
         </div>
       </div>
 
-      {status.isLoading ? (
+      {status.isLoading && !status.data ? (
         <Skeleton className="h-40" />
-      ) : status.isError ? (
+      ) : status.isError && !status.data ? (
         <ErrorState what="a agenda" onRetry={() => status.refetch()} />
       ) : !algumConectado ? (
         <div className="space-y-3">
@@ -158,7 +180,7 @@ export default function Agenda() {
                       <span className="block text-sm font-medium truncate">{e.titulo}</span>
                       <span className="block text-xs text-muted-foreground">
                         {new Date(e.inicio.length === 10 ? e.inicio + "T12:00:00" : e.inicio).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
-                        {!e.diaInteiro && ` · ${horaCurta(e.inicio)}`}{e.organizador ? ` · de ${e.organizador}` : ""}
+                        {!e.diaInteiro && ` · ${horaCurta(e.inicio)}–${horaCurta(e.fim)}`}{e.organizador ? ` · de ${e.organizador}` : ""}
                       </span>
                     </button>
                     <div className="flex gap-1">
@@ -178,9 +200,9 @@ export default function Agenda() {
           {/* Barra: visão, navegação e filtros */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Visão">
-              {([["dia", "Dia"], ["semana", "Semana"], ["mes", "Mês"]] as const).map(([v, r]) => (
+              {VISOES.map(([v, r]) => (
                 <button key={v} type="button" role="radio" aria-checked={visao === v} onClick={() => trocarVisao(v)}
-                  className={cn("px-3 py-1 text-xs rounded-md", visao === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
+                  className={cn("px-2.5 sm:px-3 py-1 text-xs rounded-md", visao === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
               ))}
             </div>
             <div className="flex items-center gap-1">
@@ -189,21 +211,32 @@ export default function Agenda() {
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => andar(1)} aria-label="Próximo"><ChevronRight className="h-4 w-4" /></Button>
             </div>
             <span className="text-sm font-semibold first-letter:uppercase">{rotuloPeriodo(visao, ref)}</span>
+            {eventos.isFetching && <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" aria-label="atualizando" />}
             <span className="flex-1" />
             <div className="flex flex-wrap gap-1.5">
               {(["mandato", "pessoal"] as OrigemAgenda[]).filter((o) => (o === "mandato" ? status.data?.mandato : status.data?.pessoal)).map((o) => (
                 <button key={o} type="button" aria-pressed={mostrar[o]} onClick={() => setMostrar((m) => ({ ...m, [o]: !m[o] }))}
                   className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs", mostrar[o] ? "bg-card" : "opacity-50")}>
-                  <span className="h-2 w-2 rounded-full" style={{ background: (o === "mandato" ? status.data?.mandato?.calendarios[0]?.cor : status.data?.pessoal?.calendarios[0]?.cor) || "#888" }} />
+                  <span className="h-2 w-2 rounded-full" style={{ background: corDe(o) }} />
                   {ROTULO_ORIGEM[o]}
                 </button>
               ))}
             </div>
           </div>
 
+          {simultaneosNoPeriodo > 0 && visao !== "livres" && (
+            <p className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {simultaneosNoPeriodo === 1 ? "1 horário com compromissos ao mesmo tempo" : `${simultaneosNoPeriodo} horários com compromissos ao mesmo tempo`} neste período (moldura "Mesmo horário").
+            </p>
+          )}
+
           {/* Visões */}
-          {eventos.isLoading ? <Skeleton className="h-80" /> : eventos.isError ? (
+          {eventos.isLoading && !eventos.data ? <Skeleton className="h-80" /> : eventos.isError && !eventos.data ? (
             <ErrorState what="os eventos" onRetry={() => eventos.refetch()} />
+          ) : visao === "livres" ? (
+            <HorariosLivres dias={dias} eventos={eventos.data?.eventos ?? []} origens={origensAtivas.length ? origensAtivas : ["mandato"]}
+              onEscolher={podeCriar ? (inicio, fim) => setCriando({ dia: inicio, inicio, fim }) : status.data?.mandato ? (inicio, fim) => setPedindo({ inicio, fim }) : undefined} />
           ) : visao === "mes" ? (
             <div className="rounded-xl border bg-card overflow-hidden">
               <div className="grid grid-cols-7 border-b bg-muted/40">
@@ -212,14 +245,18 @@ export default function Agenda() {
               <div className="grid grid-cols-7">
                 {dias.map((d) => {
                   const doDia = lista.filter((e) => eventoNoDia(e, d));
+                  const simult = agruparPorHorario(doDia).blocos.some((b) => b.length > 1);
                   const foraDoMes = d.getMonth() !== ref.getMonth();
                   const ehHoje = diaISO(d) === hojeISO;
                   return (
-                    <div key={d.toISOString()} className={cn("min-h-[86px] md:min-h-[108px] border-b border-r p-1 flex flex-col gap-0.5", foraDoMes && "bg-muted/20")}>
-                      <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }}
-                        className={cn("self-start rounded-full px-1.5 text-xs tabular-nums hover:bg-muted", ehHoje && "bg-primary text-primary-foreground hover:bg-primary", foraDoMes && "text-muted-foreground")}>
-                        {d.getDate()}
-                      </button>
+                    <div key={d.toISOString()} className={cn("min-h-[86px] md:min-h-[112px] border-b border-r p-1 flex flex-col gap-0.5", foraDoMes && "bg-muted/20")}>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }}
+                          className={cn("rounded-full px-1.5 text-xs tabular-nums hover:bg-muted", ehHoje && "bg-primary text-primary-foreground hover:bg-primary", foraDoMes && "text-muted-foreground")}>
+                          {d.getDate()}
+                        </button>
+                        {simult && <AlertTriangle className="h-3 w-3 text-amber-600" aria-label="compromissos ao mesmo tempo" />}
+                      </div>
                       {celular ? (
                         doDia.length > 0 && (
                           <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="flex flex-wrap gap-0.5 px-0.5" aria-label={`${doDia.length} eventos`}>
@@ -247,29 +284,46 @@ export default function Agenda() {
                 })}
               </div>
             </div>
+          ) : visao === "lista" ? (
+            <div className="space-y-4">
+              {dias.filter((d) => lista.some((e) => eventoNoDia(e, d))).length === 0 && (
+                <p className="text-sm text-muted-foreground py-6 text-center">Nada marcado nos próximos 30 dias.</p>
+              )}
+              {dias.map((d) => {
+                const doDia = lista.filter((e) => eventoNoDia(e, d));
+                if (doDia.length === 0) return null;
+                const ehHoje = diaISO(d) === hojeISO;
+                return (
+                  <section key={d.toISOString()} className="grid gap-2 md:grid-cols-[9rem_1fr]">
+                    <p className={cn("text-sm font-semibold first-letter:uppercase md:pt-2", ehHoje && "text-primary")}>
+                      {ehHoje ? "Hoje" : d.toLocaleDateString("pt-BR", { weekday: "long" })}
+                      <span className="block text-xs font-normal text-muted-foreground">{d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}</span>
+                    </p>
+                    <EventosDoDia eventos={doDia} onAbrir={setAberto} />
+                  </section>
+                );
+              })}
+            </div>
           ) : (
             <div className={cn(visao === "semana" && !celular ? "grid grid-cols-7 gap-2" : "space-y-3")}>
               {dias.map((d) => {
                 const doDia = lista.filter((e) => eventoNoDia(e, d));
                 const ehHoje = diaISO(d) === hojeISO;
+                const compacto = visao === "semana" && !celular;
                 return (
-                  <section key={d.toISOString()} className={cn("rounded-xl border bg-muted/20 p-2 min-w-0", ehHoje && "border-primary/40 bg-primary/[0.03]", visao === "semana" && !celular && "min-h-[220px]")}>
+                  <section key={d.toISOString()} className={cn("rounded-xl border bg-muted/20 p-2 min-w-0", ehHoje && "border-primary/40 bg-primary/[0.03]", compacto && "min-h-[260px]")}>
                     <div className="flex items-center justify-between gap-1 px-1 pb-1.5">
                       <button type="button" onClick={() => { setRef(d); trocarVisao("dia"); }} className="text-left">
                         <span className="text-[11px] uppercase text-muted-foreground">{DIAS_SEMANA[(d.getDay() + 6) % 7]}</span>{" "}
                         <span className={cn("text-sm font-semibold tabular-nums", ehHoje && "text-primary")}>{d.getDate()}</span>
                       </button>
                       {podeCriar && (
-                        <button type="button" onClick={() => setCriandoEm(d)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Novo evento neste dia">
+                        <button type="button" onClick={() => setCriando({ dia: d })} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Novo evento neste dia">
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
-                    <div className="space-y-1">
-                      {doDia.length === 0 ? (
-                        <p className="px-1 text-[11px] text-muted-foreground">{visao === "dia" ? "Nada marcado." : "—"}</p>
-                      ) : doDia.map((e) => <LinhaEvento key={e.id + e.calendarId} e={e} onAbrir={setAberto} compacta={visao === "semana" && !celular} />)}
-                    </div>
+                    <EventosDoDia eventos={doDia} onAbrir={setAberto} compacto={compacto} vazio={visao === "dia" ? "Nada marcado." : "—"} />
                   </section>
                 );
               })}
@@ -282,8 +336,8 @@ export default function Agenda() {
       <Sheet open={conexoes} onOpenChange={setConexoes}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader className="text-left mb-4">
-            <SheetTitle>Conexões com o Google</SheetTitle>
-            <SheetDescription>Escolha quais agendas aparecem, reconecte ou desconecte.</SheetDescription>
+            <SheetTitle>Conexões e cores</SheetTitle>
+            <SheetDescription>Escolha quais agendas aparecem e a cor de cada uma, reconecte ou desconecte.</SheetDescription>
           </SheetHeader>
           {status.data && <ConexoesAgenda status={status.data} compacto />}
         </SheetContent>
@@ -293,14 +347,19 @@ export default function Agenda() {
       <EscolherCalendariosDialog tipo={escolherApos} onClose={() => setEscolherApos(null)}
         somenteLeitura={escolherApos === "mandato" && !status.data?.souEditorMandato} />
 
+      <PedirHorarioDialog aberto={!!pedindo} onClose={() => setPedindo(null)} inicial={pedindo ?? undefined} />
+      <PedidosAgendaSheet aberto={pedidosAberto} onAbertoChange={setPedidosAberto} />
+      <CompartilharSemanaDialog aberto={compartilhar} onClose={() => setCompartilhar(false)} referencia={visao === "semana" || visao === "livres" ? ref : new Date()} />
+
       <EventoDetalheDialog evento={aberto} onClose={() => setAberto(null)} onEditar={(e) => { setAberto(null); setEditando(e); }} />
       {status.data && (
         <EventoFormDialog
-          aberto={!!editando || !!criandoEm}
-          onClose={() => { setEditando(null); setCriandoEm(null); }}
+          aberto={!!editando || !!criando}
+          onClose={() => { setEditando(null); setCriando(null); }}
           status={status.data}
           evento={editando}
-          diaInicial={criandoEm ?? undefined}
+          diaInicial={criando?.dia}
+          horarioInicial={criando?.inicio && criando?.fim ? { inicio: criando.inicio, fim: criando.fim } : undefined}
         />
       )}
     </div>

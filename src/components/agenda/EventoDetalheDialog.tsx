@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { CalendarDays, Check, Clock, ExternalLink, HelpCircle, MapPin, Pencil, Trash2, Users, Video, X } from "lucide-react";
+import { CalendarDays, Check, Clock, ExternalLink, FileText, HelpCircle, Lock, MapPin, Pencil, Trash2, User, Users, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Link } from "react-router-dom";
+import { RegistroCompromisso } from "./RegistroCompromisso";
 import { ROTULO_ORIGEM, ROTULO_RESPOSTA, diaISO, horaCurta, somarDias, useAcoesGoogle, type EventoGoogle } from "@/hooks/useGoogleAgenda";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +55,15 @@ export function EventoDetalheDialog({ evento, onClose, onEditar }: { evento: Eve
           <div className="space-y-3 text-sm">
             <p className="flex items-start gap-2"><Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" /><span className="first-letter:uppercase">{quando(e)}</span></p>
             <p className="flex items-start gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4 mt-0.5 shrink-0" />{ROTULO_ORIGEM[e.origem]} · {e.calendario}{e.recorrente ? " · repete" : ""}</p>
+            {e.oculto ? (
+              <p className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" /> Compromisso reservado: o horário está ocupado, mas só quem edita a agenda do mandato vê os detalhes.
+              </p>
+            ) : e.reservado && e.origem === "mandato" && (
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" /> Reservado: o resto da equipe vê só "Ocupado".
+              </p>
+            )}
             {e.local && (
               <p className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
@@ -83,6 +94,23 @@ export function EventoDetalheDialog({ evento, onClose, onEditar }: { evento: Eve
                 </ul>
               </div>
             )}
+
+            {(e.vinculos?.demandaId || e.vinculos?.municipeId) && (
+              <div className="flex flex-wrap gap-1.5">
+                {e.vinculos.demandaId && (
+                  <Link to={`/demandas?id=${e.vinculos.demandaId}`} onClick={onClose} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs hover:bg-muted">
+                    <FileText className="h-3.5 w-3.5" /> Ver a demanda ligada
+                  </Link>
+                )}
+                {e.vinculos.municipeId && (
+                  <Link to={`/municipes?abrir=${e.vinculos.municipeId}`} onClick={onClose} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs hover:bg-muted">
+                    <User className="h-3.5 w-3.5" /> Ver o munícipe
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {!e.oculto && <RegistroCompromisso evento={e} />}
 
             {(e.criadoNoJorgeusPor || e.editadoNoJorgeusPor) && (
               <p className="text-[11px] text-muted-foreground">

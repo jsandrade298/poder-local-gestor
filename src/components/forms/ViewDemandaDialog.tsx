@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AgendaVinculada } from "@/components/agenda/AgendaVinculada";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { paraTexto } from "@/components/ui/EditorRico";
 import { Badge } from "@/components/ui/badge";
@@ -547,6 +548,16 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                 )}
               </CardContent>
             </Card>
+
+            {/* Agenda ligada a esta demanda (pedir horário já vinculado) */}
+            <AgendaVinculada
+              demandaId={demanda.id}
+              municipeId={demanda.municipe_id}
+              sugestao={{
+                titulo: `${demanda.titulo}${demanda.protocolo ? ` (#${demanda.protocolo})` : ""}`,
+                local: [demanda.logradouro && `${demanda.logradouro}${demanda.numero ? `, ${demanda.numero}` : ""}`, demanda.bairro, demanda.cidade].filter(Boolean).join(" - "),
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="atividades" className="overflow-y-auto max-h-[calc(90vh-200px)]">

@@ -109,7 +109,7 @@ export async function google(token: string, caminho: string, init: RequestInit &
   return corpo;
 }
 
-export interface CalendarioEscolhido { id: string; nome: string; cor: string; papel: string; principal?: boolean }
+export interface CalendarioEscolhido { id: string; nome: string; cor: string; papel: string; principal?: boolean; corPersonalizada?: boolean }
 
 /** Agendas da conta (lista do Google), no formato do Jorgeus. */
 export async function listarCalendarios(token: string): Promise<CalendarioEscolhido[]> {

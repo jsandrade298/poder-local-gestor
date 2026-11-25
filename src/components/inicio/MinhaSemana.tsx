@@ -213,13 +213,15 @@ export function MinhaSemana({
                             <p className="text-[11px] text-muted-foreground truncate">
                               {g === "semana" || g === "depois" ? `${diaCurto(l.quando)} · ` : ""}
                               {l.a.diaInteiro ? "dia inteiro" : new Date(l.a.data_hora_proposta).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              {!l.a.diaInteiro && l.a.fim ? `–${new Date(l.a.fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}
                               {l.a.local_endereco ? ` · ${l.a.local_endereco}` : ""}
                             </p>
                           </div>
                           {l.a.selo ? (
-                            <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",
-                              l.a.selo === "convite" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-muted text-muted-foreground")}>
-                              {l.a.selo}
+                            <span className={cn("flex items-center gap-1 text-[11px] shrink-0 max-w-[45%] truncate",
+                              l.a.convite ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+                              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: l.a.cor || "currentColor" }} />
+                              <span className="truncate">{l.a.selo}</span>
                             </span>
                           ) : (
                             <span className={cn("text-[11px] shrink-0 rounded px-1.5 py-0.5",

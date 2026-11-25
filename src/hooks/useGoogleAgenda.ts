@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -12,7 +14,7 @@ import { toast } from "sonner";
 export type OrigemAgenda = "mandato" | "pessoal";
 export type RespostaConvite = "accepted" | "declined" | "tentative" | "needsAction";
 
-export interface CalendarioGoogle { id: string; nome: string; cor: string; papel: string; principal?: boolean; escolhida?: boolean }
+export interface CalendarioGoogle { id: string; nome: string; cor: string; papel: string; principal?: boolean; escolhida?: boolean; corPersonalizada?: boolean }
 
 export interface EventoGoogle {
   id: string;
@@ -37,6 +39,12 @@ export interface EventoGoogle {
   podeExcluir: boolean;
   criadoNoJorgeusPor: string | null;
   editadoNoJorgeusPor: string | null;
+  /** Só editores veem os detalhes; para os outros vem como "Ocupado" (oculto = true) */
+  reservado: boolean;
+  oculto: boolean;
+  /** Marcado como "disponível" no Google: não ocupa o horário */
+  livre: boolean;
+  vinculos: { demandaId?: string | null; municipeId?: string | null; pedidoId?: string | null };
 }
 
 export interface StatusGoogle {
@@ -55,6 +63,9 @@ export interface EventoForm {
   inicio: string;
   fim: string;
   convidados?: { email: string; resposta?: RespostaConvite }[];
+  /** Agenda do mandato: os outros veem só "Ocupado" */
+  reservado?: boolean;
+  vinculos?: { demandaId?: string | null; municipeId?: string | null; pedidoId?: string | null };
 }
 
 export class ErroAgenda extends Error {
@@ -72,29 +83,61 @@ export async function chamarAgenda<T = any>(acao: string, extra: Record<string, 
   return data as T;
 }
 
+// Cache no navegador (por pessoa): a tela abre já com o que se viu da última
+// vez e atualiza em segundo plano. Nunca guarda o token, só o que já aparece na tela.
+function lerCache<T>(chave: string | null): T | undefined {
+  if (!chave) return undefined;
+  try { const v = localStorage.getItem(chave); return v ? (JSON.parse(v) as T) : undefined; } catch { return undefined; }
+}
+function gravarCache(chave: string | null, valor: unknown) {
+  if (!chave) return;
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem storage */ }
+}
+
 export function useStatusGoogle(habilitado = true) {
-  return useQuery({
+  const { user } = useAuth();
+  const chave = user?.id ? `jorgeus-google-status:${user.id}` : null;
+  const q = useQuery({
     queryKey: ["google-agenda-status"],
     enabled: habilitado,
     queryFn: () => chamarAgenda<StatusGoogle>("status"),
+    placeholderData: () => lerCache<StatusGoogle>(chave),
     staleTime: 5 * 60_000,
     retry: false,
   });
+  useEffect(() => { if (q.data && !q.isPlaceholderData) gravarCache(chave, q.data); }, [q.data, q.isPlaceholderData, chave]);
+  return q;
 }
 
-/** Eventos das duas agendas no período (só busca se houver algo conectado). */
-export function useEventosGoogle(de: Date, ate: Date, habilitado = true) {
+type RespostaEventos = { eventos: EventoGoogle[]; avisos: { origem: OrigemAgenda; codigo?: string; mensagem: string }[] };
+
+/**
+ * Eventos das duas agendas no período (só busca se houver algo conectado).
+ * `guardarComo`: guarda o resultado no navegador para mostrar na hora da
+ * próxima vez (usado no Início).
+ */
+export function useEventosGoogle(de: Date, ate: Date, habilitado = true, guardarComo?: string) {
+  const { user } = useAuth();
   const status = useStatusGoogle(habilitado);
   const algumConectado = !!(status.data?.mandato?.calendarios?.length || status.data?.pessoal?.calendarios?.length);
+  const chave = guardarComo && user?.id ? `jorgeus-agenda:${guardarComo}:${user.id}` : null;
   const q = useQuery({
     queryKey: ["google-agenda-eventos", de.toISOString(), ate.toISOString()],
     enabled: habilitado && algumConectado,
-    queryFn: () => chamarAgenda<{ eventos: EventoGoogle[]; avisos: { origem: OrigemAgenda; codigo?: string; mensagem: string }[] }>(
-      "eventos", { de: de.toISOString(), ate: ate.toISOString() }),
+    queryFn: () => chamarAgenda<RespostaEventos>("eventos", { de: de.toISOString(), ate: ate.toISOString() }),
+    placeholderData: () => {
+      const c = lerCache<{ de: string; dados: RespostaEventos }>(chave);
+      return c && c.de === de.toISOString() ? c.dados : undefined;
+    },
     staleTime: 60_000,
     retry: 1,
   });
-  return { ...q, status, algumConectado };
+  useEffect(() => {
+    if (q.data && !q.isPlaceholderData) gravarCache(chave, { de: de.toISOString(), dados: q.data });
+  }, [q.data, q.isPlaceholderData, chave]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Ainda buscando no Google (mesmo que já mostre o que estava guardado) */
+  const buscando = algumConectado && (q.isFetching || q.isPlaceholderData || (q.isLoading && !q.data));
+  return { ...q, status, algumConectado, buscando };
 }
 
 export function useAcoesGoogle() {
@@ -144,7 +187,7 @@ export function useAcoesGoogle() {
     onError: erro,
   });
   const escolher = useMutation({
-    mutationFn: (v: { tipo: OrigemAgenda; ids: string[] }) => chamarAgenda("escolher", v),
+    mutationFn: (v: { tipo: OrigemAgenda; ids: string[]; cores?: Record<string, string> }) => chamarAgenda("escolher", v),
     onSuccess: () => {
       toast.success("Agendas atualizadas");
       qc.invalidateQueries({ queryKey: ["google-agenda-status"] });
@@ -180,3 +223,90 @@ export function eventoNoDia(e: EventoGoogle, dia: Date) {
 }
 
 export const horaCurta = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+// ── Pedidos de agenda (agenda do mandato) ───────────────────────
+
+export type StatusPedido = "pendente" | "aprovado" | "recusado" | "contraproposta" | "cancelado";
+export interface PedidoAgenda {
+  id: string;
+  solicitante_id: string;
+  titulo: string;
+  descricao: string | null;
+  local: string | null;
+  opcoes: { inicio: string; fim: string }[];
+  status: StatusPedido;
+  escolhida: { inicio: string; fim: string } | null;
+  contraproposta: { inicio: string; fim: string; mensagem: string | null } | null;
+  motivo: string | null;
+  decidido_por: string | null;
+  decidido_em: string | null;
+  reservado: boolean;
+  demanda_id: string | null;
+  municipe_id: string | null;
+  created_at: string;
+}
+
+/** Pedidos que a pessoa pode ver: os seus e, para editores, todos do gabinete. */
+export function usePedidosAgenda(habilitado = true) {
+  return useQuery({
+    queryKey: ["pedidos-agenda"],
+    enabled: habilitado,
+    queryFn: async () => {
+      const desde = new Date(Date.now() - 60 * 86_400_000).toISOString();
+      const { data, error } = await (supabase.from("pedidos_agenda") as any)
+        .select("*").or(`status.in.(pendente,contraproposta),created_at.gte.${desde}`)
+        .order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return (data ?? []) as PedidoAgenda[];
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useAcoesPedidos() {
+  const qc = useQueryClient();
+  const recarregar = () => {
+    qc.invalidateQueries({ queryKey: ["pedidos-agenda"] });
+    qc.invalidateQueries({ queryKey: ["google-agenda-eventos"] });
+  };
+  const erro = (e: any) => toast.error(e?.message || "Não foi possível concluir");
+  const criar = useMutation({
+    mutationFn: (v: { titulo: string; descricao?: string; local?: string; opcoes: { inicio: string; fim: string }[]; demandaId?: string | null; municipeId?: string | null }) =>
+      chamarAgenda<{ id: string }>("pedido-criar", v),
+    onSuccess: () => { toast.success("Pedido enviado", { description: "Quem edita a agenda do mandato foi avisado." }); recarregar(); },
+    onError: erro,
+  });
+  const decidir = useMutation({
+    mutationFn: (v: { pedidoId: string; decisao: "aprovar" | "recusar" | "contrapropor"; opcao?: { inicio: string; fim: string }; motivo?: string; mensagem?: string; reservado?: boolean; calendarId?: string }) =>
+      chamarAgenda("pedido-decidir", v),
+    onSuccess: (_d, v) => {
+      toast.success(v.decisao === "aprovar" ? "Aprovado: já está na agenda do mandato" : v.decisao === "recusar" ? "Pedido recusado" : "Outro horário proposto");
+      recarregar();
+    },
+    onError: erro,
+  });
+  const responder = useMutation({
+    mutationFn: (v: { pedidoId: string; aceitar: boolean }) => chamarAgenda("pedido-responder", v),
+    onSuccess: (_d, v) => { toast.success(v.aceitar ? "Combinado: entrou na agenda do mandato" : "Pedido cancelado"); recarregar(); },
+    onError: erro,
+  });
+  const cancelar = useMutation({
+    mutationFn: (pedidoId: string) => chamarAgenda("pedido-cancelar", { pedidoId }),
+    onSuccess: () => { toast.success("Pedido cancelado"); recarregar(); },
+    onError: erro,
+  });
+  return { criar, decidir, responder, cancelar };
+}
+
+/** Eventos ligados a uma demanda ou munícipe (para mostrar dentro deles). */
+export function useEventosVinculados(alvo: { demandaId?: string | null; municipeId?: string | null }, habilitado = true) {
+  const status = useStatusGoogle(habilitado);
+  const conectado = !!(status.data?.mandato || status.data?.pessoal);
+  return useQuery({
+    queryKey: ["google-agenda-vinculados", alvo.demandaId ?? null, alvo.municipeId ?? null],
+    enabled: habilitado && conectado && !!(alvo.demandaId || alvo.municipeId),
+    queryFn: () => chamarAgenda<{ eventos: EventoGoogle[] }>("vinculados", { demandaId: alvo.demandaId, municipeId: alvo.municipeId }),
+    staleTime: 60_000,
+    retry: false,
+  });
+}

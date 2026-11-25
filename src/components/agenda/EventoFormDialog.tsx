@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { AlertTriangle, Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  ROTULO_ORIGEM, diaISO, somarDias, useAcoesGoogle,
+  ROTULO_ORIGEM, diaISO, inicioDoDia, somarDias, useAcoesGoogle, useEventosGoogle,
   type EventoGoogle, type OrigemAgenda, type StatusGoogle,
 } from "@/hooks/useGoogleAgenda";
+import { conflitosCom, faixaHorario } from "./agendaUtil";
 
 /**
  * Criar ou editar um evento do Google Agenda.
@@ -22,7 +23,7 @@ const escreve = (papel: string) => papel === "owner" || papel === "writer";
 const horaDe = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
 
 export function EventoFormDialog({
-  aberto, onClose, status, evento, diaInicial,
+  aberto, onClose, status, evento, diaInicial, horarioInicial, vinculos, tituloInicial,
 }: {
   aberto: boolean;
   onClose: () => void;
@@ -30,6 +31,11 @@ export function EventoFormDialog({
   /** Editando este evento; sem ele, cria um novo. */
   evento?: EventoGoogle | null;
   diaInicial?: Date;
+  /** Vindo de um horário livre */
+  horarioInicial?: { inicio: Date; fim: Date };
+  /** Evento criado a partir de uma demanda/munícipe */
+  vinculos?: { demandaId?: string | null; municipeId?: string | null };
+  tituloInicial?: string;
 }) {
   const { criar, editar } = useAcoesGoogle();
   const destinos = useMemo(() => {
@@ -50,6 +56,7 @@ export function EventoFormDialog({
   const [descricao, setDescricao] = useState("");
   const [convidados, setConvidados] = useState<string[]>([]);
   const [novoConvidado, setNovoConvidado] = useState("");
+  const [reservado, setReservado] = useState(false);
 
   useEffect(() => {
     if (!aberto) return;
@@ -69,16 +76,31 @@ export function EventoFormDialog({
       setLocal(evento.local);
       setDescricao(evento.descricao);
       setConvidados(evento.convidados.filter((c) => !c.organizador).map((c) => c.email));
+      setReservado(evento.reservado);
     } else {
-      const d = diaISO(diaInicial ?? new Date());
+      const d = diaISO(horarioInicial?.inicio ?? diaInicial ?? new Date());
       setDestino(destinos[0] ? `${destinos[0].origem}|${destinos[0].id}` : "");
-      setTitulo(""); setDiaInteiro(false); setData(d); setDataFim(d);
-      setHIni("09:00"); setHFim("10:00"); setLocal(""); setDescricao(""); setConvidados([]);
+      setTitulo(tituloInicial ?? ""); setDiaInteiro(false); setData(d); setDataFim(d);
+      setHIni(horarioInicial ? horaDe(horarioInicial.inicio.toISOString()) : "09:00");
+      setHFim(horarioInicial ? horaDe(horarioInicial.fim.toISOString()) : "10:00");
+      setLocal(""); setDescricao(""); setConvidados([]); setReservado(false);
     }
     setNovoConvidado("");
   }, [aberto, evento?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [origem, calendarId] = destino.split("|") as [OrigemAgenda, string];
+  const origemAtual: OrigemAgenda | undefined = evento?.origem ?? origem;
+
+  // Conflito: o que já está marcado nesse horário na mesma agenda (avisa, não impede —
+  // o parlamentar pode ter dois compromissos e passar rapidamente nos dois)
+  const diaRef = useMemo(() => (data ? inicioDoDia(new Date(`${data}T12:00:00`)) : inicioDoDia(new Date())), [data]);
+  const doDia = useEventosGoogle(diaRef, somarDias(diaRef, 1), aberto && !!data && !diaInteiro);
+  const conflitos = useMemo(() => {
+    if (!data || diaInteiro || !origemAtual) return [];
+    const ini = new Date(`${data}T${hIni}:00`), fim = new Date(`${dataFim || data}T${hFim}:00`);
+    if (!(fim > ini)) return [];
+    return conflitosCom(ini, fim, (doDia.data?.eventos ?? []).filter((e) => e.origem === origemAtual), evento?.id);
+  }, [doDia.data, data, dataFim, hIni, hFim, diaInteiro, origemAtual, evento?.id]);
   const salvando = criar.isPending || editar.isPending;
 
   const adicionarConvidado = () => {
@@ -95,6 +117,8 @@ export function EventoFormDialog({
       : { inicio: new Date(`${data}T${hIni}:00`).toISOString(), fim: new Date(`${fimData}T${hFim}:00`).toISOString() };
     const ev = {
       titulo, local, descricao, diaInteiro, ...corpo,
+      ...(origemAtual === "mandato" ? { reservado } : {}),
+      ...(!evento && vinculos ? { vinculos } : {}),
       convidados: convidados.map((email) => ({
         email, resposta: evento?.convidados.find((c) => c.email === email)?.resposta,
       })),
@@ -179,6 +203,27 @@ export function EventoFormDialog({
               )}
             </div>
             {fimAntes && <p className="text-xs text-destructive">O fim precisa ser depois do início.</p>}
+            {conflitos.length > 0 && (
+              <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs dark:border-amber-800/60 dark:bg-amber-950/30">
+                <p className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Mesmo horário de {conflitos.length === 1 ? "outro compromisso" : `${conflitos.length} compromissos`}
+                </p>
+                <ul className="mt-1 space-y-0.5 text-amber-900/80 dark:text-amber-200/80">
+                  {conflitos.map((c) => <li key={c.id}>{faixaHorario(c)} · {c.titulo}</li>)}
+                </ul>
+                <p className="mt-1 text-amber-900/70 dark:text-amber-200/70">Dá para salvar assim; na agenda os dois aparecem juntos, como simultâneos.</p>
+              </div>
+            )}
+
+            {origemAtual === "mandato" && (
+              <label className="flex items-start gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer">
+                <Switch checked={reservado} onCheckedChange={setReservado} className="mt-0.5" />
+                <span>
+                  <span className="flex items-center gap-1.5 font-medium"><Lock className="h-3.5 w-3.5" /> Reservado</span>
+                  <span className="block text-xs text-muted-foreground">A equipe vê só o horário como "Ocupado". Título, local, descrição e convidados ficam visíveis apenas para os editores da agenda.</span>
+                </span>
+              </label>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="ev-local">Local</Label>

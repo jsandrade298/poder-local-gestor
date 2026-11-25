@@ -300,7 +300,7 @@ export default function Inicio() {
 
   // Google Agenda (mandato + minha), próximos dias, no mesmo formato das agendas
   const hoje0 = useMemo(() => inicioDoDiaG(new Date()), []);
-  const google = useEventosGoogle(hoje0, somarDiasG(hoje0, 9), !!uid);
+  const google = useEventosGoogle(hoje0, somarDiasG(hoje0, 9), !!uid, "inicio");
   const doGoogle = useMemo<AgendaResumo[]>(() => (google.data?.eventos ?? [])
     .filter((e) => e.minhaResposta !== "declined")
     .map((e) => ({
@@ -312,8 +312,11 @@ export default function Inicio() {
       status: "confirmado",
       link: "/agenda",
       diaInteiro: e.diaInteiro,
-      selo: e.minhaResposta === "needsAction" ? "convite" : e.origem === "mandato" ? "mandato" : "minha agenda",
+      selo: e.minhaResposta === "needsAction" ? `Convite${e.organizador ? ` de ${e.organizador.split(/[ @]/)[0]}` : ""}`
+        : e.origem === "mandato" ? (e.oculto ? "Agenda do mandato · reservado" : "Agenda do mandato") : "Minha agenda",
       cor: e.cor,
+      fim: e.diaInteiro ? undefined : e.fim,
+      convite: e.minhaResposta === "needsAction",
     })), [google.data]);
   const todasAgendas = useMemo(() => [...(agendas.data ?? []), ...doGoogle]
     .sort((a, b) => a.data_hora_proposta.localeCompare(b.data_hora_proposta)), [agendas.data, doGoogle]);
@@ -354,29 +357,53 @@ export default function Inicio() {
         </div>
       </div>
 
-      {/* Hoje na agenda: compromissos do dia em destaque */}
-      {agendaHoje.length > 0 && (
+      {/* Hoje na agenda: aparece já de saída (com "buscando…") para ninguém achar que não há nada */}
+      {(agendaHoje.length > 0 || google.algumConectado) && (
         <section aria-label="Compromissos de hoje" className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 md:p-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <h2 className="titulo-compacto text-sm font-semibold flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> Hoje na agenda</h2>
-            <Link to="/agenda" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">Agenda <ChevronRight className="h-3.5 w-3.5" /></Link>
+            <span className="flex items-center gap-3">
+              {google.buscando && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground" role="status">
+                  <span className="h-3 w-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" aria-hidden />
+                  {agendaHoje.length > 0 ? "atualizando" : "buscando no Google…"}
+                </span>
+              )}
+              <Link to="/agenda" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5">Agenda <ChevronRight className="h-3.5 w-3.5" /></Link>
+            </span>
           </div>
+          {agendaHoje.length === 0 ? (
+            google.buscando ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
+                {[0, 1].map((i) => <Skeleton key={i} className="h-[60px] rounded-lg" />)}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhum compromisso hoje.</p>
+            )
+          ) : (
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {agendaHoje.map((a) => (
               <li key={a.id}>
                 <Link to={a.link ?? "/solicitar-agenda"} className="flex gap-3 rounded-lg border bg-card px-3 py-2 hover:border-primary/50 transition-colors"
                   style={a.cor ? { borderLeftColor: a.cor, borderLeftWidth: 3 } : undefined}>
-                  <span className="text-lg font-bold tabular-nums text-primary leading-tight">{a.diaInteiro ? "dia" : hora(a.data_hora_proposta)}</span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-lg font-bold tabular-nums text-primary leading-tight">{a.diaInteiro ? "dia" : hora(a.data_hora_proposta)}</span>
+                    {a.fim && <span className="block text-[11px] tabular-nums text-muted-foreground">até {hora(a.fim)}</span>}
+                  </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-medium truncate">{a.titulo || a.descricao_objetivo || "Compromisso"}</span>
                     {a.local_endereco && <span className="flex items-center gap-1 text-xs text-muted-foreground truncate"><MapPin className="h-3 w-3 shrink-0" />{a.local_endereco}</span>}
-                    {a.selo ? <span className="text-[11px] text-muted-foreground">{a.selo === "convite" ? "convite aguardando resposta" : a.selo}</span>
-                      : a.status === "pendente" && <span className="text-[11px] text-amber-600 dark:text-amber-400">aguardando confirmação</span>}
+                    {a.selo ? (
+                      <span className={cn("flex items-center gap-1 text-[11px]", a.convite ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: a.cor || "currentColor" }} />{a.selo}
+                      </span>
+                    ) : a.status === "pendente" && <span className="text-[11px] text-amber-600 dark:text-amber-400">aguardando confirmação</span>}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
+          )}
         </section>
       )}
 

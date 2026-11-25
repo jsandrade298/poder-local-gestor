@@ -47,9 +47,12 @@ export interface AgendaResumo {
   /** Eventos do Google Agenda: para onde o item leva e como aparece */
   link?: string;
   diaInteiro?: boolean;
-  /** Ex.: "mandato", "minha agenda", "convite" (no lugar de confirmada/pendente) */
+  /** Ex.: "Agenda do mandato", "Minha agenda", "Convite de Fulano" (no lugar de confirmada/pendente) */
   selo?: string;
   cor?: string;
+  /** Fim do compromisso (para mostrar 9:00–10:00) */
+  fim?: string;
+  convite?: boolean;
 }
 
 function hojeISO() {

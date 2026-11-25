@@ -4,6 +4,8 @@ import { CalendarCheck2, Landmark, Link2Off, Lock, Settings2, User } from "lucid
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CORES_AGENDA } from "./agendaUtil";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -22,8 +24,12 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
     staleTime: 0,
   });
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [cores, setCores] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (lista.data) setMarcadas(new Set(lista.data.calendarios.filter((c) => c.escolhida).map((c) => c.id)));
+    if (lista.data) {
+      setMarcadas(new Set(lista.data.calendarios.filter((c) => c.escolhida).map((c) => c.id)));
+      setCores({});
+    }
   }, [lista.data]);
 
   return (
@@ -32,8 +38,8 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
         <DialogHeader>
           <DialogTitle>{tipo === "mandato" ? "Agendas do mandato no Jorgeus" : "Suas agendas no Jorgeus"}</DialogTitle>
           <DialogDescription>
-            Marque as agendas da conta Google que devem aparecer.{" "}
-            {tipo === "mandato" ? "Toda a equipe passa a ver os eventos delas." : "Só você vê as suas."}
+            Marque as agendas da conta Google que devem aparecer e, se quiser, troque a cor (toque na bolinha).{" "}
+            {tipo === "mandato" ? "A cor e as agendas valem para toda a equipe." : "Só você vê as suas, com as cores que escolher."}
           </DialogDescription>
         </DialogHeader>
         {lista.isError ? (
@@ -44,7 +50,27 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
               <label key={c.id} className={cn("flex items-center gap-3 rounded-lg border px-3 py-2", !somenteLeitura && "cursor-pointer hover:bg-muted/40")}>
                 <Checkbox checked={marcadas.has(c.id)} disabled={somenteLeitura}
                   onCheckedChange={(v) => setMarcadas((s) => { const n = new Set(s); if (v) n.add(c.id); else n.delete(c.id); return n; })} />
-                <span className="h-3 w-3 rounded-full shrink-0" style={{ background: c.cor }} />
+                {somenteLeitura ? (
+                  <span className="h-3 w-3 rounded-full shrink-0" style={{ background: c.cor }} />
+                ) : (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" onClick={(ev) => ev.stopPropagation()} aria-label={`Cor da agenda ${c.nome}`}
+                        className="h-5 w-5 rounded-full shrink-0 ring-2 ring-offset-2 ring-offset-background ring-transparent hover:ring-border"
+                        style={{ background: cores[c.id] ?? c.cor }} />
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start" onClick={(ev) => ev.stopPropagation()}>
+                      <p className="text-[11px] text-muted-foreground mb-1.5">{tipo === "mandato" ? "Cor para todo o gabinete" : "Cor só para você"}</p>
+                      <div className="grid grid-cols-6 gap-1.5">
+                        {CORES_AGENDA.map((cor) => (
+                          <button key={cor} type="button" aria-label={`Usar ${cor}`} onClick={() => setCores((m) => ({ ...m, [c.id]: cor }))}
+                            className={cn("h-6 w-6 rounded-full", (cores[c.id] ?? c.cor).toLowerCase() === cor.toLowerCase() && "ring-2 ring-offset-2 ring-foreground")}
+                            style={{ background: cor }} />
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium truncate">{c.nome}{c.principal ? " (principal)" : ""}</span>
                   <span className="block text-[11px] text-muted-foreground">
@@ -59,7 +85,7 @@ export function EscolherCalendariosDialog({ tipo, onClose, somenteLeitura }: { t
           <Button variant="outline" onClick={onClose}>{somenteLeitura ? "Fechar" : "Cancelar"}</Button>
           {!somenteLeitura && (
             <Button disabled={marcadas.size === 0 || escolher.isPending}
-              onClick={() => escolher.mutate({ tipo: tipo!, ids: [...marcadas] }, { onSuccess: onClose })}>
+              onClick={() => escolher.mutate({ tipo: tipo!, ids: [...marcadas], cores }, { onSuccess: onClose })}>
               {escolher.isPending ? "Salvando…" : "Salvar"}
             </Button>
           )}

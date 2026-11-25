@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AgendaVinculada } from "@/components/agenda/AgendaVinculada";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -283,6 +284,9 @@ export function MunicipeDetailsDialog({ municipe, open, onOpenChange, abaInicial
                   )}
                 </CardContent>
               </Card>
+
+              {/* Agenda ligada a este munícipe */}
+              <AgendaVinculada municipeId={municipe.id} sugestao={{ titulo: `Encontro com ${municipe.nome}` }} />
             </TabsContent>
 
             {/* Aba de Prontuário */}
