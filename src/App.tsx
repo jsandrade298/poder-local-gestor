@@ -68,6 +68,7 @@ const EscolherDestino = lazy(() => import("./pages/EscolherDestino"));
 const AdminSaaS = lazy(() => import("./pages/AdminSaaS"));
 const AdminNotificacoesWhatsApp = lazy(() => import("./pages/AdminNotificacoesWhatsApp"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const Privacidade = lazy(() => import("./pages/Privacidade"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ConviteRepresentante = lazy(() => import("./pages/ConviteRepresentante"));
 const RepresentanteDashboard = lazy(() => import("./pages/representante/RepresentanteDashboard"));
@@ -116,6 +117,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/site" element={<LandingPage />} />
+              <Route path="/privacidade" element={<Privacidade />} />
               <Route path="/convite" element={<ConviteRepresentante />} />
               <Route path="/rep" element={<RepresentanteDashboard />} />
               <Route path="/rep/municipes" element={<RepresentanteMunicipes />} />

@@ -142,6 +142,9 @@ export default function Login() {
               <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
               O acesso é criado pelo administrador do seu gabinete. Se ainda não tem login ou esqueceu a senha, fale com ele.
             </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              <Link to="/privacidade" className="underline underline-offset-2 hover:text-foreground">Política de Privacidade</Link>
+            </p>
           </div>
         </div>
       </main>

@@ -206,7 +206,10 @@ export default function LandingPage() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
           <MarcaLogo perfil={perfil} className="h-8 w-auto" />
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Jorgeus · Gestão e Inteligência Parlamentar</p>
+          <p className="text-xs text-muted-foreground text-center sm:text-right">
+            © {new Date().getFullYear()} Jorgeus · Gestão e Inteligência Parlamentar ·{" "}
+            <Link to="/privacidade" className="underline underline-offset-2 hover:text-foreground">Política de Privacidade</Link>
+          </p>
         </div>
       </footer>
     </div>

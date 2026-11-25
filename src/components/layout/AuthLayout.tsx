@@ -56,6 +56,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const isLandingPage = location.pathname === "/";
   const isSiteAntigo = location.pathname === "/site";
   const isConvitePage = location.pathname === "/convite";
+  const isPaginaPublica = location.pathname === "/privacidade";
   const isRepArea = location.pathname.startsWith("/rep");
   const { user, loading, profileLoading, isSuperAdmin, roleNoTenant } = useAuth();
   
@@ -82,6 +83,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       if (roleNoTenant === "representante") return <Navigate to="/rep" replace />;
       return <Navigate to={INICIO_APP} replace />;
     }
+    return <>{children}</>;
+  }
+
+  // ========== PÁGINAS PÚBLICAS (com ou sem login) ==========
+  if (isPaginaPublica) {
     return <>{children}</>;
   }
 
