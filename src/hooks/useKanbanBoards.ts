@@ -369,6 +369,8 @@ export function useKanbanBoardCards(boardId: string | undefined) {
       data_prazo?: string;
       /** Vincula a demanda ao cartão logo após criar */
       demanda_id?: string;
+      /** Criação em lote: quem chama mostra um aviso só no fim */
+      silencioso?: boolean;
     }) => {
       if (!boardId) throw new Error('Board não selecionado');
       const { data: user } = await supabase.auth.getUser();
@@ -409,14 +411,14 @@ export function useKanbanBoardCards(boardId: string | undefined) {
       await supabase.from('kanban_boards').update({ updated_at: new Date().toISOString() }).eq('id', boardId);
       return criado as { id: string };
     },
-    onSuccess: () => {
-      toast.success('Cartão criado!');
+    onSuccess: (_d, v) => {
+      if (!v.silencioso) toast.success('Cartão criado!');
       queryClient.invalidateQueries({ queryKey: ['kanban-board-cards', boardId] });
       queryClient.invalidateQueries({ queryKey: ['kanban-boards'] });
       queryClient.invalidateQueries({ queryKey: ['quadro-extras', boardId] });
       queryClient.invalidateQueries({ queryKey: ['inicio-minhas-tarefas'] });
     },
-    onError: (err: any) => toast.error('Erro ao criar card: ' + err.message),
+    onError: (err: any, v) => { if (!v.silencioso) toast.error('Erro ao criar card: ' + err.message); },
   });
 
   const updateCard = useMutation({

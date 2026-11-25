@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DemandaRapida } from "@/components/demandas/DemandaRapida";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { CheckSquare, Link2, MessageSquare, History, Trash2, X, Plus, Lock } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,6 +63,7 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
   const { comentarios, addComentario, deleteComentario } = useBoardCardComentarios(card?.id);
   const { colaboradores, incluir: incluirColab, remover: removerColab } = useColaboradoresCartao(card?.id, boardId);
   const { demandas, vincular, desvincular } = useDemandasCartao(card?.id, boardId);
+  const { finalSlugs } = useDemandaStatus();
   const historico = useHistoricoCartao(card?.id);
 
   const [aba, setAba] = useState("detalhes");
@@ -121,7 +123,12 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
 
   const naoColaboradores = pessoas.filter((p) => p.id !== card.responsavel_id && !colaboradores.includes(p.id));
   const coluna = colunas.find((c) => c.id === card.coluna_id);
-  const atrasado = card.data_prazo && !colunaEhFinal(coluna || {}) && card.data_prazo < new Date().toISOString().slice(0, 10);
+  // Sem prazo próprio, vale o da demanda vinculada (o mais próximo entre as em aberto)
+  const prazoDemanda = !card.data_prazo
+    ? demandas.filter((d) => d.data_prazo && !finalSlugs.includes(d.status)).sort((a, b) => String(a.data_prazo).localeCompare(String(b.data_prazo)))[0]
+    : undefined;
+  const prazoValido = card.data_prazo || prazoDemanda?.data_prazo || null;
+  const atrasado = prazoValido && !colunaEhFinal(coluna || {}) && prazoValido < new Date().toISOString().slice(0, 10);
 
   return (
     <Sheet open={!!card} onOpenChange={onOpenChange}>
@@ -163,6 +170,11 @@ export function CartaoProjetoDrawer({ boardId, boardNome, card, colunas, editave
                 <label className="text-xs font-medium text-muted-foreground" htmlFor="prazo-cartao">Prazo {atrasado && <span className="text-destructive font-semibold">· atrasado</span>}</label>
                 <Input id="prazo-cartao" type="date" className="h-9" value={card.data_prazo || ""} disabled={!editavel}
                   onChange={(e) => salvar({ data_prazo: e.target.value || null } as any)} />
+                {prazoDemanda && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Vale o prazo da demanda #{prazoDemanda.protocolo}: <strong className="text-foreground">{new Date(prazoDemanda.data_prazo + "T12:00:00").toLocaleDateString("pt-BR")}</strong>. Preencha só se o cartão tiver outro prazo.
+                  </p>
+                )}
               </div>
             </div>
 

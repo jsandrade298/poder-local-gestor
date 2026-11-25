@@ -17,14 +17,48 @@ import { normalizarBusca } from "@/lib/busca";
 
 /**
  * Período escolhido, como texto (guardado no navegador):
+ *   "semana" | "quinzena" | "mes"   a semana (seg–dom), a quinzena (1–15 / 16–fim)
+ *                                    ou o mês corrente; ":-1", ":-2"… voltam períodos
  *   "3" | "6" | "12"   últimos N meses
  *   "ano-2026"         o ano inteiro (até hoje, se for o ano atual)
  *   "tudo"             desde a primeira demanda registrada (mandato todo no sistema)
  */
 export type Periodo = string;
+export type PeriodoCurto = "semana" | "quinzena" | "mes";
 
 export function periodoValido(p: string | null | undefined): p is Periodo {
-  return !!p && (/^(3|6|12)$/.test(p) || /^ano-\d{4}$/.test(p) || p === "tudo");
+  return !!p && (/^(3|6|12)$/.test(p) || /^ano-\d{4}$/.test(p) || p === "tudo" || /^(semana|quinzena|mes)(:-\d+)?$/.test(p));
+}
+
+/** "semana:-2" → { tipo: "semana", desloc: -2 }; períodos longos → null */
+export function lerPeriodoCurto(p: Periodo): { tipo: PeriodoCurto; desloc: number } | null {
+  const m = p.match(/^(semana|quinzena|mes)(?::(-\d+))?$/);
+  return m ? { tipo: m[1] as PeriodoCurto, desloc: Math.min(0, Number(m[2] || 0)) } : null;
+}
+
+const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const diaMes = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+/** Começo e fim (completo) de uma semana/quinzena/mês, contando a partir de hoje. */
+function janelaCurta(tipo: PeriodoCurto, desloc: number, hoje: Date) {
+  if (tipo === "semana") {
+    const inicio = inicioSemana(hoje);
+    inicio.setDate(inicio.getDate() + 7 * desloc);
+    const fim = new Date(inicio); fim.setDate(fim.getDate() + 6);
+    return { inicio, fim };
+  }
+  if (tipo === "mes") {
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + desloc, 1);
+    return { inicio, fim: new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0) };
+  }
+  // Quinzena: 1ª = dias 1 a 15; 2ª = dia 16 até o fim do mês
+  const idx = hoje.getFullYear() * 24 + hoje.getMonth() * 2 + (hoje.getDate() > 15 ? 1 : 0) + desloc;
+  const ano = Math.floor(idx / 24), mes = Math.floor((idx % 24) / 2), segunda = idx % 2 === 1;
+  return {
+    inicio: new Date(ano, mes, segunda ? 16 : 1),
+    fim: segunda ? new Date(ano, mes + 1, 0) : new Date(ano, mes, 15),
+    segunda,
+  };
 }
 
 const NOMES_MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -101,24 +135,30 @@ function inicioMes(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-function chaveBalde(d: Date, mensal: boolean) {
-  return isoDia(mensal ? inicioMes(d) : inicioSemana(d));
+/** Tamanho de cada barra/ponto dos gráficos de tempo */
+export type Escala = "dia" | "semana" | "mes";
+
+function chaveBalde(d: Date, escala: Escala) {
+  if (escala === "dia") { const x = new Date(d); x.setHours(0, 0, 0, 0); return isoDia(x); }
+  return isoDia(escala === "mes" ? inicioMes(d) : inicioSemana(d));
 }
 
-function rotuloBalde(chave: string, mensal: boolean) {
+function rotuloBalde(chave: string, escala: Escala, poucosDias = false) {
   const d = new Date(chave + "T12:00:00");
-  return mensal
+  if (escala === "dia") return poucosDias ? `${DIAS_SEMANA[d.getDay()]} ${d.getDate()}` : diaMes(d);
+  return escala === "mes"
     ? d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", "")
-    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    : diaMes(d);
 }
 
-function gerarBaldes(inicio: Date, fim: Date, mensal: boolean) {
+function gerarBaldes(inicio: Date, fim: Date, escala: Escala) {
   const chaves: string[] = [];
-  const cursor = mensal ? inicioMes(inicio) : inicioSemana(inicio);
+  const cursor = escala === "mes" ? inicioMes(inicio) : escala === "semana" ? inicioSemana(inicio) : new Date(inicio);
+  cursor.setHours(0, 0, 0, 0);
   while (cursor <= fim) {
     chaves.push(isoDia(cursor));
-    if (mensal) cursor.setMonth(cursor.getMonth() + 1);
-    else cursor.setDate(cursor.getDate() + 7);
+    if (escala === "mes") cursor.setMonth(cursor.getMonth() + 1);
+    else cursor.setDate(cursor.getDate() + (escala === "semana" ? 7 : 1));
   }
   return chaves;
 }
@@ -189,9 +229,37 @@ export function useAnalisesData(periodo: Periodo) {
 
     let inicio: Date;
     let fim: Date = hoje;
-    let rotulo: string;      // "nos últimos 6 meses", "em 2026", "desde fev/2026"
-    let rotuloCurto: string; // "6m", "2026", "total"
-    if (periodo.startsWith("ano-")) {
+    let rotulo: string;      // "nos últimos 6 meses", "em 2026", "desde fev/2026", "nesta semana (23/11 a 29/11)"
+    let rotuloCurto: string; // "6m", "2026", "total", "semana"
+    const curto = lerPeriodoCurto(periodo);
+    let navegacao: null | { tipo: PeriodoCurto; desloc: number; podeVoltar: boolean; podeAvancar: boolean; completo: boolean } = null;
+    let anterior: null | { inicio: Date; fim: Date; rotulo: string } = null;
+    if (curto) {
+      const j = janelaCurta(curto.tipo, curto.desloc, hoje);
+      inicio = j.inicio;
+      fim = j.fim > hoje ? hoje : j.fim;
+      const faixa = `${diaMes(j.inicio)} a ${diaMes(j.fim)}`;
+      const nomeMes = j.inicio.toLocaleDateString("pt-BR", { month: "long" });
+      if (curto.tipo === "semana") {
+        rotulo = curto.desloc === 0 ? `nesta semana (${faixa})` : curto.desloc === -1 ? `na semana passada (${faixa})` : `na semana de ${faixa}`;
+        rotuloCurto = "semana";
+      } else if (curto.tipo === "quinzena") {
+        rotulo = `${curto.desloc === 0 ? "nesta quinzena" : `na ${j.segunda ? "2ª" : "1ª"} quinzena de ${nomeMes}`} (${faixa}${j.inicio.getFullYear() !== anoAtual ? "/" + j.inicio.getFullYear() : ""})`;
+        rotuloCurto = "quinzena";
+      } else {
+        rotulo = curto.desloc === 0 ? `neste mês (${mesAno(j.inicio)})` : curto.desloc === -1 ? `no mês passado (${mesAno(j.inicio)})` : `em ${mesAno(j.inicio)}`;
+        rotuloCurto = "mês";
+      }
+      // Comparação justa: o período anterior até o MESMO ponto (ex.: seg–qua com seg–qua)
+      const ja = janelaCurta(curto.tipo, curto.desloc - 1, hoje);
+      const decorrido = fim.getTime() - inicio.getTime();
+      const fimAnt = new Date(Math.min(ja.fim.getTime(), ja.inicio.getTime() + decorrido));
+      anterior = {
+        inicio: ja.inicio, fim: fimAnt,
+        rotulo: curto.tipo === "semana" ? "à semana anterior" : curto.tipo === "quinzena" ? "à quinzena anterior" : "ao mês anterior",
+      };
+      navegacao = { ...curto, podeVoltar: j.inicio > primeira, podeAvancar: curto.desloc < 0, completo: j.fim <= hoje };
+    } else if (periodo.startsWith("ano-")) {
       const ano = Number(periodo.slice(4));
       inicio = new Date(ano, 0, 1);
       fim = ano < anoAtual ? new Date(ano, 11, 31) : hoje;
@@ -210,8 +278,11 @@ export function useAnalisesData(periodo: Periodo) {
     }
     const fimDoDia = new Date(fim);
     fimDoDia.setHours(23, 59, 59, 999);
-    // Semanas até ~6 meses; acima disso, meses
-    const mensal = (fim.getTime() - inicio.getTime()) / 86400000 > 190;
+    // Dias até ~1,5 mês; semanas até ~6 meses; acima disso, meses
+    const diasNoPeriodo = (fim.getTime() - inicio.getTime()) / 86400000;
+    const escala: Escala = diasNoPeriodo > 190 ? "mes" : diasNoPeriodo > 45 ? "semana" : "dia";
+    const mensal = escala === "mes";
+    const poucosDias = curto?.tipo === "semana";
 
     const noPeriodo = (iso: string) => {
       const d = new Date(iso);
@@ -221,32 +292,47 @@ export function useAnalisesData(periodo: Periodo) {
     const concluidas = demandas.filter((d) => ehFinal(d.status) && noPeriodo(d.updated_at));
     const abertas = demandas.filter((d) => !ehFinal(d.status));
 
+    // Mesmo recorte no período anterior (só nos períodos curtos)
+    let comparacao: null | { entraram: number; concluidas: number; rotulo: string } = null;
+    if (anterior) {
+      const ini = anterior.inicio, f = new Date(anterior.fim); f.setHours(23, 59, 59, 999);
+      const noAnterior = (iso: string) => { const d = new Date(iso); return d >= ini && d <= f; };
+      comparacao = {
+        entraram: demandas.filter((d) => noAnterior(d.created_at)).length,
+        concluidas: demandas.filter((d) => ehFinal(d.status) && noAnterior(d.updated_at)).length,
+        rotulo: anterior.rotulo,
+      };
+    }
+
     // ── Entrada × conclusão por semana/mês ──
-    const chaves = gerarBaldes(inicio, fim, mensal);
+    // Períodos curtos mostram o período inteiro (os dias que ainda vão chegar ficam zerados)
+    const chaves = gerarBaldes(inicio, curto ? janelaCurta(curto.tipo, curto.desloc, hoje).fim : fim, escala);
     const entradaPor = new Map<string, number>();
     const conclusaoPor = new Map<string, number>();
     entraram.forEach((d) => {
-      const k = chaveBalde(new Date(d.created_at), mensal);
+      const k = chaveBalde(new Date(d.created_at), escala);
       entradaPor.set(k, (entradaPor.get(k) || 0) + 1);
     });
     concluidas.forEach((d) => {
-      const k = chaveBalde(new Date(d.updated_at), mensal);
+      const k = chaveBalde(new Date(d.updated_at), escala);
       conclusaoPor.set(k, (conclusaoPor.get(k) || 0) + 1);
     });
+    // Dias que ainda não chegaram ficam vazios (sem linha), não como zero
+    const futuro = (k: string) => k > hojeIso;
     const fluxo = chaves.map((k) => ({
       chave: k,
-      rotulo: rotuloBalde(k, mensal),
-      entrada: entradaPor.get(k) || 0,
-      conclusao: conclusaoPor.get(k) || 0,
+      rotulo: rotuloBalde(k, escala, poucosDias),
+      entrada: futuro(k) ? (null as unknown as number) : entradaPor.get(k) || 0,
+      conclusao: futuro(k) ? (null as unknown as number) : conclusaoPor.get(k) || 0,
     }));
 
     // Primeiro mês/semana muito acima dos outros = cadastro em massa ao começar
     // a usar o sistema (importação). Avisamos para não ler como "pico de pedidos".
     let picoInicial: { rotulo: string; valor: number } | null = null;
-    const primeiroBalde = chaveBalde(primeira, mensal);
+    const primeiroBalde = chaveBalde(primeira, escala);
     const idxPico = fluxo.findIndex((f) => f.chave === primeiroBalde);
     if (idxPico >= 0 && fluxo.length >= 4) {
-      const outros = fluxo.filter((_, i) => i !== idxPico).map((f) => f.entrada).filter((v) => v > 0).sort((a, b) => a - b);
+      const outros = fluxo.filter((_, i) => i !== idxPico).map((f) => f.entrada).filter((v) => v > 0).sort((a, b) => a - b); // null (futuro) não passa em v > 0
       const med = outros.length ? outros[Math.floor(outros.length / 2)] : 0;
       if (med > 0 && fluxo[idxPico].entrada > med * 3) {
         picoInicial = { rotulo: fluxo[idxPico].rotulo, valor: fluxo[idxPico].entrada };
@@ -334,14 +420,14 @@ export function useAnalisesData(periodo: Periodo) {
       const novos = municipes.filter((m) => noPeriodo(m.created_at));
       const novosMap = new Map<string, number>();
       novos.forEach((m) => {
-        const k = chaveBalde(new Date(m.created_at), mensal);
+        const k = chaveBalde(new Date(m.created_at), escala);
         novosMap.set(k, (novosMap.get(k) || 0) + 1);
       });
       const telValido = municipes.filter((m) => (m.telefone || "").replace(/\D/g, "").replace(/^55/, "").length >= 10).length;
       base = {
         total: municipes.length,
         novosNoPeriodo: novos.length,
-        novosPor: chaves.map((k) => ({ rotulo: rotuloBalde(k, mensal), chave: k, valor: novosMap.get(k) || 0 })),
+        novosPor: chaves.map((k) => ({ rotulo: rotuloBalde(k, escala, poucosDias), chave: k, valor: k > hojeIso ? (null as unknown as number) : novosMap.get(k) || 0 })),
         telefone: cobertura(telValido, municipes.length),
         bairro: cobertura(municipes.filter((m) => m.bairro && m.bairro.trim()).length, municipes.length),
         nascimento: cobertura(municipes.filter((m) => m.data_nascimento).length, municipes.length),
@@ -361,7 +447,9 @@ export function useAnalisesData(periodo: Periodo) {
 
     return {
       mensal,
-      periodo: { rotulo, rotuloCurto, anosDisponiveis, ehPassado: fim < hoje },
+      escala,
+      comparacao,
+      periodo: { rotulo, rotuloCurto, anosDisponiveis, ehPassado: fim < hoje, navegacao },
       geral,
       picoInicial,
       totais: {

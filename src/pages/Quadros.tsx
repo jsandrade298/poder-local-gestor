@@ -91,17 +91,31 @@ export default function Quadros() {
     enabled: !!uid,
     queryFn: async () => {
       const hoje = new Date().toISOString().slice(0, 10);
-      const [colunas, cards] = await Promise.all([
+      const [colunas, cards, vinculos, status] = await Promise.all([
         fetchAll((f, t) => supabase.from("kanban_board_colunas").select("id, nome, slug").order("id").range(f, t) as any),
         fetchAll((f, t) => supabase.from("kanban_board_cards").select("id, board_id, coluna_id, data_prazo").is("arquivado_em", null).order("id").range(f, t) as any),
+        // Cartão sem prazo próprio usa o prazo da demanda vinculada
+        fetchAll((f, t) => supabase.from("kanban_board_card_demandas").select("id, card_id, demandas(data_prazo, status)").order("id").range(f, t) as any),
+        supabase.from("demanda_status").select("slug, is_final"),
       ]);
       const final = new Set((colunas as any[]).filter(colunaEhFinal).map((c) => c.id));
+      const statusFinal = new Set(((status as any).data ?? []).filter((x: any) => x.is_final).map((x: any) => x.slug));
+      const prazoDemanda = new Map<string, string>();
+      (vinculos as any[]).forEach((v) => {
+        const d = v.demandas;
+        if (!d?.data_prazo || statusFinal.has(d.status)) return;
+        const atual = prazoDemanda.get(v.card_id);
+        if (!atual || d.data_prazo < atual) prazoDemanda.set(v.card_id, d.data_prazo);
+      });
       const porQuadro = new Map<string, Resumo>();
       (cards as any[]).forEach((c) => {
         const r = porQuadro.get(c.board_id) || { total: 0, concluidos: 0, atrasados: 0 };
         r.total++;
         if (final.has(c.coluna_id)) r.concluidos++;
-        else if (c.data_prazo && c.data_prazo < hoje) r.atrasados++;
+        else {
+          const prazo = c.data_prazo || prazoDemanda.get(c.id);
+          if (prazo && prazo < hoje) r.atrasados++;
+        }
         porQuadro.set(c.board_id, r);
       });
       return { porQuadro };

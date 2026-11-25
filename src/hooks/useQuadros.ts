@@ -135,6 +135,13 @@ export interface DemandaNoCartao {
   titulo: string;
   status: string;
   municipe_id: string | null;
+  /** Dados essenciais mostrados no cartão */
+  descricao?: string | null;
+  data_prazo?: string | null;
+  created_at?: string | null;
+  responsavel_id?: string | null;
+  area?: string | null;
+  municipe?: string | null;
 }
 
 export function useExtrasDoQuadro(boardId: string | undefined) {
@@ -144,7 +151,7 @@ export function useExtrasDoQuadro(boardId: string | undefined) {
     queryFn: async () => {
       const [c, d] = await Promise.all([
         fetchAll((f, t) => supabase.from("kanban_board_card_colaboradores").select("id, card_id, usuario_id, kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!).order("id").range(f, t) as any),
-        fetchAll((f, t) => supabase.from("kanban_board_card_demandas").select("id, card_id, demanda_id, demandas(protocolo, titulo, status, municipe_id), kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!).order("id").range(f, t) as any),
+        fetchAll((f, t) => supabase.from("kanban_board_card_demandas").select("id, card_id, demanda_id, demandas(protocolo, titulo, status, municipe_id, descricao, data_prazo, created_at, responsavel_id, areas(nome), municipes(nome)), kanban_board_cards!inner(board_id)").eq("kanban_board_cards.board_id", boardId!).order("id").range(f, t) as any),
       ]);
       const colab = new Map<string, string[]>();
       (c as any[]).forEach((r) => colab.set(r.card_id, [...(colab.get(r.card_id) || []), r.usuario_id]));
@@ -153,6 +160,9 @@ export function useExtrasDoQuadro(boardId: string | undefined) {
       (d as any[]).filter((r) => r.demandas).forEach((r) => dems.set(r.card_id, [...(dems.get(r.card_id) || []), {
         id: r.demanda_id, protocolo: r.demandas?.protocolo, titulo: r.demandas?.titulo,
         status: r.demandas?.status, municipe_id: r.demandas?.municipe_id ?? null,
+        descricao: r.demandas?.descricao ?? null, data_prazo: r.demandas?.data_prazo ?? null,
+        created_at: r.demandas?.created_at ?? null, responsavel_id: r.demandas?.responsavel_id ?? null,
+        area: r.demandas?.areas?.nome ?? null, municipe: r.demandas?.municipes?.nome ?? null,
       }]));
       return { colab, dems };
     },
@@ -207,11 +217,11 @@ export function useDemandasCartao(cardId: string | undefined, boardId: string | 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("kanban_board_card_demandas")
-        .select("demanda_id, demandas(id, protocolo, titulo, status)")
+        .select("demanda_id, demandas(id, protocolo, titulo, status, data_prazo)")
         .eq("card_id", cardId!)
         .order("created_at");
       if (error) throw error;
-      return (data ?? []).map((r: any) => r.demandas).filter(Boolean) as { id: string; protocolo: string; titulo: string; status: string }[];
+      return (data ?? []).map((r: any) => r.demandas).filter(Boolean) as { id: string; protocolo: string; titulo: string; status: string; data_prazo: string | null }[];
     },
   });
   const invalidar = () => {

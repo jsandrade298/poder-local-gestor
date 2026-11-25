@@ -3,13 +3,14 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, LabelList,
 } from "recharts";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  useAnalisesData, Periodo, periodoValido, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
+  useAnalisesData, Periodo, periodoValido, lerPeriodoCurto, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
 } from "@/hooks/useAnalisesData";
 import { cn } from "@/lib/utils";
 
@@ -143,6 +144,9 @@ function Medidor({ rotulo, cob }: { rotulo: string; cob: Cobertura }) {
 // ─── Tela ───────────────────────────────────────────────────────
 
 const PERIODOS: { v: Periodo; rotulo: string }[] = [
+  { v: "semana", rotulo: "Semana" },
+  { v: "quinzena", rotulo: "Quinzena" },
+  { v: "mes", rotulo: "Mês" },
   { v: "3", rotulo: "3 meses" },
   { v: "6", rotulo: "6 meses" },
   { v: "12", rotulo: "12 meses" },
@@ -162,7 +166,24 @@ export default function Analises() {
   };
 
   const { dados, carregando, carregandoBase, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo);
-  const unidadeTempo = dados?.mensal ? "mês" : "semana";
+  const unidadeTempo = dados?.escala === "mes" ? "mês" : dados?.escala === "dia" ? "dia" : "semana";
+  // Semana/quinzena/mês: o botão fica marcado mesmo vendo um período anterior
+  const tipoCurto = lerPeriodoCurto(periodo)?.tipo;
+  const marcado = (v: Periodo) => periodo === v || tipoCurto === v;
+  const nav = dados?.periodo.navegacao;
+  const andarPeriodo = (n: number) => {
+    if (!nav) return;
+    const d = Math.min(0, nav.desloc + n);
+    escolherPeriodo(d === 0 ? nav.tipo : `${nav.tipo}:${d}`);
+  };
+  /** "+3 (antes 5)" comparando com o mesmo trecho do período anterior */
+  const comparar = (agora: number, antes: number | undefined) => {
+    if (antes === undefined || !dados?.comparacao) return null;
+    const dif = agora - antes;
+    return dif === 0
+      ? `igual ${dados.comparacao.rotulo} (${num(antes)})`
+      : `${dif > 0 ? "+" : ""}${num(dif)} em relação ${dados.comparacao.rotulo} (${num(antes)})`;
+  };
   const anos = dados?.periodo.anosDisponiveis ?? [new Date().getFullYear()];
   const anoEscolhido = periodo.startsWith("ano-") ? periodo : "";
 
@@ -178,10 +199,11 @@ export default function Analises() {
           <div className="inline-flex flex-wrap rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Período">
             {PERIODOS.map((p) => (
               <button
-                key={p.v} type="button" role="radio" aria-checked={periodo === p.v}
+                key={p.v} type="button" role="radio" aria-checked={marcado(p.v)}
                 onClick={() => escolherPeriodo(p.v)}
                 className={cn("px-3 py-1.5 text-sm rounded-md transition-colors",
-                  periodo === p.v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
+                  p.v === "3" && "sm:ml-1.5 sm:border-l sm:rounded-l-none sm:pl-3.5",
+                  marcado(p.v) ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
               >
                 {p.rotulo}
               </button>
@@ -237,14 +259,32 @@ export default function Analises() {
             </dl>
           </div>
 
-          <h2 className="text-sm font-semibold text-muted-foreground pt-1 first-letter:uppercase">
-            {dados.periodo.rotulo}
-          </h2>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {nav && (
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => andarPeriodo(-1)} disabled={!nav.podeVoltar}
+                aria-label={nav.tipo === "semana" ? "Semana anterior" : nav.tipo === "quinzena" ? "Quinzena anterior" : "Mês anterior"}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <h2 className="text-sm font-semibold text-muted-foreground first-letter:uppercase">{dados.periodo.rotulo}</h2>
+            {nav && (
+              <>
+                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => andarPeriodo(1)} disabled={!nav.podeAvancar}
+                  aria-label={nav.tipo === "semana" ? "Próxima semana" : nav.tipo === "quinzena" ? "Próxima quinzena" : "Próximo mês"}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {nav.desloc < 0 && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => escolherPeriodo(nav.tipo)}>Voltar para a atual</Button>}
+                {!nav.completo && <span className="text-[11px] text-muted-foreground">em andamento, até hoje</span>}
+              </>
+            )}
+          </div>
 
           {/* Indicadores do período */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Indicador rotulo="Entraram" valor={num(dados.totais.entraram)} detalhe={`demandas novas ${dados.periodo.rotulo}`} />
-            <Indicador rotulo="Concluídas" valor={num(dados.totais.concluidas)} detalhe="estimado pela última alteração" />
+            <Indicador rotulo="Entraram" valor={num(dados.totais.entraram)}
+              detalhe={comparar(dados.totais.entraram, dados.comparacao?.entraram) ?? `demandas novas ${dados.periodo.rotulo}`} />
+            <Indicador rotulo="Concluídas" valor={num(dados.totais.concluidas)}
+              detalhe={comparar(dados.totais.concluidas, dados.comparacao?.concluidas) ?? "estimado pela última alteração"} />
             <Indicador
               rotulo="Saldo da fila"
               valor={(dados.totais.saldo > 0 ? "+" : "") + num(dados.totais.saldo)}
@@ -288,8 +328,8 @@ export default function Analises() {
                   <XAxis dataKey="rotulo" tick={EIXO} tickLine={false} axisLine={{ stroke: COR.eixo }} interval="preserveStartEnd" minTickGap={16} />
                   <YAxis tick={EIXO} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
                   <Tooltip content={<DicaGrafico />} cursor={{ stroke: COR.eixo, strokeWidth: 1 }} />
-                  <Line type="monotone" dataKey="entrada" name="Entraram" stroke={COR.serie1} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} />
-                  <Line type="monotone" dataKey="conclusao" name="Concluídas" stroke={COR.serie2} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} />
+                  <Line type="monotone" dataKey="entrada" name="Entraram" stroke={COR.serie1} strokeWidth={2} dot={dados.escala === "dia" ? { r: 2.5, strokeWidth: 0, fill: COR.serie1 } : false} activeDot={{ r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} />
+                  <Line type="monotone" dataKey="conclusao" name="Concluídas" stroke={COR.serie2} strokeWidth={2} dot={dados.escala === "dia" ? { r: 2.5, strokeWidth: 0, fill: COR.serie2 } : false} activeDot={{ r: 4, strokeWidth: 2, stroke: "hsl(var(--card))" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

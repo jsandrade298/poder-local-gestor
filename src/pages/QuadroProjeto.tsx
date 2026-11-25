@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
-  ArrowLeft, Users, Plus, Lock, AlertTriangle, CheckSquare, MessageSquare, Link2,
+  ArrowLeft, Users, Plus, Lock, AlertTriangle, Link2,
   MoreHorizontal, Settings2, UserPlus, Eye, Pencil, Archive, ArchiveRestore, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BoardColumnConfig } from "@/components/kanban/BoardColumnConfig";
 import { CartaoProjetoDrawer, Avatar } from "@/components/quadros/CartaoProjetoDrawer";
 import { AcoesProjeto } from "@/components/quadros/AcoesProjeto";
+import { CartaoDoQuadro, prazoDoCartao } from "@/components/quadros/CartaoDoQuadro";
+import { BarraRolagem } from "@/components/quadros/BarraRolagem";
+import { TrazerDemandasDialog, type DemandaParaQuadro } from "@/components/quadros/TrazerDemandasDialog";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -30,7 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useKanbanBoards, useKanbanBoardColunas, useKanbanBoardCards, KanbanBoardCard } from "@/hooks/useKanbanBoards";
 import { useBoardCardCounts } from "@/hooks/useBoardCardExtras";
 import {
-  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, useBuscaDemandas, avisar, colunaEhFinal, useCartoesArquivados, useProjetosArquivados,
+  useMembrosQuadro, useExtrasDoQuadro, usePessoasGabinete, avisar, colunaEhFinal, useCartoesArquivados, useProjetosArquivados,
   etapaComoKanban, nomeDoQuadro,
 } from "@/hooks/useQuadros";
 import { normalizarBusca } from "@/lib/busca";
@@ -66,9 +70,14 @@ export default function QuadroProjeto() {
   const { colunas, isLoading: carregandoColunas } = useKanbanBoardColunas(boardId);
   const { cards, isLoading: carregandoCards, createCard, moveCard, archiveCard, deleteCard } = useKanbanBoardCards(boardId);
   const arquivados = useCartoesArquivados(boardId);
-  // Celular: uma etapa por vez (abas no topo), sem rolar para o lado
+  // Celular: as etapas lado a lado, deslizando (com a barra e as abas para pular)
   const celular = useIsMobile();
   const [etapaCel, setEtapaCel] = useState<string | null>(null);
+  const trilho = useRef<HTMLDivElement>(null);
+  const [arrastando, setArrastando] = useState(false);
+  // Cartões detalhados (padrão) ou compactos, lembrado por navegador
+  const [detalhado, setDetalhado] = useState(() => { try { return localStorage.getItem("quadros-cartoes") !== "compacto"; } catch { return true; } });
+  const escolherDetalhe = (v: boolean) => { setDetalhado(v); try { localStorage.setItem("quadros-cartoes", v ? "detalhado" : "compacto"); } catch { /* sem storage */ } };
   const [arquivadosAberto, setArquivadosAberto] = useState(false);
   const [cartaoExcluir, setCartaoExcluir] = useState<KanbanBoardCard | null>(null);
   const contagens = useBoardCardCounts(boardId) as any;
@@ -86,10 +95,9 @@ export default function QuadroProjeto() {
   const [membrosAberto, setMembrosAberto] = useState(false);
   const [colunasAberto, setColunasAberto] = useState(false);
   const [demandaAberto, setDemandaAberto] = useState(false);
-  const [buscaDemanda, setBuscaDemanda] = useState("");
-  const resultadosDemanda = useBuscaDemandas(buscaDemanda);
   const [movimentos, setMovimentos] = useState<MovimentoDemandaKanban[]>([]);
-  const { statusList } = useDemandaStatus();
+  const { statusList, finalSlugs } = useDemandaStatus();
+  const statusFinais = useMemo(() => new Set(finalSlugs), [finalSlugs]);
 
   // Quem edita o quadro: pessoal = só o dono; projeto = membros.
   // (O banco garante o mesmo.) Responsável e colaboradores editam o próprio cartão.
@@ -109,7 +117,9 @@ export default function QuadroProjeto() {
   };
 
   const finais = useMemo(() => new Set(colunas.filter(colunaEhFinal).map((c) => c.id)), [colunas]);
-  const atrasado = (c: KanbanBoardCard) => !!c.data_prazo && !finais.has(c.coluna_id) && c.data_prazo < hoje();
+  // Prazo: o do cartão ou, se não tiver, o da demanda vinculada (sem digitar de novo)
+  const prazoDe = (c: KanbanBoardCard) => prazoDoCartao(c, extras.dems.get(c.id) || [], statusFinais);
+  const atrasado = (c: KanbanBoardCard) => { const p = prazoDe(c); return !!p && !finais.has(c.coluna_id) && p.data < hoje(); };
   const pessoasDoCartao = (c: KanbanBoardCard) => [c.responsavel_id, ...(extras.colab.get(c.id) || [])].filter(Boolean) as string[];
 
   const filtrados = useMemo(() => {
@@ -118,12 +128,12 @@ export default function QuadroProjeto() {
       if (soAtrasados && !atrasado(c)) return false;
       if (pessoa !== "todas" && !pessoasDoCartao(c).includes(pessoa)) return false;
       if (palavras.length) {
-        const alvo = normalizarBusca(`${c.titulo} ${c.descricao || ""} ${(extras.dems.get(c.id) || []).map((d) => d.protocolo).join(" ")}`);
+        const alvo = normalizarBusca(`${c.titulo} ${c.descricao || ""} ${(extras.dems.get(c.id) || []).map((d) => `${d.protocolo} ${d.municipe || ""} ${d.area || ""}`).join(" ")}`);
         if (!palavras.every((p) => alvo.includes(p))) return false;
       }
       return true;
     });
-  }, [cards, busca, pessoa, soAtrasados, extras, finais]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cards, busca, pessoa, soAtrasados, extras, finais, statusFinais]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const antigoNaFinal = (c: KanbanBoardCard) =>
     finais.has(c.coluna_id) && dias((c.updated_at || c.created_at).slice(0, 10)) < -DIAS_FINAL_VISIVEL;
@@ -148,6 +158,20 @@ export default function QuadroProjeto() {
     return lista;
   }, [agrupar, colunas, filtrados, finais, verAntigos, membros, porId]); // eslint-disable-line react-hooks/exhaustive-deps
   const grupoCel = grupos.some((g: any) => g.id === etapaCel) ? etapaCel : grupos[0]?.id;
+  /** Celular: a aba marcada acompanha a etapa que está na tela */
+  const sincronizarAba = () => {
+    const el = trilho.current;
+    if (!el) return;
+    const secoes = Array.from(el.querySelectorAll<HTMLElement>("[data-grupo]"));
+    const base = el.getBoundingClientRect().left;
+    const atual = secoes.reduce((melhor, s) => (Math.abs(s.getBoundingClientRect().left - base) < Math.abs(melhor.getBoundingClientRect().left - base) ? s : melhor), secoes[0]);
+    if (atual && atual.dataset.grupo !== etapaCel) setEtapaCel(atual.dataset.grupo || null);
+  };
+  const irParaGrupo = (id: string) => {
+    setEtapaCel(id);
+    const el = trilho.current, sec = el?.querySelector<HTMLElement>(`[data-grupo="${id}"]`);
+    if (el && sec) el.scrollTo({ left: el.scrollLeft + sec.getBoundingClientRect().left - el.getBoundingClientRect().left, behavior: "smooth" });
+  };
 
   const totalFinal = cards.filter((c) => finais.has(c.coluna_id)).length;
   const totalAtrasados = cards.filter(atrasado).length;
@@ -175,13 +199,20 @@ export default function QuadroProjeto() {
     mover(c, r.destination.droppableId, r.destination.index);
   };
 
-  const criarDeDemanda = (d: { id: string; titulo: string; responsavel_id?: string | null }) => {
-    const primeira = colunas[0];
-    if (!primeira) return;
-    createCard.mutate(
-      { coluna_id: primeira.id, titulo: d.titulo, responsavel_id: d.responsavel_id || undefined, demanda_id: d.id, cor: "#0f766e" },
-      { onSuccess: () => { setDemandaAberto(false); setBuscaDemanda(""); } },
-    );
+  // Demandas que já têm cartão neste quadro
+  const demandasNoQuadro = useMemo(() => new Set([...extras.dems.values()].flat().map((d) => d.id)), [extras]);
+
+  /** Cada demanda escolhida vira um cartão vinculado (o prazo vem da própria demanda). */
+  const trazerDemandas = async (lista: DemandaParaQuadro[], colunaId: string) => {
+    let ok = 0;
+    // De 4 em 4, para não esperar uma por uma (nem sobrecarregar o servidor)
+    for (let i = 0; i < lista.length; i += 4) {
+      const lote = await Promise.allSettled(lista.slice(i, i + 4).map((d) =>
+        createCard.mutateAsync({ coluna_id: colunaId, titulo: d.titulo, responsavel_id: d.responsavel_id || undefined, demanda_id: d.id, cor: "#0f766e", silencioso: true })));
+      ok += lote.filter((r) => r.status === "fulfilled").length;
+    }
+    if (ok) toast.success(ok === 1 ? "Demanda trazida para o quadro" : `${ok} demandas trazidas para o quadro`);
+    if (ok < lista.length) toast.error(`${lista.length - ok} não ${lista.length - ok === 1 ? "pôde" : "puderam"} ser trazida${lista.length - ok === 1 ? "" : "s"}. Tente de novo.`);
   };
 
   const criar = (colunaId: string) => {
@@ -311,6 +342,12 @@ export default function QuadroProjeto() {
         <Button variant={soAtrasados ? "default" : "outline"} size="sm" className="h-9 gap-1.5" onClick={() => setSoAtrasados(!soAtrasados)} aria-pressed={soAtrasados}>
           <AlertTriangle className="h-3.5 w-3.5" /> Só atrasados
         </Button>
+        <div className="flex rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Como mostrar os cartões">
+          {([[true, "Detalhados"], [false, "Compactos"]] as const).map(([v, r]) => (
+            <button key={r} type="button" role="radio" aria-checked={detalhado === v} onClick={() => escolherDetalhe(v)}
+              className={cn("px-2.5 py-1 text-xs rounded-md", detalhado === v ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>{r}</button>
+          ))}
+        </div>
         <span className="flex-1" />
         {(arquivados.data?.length ?? 0) > 0 && (
           <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={() => setArquivadosAberto(true)}>
@@ -330,13 +367,13 @@ export default function QuadroProjeto() {
         )}
       </div>
 
-      {/* Celular: escolher a etapa (ou a pessoa) */}
+      {/* Celular: atalhos para cada etapa (ou pessoa); a de agora fica marcada */}
       {celular && grupos.length > 1 && (
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={agrupar === "etapa" ? "Etapas" : "Pessoas"}>
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5 [scrollbar-width:none]" role="tablist" aria-label={agrupar === "etapa" ? "Etapas" : "Pessoas"}>
           {grupos.map((g: any) => (
             <button key={g.id} type="button" role="tab" aria-selected={g.id === grupoCel}
-              onClick={() => setEtapaCel(g.id)}
-              className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
+              onClick={() => irParaGrupo(g.id)}
+              className={cn("flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
                 g.id === grupoCel ? "border-primary bg-primary text-primary-foreground font-semibold" : "bg-card text-muted-foreground")}>
               {g.cor && <span className="h-2 w-2 rounded-full" style={{ background: g.cor }} aria-hidden />}
               <span className="max-w-[9rem] truncate">{g.nome}</span>
@@ -346,15 +383,19 @@ export default function QuadroProjeto() {
         </div>
       )}
 
-      {/* Colunas */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className={cn("flex gap-3 pb-3 items-start", celular ? "flex-col" : "overflow-x-auto -mx-1 px-1")}>
-          {grupos.filter((g: any) => !celular || g.id === grupoCel).map((g: any) => (
+      {/* Barra de rolagem lateral, sempre à vista (a nativa fica lá embaixo) */}
+      <BarraRolagem alvo={trilho} />
+
+      {/* Colunas (lado a lado; no celular, deslizando de uma em uma) */}
+      <DragDropContext onDragStart={() => setArrastando(true)} onDragEnd={(r) => { setArrastando(false); onDragEnd(r); }}>
+        <div ref={trilho} onScroll={celular ? sincronizarAba : undefined}
+          className={cn("flex gap-3 pb-3 items-start overflow-x-auto -mx-1 px-1 overscroll-x-contain", celular && !arrastando && "snap-x snap-mandatory")}>
+          {grupos.map((g: any) => (
             <Droppable key={g.id} droppableId={g.id} isDropDisabled={agrupar !== "etapa"}>
               {(prov, snap) => (
                 <section
-                  ref={prov.innerRef} {...prov.droppableProps}
-                  className={cn(celular ? "w-full" : "flex-[0_0_290px]", "rounded-xl bg-muted/40 p-2.5 space-y-2 min-h-[120px]", snap.isDraggingOver && "ring-2 ring-primary/40")}
+                  ref={prov.innerRef} {...prov.droppableProps} data-grupo={g.id}
+                  className={cn(celular ? "flex-[0_0_86%] snap-start" : "flex-[0_0_290px]", "rounded-xl bg-muted/40 p-2.5 space-y-2 min-h-[120px]", snap.isDraggingOver && "ring-2 ring-primary/40")}
                   aria-label={g.nome}
                 >
                   <div className="flex items-center justify-between px-1">
@@ -376,10 +417,11 @@ export default function QuadroProjeto() {
                           role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && abrir(c.id)}
                           aria-label={c.titulo}
                         >
-                          {c.cor && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r" style={{ background: c.cor }} aria-hidden />}
-                          <div className="flex items-start gap-1 pl-1.5">
-                            <h3 className="text-[13px] font-medium leading-snug flex-1 min-w-0 break-words">{c.titulo}</h3>
-                            {podeEditar(c) && agrupar === "etapa" && (
+                          <CartaoDoQuadro
+                            c={c} dems={extras.dems.get(c.id) || []} prazo={prazoDe(c)} concluido={finais.has(c.coluna_id)}
+                            pessoas={pessoasDoCartao(c)} nomeDe={(id) => porId.get(id)?.nome} detalhado={detalhado}
+                            contagens={{ checklist: contagens?.checklist?.[c.id], comentarios: contagens?.comentarios?.[c.id] }}
+                            menu={podeEditar(c) && agrupar === "etapa" && (
                               <div onClick={(e) => e.stopPropagation()} className="md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 -mr-1 -mt-1">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Ações do cartão"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -401,27 +443,7 @@ export default function QuadroProjeto() {
                                 </DropdownMenu>
                               </div>
                             )}
-                          </div>
-                          {(extras.dems.get(c.id) || []).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5 pl-1.5">
-                              {(extras.dems.get(c.id) || []).slice(0, 2).map((d) => (
-                                <span key={d.id} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[10.5px] font-medium px-2 py-0.5"><Link2 className="h-3 w-3" />#{d.protocolo}</span>
-                              ))}
-                              {(extras.dems.get(c.id) || []).length > 2 && <span className="rounded-full bg-muted text-[10.5px] px-2 py-0.5">+{(extras.dems.get(c.id) || []).length - 2}</span>}
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between gap-2 mt-2 pl-1.5">
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                              {c.data_prazo && (atrasado(c)
-                                ? <span className="rounded-full bg-destructive/10 text-destructive font-semibold px-2 py-0.5">Atrasado {-dias(c.data_prazo)}d</span>
-                                : !finais.has(c.coluna_id) && dias(c.data_prazo) <= 2
-                                  ? <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold px-2 py-0.5">{dias(c.data_prazo) === 0 ? "Vence hoje" : `Vence em ${dias(c.data_prazo)}d`}</span>
-                                  : <span>📅 {new Date(c.data_prazo + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>)}
-                              {contagens?.checklist?.[c.id]?.total > 0 && <span className="flex items-center gap-0.5"><CheckSquare className="h-3 w-3" />{contagens.checklist[c.id].done}/{contagens.checklist[c.id].total}</span>}
-                              {contagens?.comentarios?.[c.id] > 0 && <span className="flex items-center gap-0.5"><MessageSquare className="h-3 w-3" />{contagens.comentarios[c.id]}</span>}
-                            </div>
-                            <div className="flex -space-x-1.5">{pessoasDoCartao(c).slice(0, 4).map((pid) => <Avatar key={pid} id={pid} nome={porId.get(pid)?.nome} size={22} />)}</div>
-                          </div>
+                          />
                         </div>
                       )}
                     </Draggable>
@@ -461,7 +483,7 @@ export default function QuadroProjeto() {
       <p className="text-xs text-muted-foreground">
         {agrupar === "pessoa"
           ? "Agrupar por pessoa mostra o que está em aberto com cada pessoa (responsável ou colaborador). Para mover, volte para Etapa."
-          : celular ? "Toque numa etapa acima para ver os cartões dela. Para mudar um cartão de etapa, use o menu ⋯ dele." : "Arraste os cartões entre as etapas. Atrasos aparecem sozinhos pelo prazo."}
+          : celular ? "Deslize para o lado (ou toque numa etapa acima) para passar pelas etapas. Para mudar um cartão de etapa, use o menu ⋯ dele ou segure e arraste." : "Arraste os cartões entre as etapas. O prazo da demanda vale para o cartão que não tiver um próprio; atrasos aparecem sozinhos."}
       </p>
 
       {/* Membros */}
@@ -504,35 +526,9 @@ export default function QuadroProjeto() {
 
       {aviso && <div role="status" className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-6 z-50 rounded-md bg-foreground text-background px-4 py-2 text-sm shadow-lg">{aviso}</div>}
 
-      {/* Trazer uma demanda para o quadro */}
-      <Dialog open={demandaAberto} onOpenChange={(o) => { setDemandaAberto(o); if (!o) setBuscaDemanda(""); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Trazer demanda para {nome}</DialogTitle>
-            <DialogDescription>Vira um cartão em "{colunas[0]?.nome}", já vinculado à demanda. Ao mudar de etapa, você escolhe se atualiza o status.</DialogDescription>
-          </DialogHeader>
-          <Input autoFocus value={buscaDemanda} onChange={(e) => setBuscaDemanda(e.target.value)} placeholder="Protocolo, título ou munícipe…" />
-          <div className="max-h-72 overflow-y-auto divide-y rounded-md border">
-            {buscaDemanda.trim().length < 2 ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">Digite ao menos 2 letras.</p>
-            ) : resultadosDemanda.isLoading ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">Buscando…</p>
-            ) : (resultadosDemanda.data || []).length === 0 ? (
-              <p className="px-3 py-4 text-sm text-muted-foreground">Nenhuma demanda encontrada.</p>
-            ) : (resultadosDemanda.data || []).map((d: any) => {
-              const jaEsta = cards.some((c) => (extras.dems.get(c.id) || []).some((x) => x.id === d.id));
-              return (
-                <button key={d.id} type="button" disabled={jaEsta || createCard.isPending} onClick={() => criarDeDemanda(d)}
-                  className="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <span className="text-xs font-mono text-primary shrink-0">#{d.protocolo}</span>
-                  <span className="text-sm truncate flex-1">{d.titulo}</span>
-                  {jaEsta && <span className="text-[11px] text-muted-foreground shrink-0">já está no quadro</span>}
-                </button>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Trazer demandas para o quadro: ver, filtrar e escolher várias */}
+      <TrazerDemandasDialog aberto={demandaAberto} onClose={() => setDemandaAberto(false)} quadroNome={nome}
+        colunas={colunas.filter((col) => !finais.has(col.id))} jaNoQuadro={demandasNoQuadro} onTrazer={trazerDemandas} />
 
       {/* Excluir cartão */}
       <AlertDialog open={!!cartaoExcluir} onOpenChange={(v) => !v && setCartaoExcluir(null)}>
