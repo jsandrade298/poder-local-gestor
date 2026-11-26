@@ -210,10 +210,12 @@ export default function Demandas() {
       if (atrasoFilter === "overdue") {
         query = query.lt('data_prazo', todayStr);
       } else if (["30", "60", "90"].includes(atrasoFilter)) {
-        const minDays = parseInt(atrasoFilter);
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - minDays);
-        query = query.lt('data_prazo', cutoffDate.toISOString().split('T')[0]);
+        // "Mais de N dias" de atraso (data local, para não virar o dia à noite)
+        query = query.lt('data_prazo', somarDiasISO(todayStr, -parseInt(atrasoFilter)));
+      } else if (["ate-30", "31-60", "61-90"].includes(atrasoFilter)) {
+        // Faixas que não se somam (as de Análises): só as atrasadas entre N e M dias
+        const [min, max] = atrasoFilter === "ate-30" ? [0, 30] : atrasoFilter === "31-60" ? [30, 60] : [60, 90];
+        query = query.lt('data_prazo', somarDiasISO(todayStr, -min)).gte('data_prazo', somarDiasISO(todayStr, -max));
       }
     }
 
@@ -1770,6 +1772,9 @@ export default function Demandas() {
                     <SelectItem value="30">Mais de 30 dias</SelectItem>
                     <SelectItem value="60">Mais de 60 dias</SelectItem>
                     <SelectItem value="90">Mais de 90 dias</SelectItem>
+                    <SelectItem value="ate-30">Atrasadas até 30 dias</SelectItem>
+                    <SelectItem value="31-60">Atrasadas de 31 a 60 dias</SelectItem>
+                    <SelectItem value="61-90">Atrasadas de 61 a 90 dias</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

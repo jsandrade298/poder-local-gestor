@@ -192,6 +192,26 @@ export function FunilRecebidas({ total, itens }: {
   );
 }
 
+// ─── Barras simples (alinhadas à esquerda, para colunas estreitas) ─
+
+export function ListaBarras({ itens, total }: { itens: { nome: string; valor: number }[]; total: number }) {
+  if (itens.length === 0) return <p className="py-3 text-sm text-muted-foreground">Nada para mostrar.</p>;
+  const max = Math.max(...itens.map((i) => i.valor), 1);
+  return (
+    <ul className="space-y-1.5">
+      {itens.map((i) => (
+        <li key={i.nome} className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
+          <span className="truncate" title={i.nome}>{i.nome}</span>
+          <span className="h-2.5 rounded-full bg-muted">
+            <span className="block h-full rounded-full" style={{ width: `${(i.valor / max) * 100}%`, minWidth: i.valor ? 4 : 0, background: "var(--viz-seq)" }} />
+          </span>
+          <span className="w-[4.5rem] text-right tabular-nums"><strong>{num(i.valor)}</strong> <span className="text-muted-foreground">{total ? pct(i.valor / total) : ""}</span></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── Tabela por área ───────────────────────────────────────────
 
 export function TabelaAreas({ linhas, onEscolher, areaFiltrada }: {

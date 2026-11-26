@@ -399,15 +399,15 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
     const noPrazo = concluidasComPrazo.filter((d) => isoDia(new Date(d.updated_at)) <= d.data_prazo!).length;
     const abertasComPrazo = abertas.filter((d) => d.data_prazo);
     const atrasadasAbertas = abertasComPrazo.filter((d) => d.data_prazo! < hojeIso);
-    // Faixas de atraso (como na Visão geral antiga), cumulativas como o filtro de Demandas:
-    // "30+" inclui as de 60 e 90 — assim o número bate com a lista que o link abre
+    // Faixas de atraso: cada demanda entra em UMA faixa só (a soma dá o total de atrasadas).
+    // Os filtros "ate-30", "31-60", "61-90" e "90" de Demandas abrem exatamente essas listas.
     const diasDeAtraso = (prazo: string) => Math.round((hoje.getTime() - new Date(prazo + "T00:00:00").getTime()) / 86400000);
     const atrasos = atrasadasAbertas.map((d) => diasDeAtraso(d.data_prazo!));
     const faixasAtraso = [
-      { rotulo: "atrasadas", filtro: "overdue", valor: atrasos.length },
-      { rotulo: "30+ dias", filtro: "30", valor: atrasos.filter((n) => n > 30).length },
-      { rotulo: "60+ dias", filtro: "60", valor: atrasos.filter((n) => n > 60).length },
-      { rotulo: "90+ dias", filtro: "90", valor: atrasos.filter((n) => n > 90).length },
+      { rotulo: "até 30 dias", filtro: "ate-30", valor: atrasos.filter((n) => n <= 30).length },
+      { rotulo: "31 a 60 dias", filtro: "31-60", valor: atrasos.filter((n) => n > 30 && n <= 60).length },
+      { rotulo: "61 a 90 dias", filtro: "61-90", valor: atrasos.filter((n) => n > 60 && n <= 90).length },
+      { rotulo: "mais de 90", filtro: "90", valor: atrasos.filter((n) => n > 90).length },
     ];
     const atrasoPorArea = new Map<string, number>();
     atrasadasAbertas.forEach((d) => {

@@ -13,7 +13,7 @@ import {
   useAnalisesData, Periodo, periodoValido, lerPeriodoCurto, lerPeriodoLivre, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
   type FiltrosAnalise,
 } from "@/hooks/useAnalisesData";
-import { FiltrosAnalises, FunilRecebidas, PeriodoPersonalizado, TabelaAreas, exportarCsv } from "@/components/analises/PecasAnalises";
+import { FiltrosAnalises, FunilRecebidas, ListaBarras, PeriodoPersonalizado, TabelaAreas, exportarCsv } from "@/components/analises/PecasAnalises";
 import { usePessoasGabinete } from "@/hooks/useQuadros";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { Link } from "react-router-dom";
@@ -357,7 +357,7 @@ export default function Analises() {
                 </dl>
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Por prioridade</p>
-                  <BarrasHorizontais dados={dados.prioridades} nomeSerie="Demandas" />
+                  <ListaBarras itens={dados.prioridades} total={dados.recebidas.total} />
                 </div>
               </div>
             </div>
