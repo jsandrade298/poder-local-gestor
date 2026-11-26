@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarRange, Download, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -75,12 +75,14 @@ export function PeriodoPersonalizado({ ativo, de, ate, onAplicar }: {
 
 // ─── Filtros (área e responsável) + exportar ───────────────────
 
-export function FiltrosAnalises({ filtros, onMudar, pessoas, onExportar, podeExportar }: {
+export function FiltrosAnalises({ filtros, onMudar, pessoas, onExportar, podeExportar, acoes }: {
   filtros: FiltrosAnalise;
   onMudar: (f: FiltrosAnalise) => void;
   pessoas: { id: string; nome: string }[];
   onExportar: () => void;
   podeExportar: boolean;
+  /** Botões extras à direita (ex.: Relatório) */
+  acoes?: ReactNode;
 }) {
   const areas = useQuery({
     queryKey: ["analises-areas"],
@@ -121,8 +123,9 @@ export function FiltrosAnalises({ filtros, onMudar, pessoas, onExportar, podeExp
         </button>
       )}
       <span className="flex-1" />
+      {acoes}
       <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onExportar} disabled={!podeExportar}>
-        <Download className="h-3.5 w-3.5" /> Exportar demandas do período
+        <Download className="h-3.5 w-3.5" /> Exportar planilha
       </Button>
     </div>
   );

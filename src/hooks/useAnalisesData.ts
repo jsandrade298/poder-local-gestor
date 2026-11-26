@@ -11,8 +11,10 @@ import { normalizarBusca } from "@/lib/busca";
  * Regras:
  *  - Tudo é calculado sobre TODAS as linhas (paginado), sem o limite de 1.000.
  *  - Cada gráfico informa a cobertura do dado; abaixo do mínimo, não aparece.
- *  - Não existe data de conclusão no banco: para demandas em status final,
- *    usamos a última alteração (updated_at) como estimativa — a tela avisa.
+ *  - Conclusão: `concluida_em` (gravada pelo banco quando o status vira final,
+ *    desde 26/11/2026). As concluídas antes disso têm a data estimada pela
+ *    última alteração (`conclusao_estimada`) — a tela avisa quanto disso há.
+ *  - Primeira resposta: a primeira atividade registrada na demanda.
  */
 
 /**
@@ -103,6 +105,10 @@ export interface DemandaLinha {
   status: string | null;
   created_at: string;
   updated_at: string;
+  concluida_em: string | null;
+  conclusao_estimada: boolean | null;
+  municipe_id: string | null;
+  municipes: { nome: string } | null;
   data_prazo: string | null;
   origem: string | null;
   bairro: string | null;
@@ -197,7 +203,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
     queryFn: () =>
       fetchAll<DemandaLinha>((from, to) =>
         supabase.from("demandas")
-          .select("id, protocolo, titulo, area_id, prioridade, status, created_at, updated_at, data_prazo, origem, bairro, responsavel_id, humor, areas(nome)")
+          .select("id, protocolo, titulo, area_id, prioridade, status, created_at, updated_at, concluida_em, conclusao_estimada, data_prazo, origem, bairro, responsavel_id, municipe_id, humor, areas(nome), municipes(nome)")
           .order("id").range(from, to) as any
       ),
     staleTime: 5 * 60_000,
@@ -211,6 +217,19 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
           .select("id, created_at, telefone, bairro, data_nascimento")
           .order("id").range(from, to) as any
       ),
+    staleTime: 5 * 60_000,
+  });
+
+  // Primeira atividade de cada demanda (= primeira resposta registrada)
+  const atividadesQ = useQuery({
+    queryKey: ["analises-primeira-atividade"],
+    queryFn: async () => {
+      const linhas = await fetchAll<{ demanda_id: string; created_at: string }>((from, to) =>
+        supabase.from("demanda_atividades").select("demanda_id, created_at").order("id").range(from, to) as any);
+      const primeira = new Map<string, string>();
+      linhas.forEach((a) => { const atual = primeira.get(a.demanda_id); if (!atual || a.created_at < atual) primeira.set(a.demanda_id, a.created_at); });
+      return primeira;
+    },
     staleTime: 5 * 60_000,
   });
 
@@ -323,7 +342,11 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       return d >= inicio && d <= fimDoDia;
     };
     const entraram = demandas.filter((d) => noPeriodo(d.created_at));
-    const concluidas = demandas.filter((d) => ehFinal(d.status) && noPeriodo(d.updated_at));
+    // Data da conclusão: a gravada pelo banco; sem ela, a última alteração (estimativa)
+    const conclusao = (d: DemandaLinha) => d.concluida_em || d.updated_at;
+    const estimada = (d: DemandaLinha) => !d.concluida_em || !!d.conclusao_estimada;
+    const concluidas = demandas.filter((d) => ehFinal(d.status) && noPeriodo(conclusao(d)));
+    const concluidasEstimadas = concluidas.filter(estimada).length;
     const abertas = demandas.filter((d) => !ehFinal(d.status));
 
     // Mesmo recorte no período anterior (só nos períodos curtos)
@@ -333,7 +356,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       const noAnterior = (iso: string) => { const d = new Date(iso); return d >= ini && d <= f; };
       comparacao = {
         entraram: demandas.filter((d) => noAnterior(d.created_at)).length,
-        concluidas: demandas.filter((d) => ehFinal(d.status) && noAnterior(d.updated_at)).length,
+        concluidas: demandas.filter((d) => ehFinal(d.status) && noAnterior(conclusao(d))).length,
         rotulo: anterior.rotulo,
       };
     }
@@ -348,7 +371,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       entradaPor.set(k, (entradaPor.get(k) || 0) + 1);
     });
     concluidas.forEach((d) => {
-      const k = chaveBalde(new Date(d.updated_at), escala);
+      const k = chaveBalde(new Date(conclusao(d)), escala);
       conclusaoPor.set(k, (conclusaoPor.get(k) || 0) + 1);
     });
     // Dias que ainda não chegaram ficam vazios (sem linha), não como zero
@@ -375,7 +398,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
 
     // ── Tempo até concluir (dias, estimado) ──
     const tempos = concluidas
-      .map((d) => (new Date(d.updated_at).getTime() - new Date(d.created_at).getTime()) / 86400000)
+      .map((d) => (new Date(conclusao(d)).getTime() - new Date(d.created_at).getTime()) / 86400000)
       .filter((x) => x >= 0)
       .sort((a, b) => a - b);
     const mediana = tempos.length ? tempos[Math.floor(tempos.length / 2)] : null;
@@ -396,7 +419,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
 
     // ── Prazo ──
     const concluidasComPrazo = concluidas.filter((d) => d.data_prazo);
-    const noPrazo = concluidasComPrazo.filter((d) => isoDia(new Date(d.updated_at)) <= d.data_prazo!).length;
+    const noPrazo = concluidasComPrazo.filter((d) => isoDia(new Date(conclusao(d))) <= d.data_prazo!).length;
     const abertasComPrazo = abertas.filter((d) => d.data_prazo);
     const atrasadasAbertas = abertasComPrazo.filter((d) => d.data_prazo! < hojeIso);
     // Faixas de atraso: cada demanda entra em UMA faixa só (a soma dá o total de atrasadas).
@@ -478,6 +501,42 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       };
     }
 
+    // ── Primeira resposta (primeira atividade registrada) das que entraram no período ──
+    const primeiras = atividadesQ.data;
+    let primeiraResposta: null | { comResposta: number; semRespostaAbertas: number; medianaDias: number | null; ate2Dias: number; base: number } = null;
+    if (primeiras) {
+      const esperas = entraram.flatMap((d) => {
+        const p = primeiras.get(d.id);
+        return p ? [Math.max(0, (new Date(p).getTime() - new Date(d.created_at).getTime()) / 86400000)] : [];
+      }).sort((a, b) => a - b);
+      primeiraResposta = {
+        base: entraram.length,
+        comResposta: esperas.length,
+        semRespostaAbertas: entraram.filter((d) => !ehFinal(d.status) && !primeiras.has(d.id)).length,
+        medianaDias: esperas.length ? esperas[Math.floor(esperas.length / 2)] : null,
+        ate2Dias: esperas.filter((x) => x <= 2).length,
+      };
+    }
+
+    // ── Munícipes atendidos no período (pessoas diferentes, quem voltou) ──
+    const porMunicipe = new Map<string, { nome: string; n: number }>();
+    entraram.forEach((d) => {
+      if (!d.municipe_id) return;
+      const m = porMunicipe.get(d.municipe_id) || { nome: d.municipes?.nome || "Munícipe", n: 0 };
+      m.n++;
+      porMunicipe.set(d.municipe_id, m);
+    });
+    // "Já atendido antes": qualquer demanda anterior ao período, em qualquer área
+    const jaAtendidos = new Set(todasDemandas.filter((d) => new Date(d.created_at) < inicio && d.municipe_id).map((d) => d.municipe_id!));
+    const municipesAtendidos = {
+      pessoas: porMunicipe.size,
+      comMaisDeUma: [...porMunicipe.values()].filter((m) => m.n > 1).length,
+      primeiraVez: [...porMunicipe.keys()].filter((id) => !jaAtendidos.has(id)).length,
+      jaAtendidosAntes: [...porMunicipe.keys()].filter((id) => jaAtendidos.has(id)).length,
+      top: [...porMunicipe.entries()].map(([id, m]) => ({ id, nome: m.nome, valor: m.n }))
+        .filter((m) => m.valor > 1).sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome, "pt-BR")).slice(0, 8),
+    };
+
     // ── Demandas recebidas no período: onde estão hoje (funil), por área e prioridade ──
     const porStatusRecebidas = new Map<string, number>();
     entraram.forEach((d) => porStatusRecebidas.set(d.status || "", (porStatusRecebidas.get(d.status || "") || 0) + 1));
@@ -525,6 +584,10 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       comparacao,
       recebidas,
       funilRecebidas,
+      primeiraResposta,
+      municipesAtendidos,
+      /** Quantas das concluídas no período têm data estimada (concluídas antes do registro existir) */
+      concluidasEstimadas,
       porArea,
       prioridades,
       /** As demandas que entraram no período (para exportar) */
@@ -557,7 +620,7 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
       base,
       coberturaHumor: cobertura(demandas.filter((d) => d.humor).length, demandas.length),
     };
-  }, [demandasQ.data, municipesQ.data, pessoasQ.data, statusList, finalSlugs, periodo, filtros.areaId, filtros.responsavelId]);
+  }, [demandasQ.data, municipesQ.data, pessoasQ.data, atividadesQ.data, statusList, finalSlugs, periodo, filtros.areaId, filtros.responsavelId]);
 
   return {
     dados: resultado,
@@ -565,7 +628,8 @@ export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) 
     carregandoBase: municipesQ.isLoading,
     erro: demandasQ.isError,
     erroBase: municipesQ.isError,
-    tentarDeNovo: () => { demandasQ.refetch(); municipesQ.refetch(); pessoasQ.refetch(); },
+    carregandoAtividades: atividadesQ.isLoading,
+    tentarDeNovo: () => { demandasQ.refetch(); municipesQ.refetch(); pessoasQ.refetch(); atividadesQ.refetch(); },
     getStatusLabel,
   };
 }

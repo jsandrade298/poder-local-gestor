@@ -15,6 +15,8 @@ import {
 } from "@/hooks/useAnalisesData";
 import { FiltrosAnalises, FunilRecebidas, ListaBarras, PeriodoPersonalizado, TabelaAreas, exportarCsv } from "@/components/analises/PecasAnalises";
 import { usePessoasGabinete } from "@/hooks/useQuadros";
+import { RelatorioPeriodo } from "@/components/analises/RelatorioPeriodo";
+import { useConfiguracoes } from "@/hooks/useConfiguracoes";
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,8 @@ const COR = {
 const EIXO = { fontSize: 11, fill: COR.texto };
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+/** 0,3 dia → "7 h"; 2,4 → "2 dias" */
+const tempoCurto = (d: number | null) => (d === null ? "–" : d < 1 ? `${Math.max(1, Math.round(d * 24))} h` : `${Math.round(d)} ${Math.round(d) === 1 ? "dia" : "dias"}`);
 const num = (x: number) => x.toLocaleString("pt-BR");
 
 // ─── Peças ──────────────────────────────────────────────────────
@@ -179,7 +183,13 @@ export default function Analises() {
   const { finalSlugs, getStatusLabel } = useDemandaStatus();
   const livre = lerPeriodoLivre(periodo);
 
-  const { dados, carregando, carregandoBase, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo, filtros);
+  const { dados, carregando, carregandoBase, carregandoAtividades, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo, filtros);
+  const { data: config } = useConfiguracoes();
+  /** Os filtros em texto, para o relatório */
+  const filtrosTexto = [
+    filtros.areaId ? `área ${filtros.areaId === "sem" ? "(sem área)" : dados?.porArea.find((a) => a.id === filtros.areaId)?.nome || "escolhida"}` : "",
+    filtros.responsavelId ? `responsável ${filtros.responsavelId === "sem" ? "(sem responsável)" : porId.get(filtros.responsavelId)?.nome || ""}` : "",
+  ].filter(Boolean).join(" · ");
   const exportar = () => dados && exportarCsv(dados.listaEntraram, {
     nomeStatus: (s) => getStatusLabel(s || ""),
     ehFinal: (s) => finalSlugs.includes(s || ""),
@@ -245,7 +255,8 @@ export default function Analises() {
           </Select>
         </div>
         <div className="border-t pt-2.5">
-          <FiltrosAnalises filtros={filtros} onMudar={mudarFiltros} pessoas={pessoas} onExportar={exportar} podeExportar={!!dados && dados.listaEntraram.length > 0} />
+          <FiltrosAnalises filtros={filtros} onMudar={mudarFiltros} pessoas={pessoas} onExportar={exportar} podeExportar={!!dados && dados.listaEntraram.length > 0}
+            acoes={dados && <RelatorioPeriodo dados={dados} gabinete={config?.gabinete?.nome || ""} filtros={filtrosTexto} />} />
         </div>
       </div>
 
@@ -311,7 +322,10 @@ export default function Analises() {
             <Indicador rotulo="Entraram" valor={num(dados.totais.entraram)}
               detalhe={comparar(dados.totais.entraram, dados.comparacao?.entraram) ?? `demandas novas ${dados.periodo.rotulo}`} />
             <Indicador rotulo="Concluídas" valor={num(dados.totais.concluidas)}
-              detalhe={comparar(dados.totais.concluidas, dados.comparacao?.concluidas) ?? "estimado pela última alteração"} />
+              detalhe={<>
+                {comparar(dados.totais.concluidas, dados.comparacao?.concluidas) ?? "pela data de conclusão"}
+                {dados.concluidasEstimadas > 0 && <span className="block">{num(dados.concluidasEstimadas)} com data estimada</span>}
+              </>} />
             <Indicador
               rotulo="Saldo da fila"
               valor={(dados.totais.saldo > 0 ? "+" : "") + num(dados.totais.saldo)}
@@ -321,7 +335,7 @@ export default function Analises() {
             <Indicador
               rotulo="Tempo até concluir"
               valor={dados.totais.medianaDias === null ? "–" : `${Math.round(dados.totais.medianaDias)} dias`}
-              detalhe="mediana, estimada"
+              detalhe={dados.concluidasEstimadas > 0 ? "mediana (inclui datas estimadas)" : "mediana"}
             />
             <Indicador
               rotulo="Concluídas no prazo"
@@ -372,10 +386,75 @@ export default function Analises() {
               onEscolher={(id) => mudarFiltros({ ...filtros, areaId: filtros.areaId === id ? null : id })} />
           </Painel>
 
+          {/* Atendimento: primeira resposta e munícipes atendidos */}
+          <Painel titulo="Atendimento" subtitulo={`Das demandas que entraram ${dados.periodo.rotulo}: quanto tempo levou o primeiro retorno e quantas pessoas foram atendidas.`}>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <section aria-label="Primeira resposta">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">Primeira resposta</p>
+                {carregandoAtividades || !dados.primeiraResposta ? <Skeleton className="h-24" /> : dados.primeiraResposta.base === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma demanda entrou neste período.</p>
+                ) : (
+                  <>
+                    <dl className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <dt className="text-[11px] text-muted-foreground">Tempo (mediana)</dt>
+                        <dd className="text-xl font-bold tabular-nums leading-tight">{tempoCurto(dados.primeiraResposta.medianaDias)}</dd>
+                      </div>
+                      <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <dt className="text-[11px] text-muted-foreground">Em até 2 dias</dt>
+                        <dd className="text-xl font-bold tabular-nums leading-tight">{pct(dados.primeiraResposta.ate2Dias / dados.primeiraResposta.base)}</dd>
+                      </div>
+                      <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <dt className="text-[11px] text-muted-foreground">Sem resposta</dt>
+                        <dd className={cn("text-xl font-bold tabular-nums leading-tight", dados.primeiraResposta.semRespostaAbertas > 0 && "text-destructive")}>{num(dados.primeiraResposta.semRespostaAbertas)}</dd>
+                      </div>
+                    </dl>
+                    <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
+                      Primeira resposta = primeira atividade registrada na demanda (comentário ou atualização).
+                      {" "}{num(dados.primeiraResposta.comResposta)} de {num(dados.primeiraResposta.base)} já tiveram alguma; "sem resposta" conta só as que seguem em aberto.
+                    </p>
+                  </>
+                )}
+              </section>
+              <section aria-label="Munícipes atendidos" className="lg:border-l lg:pl-6">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">Munícipes atendidos</p>
+                <dl className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                    <dt className="text-[11px] text-muted-foreground">Pessoas</dt>
+                    <dd className="text-xl font-bold tabular-nums leading-tight">{num(dados.municipesAtendidos.pessoas)}</dd>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                    <dt className="text-[11px] text-muted-foreground">Primeira vez</dt>
+                    <dd className="text-xl font-bold tabular-nums leading-tight">{num(dados.municipesAtendidos.primeiraVez)}</dd>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                    <dt className="text-[11px] text-muted-foreground">Já atendidas antes</dt>
+                    <dd className="text-xl font-bold tabular-nums leading-tight">{num(dados.municipesAtendidos.jaAtendidosAntes)}</dd>
+                  </div>
+                </dl>
+                {dados.municipesAtendidos.top.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="mb-1 text-[11px] text-muted-foreground">{num(dados.municipesAtendidos.comMaisDeUma)} {dados.municipesAtendidos.comMaisDeUma === 1 ? "pessoa trouxe" : "pessoas trouxeram"} mais de uma demanda no período:</p>
+                    <ul className="divide-y text-sm">
+                      {dados.municipesAtendidos.top.map((m) => (
+                        <li key={m.id} className="flex items-center justify-between gap-2 py-1">
+                          <span className="truncate">{m.nome}</span>
+                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{m.valor} demandas</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : dados.municipesAtendidos.pessoas > 0 && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">Cada pessoa trouxe uma demanda no período.</p>
+                )}
+              </section>
+            </div>
+          </Painel>
+
           {/* Saldo: entrada × conclusão */}
           <Painel
             titulo={`Entrada e conclusão por ${unidadeTempo}`}
-            subtitulo={<>Se a linha de entrada fica acima da de conclusão, a fila está crescendo. Conclusão estimada pela última alteração das demandas em status final.</>}
+            subtitulo={<>Se a linha de entrada fica acima da de conclusão, a fila está crescendo.{dados.concluidasEstimadas > 0 && " As conclusões anteriores a 26/11/2026 usam a data da última alteração (estimada)."}</>}
           >
             {dados.picoInicial && (
               <p className="text-[11px] text-muted-foreground mb-2 flex items-start gap-1">
