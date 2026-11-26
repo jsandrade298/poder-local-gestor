@@ -323,7 +323,12 @@ export default function Inicio() {
 
   // Compromissos de hoje ficam na faixa do topo; o resto da agenda, na Minha semana
   const agendaHoje = useMemo(() => todasAgendas.filter((a) => diaLocal(a.data_hora_proposta) === hoje), [todasAgendas, hoje]);
-  const agendasSemana = useMemo(() => ({ ...agendas, data: todasAgendas.filter((a) => diaLocal(a.data_hora_proposta) !== hoje) }), [agendas, todasAgendas, hoje]);
+  const agendasSemana = useMemo(() => ({
+    ...agendas,
+    // Enquanto o Google não respondeu pela primeira vez, a coluna mostra "carregando" (não "nada marcado")
+    isLoading: agendas.isLoading || (google.algumConectado && !google.data),
+    data: todasAgendas.filter((a) => diaLocal(a.data_hora_proposta) !== hoje),
+  }), [agendas, todasAgendas, hoje, google.algumConectado, google.data]);
   const cartoesComigo = useMemo(() => (tarefas.data ?? []).map((t) => t.id), [tarefas.data]);
   const paraHoje = (tarefas.data ?? []).filter((t) => t.data_prazo && t.data_prazo <= hoje).length;
   const saindoDaLixeira = (lixeira.data ?? []).filter((d) => Date.now() - new Date(d.excluida_em).getTime() > (DIAS_LIXEIRA - 3) * 86_400_000).length;

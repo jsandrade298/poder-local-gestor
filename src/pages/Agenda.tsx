@@ -68,10 +68,17 @@ function rotuloPeriodo(visao: Visao, ref: Date, celular = false) {
 export default function Agenda() {
   const [params, setParams] = useSearchParams();
   const celular = useIsMobile();
+  // /agenda?dia=AAAA-MM-DD (vindo da Minha semana) abre direto aquele dia
+  const diaDaUrl = /^\d{4}-\d{2}-\d{2}$/.test(params.get("dia") || "") ? params.get("dia")! : null;
   const [visao, setVisao] = useState<Visao>(() => {
+    if (diaDaUrl) return "dia";
     try { const v = localStorage.getItem("agenda-visao") as Visao; return VISOES.some(([x]) => x === v) ? v : "semana"; } catch { return "semana"; }
   });
-  const [ref, setRef] = useState(() => new Date());
+  const [ref, setRef] = useState(() => (diaDaUrl ? new Date(`${diaDaUrl}T12:00:00`) : new Date()));
+  useEffect(() => {
+    if (!diaDaUrl) return;
+    const p = new URLSearchParams(params); p.delete("dia"); setParams(p, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [mostrar, setMostrar] = useState<Record<OrigemAgenda, boolean>>({ mandato: true, pessoal: true });
   const [aberto, setAberto] = useState<EventoGoogle | null>(null);
   const [editando, setEditando] = useState<EventoGoogle | null>(null);
