@@ -27,8 +27,21 @@ export type Periodo = string;
 export type PeriodoCurto = "semana" | "quinzena" | "mes";
 
 export function periodoValido(p: string | null | undefined): p is Periodo {
-  return !!p && (/^(3|6|12)$/.test(p) || /^ano-\d{4}$/.test(p) || p === "tudo" || /^(semana|quinzena|mes)(:-\d+)?$/.test(p));
+  return !!p && (/^(3|6|12)$/.test(p) || /^ano-\d{4}$/.test(p) || p === "tudo" || /^(semana|quinzena|mes)(:-\d+)?$/.test(p) || !!lerPeriodoLivre(p));
 }
+
+/** "livre:2026-11-01:2026-11-25" → datas (início ≤ fim); outro formato → null */
+export function lerPeriodoLivre(p: Periodo): { de: string; ate: string } | null {
+  const m = p.match(/^livre:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$/);
+  if (!m || m[1] > m[2]) return null;
+  return { de: m[1], ate: m[2] };
+}
+
+/** Filtros que valem para a tela toda (as demandas de fora não entram em nenhum número) */
+export interface FiltrosAnalise { areaId?: string | null; responsavelId?: string | null }
+
+const ROTULO_PRIORIDADE: Record<string, string> = { urgente: "Urgente", alta: "Alta", media: "Média", baixa: "Baixa" };
+const ORDEM_PRIORIDADE = ["urgente", "alta", "media", "baixa"];
 
 /** "semana:-2" → { tipo: "semana", desloc: -2 }; períodos longos → null */
 export function lerPeriodoCurto(p: Periodo): { tipo: PeriodoCurto; desloc: number } | null {
@@ -81,8 +94,12 @@ const ROTULO_ORIGEM: Record<string, string> = {
   outro: "Outro",
 };
 
-interface DemandaLinha {
+export interface DemandaLinha {
   id: string;
+  protocolo: string;
+  titulo: string;
+  area_id: string | null;
+  prioridade: string | null;
   status: string | null;
   created_at: string;
   updated_at: string;
@@ -172,7 +189,7 @@ function topN<T extends { valor: number }>(itens: T[], n: number) {
   return [...itens].sort((a, b) => b.valor - a.valor).slice(0, n);
 }
 
-export function useAnalisesData(periodo: Periodo) {
+export function useAnalisesData(periodo: Periodo, filtros: FiltrosAnalise = {}) {
   const { statusList, finalSlugs, getStatusLabel } = useDemandaStatus();
 
   const demandasQ = useQuery({
@@ -180,7 +197,7 @@ export function useAnalisesData(periodo: Periodo) {
     queryFn: () =>
       fetchAll<DemandaLinha>((from, to) =>
         supabase.from("demandas")
-          .select("id, status, created_at, updated_at, data_prazo, origem, bairro, responsavel_id, humor, areas(nome)")
+          .select("id, protocolo, titulo, area_id, prioridade, status, created_at, updated_at, data_prazo, origem, bairro, responsavel_id, humor, areas(nome)")
           .order("id").range(from, to) as any
       ),
     staleTime: 5 * 60_000,
@@ -208,9 +225,13 @@ export function useAnalisesData(periodo: Periodo) {
   });
 
   const resultado = useMemo(() => {
-    const demandas = demandasQ.data;
+    const todasDemandas = demandasQ.data;
     const municipes = municipesQ.data;
-    if (!demandas || statusList.length === 0) return null;
+    if (!todasDemandas || statusList.length === 0) return null;
+    // Área e responsável escolhidos: valem para todos os números das demandas
+    const demandas = todasDemandas.filter((d) =>
+      (!filtros.areaId || (filtros.areaId === "sem" ? !d.area_id : d.area_id === filtros.areaId)) &&
+      (!filtros.responsavelId || (filtros.responsavelId === "sem" ? !d.responsavel_id : d.responsavel_id === filtros.responsavelId)));
 
     const finais = new Set(finalSlugs);
     const ehFinal = (s: string | null) => finais.has(s || "");
@@ -219,7 +240,7 @@ export function useAnalisesData(periodo: Periodo) {
     const nomes = new Map((pessoasQ.data ?? []).map((p) => [p.id, p.nome as string]));
 
     // ── Janela do período ──
-    const primeira = demandas.reduce<Date | null>((min, d) => {
+    const primeira = todasDemandas.reduce<Date | null>((min, d) => {
       const x = new Date(d.created_at);
       return !min || x < min ? x : min;
     }, null) ?? hoje;
@@ -232,6 +253,7 @@ export function useAnalisesData(periodo: Periodo) {
     let rotulo: string;      // "nos últimos 6 meses", "em 2026", "desde fev/2026", "nesta semana (23/11 a 29/11)"
     let rotuloCurto: string; // "6m", "2026", "total", "semana"
     const curto = lerPeriodoCurto(periodo);
+    const livre = lerPeriodoLivre(periodo);
     let navegacao: null | { tipo: PeriodoCurto; desloc: number; podeVoltar: boolean; podeAvancar: boolean; completo: boolean } = null;
     let anterior: null | { inicio: Date; fim: Date; rotulo: string } = null;
     if (curto) {
@@ -259,6 +281,18 @@ export function useAnalisesData(periodo: Periodo) {
         rotulo: curto.tipo === "semana" ? "à semana anterior" : curto.tipo === "quinzena" ? "à quinzena anterior" : "ao mês anterior",
       };
       navegacao = { ...curto, podeVoltar: j.inicio > primeira, podeAvancar: curto.desloc < 0, completo: j.fim <= hoje };
+    } else if (livre) {
+      inicio = new Date(`${livre.de}T00:00:00`);
+      const fimEscolhido = new Date(`${livre.ate}T00:00:00`);
+      fim = fimEscolhido > hoje ? hoje : fimEscolhido;
+      const fmt = (d: Date) => d.toLocaleDateString("pt-BR");
+      rotulo = livre.de === livre.ate ? `em ${fmt(inicio)}` : `de ${fmt(inicio)} a ${fmt(fimEscolhido)}`;
+      rotuloCurto = "período";
+      // Compara com o mesmo número de dias logo antes
+      const dur = Math.round((fim.getTime() - inicio.getTime()) / 86400000) + 1;
+      const fimAnt = new Date(inicio); fimAnt.setDate(fimAnt.getDate() - 1);
+      const iniAnt = new Date(fimAnt); iniAnt.setDate(iniAnt.getDate() - (dur - 1));
+      anterior = { inicio: iniAnt, fim: fimAnt, rotulo: `aos ${dur} ${dur === 1 ? "dia" : "dias"} anteriores` };
     } else if (periodo.startsWith("ano-")) {
       const ano = Number(periodo.slice(4));
       inicio = new Date(ano, 0, 1);
@@ -365,6 +399,16 @@ export function useAnalisesData(periodo: Periodo) {
     const noPrazo = concluidasComPrazo.filter((d) => isoDia(new Date(d.updated_at)) <= d.data_prazo!).length;
     const abertasComPrazo = abertas.filter((d) => d.data_prazo);
     const atrasadasAbertas = abertasComPrazo.filter((d) => d.data_prazo! < hojeIso);
+    // Faixas de atraso (como na Visão geral antiga), cumulativas como o filtro de Demandas:
+    // "30+" inclui as de 60 e 90 — assim o número bate com a lista que o link abre
+    const diasDeAtraso = (prazo: string) => Math.round((hoje.getTime() - new Date(prazo + "T00:00:00").getTime()) / 86400000);
+    const atrasos = atrasadasAbertas.map((d) => diasDeAtraso(d.data_prazo!));
+    const faixasAtraso = [
+      { rotulo: "atrasadas", filtro: "overdue", valor: atrasos.length },
+      { rotulo: "30+ dias", filtro: "30", valor: atrasos.filter((n) => n > 30).length },
+      { rotulo: "60+ dias", filtro: "60", valor: atrasos.filter((n) => n > 60).length },
+      { rotulo: "90+ dias", filtro: "90", valor: atrasos.filter((n) => n > 90).length },
+    ];
     const atrasoPorArea = new Map<string, number>();
     atrasadasAbertas.forEach((d) => {
       const a = d.areas?.nome || "Sem área";
@@ -434,6 +478,36 @@ export function useAnalisesData(periodo: Periodo) {
       };
     }
 
+    // ── Demandas recebidas no período: onde estão hoje (funil), por área e prioridade ──
+    const porStatusRecebidas = new Map<string, number>();
+    entraram.forEach((d) => porStatusRecebidas.set(d.status || "", (porStatusRecebidas.get(d.status || "") || 0) + 1));
+    const funilRecebidas = statusList.map((s) => ({ slug: s.slug, nome: s.nome, cor: s.cor, final: s.is_final, valor: porStatusRecebidas.get(s.slug) || 0 }));
+    const semStatusConhecido = entraram.length - funilRecebidas.reduce((n, f) => n + f.valor, 0);
+    if (semStatusConhecido > 0) funilRecebidas.push({ slug: "_outro", nome: "Outro status", cor: "#94a3b8", final: false, valor: semStatusConhecido });
+    const recebidasAbertas = entraram.filter((d) => !ehFinal(d.status));
+    const recebidas = {
+      total: entraram.length,
+      concluidas: entraram.filter((d) => ehFinal(d.status)).length,
+      abertas: recebidasAbertas.length,
+      atrasadas: recebidasAbertas.filter((d) => d.data_prazo && d.data_prazo < hojeIso).length,
+      semResponsavel: recebidasAbertas.filter((d) => !d.responsavel_id).length,
+      semPrazo: recebidasAbertas.filter((d) => !d.data_prazo).length,
+    };
+    const areaMap = new Map<string, { id: string; nome: string; recebidas: number; concluidas: number; abertas: number; atrasadas: number }>();
+    entraram.forEach((d) => {
+      const id = d.area_id || "sem";
+      const l = areaMap.get(id) || { id, nome: d.areas?.nome || "Sem área", recebidas: 0, concluidas: 0, abertas: 0, atrasadas: 0 };
+      l.recebidas++;
+      if (ehFinal(d.status)) l.concluidas++;
+      else { l.abertas++; if (d.data_prazo && d.data_prazo < hojeIso) l.atrasadas++; }
+      areaMap.set(id, l);
+    });
+    const porArea = [...areaMap.values()].sort((a, b) => b.recebidas - a.recebidas || a.nome.localeCompare(b.nome, "pt-BR"));
+    const prioMap = new Map<string, number>();
+    entraram.forEach((d) => { const p = d.prioridade || "sem"; prioMap.set(p, (prioMap.get(p) || 0) + 1); });
+    const prioridades = [...ORDEM_PRIORIDADE, "sem"].filter((p) => prioMap.has(p))
+      .map((p) => ({ nome: ROTULO_PRIORIDADE[p] || "Sem prioridade", valor: prioMap.get(p)! }));
+
     // ── Totais gerais (tudo o que já foi registrado, sem período) ──
     const concluidasTotal = demandas.filter((d) => ehFinal(d.status)).length;
     const geral = {
@@ -449,6 +523,13 @@ export function useAnalisesData(periodo: Periodo) {
       mensal,
       escala,
       comparacao,
+      recebidas,
+      funilRecebidas,
+      porArea,
+      prioridades,
+      /** As demandas que entraram no período (para exportar) */
+      listaEntraram: entraram,
+      filtrado: !!(filtros.areaId || filtros.responsavelId),
       periodo: { rotulo, rotuloCurto, anosDisponiveis, ehPassado: fim < hoje, navegacao },
       geral,
       picoInicial,
@@ -467,6 +548,7 @@ export function useAnalisesData(periodo: Periodo) {
       funil,
       atrasoPorArea: topN([...atrasoPorArea.entries()].map(([nome, valor]) => ({ nome, valor })), 8),
       atrasadasAbertas: atrasadasAbertas.length,
+      faixasAtraso,
       coberturaPrazo: cobertura(abertasComPrazo.length, abertas.length),
       bairros,
       coberturaBairro: cobertura(comBairro.length, entraram.length),
@@ -475,7 +557,7 @@ export function useAnalisesData(periodo: Periodo) {
       base,
       coberturaHumor: cobertura(demandas.filter((d) => d.humor).length, demandas.length),
     };
-  }, [demandasQ.data, municipesQ.data, pessoasQ.data, statusList, finalSlugs, periodo]);
+  }, [demandasQ.data, municipesQ.data, pessoasQ.data, statusList, finalSlugs, periodo, filtros.areaId, filtros.responsavelId]);
 
   return {
     dados: resultado,

@@ -10,8 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  useAnalisesData, Periodo, periodoValido, lerPeriodoCurto, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
+  useAnalisesData, Periodo, periodoValido, lerPeriodoCurto, lerPeriodoLivre, Cobertura, COBERTURA_MINIMA, COBERTURA_AVISO,
+  type FiltrosAnalise,
 } from "@/hooks/useAnalisesData";
+import { FiltrosAnalises, FunilRecebidas, PeriodoPersonalizado, TabelaAreas, exportarCsv } from "@/components/analises/PecasAnalises";
+import { usePessoasGabinete } from "@/hooks/useQuadros";
+import { useDemandaStatus } from "@/hooks/useDemandaStatus";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 // ─── Tokens de gráfico (index.css: --viz-*) ─────────────────────
@@ -165,7 +170,22 @@ export default function Analises() {
     try { localStorage.setItem("analises-periodo", p); } catch { /* sem storage */ }
   };
 
-  const { dados, carregando, carregandoBase, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo);
+  // Área e responsável: valem para a tela toda (lembrados no navegador)
+  const [filtros, setFiltros] = useState<FiltrosAnalise>(() => {
+    try { const f = JSON.parse(localStorage.getItem("analises-filtros") || "{}"); return { areaId: f.areaId || null, responsavelId: f.responsavelId || null }; } catch { return {}; }
+  });
+  const mudarFiltros = (f: FiltrosAnalise) => { setFiltros(f); try { localStorage.setItem("analises-filtros", JSON.stringify(f)); } catch { /* sem storage */ } };
+  const { pessoas, porId } = usePessoasGabinete();
+  const { finalSlugs, getStatusLabel } = useDemandaStatus();
+  const livre = lerPeriodoLivre(periodo);
+
+  const { dados, carregando, carregandoBase, erro, erroBase, tentarDeNovo } = useAnalisesData(periodo, filtros);
+  const exportar = () => dados && exportarCsv(dados.listaEntraram, {
+    nomeStatus: (s) => getStatusLabel(s || ""),
+    ehFinal: (s) => finalSlugs.includes(s || ""),
+    nomePessoa: (id) => (id ? porId.get(id)?.nome || "" : ""),
+    rotulo: dados.periodo.rotulo,
+  });
   const unidadeTempo = dados?.escala === "mes" ? "mês" : dados?.escala === "dia" ? "dia" : "semana";
   // Semana/quinzena/mês: o botão fica marcado mesmo vendo um período anterior
   const tipoCurto = lerPeriodoCurto(periodo)?.tipo;
@@ -189,28 +209,32 @@ export default function Analises() {
 
   return (
     <div className="md:container md:mx-auto md:px-4 max-w-[1400px] space-y-4 md:space-y-5">
-      {/* Cabeçalho + filtro (uma linha, acima dos gráficos) */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold">Análises</h1>
-          <p className="text-sm text-muted-foreground">O gabinete em números: entrada, saldo, andamento, prazos, território e equipe.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 self-start">
+      {/* Cabeçalho */}
+      <div>
+        <h1 className="text-xl md:text-2xl font-bold">Análises</h1>
+        <p className="text-sm text-muted-foreground">O gabinete em números: entrada, andamento, prazos, áreas, território e equipe.</p>
+      </div>
+
+      {/* Controles: período (uma linha) e filtros (outra), juntos acima dos números */}
+      <div className="space-y-2.5 rounded-xl border bg-card p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Período</span>
           <div className="inline-flex flex-wrap rounded-lg border bg-muted/30 p-0.5" role="radiogroup" aria-label="Período">
             {PERIODOS.map((p) => (
               <button
                 key={p.v} type="button" role="radio" aria-checked={marcado(p.v)}
                 onClick={() => escolherPeriodo(p.v)}
-                className={cn("px-3 py-1.5 text-sm rounded-md transition-colors",
-                  p.v === "3" && "sm:ml-1.5 sm:border-l sm:rounded-l-none sm:pl-3.5",
+                className={cn("px-2.5 py-1 text-sm rounded-md transition-colors",
+                  p.v === "3" && "sm:ml-1 sm:border-l sm:rounded-l-none sm:pl-3",
                   marcado(p.v) ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}
               >
                 {p.rotulo}
               </button>
             ))}
+            <PeriodoPersonalizado ativo={!!livre} de={livre?.de} ate={livre?.ate} onAplicar={(de, ate) => escolherPeriodo(`livre:${de}:${ate}`)} />
           </div>
           <Select value={anoEscolhido} onValueChange={(v) => escolherPeriodo(v)}>
-            <SelectTrigger className={cn("h-9 w-[120px] text-sm", anoEscolhido && "font-medium ring-1 ring-primary/40")} aria-label="Balanço de um ano">
+            <SelectTrigger className={cn("h-8 w-[110px] text-sm", anoEscolhido && "font-medium ring-1 ring-primary/40")} aria-label="Balanço de um ano">
               <SelectValue placeholder="Por ano" />
             </SelectTrigger>
             <SelectContent>
@@ -219,6 +243,9 @@ export default function Analises() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="border-t pt-2.5">
+          <FiltrosAnalises filtros={filtros} onMudar={mudarFiltros} pessoas={pessoas} onExportar={exportar} podeExportar={!!dados && dados.listaEntraram.length > 0} />
         </div>
       </div>
 
@@ -234,7 +261,7 @@ export default function Analises() {
           {/* Totais gerais: tudo o que o gabinete já registrou */}
           <div className="rounded-lg border bg-muted/30 px-4 py-3">
             <p className="text-xs text-muted-foreground mb-2">
-              No total, desde {dados.geral.desde} (todo o período registrado no sistema)
+              No total, desde {dados.geral.desde} (todo o período registrado no sistema){dados.filtrado && <strong className="text-foreground"> · com os filtros escolhidos</strong>}
             </p>
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
               <div>
@@ -303,6 +330,48 @@ export default function Analises() {
             />
           </div>
 
+          {/* Demandas recebidas no período: funil + resumo + prioridade */}
+          <Painel
+            titulo="Demandas recebidas no período"
+            subtitulo={`As ${num(dados.recebidas.total)} demandas que entraram ${dados.periodo.rotulo}, e em que status cada uma está hoje.`}
+          >
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <FunilRecebidas total={dados.recebidas.total} itens={dados.funilRecebidas} />
+                <p className="mt-2 text-[11px] text-muted-foreground">✓ = status que conta como concluído. A largura de cada faixa é proporcional à quantidade.</p>
+              </div>
+              <div className="space-y-4">
+                <dl className="grid grid-cols-2 gap-3">
+                  {[
+                    { r: "Concluídas", v: dados.recebidas.concluidas, d: dados.recebidas.total ? pct(dados.recebidas.concluidas / dados.recebidas.total) : "–" },
+                    { r: "Em andamento", v: dados.recebidas.abertas, d: dados.recebidas.total ? pct(dados.recebidas.abertas / dados.recebidas.total) : "–" },
+                    { r: "Atrasadas", v: dados.recebidas.atrasadas, d: "já passaram do prazo", alerta: dados.recebidas.atrasadas > 0 },
+                    { r: "Sem responsável", v: dados.recebidas.semResponsavel, d: "em aberto", alerta: dados.recebidas.semResponsavel > 0 },
+                  ].map((x) => (
+                    <div key={x.r} className="rounded-lg border bg-muted/20 px-3 py-2">
+                      <dt className="text-[11px] text-muted-foreground">{x.r}</dt>
+                      <dd className={cn("text-xl font-bold tabular-nums leading-tight", x.alerta && "text-destructive")}>{num(x.v)}</dd>
+                      <dd className="text-[11px] text-muted-foreground">{x.d}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Por prioridade</p>
+                  <BarrasHorizontais dados={dados.prioridades} nomeSerie="Demandas" />
+                </div>
+              </div>
+            </div>
+          </Painel>
+
+          {/* Por área */}
+          <Painel
+            titulo="Por área"
+            subtitulo={<>Demandas que entraram {dados.periodo.rotulo}, por área, e como estão hoje. Clique numa área para filtrar a tela toda por ela.</>}
+          >
+            <TabelaAreas linhas={dados.porArea} areaFiltrada={filtros.areaId}
+              onEscolher={(id) => mudarFiltros({ ...filtros, areaId: filtros.areaId === id ? null : id })} />
+          </Painel>
+
           {/* Saldo: entrada × conclusão */}
           <Painel
             titulo={`Entrada e conclusão por ${unidadeTempo}`}
@@ -342,7 +411,7 @@ export default function Analises() {
               </ComCobertura>
             </Painel>
 
-            <Painel titulo="Andamento por status" subtitulo="Todas as demandas do gabinete hoje, na ordem dos status configurados.">
+            <Painel titulo="Todas as demandas hoje, por status" subtitulo="O gabinete inteiro (não só as do período), na ordem dos status configurados.">
               <BarrasHorizontais
                 dados={dados.funil.map((f) => ({ nome: f.final ? `${f.nome} ✓` : f.nome, valor: f.valor }))}
                 nomeSerie="Demandas"
@@ -355,6 +424,19 @@ export default function Analises() {
               subtitulo={`${num(dados.atrasadasAbertas)} demandas abertas já passaram do prazo.`}
             >
               <ComCobertura cob={dados.coberturaPrazo} oQue="prazo definido">
+                {dados.atrasadasAbertas > 0 && (
+                  <div className="mb-3 grid grid-cols-4 gap-1.5">
+                    {dados.faixasAtraso.map((f, i) => (
+                      <Link key={f.rotulo} title="Ver estas demandas"
+                        to={`/demandas?atraso=${f.filtro}${filtros.areaId && filtros.areaId !== "sem" ? `&area=${filtros.areaId}` : ""}${filtros.responsavelId && filtros.responsavelId !== "sem" ? `&responsavel=${filtros.responsavelId}` : ""}`}
+                        className={cn("rounded-md border px-2 py-1.5 text-center transition-colors hover:border-destructive/50",
+                          i === 0 ? "bg-amber-50 dark:bg-amber-950/30" : i === 1 ? "bg-orange-50 dark:bg-orange-950/30" : "bg-red-50 dark:bg-red-950/30")}>
+                        <span className="block text-base font-bold tabular-nums leading-tight">{num(f.valor)}</span>
+                        <span className="block text-[10.5px] text-muted-foreground">{f.rotulo}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
                 <BarrasHorizontais dados={dados.atrasoPorArea} nomeSerie="Atrasadas" />
               </ComCobertura>
             </Painel>
