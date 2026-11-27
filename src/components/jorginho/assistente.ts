@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { pedirPreenchimento } from "@/hooks/useJorginho";
-import { enviarNaConversa } from "./conversa";
+import { acoesPendentes, confirmarAcao, enviarNaConversa } from "./conversa";
+import { falaDaAcao } from "./acoes";
 import { formularioAtual, ouvirFormulario } from "./formulario";
 import { falar, mensagemErroVoz, ouvir, ondeOuve, pararFala, podeOuvir, prepararReconhecimento, type Escuta } from "./voz";
 
@@ -111,7 +112,34 @@ function pensarAlto(g: number) {
   return async () => { window.clearTimeout(timer); await enchimento; };
 }
 
+/** Ações que o Jotinha propôs na ligação e esperam um "sim" falado */
+let aguardando: { msgId: string; idx: number[] } | null = null;
+const normalizarFala = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+function sinal(t: string): "sim" | "nao" | null {
+  const n = normalizarFala(t);
+  if (/^(nao|cancela|cancelar|espera|deixa|deixa pra la|para|negativo|nem|muda|errado)\b/.test(n)) return "nao";
+  if (/^(sim|pode|confirma|confirmo|isso|manda|ok|okay|claro|beleza|fechado|positivo|perfeito|certo|com certeza|faz|faca|bora|vai|correto|exato|show|uhum|aham)\b/.test(n)) return "sim";
+  return null;
+}
+
 async function turnoConversa(texto: string, g: number) {
+  // Resposta a uma confirmação por voz
+  if (aguardando) {
+    const p = aguardando;
+    aguardando = null;
+    const s = sinal(texto);
+    if (s) {
+      definir({ fase: "pensando", ouvido: texto, erro: null });
+      const res: string[] = [];
+      for (const i of p.idx) res.push((await confirmarAcao(p.msgId, i, s === "sim")).mensagem);
+      if (g !== geracao) return;
+      await dizer(s === "sim" ? `${res.filter(Boolean).join(" ")} Mais alguma coisa?` : "Beleza, deixei pra lá. Quer mudar alguma coisa?", g);
+      esperarResposta(g);
+      return;
+    }
+    // Falou outra coisa: a proposta fica para trás e a conversa segue
+    for (const i of p.idx) await confirmarAcao(p.msgId, i, false);
+  }
   definir({ fase: "pensando", ouvido: texto, erro: null });
   const acabar = pensarAlto(g);
   const r = await enviarNaConversa(texto, { voz: true });
@@ -120,6 +148,14 @@ async function turnoConversa(texto: string, g: number) {
   if (!r) { esperarResposta(g); return; }
   // Pediu para cadastrar: o formulário abre e a ligação continua lá (iniciarAssistente assume)
   if (r.abriuFormulario) { definir({ legenda: r.content, fase: "pensando" }); return; }
+  // Propôs algo: repete o que vai fazer e pede o "sim" por voz (na ligação não há botão)
+  const pend = acoesPendentes();
+  if (pend) {
+    aguardando = { msgId: pend.msgId, idx: pend.idx };
+    await dizer(`Vou ${pend.acoes.map(falaDaAcao).join("; e também ")}. Posso confirmar?`, g);
+    esperarResposta(g);
+    return;
+  }
   await dizer(r.content, g);
   esperarResposta(g);
 }
@@ -218,6 +254,7 @@ export async function ligarParaJotinha() {
   historico = [];
   silencios = 0;
   despedindo = false;
+  aguardando = null;
   prepararReconhecimento();
   definir({ ...INICIAL, ativo: true, modo: "conversa", voz: true, inicio: Date.now(), fase: "falando" });
   await dizer("Oi! Tô na linha. Pode falar.", g);
@@ -273,6 +310,7 @@ function pararTudo() { escuta?.parar(); escuta = null; pararFala(); }
 
 export function encerrarAssistente() {
   geracao += 1;
+  aguardando = null;
   pararTudo();
   definir({ ...INICIAL });
 }

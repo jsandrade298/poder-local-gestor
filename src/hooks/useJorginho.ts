@@ -5,10 +5,16 @@ import type { ReceitaWidget } from "@/components/jorginho/widgets/receita";
 /** Chamadas à função `jorginho` (o servidor fala com a IA e com o banco). */
 
 export type AcaoJorginho =
-  | { tipo: "criar_tarefa"; titulo: string; prazo?: string | null; descricao?: string | null }
+  | { tipo: "criar_tarefa"; titulo: string; prazo?: string | null; descricao?: string | null; boardId?: string | null; quadroNome?: string | null; demandaId?: string | null; protocolo?: string | null; responsavelId?: string | null; responsavelNome?: string | null }
+  | { tipo: "alterar_demanda"; demandas: { id: string; protocolo: string; titulo: string }[]; status?: { slug: string; nome: string }; prioridade?: string; area?: { id: string; nome: string } }
+  | { tipo: "registrar_prontuario"; municipeId: string; municipeNome: string; atividade: string; titulo: string; texto: string }
+  | { tipo: "criar_municipe"; nome: string; bairro?: string | null }
+  | { tipo: "criar_compromisso"; titulo: string; inicio: string; fim: string; local?: string | null; agenda: "pessoal" | "mandato"; demandaId?: string | null; protocolo?: string | null }
+  /** Abre uma tela (não muda nada: executa na hora) */
+  | { tipo: "navegar"; link: string; rotulo: string }
   | { tipo: "mudar_responsavel"; demandas: { id: string; protocolo: string; titulo: string }[]; pessoaId: string; pessoaNome: string }
   | { tipo: "mudar_prazo"; demandaId: string; protocolo: string; titulo: string; prazo: string }
-  | { tipo: "comentar"; demandaId: string; protocolo: string; titulo: string; texto: string }
+  | { tipo: "comentar"; demandaId: string; protocolo: string; titulo: string; texto: string; atividade?: string }
   /** Abre o formulário na tela e o Jotinha preenche junto (não salva nada sozinho) */
   | { tipo: "abrir_formulario"; formulario: "nova_demanda"; valores?: Record<string, string> };
 

@@ -46,12 +46,12 @@ function useCronometro(inicio: number) {
 const statusChamada = (f: Fase, mudo: boolean) =>
   f === "falando" ? "Jotinha falando…" : f === "ouvindo" ? "Ouvindo você…" : f === "pensando" ? "Pensando…" : mudo ? "Microfone desligado" : "Toque no Jotinha para falar";
 
-function BotaoChamada({ onClick, rotulo, ativo, perigo, grande, children }: {
-  onClick: () => void; rotulo: string; ativo?: boolean; perigo?: boolean; grande?: boolean; children: ReactNode;
+function BotaoChamada({ onClick, rotulo, ativo, perigo, grande, children, className }: {
+  onClick: () => void; rotulo: string; ativo?: boolean; perigo?: boolean; grande?: boolean; children: ReactNode; className?: string;
 }) {
   return (
     <button type="button" onClick={onClick} aria-label={rotulo} title={rotulo} aria-pressed={ativo}
-      className={cn("grid shrink-0 place-items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+      className={cn("grid shrink-0 place-items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70", className,
         grande ? "h-14 w-14" : "h-10 w-10",
         perigo ? "bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600" : ativo ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/20")}>
       {children}
@@ -183,22 +183,23 @@ export function PilulaLigacao({ fase, mudo, inicio, onExpandir, onMudo, onDeslig
   const tempo = useCronometro(inicio);
   const vivo = fase === "falando" || fase === "ouvindo";
   return (
-    <div className={cn("relative flex items-center gap-2 overflow-hidden rounded-full bg-slate-950 py-1.5 pl-1.5 pr-2 text-white shadow-2xl ring-1 ring-white/10", className)} role="region" aria-label="Ligação com o Jotinha (minimizada)">
+    <div className={cn("relative flex w-full items-center gap-1.5 overflow-hidden rounded-full bg-slate-950 py-1.5 pl-1.5 pr-1.5 text-white shadow-2xl ring-1 ring-white/10 sm:w-auto sm:gap-2 sm:pr-2", className)} role="region" aria-label="Ligação com o Jotinha (minimizada)">
       <div className="pointer-events-none absolute -left-6 -top-6 h-20 w-20 rounded-full bg-primary/40 blur-2xl" />
-      <button type="button" onClick={onExpandir} className="relative flex items-center gap-2 rounded-full pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" aria-label="Voltar para a ligação">
-        <span className={cn("relative grid h-10 w-10 place-items-center rounded-full ring-1 ring-white/15", fase === "ouvindo" ? "bg-emerald-400/15" : "bg-white/[0.07]")}>
+      <button type="button" onClick={onExpandir} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" aria-label="Voltar para a ligação">
+        <span className={cn("relative grid h-10 w-10 shrink-0 place-items-center rounded-full ring-1 ring-white/15", fase === "ouvindo" ? "bg-emerald-400/15" : "bg-white/[0.07]")}>
           {vivo && <span className={cn("absolute inset-0 animate-ping rounded-full", fase === "ouvindo" ? "bg-emerald-400/20" : "bg-primary/30")} />}
           <JorginhoAvatar className="relative h-9 w-8" expressao={expressaoDaFase(fase)} modo="escuro" parado />
         </span>
-        <span className="leading-tight">
-          <span className="block text-xs font-semibold">Jotinha <span className="font-normal tabular-nums text-white/55">{tempo}</span></span>
-          <span className="flex items-center gap-1.5 text-[11px] text-white/70"><Barras ativo={vivo} /> {statusChamada(fase, mudo).replace("Toque no Jotinha para falar", "Toque para falar")}</span>
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-xs font-semibold">Jotinha <span className="font-normal tabular-nums text-white/55">{tempo}</span></span>
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-white/70"><Barras ativo={vivo} /> <span className="truncate">{statusChamada(fase, mudo).replace("Toque no Jotinha para falar", "Toque para falar")}</span></span>
         </span>
       </button>
       <BotaoChamada onClick={onMudo} rotulo={mudo ? "Ligar o microfone" : "Desligar o microfone"} ativo={mudo}>
         {mudo ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </BotaoChamada>
-      <BotaoChamada onClick={onExpandir} rotulo="Voltar para a ligação"><Maximize2 className="h-4 w-4" /></BotaoChamada>
+      {/* No celular, tocar na pílula já volta para a ligação */}
+      <BotaoChamada onClick={onExpandir} rotulo="Voltar para a ligação" className="hidden sm:grid"><Maximize2 className="h-4 w-4" /></BotaoChamada>
       <BotaoChamada onClick={onDesligar} rotulo="Desligar" perigo><PhoneOff className="h-4 w-4" /></BotaoChamada>
     </div>
   );

@@ -177,24 +177,49 @@ const FERRAMENTAS = [
   { type: "function", function: { name: "minhas_tarefas", description: "Cartões dos quadros com quem pergunta (responsável ou colaborando), em aberto.", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "agenda", description: "Compromissos da agenda (mandato e pessoal) a partir de uma data.", parameters: { type: "object", properties: { a_partir_de: { type: "string", description: "AAAA-MM-DD; padrão hoje" }, dias: { type: "integer", minimum: 1, maximum: 14 } } } } },
   { type: "function", function: { name: "buscar_municipe", description: "Procura munícipes pelo nome e diz quantas demandas cada um tem (sem dados de contato).", parameters: { type: "object", properties: { nome: { type: "string" } }, required: ["nome"] } } },
-  { type: "function", function: { name: "propor_tarefa", description: "PROPÕE criar uma tarefa no Meu quadro de quem pergunta. A pessoa confirma na tela.", parameters: { type: "object", properties: { titulo: { type: "string" }, prazo: { type: "string", description: "AAAA-MM-DD" }, descricao: { type: "string" } }, required: ["titulo"] } } },
+  { type: "function", function: { name: "propor_tarefa", description: "PROPÕE criar uma tarefa (cartão) num quadro — o Meu quadro por padrão ou um quadro de projeto pelo nome —, opcionalmente vinculada a uma demanda e com responsável. A pessoa confirma.", parameters: { type: "object", properties: { titulo: { type: "string" }, prazo: { type: "string", description: "AAAA-MM-DD" }, descricao: { type: "string" }, quadro: { type: "string", description: "Nome do quadro; vazio = Meu quadro" }, demanda: { type: "string", description: "Protocolo da demanda a vincular" }, responsavel: { type: "string", description: "Pessoa da equipe; 'eu' = quem pede" } }, required: ["titulo"] } } },
+  { type: "function", function: { name: "propor_alterar_demanda", description: "PROPÕE mudar status, prioridade e/ou área de uma ou mais demandas. A pessoa confirma.", parameters: { type: "object", properties: { protocolos: { type: "array", items: { type: "string" } }, status: { type: "string", description: "Nome do status do gabinete" }, prioridade: { type: "string", enum: ["baixa", "media", "alta", "urgente"] }, area: { type: "string", description: "Nome da área" } }, required: ["protocolos"] } } },
+  { type: "function", function: { name: "ver_municipe", description: "Prontuário de um munícipe pelo nome: bairro, demandas dele e últimos registros do prontuário (sem dados de contato). Se houver homônimos, devolve a lista para a pessoa escolher.", parameters: { type: "object", properties: { nome: { type: "string" } }, required: ["nome"] } } },
+  { type: "function", function: { name: "propor_registro_prontuario", description: "PROPÕE registrar algo no prontuário de um munícipe (ligação, visita, reunião, atendimento, WhatsApp, anotação). A pessoa confirma.", parameters: { type: "object", properties: { municipe: { type: "string" }, tipo: { type: "string", enum: ["anotacao", "ligacao", "reuniao", "visita", "whatsapp", "atendimento", "evento"] }, titulo: { type: "string" }, texto: { type: "string" } }, required: ["municipe", "tipo", "texto"] } } },
+  { type: "function", function: { name: "propor_municipe_novo", description: "PROPÕE cadastrar um munícipe novo (só quando a pessoa disser que é alguém que ainda não está no cadastro). A pessoa confirma.", parameters: { type: "object", properties: { nome: { type: "string" }, bairro: { type: "string" } }, required: ["nome"] } } },
+  { type: "function", function: { name: "propor_compromisso", description: "PROPÕE marcar um compromisso no Google Agenda (a agenda da pessoa, ou a do mandato se ela pedir e puder). A pessoa confirma.", parameters: { type: "object", properties: { titulo: { type: "string" }, inicio: { type: "string", description: "AAAA-MM-DDTHH:MM (horário de Brasília)" }, duracao_min: { type: "integer", minimum: 5, maximum: 600 }, local: { type: "string" }, agenda: { type: "string", enum: ["minha", "mandato"] }, demanda: { type: "string", description: "Protocolo a vincular, se for sobre uma demanda" } }, required: ["titulo", "inicio"] } } },
+  { type: "function", function: { name: "abrir_tela", description: "Abre na tela uma demanda, o prontuário de um munícipe, um quadro ou uma tela do sistema (não muda nada; abre na hora).", parameters: { type: "object", properties: { demanda: { type: "string", description: "Protocolo" }, municipe: { type: "string", description: "Nome do munícipe" }, quadro: { type: "string", description: "Nome do quadro ('meu quadro' = o pessoal)" }, caminho: { type: "string", enum: ["/inicio", "/demandas", "/municipes", "/quadros", "/agenda", "/mapa", "/analises"] } } } } },
   { type: "function", function: { name: "propor_responsavel", description: "PROPÕE passar demandas para uma pessoa da equipe. A pessoa confirma na tela.", parameters: { type: "object", properties: { protocolos: { type: "array", items: { type: "string" } }, pessoa: { type: "string" } }, required: ["protocolos", "pessoa"] } } },
   { type: "function", function: { name: "propor_prazo", description: "PROPÕE definir o prazo de uma demanda. A pessoa confirma na tela.", parameters: { type: "object", properties: { protocolo: { type: "string" }, prazo: { type: "string", description: "AAAA-MM-DD" } }, required: ["protocolo", "prazo"] } } },
-  { type: "function", function: { name: "propor_comentario", description: "PROPÕE registrar um comentário na linha do tempo de uma demanda. A pessoa confirma na tela.", parameters: { type: "object", properties: { protocolo: { type: "string" }, texto: { type: "string" } }, required: ["protocolo", "texto"] } } },
+  { type: "function", function: { name: "propor_comentario", description: "PROPÕE registrar uma atividade na linha do tempo de uma demanda: comentário, visita técnica ou atualização. A pessoa confirma.", parameters: { type: "object", properties: { protocolo: { type: "string" }, texto: { type: "string" }, tipo: { type: "string", enum: ["comentario", "visita", "atualizacao"] } }, required: ["protocolo", "texto"] } } },
   { type: "function", function: { name: "abrir_formulario_demanda", description: "Abre o formulário de NOVA DEMANDA na tela; você e a pessoa preenchem juntos, conversando (ela pode responder por voz). Use sempre que a pessoa quiser cadastrar/registrar/abrir uma demanda. Passe o que ela já contou.", parameters: { type: "object", properties: { titulo: { type: "string" }, descricao: { type: "string", description: "O relato, se ela já contou" }, municipe: { type: "string", description: "Nome de quem pediu, se disse" }, bairro: { type: "string" }, logradouro: { type: "string" }, area: { type: "string" }, prioridade: { type: "string", enum: ["baixa", "media", "alta", "urgente"] } } } } },
 ];
 
 type Acao =
-  | { tipo: "criar_tarefa"; titulo: string; prazo?: string | null; descricao?: string | null }
+  | { tipo: "criar_tarefa"; titulo: string; prazo?: string | null; descricao?: string | null; boardId?: string | null; quadroNome?: string | null; demandaId?: string | null; protocolo?: string | null; responsavelId?: string | null; responsavelNome?: string | null }
+  | { tipo: "alterar_demanda"; demandas: { id: string; protocolo: string; titulo: string }[]; status?: { slug: string; nome: string }; prioridade?: string; area?: { id: string; nome: string } }
+  | { tipo: "registrar_prontuario"; municipeId: string; municipeNome: string; atividade: string; titulo: string; texto: string }
+  | { tipo: "criar_municipe"; nome: string; bairro?: string | null }
+  | { tipo: "criar_compromisso"; titulo: string; inicio: string; fim: string; local?: string | null; agenda: "pessoal" | "mandato"; demandaId?: string | null; protocolo?: string | null }
+  | { tipo: "navegar"; link: string; rotulo: string }
   | { tipo: "mudar_responsavel"; demandas: { id: string; protocolo: string; titulo: string }[]; pessoaId: string; pessoaNome: string }
   | { tipo: "mudar_prazo"; demandaId: string; protocolo: string; titulo: string; prazo: string }
-  | { tipo: "comentar"; demandaId: string; protocolo: string; titulo: string; texto: string }
+  | { tipo: "comentar"; demandaId: string; protocolo: string; titulo: string; texto: string; atividade?: string }
   | { tipo: "abrir_formulario"; formulario: "nova_demanda"; valores: Record<string, string> };
 
 async function demandaPorProtocolo(c: Contexto, protocolo: string) {
   const p = String(protocolo || "").replace(/^#/, "").trim();
   const { data } = await c.sb.from("demandas").select("id, protocolo, titulo").ilike("protocolo", p).maybeSingle();
   return data as null | { id: string; protocolo: string; titulo: string };
+}
+
+/** Acha UM munícipe pelo nome; com homônimos, devolve a lista (nome + bairro) para a pessoa escolher. */
+async function municipeUnico(c: Contexto, nome: string): Promise<{ municipe: { id: string; nome: string; bairro: string | null } } | { lista: { nome: string; bairro: string | null }[] } | { erro: string }> {
+  const n = String(nome || "").trim();
+  if (n.length < 2) return { erro: "Diga o nome do munícipe." };
+  let q = c.sb.from("municipes").select("id, nome, bairro");
+  for (const p of normalizar(n).replace(/[%_,()"\\]/g, " ").split(/\s+/).filter(Boolean)) q = q.ilike("busca", `%${p}%`);
+  const { data } = await q.order("nome").limit(6);
+  const lista = (data ?? []) as { id: string; nome: string; bairro: string | null }[];
+  if (!lista.length) return { erro: `Não achei "${n}" no cadastro de munícipes.` };
+  const exatos = lista.filter((m) => normalizar(m.nome) === normalizar(n));
+  if (lista.length === 1 || exatos.length === 1) return { municipe: lista.length === 1 ? lista[0] : exatos[0] };
+  return { lista: lista.map((m) => ({ nome: m.nome, bairro: m.bairro })) };
 }
 
 async function executarFerramenta(c: Contexto, nome: string, a: any, acoes: Acao[]): Promise<unknown> {
@@ -310,9 +335,101 @@ async function executarFerramenta(c: Contexto, nome: string, a: any, acoes: Acao
       return { encontrados: lista };
     }
     case "propor_tarefa": {
-      const acao: Acao = { tipo: "criar_tarefa", titulo: String(a.titulo || "").slice(0, 140), prazo: a.prazo || null, descricao: a.descricao ? String(a.descricao).slice(0, 600) : null };
-      acoes.push(acao);
-      return { proposta_mostrada: true, obs: "A pessoa vai ver um botão para confirmar. Não diga que já foi criado." };
+      // Quadro: o pessoal por padrão; um de projeto pelo nome (só os que a pessoa enxerga)
+      let boardId: string | null = null, quadroNome: string | null = null;
+      const q = String(a.quadro || "").trim();
+      if (q && !/^(meu|minha|pessoal)/.test(normalizar(q))) {
+        const { data: qs } = await c.sb.from("kanban_boards").select("id, nome, tipo").is("arquivado_em", null).neq("tipo", "pessoal").limit(100);
+        const achado = (qs ?? []).find((b: any) => normalizar(b.nome) === normalizar(q)) || (qs ?? []).find((b: any) => parecido(b.nome, q));
+        if (!achado) return { erro: `Não achei o quadro "${q}". Quadros: ${(qs ?? []).map((b: any) => b.nome).join(", ") || "nenhum além do Meu quadro"}` };
+        boardId = (achado as any).id; quadroNome = (achado as any).nome;
+      }
+      let dem: null | { id: string; protocolo: string; titulo: string } = null;
+      if (a.demanda) { dem = await demandaPorProtocolo(c, a.demanda); if (!dem) return { erro: `Não achei a demanda ${a.demanda}.` }; }
+      const resp = a.responsavel ? resolverPessoa(c, a.responsavel) : null;
+      if (a.responsavel && !resp) return { erro: `Não encontrei "${a.responsavel}" na equipe.` };
+      acoes.push({
+        tipo: "criar_tarefa", titulo: String(a.titulo || "").slice(0, 140), prazo: a.prazo || null, descricao: a.descricao ? String(a.descricao).slice(0, 600) : null,
+        boardId, quadroNome, demandaId: dem?.id ?? null, protocolo: dem?.protocolo ?? null, responsavelId: resp?.id ?? null, responsavelNome: resp?.nome ?? null,
+      });
+      return { proposta_mostrada: true, quadro: quadroNome || "Meu quadro", vinculada_a: dem?.protocolo || null, obs: "A pessoa confirma antes de criar. Não diga que já foi criado." };
+    }
+    case "propor_alterar_demanda": {
+      const ds = (await Promise.all((a.protocolos || []).slice(0, 20).map((x: string) => demandaPorProtocolo(c, x)))).filter(Boolean) as any[];
+      if (!ds.length) return { erro: "Não encontrei essas demandas." };
+      const st = a.status ? c.status.find((s) => normalizar(s.nome) === normalizar(a.status)) || c.status.find((s) => parecido(s.nome, a.status) || parecido(s.slug, a.status)) : undefined;
+      if (a.status && !st) return { erro: `Status "${a.status}" não existe. Status: ${c.status.map((s) => s.nome).join(", ")}` };
+      const ar = a.area ? c.areas.find((x) => parecido(x.nome, a.area)) : undefined;
+      if (a.area && !ar) return { erro: `Área "${a.area}" não existe. Áreas: ${c.areas.map((x) => x.nome).join(", ")}` };
+      const pr = a.prioridade ? normalizar(a.prioridade).replace("média", "media") : undefined;
+      if (!st && !ar && !pr) return { erro: "Diga o que mudar: status, prioridade ou área." };
+      acoes.push({ tipo: "alterar_demanda", demandas: ds, status: st ? { slug: st.slug, nome: st.nome } : undefined, prioridade: pr, area: ar ? { id: ar.id, nome: ar.nome } : undefined });
+      return { proposta_mostrada: true };
+    }
+    case "ver_municipe": {
+      const r = await municipeUnico(c, a.nome);
+      if ("lista" in r) return { homonimos: r.lista, obs: "Pergunte qual deles (pelo bairro)." };
+      if ("erro" in r) return r;
+      const m = r.municipe;
+      const [dm, at, ex] = await Promise.all([
+        c.sb.from("demandas").select("protocolo, titulo, status, created_at").eq("municipe_id", m.id).order("created_at", { ascending: false }).limit(8),
+        c.sb.from("municipe_atividades").select("tipo_atividade, titulo, data_atividade").eq("municipe_id", m.id).order("data_atividade", { ascending: false }).limit(6),
+        c.sb.from("municipes").select("data_nascimento, profissao").eq("id", m.id).maybeSingle(),
+      ]);
+      const nasc = (ex.data as any)?.data_nascimento as string | null;
+      return {
+        nome: m.nome, bairro: m.bairro, profissao: (ex.data as any)?.profissao || null, aniversario: nasc ? `${nasc.slice(8, 10)}/${nasc.slice(5, 7)}` : null,
+        demandas: (dm.data ?? []).map((d: any) => ({ protocolo: d.protocolo, titulo: d.titulo, status: nomeStatus(c, d.status), entrou: String(d.created_at).slice(0, 10), link: linkDemanda(d.protocolo) })),
+        prontuario: (at.data ?? []).map((x: any) => ({ tipo: x.tipo_atividade, titulo: x.titulo, quando: String(x.data_atividade || "").slice(0, 10) })),
+        link: `/municipes?abrir=${m.id}&aba=prontuario`,
+      };
+    }
+    case "propor_registro_prontuario": {
+      const r = await municipeUnico(c, a.municipe);
+      if ("lista" in r) return { homonimos: r.lista, obs: "Pergunte qual deles antes de registrar." };
+      if ("erro" in r) return r;
+      const tipo = ["anotacao", "ligacao", "reuniao", "visita", "whatsapp", "atendimento", "evento"].includes(a.tipo) ? a.tipo : "anotacao";
+      const texto = String(a.texto || "").slice(0, 2000);
+      acoes.push({ tipo: "registrar_prontuario", municipeId: r.municipe.id, municipeNome: r.municipe.nome, atividade: tipo, titulo: String(a.titulo || texto.slice(0, 60) || "Registro").slice(0, 120), texto });
+      return { proposta_mostrada: true };
+    }
+    case "propor_municipe_novo": {
+      const nome = String(a.nome || "").trim().slice(0, 120);
+      if (nome.split(/\s+/).length < 2) return { erro: "Peça o nome completo (nome e sobrenome) antes de cadastrar." };
+      acoes.push({ tipo: "criar_municipe", nome, bairro: a.bairro ? String(a.bairro).slice(0, 80) : null });
+      return { proposta_mostrada: true };
+    }
+    case "propor_compromisso": {
+      const ini = String(a.inicio || "");
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ini)) return { erro: "Diga dia e horário (AAAA-MM-DDTHH:MM)." };
+      const inicio = new Date(`${ini.slice(0, 16)}:00-03:00`);
+      const fim = new Date(inicio.getTime() + Math.min(600, Math.max(5, Number(a.duracao_min) || 60)) * 60_000);
+      let dem: null | { id: string; protocolo: string; titulo: string } = null;
+      if (a.demanda) dem = await demandaPorProtocolo(c, a.demanda);
+      acoes.push({ tipo: "criar_compromisso", titulo: String(a.titulo || "").slice(0, 140), inicio: inicio.toISOString(), fim: fim.toISOString(), local: a.local ? String(a.local).slice(0, 140) : null, agenda: a.agenda === "mandato" ? "mandato" : "pessoal", demandaId: dem?.id ?? null, protocolo: dem?.protocolo ?? null });
+      return { proposta_mostrada: true };
+    }
+    case "abrir_tela": {
+      let link = "", rotulo = "";
+      if (a.demanda) {
+        const d = await demandaPorProtocolo(c, a.demanda);
+        if (!d) return { erro: "Demanda não encontrada." };
+        link = linkDemanda(d.protocolo); rotulo = `a demanda ${d.titulo}`;
+      } else if (a.municipe) {
+        const r = await municipeUnico(c, a.municipe);
+        if ("lista" in r) return { homonimos: r.lista, obs: "Pergunte qual deles." };
+        if ("erro" in r) return r;
+        link = `/municipes?abrir=${r.municipe.id}&aba=prontuario`; rotulo = `o prontuário de ${primeiroNome(r.municipe.nome)}`;
+      } else if (a.quadro) {
+        const pessoal = /^(meu|minha|pessoal)/.test(normalizar(a.quadro));
+        const { data: qs } = await c.sb.from("kanban_boards").select("id, nome, tipo, dono_id").is("arquivado_em", null).limit(100);
+        const b = pessoal ? (qs ?? []).find((x: any) => x.tipo === "pessoal" && x.dono_id === c.uid) : (qs ?? []).find((x: any) => parecido(x.nome, a.quadro));
+        link = b ? `/quadros/${(b as any).id}` : "/quadros"; rotulo = b ? `o quadro ${(b as any).nome}` : "os quadros";
+      } else if (typeof a.caminho === "string" && a.caminho.startsWith("/")) {
+        link = a.caminho; rotulo = "a tela";
+      } else return { erro: "Diga o que abrir." };
+      acoes.push({ tipo: "navegar", link, rotulo });
+      return { aberto: true, obs: "A tela já abriu. Diga em poucas palavras." };
     }
     case "propor_responsavel": {
       const p = resolverPessoa(c, a.pessoa);
@@ -340,7 +457,8 @@ async function executarFerramenta(c: Contexto, nome: string, a: any, acoes: Acao
     case "propor_comentario": {
       const d = await demandaPorProtocolo(c, a.protocolo);
       if (!d) return { erro: "Demanda não encontrada." };
-      acoes.push({ tipo: "comentar", demandaId: d.id, protocolo: d.protocolo, titulo: d.titulo, texto: String(a.texto || "").slice(0, 2000) });
+      const atividade = ["comentario", "visita", "atualizacao"].includes(a.tipo) ? a.tipo : "comentario";
+      acoes.push({ tipo: "comentar", demandaId: d.id, protocolo: d.protocolo, titulo: d.titulo, texto: String(a.texto || "").slice(0, 2000), atividade });
       return { proposta_mostrada: true };
     }
     default:
@@ -374,7 +492,8 @@ ${contexto?.tela ? `A pessoa está na tela: ${String(contexto.tela).slice(0, 80)
 
 REGRAS
 1. Números e fatos do gabinete SÓ com as ferramentas. Nunca invente dados, protocolos, nomes ou datas. Se a ferramenta não trouxer, diga que não encontrou.
-2. Para mudar algo (tarefa, responsável, prazo, comentário) use as ferramentas propor_*: elas mostram um botão de confirmação. Nunca diga que já fez; diga "é só confirmar no botão abaixo".
+2. Para mudar algo (tarefa em qualquer quadro, responsável, prazo, status/prioridade/área, atividade na demanda, registro no prontuário, munícipe novo, compromisso na agenda) use as ferramentas propor_*: a pessoa confirma antes. Nunca diga que já fez. Para só abrir uma tela, use abrir_tela.
+2b. Se a pessoa falar de uma demanda sem dar o protocolo ("a do buraco da Rua X", "a última do seu Abelardo"), procure com listar_demandas (texto, bairro, munícipe) antes de propor algo; se vier mais de uma, pergunte qual. Para munícipe, use ver_municipe; com homônimos, pergunte qual (pelo bairro). Se a pessoa acabou de cadastrar uma demanda, "ela" é essa demanda (o protocolo está na conversa).
 3. Ao citar demandas, use link em markdown: [#PROTOCOLO](link da ferramenta). Para telas, use o caminho: [Análises](/analises).
 4. Privacidade: nunca mostre telefone, CPF, e-mail ou endereço completo de munícipe. Use só o primeiro nome quando precisar.
 5. Política: neutro e respeitoso. Nada de opinião partidária, nem piada com munícipe, partido ou religião.
@@ -385,7 +504,8 @@ REGRAS
 ${GUIA_DO_APP}`;
   if (modo === "conversa") return base + (contexto?.voz ? `
 MODO LIGAÇÃO: a conversa é por VOZ, como num telefonema; a sua resposta será lida em voz alta.
-Responda em no máximo 2 ou 3 frases curtas e naturais, sem listas, sem markdown, sem links, sem emojis e sem ler protocolos letra por letra (diga "a demanda do buraco na rua tal"). Se tiver muita coisa, diga o principal e pergunte se a pessoa quer mais.` : "");
+Responda em no máximo 2 ou 3 frases curtas e naturais, sem listas, sem markdown, sem links, sem emojis e sem ler protocolos letra por letra (diga "a demanda do buraco na rua tal"). Se tiver muita coisa, diga o principal e pergunte se a pessoa quer mais.
+Na ligação NÃO existe botão: ao propor uma ação, não fale em botão — o sistema repete o que vai fazer e pede a confirmação por voz.` : "");
   return base + `
 MODO OFICINA: a pessoa quer um WIDGET para fixar no Início. Responda APENAS com um objeto JSON (sem texto antes ou depois) no formato:
 {"titulo": string (até 60 caracteres),
@@ -578,6 +698,16 @@ const PERGUNTAS: Record<string, string[]> = {
 };
 const umaDe = (xs: string[]) => xs[Math.floor(Math.random() * xs.length)];
 
+/** Título curto a partir do relato ("O munícipe X relata que há um poste apagado…" → "Poste apagado…"). */
+function tituloDoRelato(relato: string) {
+  let t = String(relato || "").replace(/\s+/g, " ").trim();
+  t = t.replace(/^(o|a)?\s*mun[ií]cipe\s+[^,.]*?\s+(relata|relatou|informa|informou|pede|pediu|solicita|solicitou|reclama|reclamou)(\s+que)?\s+/i, "");
+  t = t.replace(/^(h[aá]|existe|tem)\s+(um|uma)\s+/i, "");
+  t = t.split(/(?<=[.!?;])\s/)[0].replace(/[.!?;]+$/, "");
+  if (t.length > 70) t = t.slice(0, 70).replace(/\s+\S*$/, "") + "…";
+  return t ? t[0].toUpperCase() + t.slice(1) : "Nova demanda";
+}
+
 async function preencherFormulario(c: Contexto, mensagens: any[], formulario: any) {
   const f = formulario && typeof formulario === "object" ? formulario : null;
   if (!f || !Array.isArray(f.campos)) throw new Erro(400, "Formulário inválido");
@@ -614,7 +744,8 @@ SUA TAREFA A CADA MENSAGEM DA PESSOA
    - "descricao": o relato completo, bem escrito, em terceira pessoa, sem inventar nada.
    - "area": sugira a área mais provável entre as opções assim que souber do que se trata.
    - Campos de opção: exatamente um dos nomes das opções. Datas: AAAA-MM-DD ("sexta que vem", "daqui 15 dias" a partir de hoje).
-   - "municipe": o nome como a pessoa falou (o sistema procura no cadastro).
+   - "municipe": o nome como a pessoa falou (o sistema procura no cadastro). Se o sistema escolheu entre homônimos, repita o nome completo escolhido.
+   - "municipe_novo": SÓ se o sistema avisou que não achou o munícipe e a pessoa confirmou que é alguém novo — o nome completo dele.
    - "responsavel": um nome da equipe; se for quem está falando ("sou eu", "comigo", "eu mesmo"), preencha exatamente "eu".
    - Para corrigir algo, preencha o campo de novo.
 2. "confirmacao": UMA frase curta, calorosa e natural, dizendo o que você anotou (ex.: "Anotei o poste apagado na Rua das Flores."). Vazia se não anotou nada. NÃO faça a próxima pergunta: o sistema faz.
@@ -656,8 +787,13 @@ Responda APENAS com um objeto JSON:
   const limpar = (t: any) => String(t || "").replace(/[*_#`]/g, "").trim();
   const confirmacao = limpar(obj.confirmacao || obj.fala).slice(0, 300);
   const enviar = obj.enviar === true, encerrar = obj.encerrar === true;
+  // Título nunca fica para depois: se a IA não criou, sai do relato
+  if (nomes.has("titulo") && !valores.titulo && !preencher.titulo && (preencher.descricao || valores.descricao)) {
+    preencher.titulo = tituloDoRelato(preencher.descricao || valores.descricao);
+  }
   // A próxima pergunta é do sistema: o primeiro campo que continua vazio depois deste preenchimento
-  const depois = { ...valores, ...preencher };
+  const depois: Record<string, string> = { ...valores, ...preencher };
+  if (depois.municipe_novo) depois.municipe = depois.municipe_novo;
   const proximo = ORDEM_PERGUNTAS.find((k) => nomes.has(k) && !depois[k] && !pulados.includes(k));
   const duvida = limpar(obj.duvida).slice(0, 240);
   const pergunta = enviar || encerrar ? "" : duvida || (proximo ? umaDe(PERGUNTAS[proximo]) : "Posso salvar?");

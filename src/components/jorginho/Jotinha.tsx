@@ -21,7 +21,7 @@ import type { ReceitaWidget } from "./widgets/receita";
 import { FAIXA, SeloJotinha, SUPERFICIE } from "./ui";
 import { Chamada, PilulaLigacao } from "./Chamada";
 import { podeOuvir } from "./voz";
-import { definirContextoConversa, enviarNaConversa, limparConversa, mudarMensagens, useConversa, usarConversaDe } from "./conversa";
+import { confirmarAcao, definirContextoConversa, enviarNaConversa, limparConversa, mudarMensagens, useConversa, usarConversaDe } from "./conversa";
 import {
   alternarMudo, encerrarAssistente, estadoLigacao, expandirLigacao, ligarParaJotinha, minimizarLigacao, responderAssistente, tocarMicrofone, useAssistente,
 } from "./assistente";
@@ -144,7 +144,20 @@ export function Jotinha() {
   const salvouRef = useRef(false);
 
   // A conversa (e a ligação) vivem fora do painel: ligam-se à pessoa e sabem em que tela ela está
-  useEffect(() => { usarConversaDe(uid, qc); }, [uid, qc]);
+  useEffect(() => { usarConversaDe(uid, qc, profile?.nome); }, [uid, qc, profile?.nome]);
+  // "Abre a demanda…": navega; numa ligação, minimiza para a pessoa ver a tela
+  const irPara = useNavigate();
+  useEffect(() => {
+    const ir = (e: Event) => {
+      const link = (e as CustomEvent).detail?.link as string | undefined;
+      if (!link) return;
+      if (estadoLigacao().ativo && estadoLigacao().modo === "conversa") { minimizarLigacao(); setAberto(false); }
+      else if (celular) setAberto(false);
+      irPara(link);
+    };
+    window.addEventListener("jotinha:navegar", ir);
+    return () => window.removeEventListener("jotinha:navegar", ir);
+  }, [irPara, celular]);
   useEffect(() => { definirContextoConversa({ tela: local.pathname }); }, [local.pathname]);
   // Ligação na conversa: o painel mostra a tela de telefone (e volta a abrir ao sair do minimizado)
   useEffect(() => { if (lig.ativo && lig.modo === "conversa" && !lig.minimizada) { setAba("conversa"); setAberto(true); } }, [lig.ativo, lig.modo, lig.minimizada]);
@@ -347,7 +360,7 @@ export function Jotinha() {
     <>
       {/* Ligação minimizada: segue ativa numa pílula, mesmo trocando de tela */}
       {lig.ativo && lig.minimizada && (
-        <div className={cn("fixed z-40 animate-in fade-in slide-in-from-bottom-2", celular ? "bottom-[84px] right-3" : "bottom-5 right-5")}>
+        <div className={cn("fixed z-40 animate-in fade-in slide-in-from-bottom-2", celular ? "bottom-[84px] left-3 right-3" : "bottom-5 right-5")}>
           <PilulaLigacao fase={lig.fase} mudo={lig.mudo} inicio={lig.inicio} onExpandir={expandirLigacao} onMudo={alternarMudo} onDesligar={encerrarAssistente} />
         </div>
       )}
@@ -505,21 +518,7 @@ function Conversa({ uid, nome, contexto, perguntaInicial, onPerguntaUsada, injet
   // Pergunta vinda de outro lugar (ex.: botão na demanda)
   useEffect(() => { if (perguntaInicial) { onPerguntaUsada(); enviar(perguntaInicial); } }, [perguntaInicial]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const confirmar = async (msgId: string, i: number, sim: boolean) => {
-    const alvo = msgs.find((m) => m.id === msgId)?.acoes?.[i];
-    if (!alvo || alvo.estado !== "pendente") return;
-    const atualizar = (estado: "feita" | "cancelada" | "erro", resultado?: string, link?: string) =>
-      mudarMensagens((ms) => ms.map((m) => (m.id !== msgId ? m : { ...m, acoes: m.acoes!.map((a, j) => (j === i ? { ...a, estado, resultado, link } : a)) })));
-    if (!sim) return atualizar("cancelada", "Deixei pra lá 👍");
-    try {
-      const r = await executarAcao(alvo.acao, { uid, nome });
-      atualizar("feita", r.mensagem, r.link);
-      ["demandas", "inicio-minhas-tarefas", "kanban-board-cards", "quadro-extras", "inicio-minhas-demandas"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
-      window.dispatchEvent(new CustomEvent("jorginho:reagir", { detail: { tipo: alvo.acao.tipo === "criar_tarefa" ? "tarefa" : "demanda" } }));
-    } catch (e: any) {
-      atualizar("erro", "Não deu certo: " + (e?.message || "erro"));
-    }
-  };
+  const confirmar = (msgId: string, i: number, sim: boolean) => { confirmarAcao(msgId, i, sim); };
 
   // Em ligação: tela de telefone, sem as mensagens escritas (elas ficam na conversa para depois)
   if (lig.ativo && lig.modo === "conversa") {
@@ -538,7 +537,7 @@ function Conversa({ uid, nome, contexto, perguntaInicial, onPerguntaUsada, injet
             <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-3.5 py-2.5 text-sm">
               {contexto.protocolo
                 ? <>Oi! Vi que você está na demanda <strong>#{contexto.protocolo}</strong>. Posso resumir, rascunhar a resposta ao munícipe ou procurar parecidas.</>
-                : <>Oi{nome ? `, ${nome.split(" ")[0]}` : ""}! Eu sou o Jotinha 👋 Pode me pedir para <strong>cadastrar uma demanda</strong>, <strong>criar uma tarefa</strong>, mudar um prazo ou passar algo para alguém da equipe — <strong>a gente faz junto</strong>: eu pergunto, você responde (pode ser falando 🎙️) e eu vou preenchendo. Também te conto como estão as demandas, a agenda e os números do gabinete.</>}
+                : <>Oi{nome ? `, ${nome.split(" ")[0]}` : ""}! Eu sou o Jotinha 👋 Pode me pedir para <strong>cadastrar uma demanda</strong> (e o munícipe, se for novo), <strong>criar uma tarefa</strong> em qualquer quadro, mudar status, prazo ou responsável, registrar uma visita ou um atendimento, abrir o <strong>prontuário</strong> de alguém ou marcar um compromisso — <strong>a gente faz junto</strong>: eu pergunto, você responde (pode ser falando 🎙️) e eu vou preenchendo. Também te conto como estão as demandas, a agenda e os números do gabinete.</>}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {podeOuvir() && (

@@ -427,7 +427,34 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar, aberto, onAbertoChan
     }
   };
 
+  /** Homônimos oferecidos na última pergunta ("qual deles?") */
+  const candidatos = useRef<{ id: string; nome: string; bairro: string | null }[]>([]);
+  const escolherMunicipe = async (m: { id: string; nome: string }) => {
+    destacar("municipe");
+    atual.current.municipeNome = m.nome;
+    candidatos.current = [];
+    aplicar({ municipe_id: m.id });
+    await esperar(300);
+  };
+  /** Entre os homônimos oferecidos: pelo nome, pelo bairro ou pela ordem ("o primeiro", "o segundo"). */
+  const escolherEntreCandidatos = (dito: string) => {
+    const lista = candidatos.current;
+    if (!lista.length) return null;
+    const n = normalizar(dito);
+    const ordem = [/\b(primeir|1)/, /\b(segund|2)/, /\b(terceir|3)/, /\b(quart|4)/].findIndex((r) => r.test(n));
+    if (ordem >= 0 && lista[ordem]) return lista[ordem];
+    if (/\bultim/.test(n)) return lista[Math.min(lista.length, 4) - 1];
+    const porNome = lista.filter((m) => normalizar(m.nome) === n || n.includes(normalizar(m.nome)));
+    if (porNome.length === 1) return porNome[0];
+    const porBairro = lista.filter((m) => m.bairro && n.includes(normalizar(m.bairro)));
+    if (porBairro.length === 1) return porBairro[0];
+    const parecidos = lista.filter((m) => normalizar(m.nome).includes(n));
+    return parecidos.length === 1 ? parecidos[0] : null;
+  };
+
   const resolverMunicipe = async (nome: string): Promise<string | null> => {
+    const daLista = escolherEntreCandidatos(nome);
+    if (daLista) { await escolherMunicipe(daLista); return null; }
     let q = supabase.from("municipes").select("id, nome, bairro").order("nome").limit(6);
     if (isRepresentante && user?.id) q = q.eq("representante_id", user.id);
     q = aplicarBusca(q, nome, { campos: CAMPOS_PADRAO_MUNICIPE });
@@ -435,22 +462,30 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar, aberto, onAbertoChan
     const lista = (data ?? []) as { id: string; nome: string; bairro: string | null }[];
     const exatos = lista.filter((m) => normalizar(m.nome) === normalizar(nome));
     const escolhido = lista.length === 1 ? lista[0] : exatos.length === 1 ? exatos[0] : null;
-    if (escolhido) {
-      destacar("municipe");
-      atual.current.municipeNome = escolhido.nome;
-      aplicar({ municipe_id: escolhido.id });
-      await esperar(300);
-      return null;
-    }
-    if (!lista.length) return `Não achei "${nome}" no cadastro de munícipes. Pode me dizer o nome completo? Se for alguém novo, cadastre primeiro em Munícipes.`;
-    const nomes = lista.slice(0, 4).map((m) => `${m.nome}${m.bairro ? `, do ${m.bairro}` : ""}`);
+    if (escolhido) { await escolherMunicipe(escolhido); return null; }
+    if (!lista.length) return `Não achei ${nome} no cadastro de munícipes. É alguém novo? Se for, posso cadastrar ${nome} agora.`;
+    candidatos.current = lista.slice(0, 4);
+    const nomes = candidatos.current.map((m, i) => `${["o primeiro", "o segundo", "o terceiro", "o quarto"][i]}, ${m.nome}${m.bairro ? `, do ${m.bairro}` : ""}`);
     return `Achei ${lista.length >= 6 ? "vários" : lista.length} munícipes com esse nome: ${nomes.join("; ")}. Qual deles?`;
+  };
+
+  /** Munícipe novo (a pessoa confirmou que não está no cadastro): cadastra e já coloca na demanda. */
+  const cadastrarMunicipe = async (nome: string): Promise<string | null> => {
+    const limpo = nome.trim().replace(/\s+/g, " ").slice(0, 120);
+    if (limpo.split(" ").length < 2) return "Me diz o nome completo, com sobrenome, para eu cadastrar.";
+    const { data, error } = await supabase.from("municipes")
+      .insert({ nome: limpo, representante_id: isRepresentante ? user?.id ?? null : null })
+      .select("id, nome").single();
+    if (error) return `Não consegui cadastrar: ${error.message}`;
+    queryClient.invalidateQueries({ queryKey: ["municipes"] });
+    await escolherMunicipe(data as any);
+    return null;
   };
 
   const preencherDoJotinha = async (v: Record<string, string>): Promise<ResultadoPreencher> => {
     const { areas: ar, usuarios: us, representantes: rp, statusList: st } = atual.current;
     const aplicados: string[] = [], avisos: string[] = [];
-    const ordem = ["titulo", "descricao", "municipe", "area", "responsavel", "representante", "status", "cep", "logradouro", "numero", "bairro", "cidade", "estado", "complemento", "prioridade", "data_prazo", "origem", "observacoes"];
+    const ordem = ["titulo", "descricao", "municipe", "municipe_novo", "area", "responsavel", "representante", "status", "cep", "logradouro", "numero", "bairro", "cidade", "estado", "complemento", "prioridade", "data_prazo", "origem", "observacoes"];
     for (const campo of ordem) {
       const bruto = String(v[campo] ?? "").trim();
       if (!bruto) continue;
@@ -511,7 +546,13 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar, aberto, onAbertoChan
           if (o) { destacar(campo); aplicar({ origem: o.valor }); aplicados.push(campo); }
           break;
         }
+        case "municipe_novo": {
+          const aviso = await cadastrarMunicipe(bruto);
+          if (aviso) avisos.push(aviso); else aplicados.push("municipe");
+          break;
+        }
         case "municipe": {
+          if (v.municipe_novo) break; // vai ser cadastrado logo abaixo
           const aviso = await resolverMunicipe(bruto);
           if (aviso) avisos.push(aviso); else aplicados.push(campo);
           break;
@@ -533,6 +574,7 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar, aberto, onAbertoChan
         { campo: "titulo", rotulo: "Título", tipo: "texto", obrigatorio: true },
         { campo: "descricao", rotulo: "Descrição (o relato)", tipo: "texto_longo", obrigatorio: true },
         { campo: "municipe", rotulo: "Munícipe (quem pediu)", tipo: "municipe", obrigatorio: true },
+        { campo: "municipe_novo", rotulo: "Munícipe novo a cadastrar (só se o sistema não achou e a pessoa confirmou)", tipo: "texto" },
         { campo: "area", rotulo: "Área", tipo: "opcao", opcoes: ar.map((a: any) => a.nome) },
         { campo: "responsavel", rotulo: "Responsável na equipe", tipo: "opcao", opcoes: us.map((u: any) => u.nome) },
         ...(isRepresentante || !rp.length ? [] : [{ campo: "representante", rotulo: "Representante", tipo: "opcao" as const, opcoes: rp.map((r: any) => r.nome) }]),
