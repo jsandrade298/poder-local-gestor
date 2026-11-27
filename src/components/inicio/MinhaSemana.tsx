@@ -137,6 +137,7 @@ export function MinhaSemana({
       toast.error("Não foi possível concluir: " + error.message);
       return;
     }
+    window.dispatchEvent(new CustomEvent("jorginho:reagir", { detail: { tipo: "tarefa" } }));
     toast.success(`Concluída: ${t.titulo}`, {
       action: {
         label: "Desfazer",

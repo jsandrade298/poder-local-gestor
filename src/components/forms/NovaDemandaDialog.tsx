@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,18 +15,56 @@ import { useBrasilAPI, formatarCep, validarCep, geocodificarEndereco } from "@/h
 import { useDemandaStatus } from "@/hooks/useDemandaStatus";
 import { AnexoPreviewDialog, LocalFileThumbnail, isPreviewable } from "@/components/ui/AnexoPreview";
 import { useAuth } from "@/contexts/AuthContext";
+import { aplicarBusca, CAMPOS_PADRAO_MUNICIPE } from "@/lib/busca";
+import { BarraJotinha } from "@/components/jorginho/BarraJotinha";
+import { iniciarAssistente } from "@/components/jorginho/assistente";
+import { abrirFormularioComJotinha, avisarFalhaSalvar, avisarSalvo, registrarFormulario, type CampoFormulario, type ResultadoPreencher } from "@/components/jorginho/formulario";
 
 interface NovaDemandaDialogProps {
   /** Botão que abre o diálogo. Sem ele, usa o botão padrão "Nova Demanda". */
   trigger?: React.ReactNode;
   /** Já abre ao aparecer (usado quando o diálogo é carregado só no primeiro toque). */
   abrirAoMontar?: boolean;
+  /** Controlado por fora (ex.: o Jotinha abre o formulário); sem botão próprio. */
+  aberto?: boolean;
+  onAbertoChange?: (aberto: boolean) => void;
+  /** Abre já com o Jotinha conversando (e, opcionalmente, com o que ele já sabe). */
+  assistente?: { voz: boolean; valores?: Record<string, string>; relato?: string } | null;
 }
 
-export function NovaDemandaDialog({ trigger, abrirAoMontar }: NovaDemandaDialogProps = {}) {
+const ORIGENS = [
+  { valor: "whatsapp_mandato", rotulo: "WhatsApp Mandato" },
+  { valor: "whatsapp_assessoria", rotulo: "WhatsApp Assessoria" },
+  { valor: "whatsapp_parlamentar", rotulo: "WhatsApp Parlamentar" },
+  { valor: "instagram", rotulo: "Instagram" },
+  { valor: "facebook", rotulo: "Facebook" },
+  { valor: "tiktok", rotulo: "Tiktok" },
+  { valor: "gabinete", rotulo: "Gabinete" },
+  { valor: "em_agenda", rotulo: "Em Agenda" },
+  { valor: "outro", rotulo: "Outro" },
+];
+const PRIORIDADES = [
+  { valor: "baixa", rotulo: "Baixa" }, { valor: "media", rotulo: "Média" },
+  { valor: "alta", rotulo: "Alta" }, { valor: "urgente", rotulo: "Urgente" },
+] as const;
+const normalizar = (t: string) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Acha uma opção pelo nome dito (igual, depois "contém"). */
+function acharPorNome<T>(lista: T[], nome: string, rotulo: (x: T) => string): T | undefined {
+  const n = normalizar(nome);
+  if (!n) return undefined;
+  return lista.find((x) => normalizar(rotulo(x)) === n)
+    || lista.find((x) => normalizar(rotulo(x)).includes(n))
+    || lista.find((x) => { const r = normalizar(rotulo(x)); return r.length > 2 && n.includes(r); });
+}
+
+export function NovaDemandaDialog({ trigger, abrirAoMontar, aberto, onAbertoChange, assistente }: NovaDemandaDialogProps = {}) {
   const { user, roleNoTenant } = useAuth();
   const isRepresentante = roleNoTenant === "representante";
-  const [open, setOpen] = useState(!!abrirAoMontar);
+  const controlado = aberto !== undefined;
+  const [openInterno, setOpenInterno] = useState(!!abrirAoMontar);
+  const open = controlado ? !!aberto : openInterno;
+  const setOpen = (v: boolean) => { if (!controlado) setOpenInterno(v); onAbertoChange?.(v); };
   const [files, setFiles] = useState<File[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [coordenadas, setCoordenadas] = useState<{ lat: number | null; lng: number | null; fonte: string | null }>({ lat: null, lng: null, fonte: null });
@@ -302,10 +340,12 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar }: NovaDemandaDialogP
       queryClient.invalidateQueries({ queryKey: ['rep-dashboard-kpis'] });
       queryClient.invalidateQueries({ queryKey: ['rep-dashboard-chart-data'] });
       queryClient.invalidateQueries({ queryKey: ['rep-dashboard-recentes'] });
+      avisarSalvo({ protocolo: result.demanda?.protocolo, titulo: result.demanda?.titulo });
       setOpen(false);
       resetForm();
     },
     onError: (error) => {
+      avisarFalhaSalvar(error.message);
       toast({
         title: "Erro ao criar demanda",
         description: error.message,
@@ -354,22 +394,238 @@ export function NovaDemandaDialog({ trigger, abrirAoMontar }: NovaDemandaDialogP
     createDemanda.mutate(formData);
   };
 
+  // ── Jotinha: preenche o formulário conversando ──────────────────
+  const atual = useRef({ formData, areas, usuarios, representantes, statusList, municipeNome: "" });
+  atual.current = { ...atual.current, formData, areas, usuarios, representantes, statusList };
+
+  /** Destaca o campo (rola até ele e dá um brilho) enquanto o Jotinha preenche. */
+  const destacar = (campo: string) => {
+    const el = document.querySelector(`[data-jotinha-form] label[for="${campo}"]`)?.parentElement as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.style.borderRadius = "10px";
+    el.animate?.([
+      { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)", backgroundColor: "hsl(var(--primary) / 0)" },
+      { boxShadow: "0 0 0 6px hsl(var(--primary) / .22)", backgroundColor: "hsl(var(--primary) / .07)", offset: 0.25 },
+      { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)", backgroundColor: "hsl(var(--primary) / 0)" },
+    ], { duration: 1600, easing: "ease-out" });
+  };
+
+  /** Atualiza o formulário e a cópia que o Jotinha lê (sem esperar a tela renderizar). */
+  const aplicar = (patch: Partial<typeof formData>) => {
+    atual.current.formData = { ...atual.current.formData, ...patch };
+    setFormData((p) => ({ ...p, ...patch }));
+  };
+
+  /** "Digita" o texto aos poucos, como se alguém estivesse escrevendo. */
+  const digitar = async (campo: keyof typeof formData, texto: string) => {
+    const passos = Math.min(28, Math.max(5, Math.ceil(texto.length / 4)));
+    for (let i = 1; i <= passos; i++) {
+      const parte = texto.slice(0, Math.ceil((texto.length * i) / passos));
+      aplicar({ [campo]: parte });
+      await esperar(22);
+    }
+  };
+
+  const resolverMunicipe = async (nome: string): Promise<string | null> => {
+    let q = supabase.from("municipes").select("id, nome, bairro").order("nome").limit(6);
+    if (isRepresentante && user?.id) q = q.eq("representante_id", user.id);
+    q = aplicarBusca(q, nome, { campos: CAMPOS_PADRAO_MUNICIPE });
+    const { data } = await q;
+    const lista = (data ?? []) as { id: string; nome: string; bairro: string | null }[];
+    const exatos = lista.filter((m) => normalizar(m.nome) === normalizar(nome));
+    const escolhido = lista.length === 1 ? lista[0] : exatos.length === 1 ? exatos[0] : null;
+    if (escolhido) {
+      destacar("municipe");
+      atual.current.municipeNome = escolhido.nome;
+      aplicar({ municipe_id: escolhido.id });
+      await esperar(300);
+      return null;
+    }
+    if (!lista.length) return `Não achei "${nome}" no cadastro de munícipes. Pode me dizer o nome completo? Se for alguém novo, cadastre primeiro em Munícipes.`;
+    const nomes = lista.slice(0, 4).map((m) => `${m.nome}${m.bairro ? `, do ${m.bairro}` : ""}`);
+    return `Achei ${lista.length >= 6 ? "vários" : lista.length} munícipes com esse nome: ${nomes.join("; ")}. Qual deles?`;
+  };
+
+  const preencherDoJotinha = async (v: Record<string, string>): Promise<ResultadoPreencher> => {
+    const { areas: ar, usuarios: us, representantes: rp, statusList: st } = atual.current;
+    const aplicados: string[] = [], avisos: string[] = [];
+    const ordem = ["titulo", "descricao", "municipe", "area", "responsavel", "representante", "status", "cep", "logradouro", "numero", "bairro", "cidade", "estado", "complemento", "prioridade", "data_prazo", "origem", "observacoes"];
+    for (const campo of ordem) {
+      const bruto = String(v[campo] ?? "").trim();
+      if (!bruto) continue;
+      switch (campo) {
+        case "titulo": case "descricao": case "observacoes": case "logradouro": case "numero": case "bairro": case "cidade": case "complemento":
+          destacar(campo);
+          await digitar(campo as keyof typeof formData, bruto.slice(0, campo === "titulo" ? 150 : 4000));
+          aplicados.push(campo);
+          break;
+        case "estado":
+          destacar(campo);
+          aplicar({ estado: bruto.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2) });
+          aplicados.push(campo);
+          break;
+        case "cep": {
+          const d = bruto.replace(/\D/g, "");
+          if (d.length !== 8) { avisos.push(`O CEP ${bruto} parece incompleto; tem 8 números.`); break; }
+          destacar("cep");
+          aplicar({ cep: formatarCep(d) });
+          const r = await buscarCep(d);
+          if (r) { const p = atual.current.formData; aplicar({ logradouro: r.logradouro || p.logradouro, bairro: r.bairro || p.bairro, cidade: r.cidade || p.cidade, estado: r.estado || p.estado }); }
+          aplicados.push("cep");
+          break;
+        }
+        case "data_prazo":
+          if (/^\d{4}-\d{2}-\d{2}$/.test(bruto)) { destacar(campo); aplicar({ data_prazo: bruto }); aplicados.push(campo); }
+          break;
+        case "prioridade": {
+          const p = acharPorNome([...PRIORIDADES], bruto, (x) => x.rotulo);
+          if (p) { destacar(campo); aplicar({ prioridade: p.valor }); aplicados.push(campo); }
+          break;
+        }
+        case "area": {
+          const a = acharPorNome(ar, bruto, (x: any) => x.nome) as any;
+          if (a) { destacar(campo); aplicar({ area_id: a.id }); aplicados.push(campo); }
+          else avisos.push(`Não achei a área "${bruto}". As áreas são: ${ar.map((x: any) => x.nome).join(", ")}.`);
+          break;
+        }
+        case "responsavel": {
+          const u = /^(eu|comigo|mim|eu mesmo|eu mesma)$/.test(normalizar(bruto)) ? us.find((x: any) => x.id === user?.id) : acharPorNome(us, bruto, (x: any) => x.nome);
+          if (u) { destacar(campo); aplicar({ responsavel_id: (u as any).id }); aplicados.push(campo); }
+          else avisos.push(`Não achei "${bruto}" na equipe.`);
+          break;
+        }
+        case "representante": {
+          if (isRepresentante) break;
+          const r = acharPorNome(rp, bruto, (x: any) => x.nome) as any;
+          if (r) { aplicar({ representante_id: r.id }); aplicados.push(campo); }
+          break;
+        }
+        case "status": {
+          const s = acharPorNome(st, bruto, (x: any) => x.nome) || st.find((x: any) => x.slug === bruto);
+          if (s) { destacar(campo); aplicar({ status: (s as any).slug }); aplicados.push(campo); }
+          break;
+        }
+        case "origem": {
+          const o = acharPorNome(ORIGENS, bruto, (x) => x.rotulo) || ORIGENS.find((x) => x.valor === bruto);
+          if (o) { destacar(campo); aplicar({ origem: o.valor }); aplicados.push(campo); }
+          break;
+        }
+        case "municipe": {
+          const aviso = await resolverMunicipe(bruto);
+          if (aviso) avisos.push(aviso); else aplicados.push(campo);
+          break;
+        }
+      }
+    }
+    await esperar(60); // deixa a tela atualizar antes de seguir
+    return { aplicados, avisos };
+  };
+
+  // O formulário do Jotinha fica registrado mesmo minimizado (os campos seguem se preenchendo)
+  const doJotinha = controlado && !!assistente;
+  const registrado = open || doJotinha;
+  useEffect(() => {
+    if (!registrado) return;
+    const camposJotinha = (): CampoFormulario[] => {
+      const { areas: ar, usuarios: us, representantes: rp, statusList: st } = atual.current;
+      return [
+        { campo: "titulo", rotulo: "Título", tipo: "texto", obrigatorio: true },
+        { campo: "descricao", rotulo: "Descrição (o relato)", tipo: "texto_longo", obrigatorio: true },
+        { campo: "municipe", rotulo: "Munícipe (quem pediu)", tipo: "municipe", obrigatorio: true },
+        { campo: "area", rotulo: "Área", tipo: "opcao", opcoes: ar.map((a: any) => a.nome) },
+        { campo: "responsavel", rotulo: "Responsável na equipe", tipo: "opcao", opcoes: us.map((u: any) => u.nome) },
+        ...(isRepresentante || !rp.length ? [] : [{ campo: "representante", rotulo: "Representante", tipo: "opcao" as const, opcoes: rp.map((r: any) => r.nome) }]),
+        { campo: "status", rotulo: "Status", tipo: "opcao", opcoes: st.map((s: any) => s.nome) },
+        { campo: "cep", rotulo: "CEP", tipo: "cep" },
+        { campo: "logradouro", rotulo: "Rua / logradouro", tipo: "texto" },
+        { campo: "numero", rotulo: "Número", tipo: "texto" },
+        { campo: "bairro", rotulo: "Bairro", tipo: "texto" },
+        { campo: "cidade", rotulo: "Cidade", tipo: "texto" },
+        { campo: "complemento", rotulo: "Complemento", tipo: "texto" },
+        { campo: "prioridade", rotulo: "Prioridade", tipo: "opcao", opcoes: PRIORIDADES.map((p) => p.rotulo) },
+        { campo: "data_prazo", rotulo: "Prazo de entrega", tipo: "data" },
+        { campo: "origem", rotulo: "Origem (por onde chegou)", tipo: "opcao", opcoes: ORIGENS.map((o) => o.rotulo) },
+        { campo: "observacoes", rotulo: "Observações", tipo: "texto_longo" },
+      ];
+    };
+    const valoresJotinha = () => {
+      const { formData: f, areas: ar, usuarios: us, statusList: st, municipeNome } = atual.current;
+      return {
+        titulo: f.titulo, descricao: f.descricao.slice(0, 400),
+        municipe: f.municipe_id ? municipeNome || "(já escolhido)" : "",
+        area: (ar as any[]).find((a) => a.id === f.area_id)?.nome || "",
+        responsavel: (us as any[]).find((u) => u.id === f.responsavel_id)?.nome || "",
+        status: (st as any[]).find((s) => s.slug === f.status)?.nome || f.status,
+        cep: f.cep, logradouro: f.logradouro, numero: f.numero, bairro: f.bairro, cidade: f.cidade, complemento: f.complemento,
+        prioridade: PRIORIDADES.find((p) => p.valor === f.prioridade)?.rotulo || "",
+        data_prazo: f.data_prazo, origem: ORIGENS.find((o) => o.valor === f.origem)?.rotulo || "", observacoes: f.observacoes.slice(0, 300),
+      };
+    };
+    return registrarFormulario({
+      id: "nova_demanda",
+      titulo: "Nova demanda",
+      campos: camposJotinha,
+      valores: valoresJotinha,
+      preencher: preencherDoJotinha,
+      enviar: () => {
+        const f = atual.current.formData;
+        const faltando = [!f.titulo && "o título", !f.descricao && "a descrição", !f.municipe_id && "o munícipe"].filter(Boolean) as string[];
+        if (faltando.length) return faltando;
+        if (!createDemanda.isPending) createDemanda.mutate(f);
+        return [];
+      },
+      global: doJotinha,
+      // Formulário de uma página: passa o que já tem para o do Jotinha (que sobrevive à troca de tela)
+      transferir: doJotinha ? undefined : async (voz: boolean) => {
+        const v: Record<string, string> = { ...valoresJotinha(), descricao: atual.current.formData.descricao, observacoes: atual.current.formData.observacoes };
+        const idMunicipe = atual.current.formData.municipe_id;
+        if (idMunicipe && !atual.current.municipeNome) {
+          const { data } = await supabase.from("municipes").select("nome").eq("id", idMunicipe).maybeSingle();
+          v.municipe = (data as any)?.nome || "";
+        }
+        const valores = Object.fromEntries(Object.entries(v).filter(([, x]) => x && x !== "(já escolhido)"));
+        setOpen(false);
+        window.setTimeout(() => abrirFormularioComJotinha("nova_demanda", { valores, voz }), 250);
+      },
+    });
+  }, [registrado]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Aberto pelo Jotinha: começa a conversa uma vez só (com o que ele já sabia, se veio do chat)
+  const iniciou = useRef(false);
+  useEffect(() => {
+    if (!open || !assistente || iniciou.current) return;
+    iniciou.current = true;
+    const t = window.setTimeout(async () => {
+      if (assistente.valores && Object.keys(assistente.valores).length) await preencherDoJotinha(assistente.valores);
+      iniciarAssistente({ voz: assistente.voz, relato: assistente.relato });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [open, assistente]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Demanda
-          </Button>
-        )}
-      </DialogTrigger>
+      {(!controlado || trigger) && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Demanda
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Demanda</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* Jotinha: preencher conversando (fica no topo enquanto rola) */}
+        <div className="sticky -top-6 z-20 -mx-6 -mt-2 bg-background/95 px-6 pb-2 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <BarraJotinha />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6" data-jotinha-form>
           {/* Informações Básicas */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Informações Básicas</h3>

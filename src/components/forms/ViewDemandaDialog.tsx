@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AgendaVinculada } from "@/components/agenda/AgendaVinculada";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { JorginhoAvatar } from "@/components/jorginho/JorginhoAvatar";
 import { paraTexto } from "@/components/ui/EditorRico";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -422,6 +423,10 @@ export function ViewDemandaDialog({ demanda, open, onOpenChange, onEdit }: ViewD
                       </PopoverContent>
                     </Popover>
                     )}
+                    <Button variant="outline" size="sm" className="gap-1.5" title="Resumo, rascunho de resposta, parecidas…"
+                      onClick={() => window.dispatchEvent(new CustomEvent("jorginho:abrir", { detail: { protocolo: demanda.protocolo } }))}>
+                      <JorginhoAvatar className="h-5 w-4 -ml-0.5" parado /> Jotinha
+                    </Button>
                     {onEdit && (
                       <Button
                         variant="outline"

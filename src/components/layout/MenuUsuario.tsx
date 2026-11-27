@@ -11,12 +11,12 @@ function iniciais(nome: string) {
   return nome.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
 }
 
-/** Abre o assistente (Navi). No celular é o único caminho; no computador há também a aba lateral. */
+/** Abre o Jotinha (o mascote fica no canto da tela; aqui é mais um caminho). */
 function ItemAjuda() {
   if (typeof window === "undefined" || !(window as any).__jorgeusAjuda) return null;
   return (
     <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event("jorgeus:abrir-ajuda"))}>
-      <MessageCircleQuestion className="h-4 w-4 mr-2" /> Ajuda (assistente)
+      <MessageCircleQuestion className="h-4 w-4 mr-2" /> Falar com o Jotinha
     </DropdownMenuItem>
   );
 }

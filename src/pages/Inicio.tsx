@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { NovaDemandaDialog } from "@/components/forms/NovaDemandaDialog";
 import { MinhaSemana } from "@/components/inicio/MinhaSemana";
+import { WidgetsDoInicio } from "@/components/jorginho/widgets/WidgetsDoInicio";
 import { DemandaRapida } from "@/components/demandas/DemandaRapida";
 import { useContagemLixeira, DIAS_LIXEIRA } from "@/components/demandas/LixeiraDemandas";
 import { Avatar } from "@/components/quadros/CartaoProjetoDrawer";
@@ -418,6 +419,8 @@ export default function Inicio() {
           {uid && <NovidadesParaVoce uid={uid} cartoes={cartoesComigo} onAbrirDemanda={setDemandaAberta} />}
 
           {uid && <MinhaSemana uid={uid} nome={profile?.nome} hoje={hoje} tarefas={tarefas} agendas={agendasSemana} />}
+
+          {uid && <WidgetsDoInicio />}
 
           <Bloco
             titulo="Minhas demandas"

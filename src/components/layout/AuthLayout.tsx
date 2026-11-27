@@ -1,7 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { HelpChatWidget } from "@/components/layout/HelpChatWidget";
+import { Jotinha } from "@/components/jorginho/Jotinha";
 import { NotificationsDropdown } from "@/components/layout/NotificationsDropdown";
 import { useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -198,8 +198,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         {/* Bottom Navigation - apenas mobile */}
         <BottomNav />
 
-        {/* Chat de ajuda flutuante */}
-        <HelpChatWidget />
+        {/* Jotinha, o mascote com IA (substituiu a Navi; o HelpChatWidget segue no código) */}
+        <Jotinha />
       </div>
     </SidebarProvider>
   );

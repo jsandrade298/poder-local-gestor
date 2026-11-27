@@ -182,6 +182,7 @@ export default function QuadroProjeto() {
     const mudouDeEtapa = c.coluna_id !== colunaId;
     moveCard.mutate({ cardId: c.id, colunaId, ordem });
     if (!mudouDeEtapa) return;
+    if (finais.has(colunaId)) window.dispatchEvent(new CustomEvent("jorginho:reagir", { detail: { tipo: "cartao" } }));
     const col = colunas.find((x) => x.id === colunaId);
     if (!col) return;
     const destinoKanban = etapaComoKanban(col);
